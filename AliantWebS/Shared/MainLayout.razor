@@ -1,0 +1,344 @@
+﻿@inherits LayoutComponentBase
+@implements IDisposable
+@using AliantWebS.Data
+@using System.Text.Json;
+@using System.Text.Json.Serialization;
+@inject AppData appData
+@inject NavigationManager navigationManager
+@inject IStringLocalizer<Pages.Languages> L
+@inject IJSRuntime JsRuntime
+
+<style>
+    .active-menu-item {
+        background-color: rgba(0, 123, 255, 0.2); /* Pale blue background with lower opacity */
+        color: #007bff; /* Keep the text color consistent with the theme */
+        padding-left: 5px; /* Optional: Adjust padding if needed */
+    }
+    }
+</style>
+
+<RadzenDialog />
+<RadzenNotification />
+<RadzenContextMenu />
+<RadzenTooltip />
+
+@*    <div class="page">*@
+@*    <div class="sidebar">*@
+<NavMenu />
+@*     </div>*@
+
+
+
+<div class="page">
+    <div class="main" >
+        <div class="top-row px-4 auth" style="margin-top:-25px; display: flex; position:sticky; opacity: 0.5;">
+            @if (!String.IsNullOrWhiteSpace(StructureName))
+            {
+                <a style=" display:inline-block;" class="pn" href="structures">
+
+                    <span class="oi oi-people" aria-hidden="true"></span>
+
+                </a>
+            }
+            
+            <a style=" display:inline-block; margin-right: auto; " class="pn" href="/EditStructure/@appData.Structure?.StructureId">
+                @StructureName
+            </a>
+
+            @if ((AI.Helpers.IsCurrentPage(navigationManager, "SHM", "BlankElement", "SensorData", "Statistics", "EditElement", "SP", "Identification", "StructuralResponse")))
+            {           
+
+                <RadzenMenu >
+                       <RadzenMenuItem Text="@L["Dashboard"]" Icon="dashboard" Click="DashClick"
+                                    class="@(IsActive("/dashboard") ? "active-menu-item" : "")">
+                       </RadzenMenuItem>
+                    @if ((appData.GetRole().Result == "Administrator") || (appData.GetRole().Result == "Developer"))
+                    {
+                        <RadzenMenuItem Text="@L["SHM"]" Icon="troubleshoot" Click="SHMClick"
+                        class="@(IsActive("/SHM") ? "active-menu-item" : "")">
+                            @*                    <RadzenMenuItem Text="Buttons" Path="buttons" Icon="account_circle"></RadzenMenuItem>
+                    <RadzenMenuItem Text="Menu" Path="menu" Icon="line_weight"></RadzenMenuItem>
+                    <RadzenMenuItem Text="ChildClick" Icon="attach_file"></RadzenMenuItem>
+                    <RadzenMenuItem Text="Dialog" Path="dialog" Icon="perm_media"></RadzenMenuItem>
+                    <RadzenMenuItem Text="Notification" Path="notification" Icon="announcement"></RadzenMenuItem>*@
+                        </RadzenMenuItem>
+                        @*              <RadzenMenuItem Text="@L["Equipment"]" Icon="line_weight" Click="EquipementClick"> *@
+                        @*                <RadzenMenuItem Text="CheckBox" Path="checkbox" Icon="check_circle"></RadzenMenuItem>
+                    <RadzenMenuItem Text="TextBox" Path="textbox" Icon="input"></RadzenMenuItem>
+                    <RadzenMenuItem Text="TextArea" Path="textarea" Icon="description"></RadzenMenuItem>
+                    <RadzenMenuItem Text="Password" Path="password" Icon="payment"></RadzenMenuItem>
+                    <RadzenMenuItem Text="Numeric" Path="numeric" Icon="aspect_ratio"></RadzenMenuItem>
+                    <RadzenMenuItem Text="DatePicker" Path="datepicker" Icon="date_range"></RadzenMenuItem>*@
+                        @*    </RadzenMenuItem> *@
+                        <RadzenMenuItem Text="@L["Structural Response"]" Icon="compare_arrows" Click="StructuralResponseClick"
+                        class="@(IsActive("/StructuralResponse") ? "active-menu-item" : "")">
+                            @*                    <RadzenMenuItem Text="DataGrid" Path="datagrid" Icon="grid_on"></RadzenMenuItem>
+                    <RadzenMenuItem Text="DataList" Path="datalist" Icon="list"></RadzenMenuItem>
+                    <RadzenMenuItem Text="DropDown" Path="dropdown" Icon="dns"></RadzenMenuItem>
+                    <RadzenMenuItem Text="DropDownDataGrid" Path="dropdown-datagrid" Icon="receipt"></RadzenMenuItem>
+                    <RadzenMenuItem Text="ListBox" Path="listbox" Icon="view_list"></RadzenMenuItem>
+                    <RadzenMenuItem Text="TemplateForm" Path="templateform" Icon="line_style"></RadzenMenuItem>*@
+                        </RadzenMenuItem>
+                        <RadzenMenuItem Text="@L["Statistics"]" Icon="assessment" Click="StatisticsClick"
+                        class="@(IsActive("/Statistics") ? "active-menu-item" : "")">
+@*                    <RadzenMenuItem Text="Tabs" Path="tabs" Icon="tab"></RadzenMenuItem>
+                    <RadzenMenuItem Text="Panel" Path="panel" Icon="content_paste"></RadzenMenuItem>
+                    <RadzenMenuItem Text="Fieldset" Path="fieldset" Icon="account_balance_wallet"></RadzenMenuItem>
+                    <RadzenMenuItem Text="Card" Path="card" Icon="line_style"></RadzenMenuItem>*@
+                </RadzenMenuItem>
+                }
+                    <RadzenMenuItem Text="@L["Signal Processing"]" Icon="assessment" Click="SPClick"
+                                    class="@(IsActive("/SP") ? "active-menu-item" : "")">
+
+                    </RadzenMenuItem>
+                    <RadzenMenuItem Text="@L["Identification"]" Icon="online_prediction" Click="IdentificationClick"
+                                    class="@(IsActive("/Identification") ? "active-menu-item" : "")">
+
+                    </RadzenMenuItem>
+  @*              <RadzenMenuItem Text="@L["Attributes"]" Icon="dashboard">
+                    <RadzenMenuItem Text="Item1"></RadzenMenuItem>
+                    <RadzenMenuItem Text="Item2"></RadzenMenuItem>
+                    <RadzenMenuItem Text="More items">
+                        <RadzenMenuItem Text="More sub items">
+                            <RadzenMenuItem Text="Item1"></RadzenMenuItem>
+                            <RadzenMenuItem Text="Item2"></RadzenMenuItem>
+                        </RadzenMenuItem>
+                    </RadzenMenuItem>
+                </RadzenMenuItem>*@
+            </RadzenMenu>
+            }
+
+            <button style="height:2.1rem; display:@displaySubmitButton; background-color:@colorSubmitButton" disabled=@(!SaveChanges) form="@FormId" type="submit" class="btn btn-success">
+                @ButtonText
+            </button>
+
+
+            <LoginDisplay />
+            <a href="#" target="_blank">@L["About"]</a>
+        </div>
+
+        <div class="content px-4" >
+
+                @Body
+
+
+        </div>
+    </div>
+</div>
+
+@code {
+
+
+
+    public string displaySubmitButton = "none";
+    private string colorSubmitButton = "#007c00";
+
+    private string formId;
+    public string FormId { get; set; }
+
+
+
+    private string buttonText = "Updated";
+    public string ButtonText
+    {
+        get => buttonText;
+        set
+        {
+
+            //  if (buttonText == value) return;
+            buttonText = value;
+
+            //      AppData.NotifyStateChanged();
+        }
+    }
+
+    private string structureName;
+    public string StructureName
+    {
+        get => structureName;
+        set
+        {
+            if (structureName == value) return;
+            structureName = value;
+            //AppData.NotifyStateChanged();
+        }
+    }
+    private bool saveChanges;
+    public bool SaveChanges
+    {
+        get => saveChanges;
+        set
+        {
+            if (saveChanges == value) return;
+            saveChanges = value;
+            if (saveChanges == false)
+            {
+                colorSubmitButton = "#007c00";
+                if (ButtonText.Trim().ToLower() == "update")
+                {
+                    ButtonText = "Updated";
+                }
+
+            }
+            else
+            {
+                colorSubmitButton = "#ff4a4a";
+                if (buttonText.Trim().ToLower() == "updated")
+                {
+                    buttonText = "Update";
+                }
+            }
+            //AppData.NotifyStateChanged();
+        }
+    }
+
+    private bool IsActive(string route)
+    {
+        return navigationManager.Uri.Contains(route);
+    }
+
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        appData.OnSaveChange -= Change;
+        appData.OnSaveChange += Change;
+
+        appData.DisplaySubmitButtonChanged -= DisplayChanged;
+        appData.DisplaySubmitButtonChanged += DisplayChanged;
+
+        appData.ButtonTextChanged -= ButtonTextChanged;
+        appData.ButtonTextChanged += ButtonTextChanged;
+
+        appData.FormIdChanged -= FormIdChanged;
+        appData.FormIdChanged += FormIdChanged;
+
+        appData.StructureNameChanged -= StructureNameChanged;
+        appData.StructureNameChanged += StructureNameChanged;
+
+
+    }
+
+    private void StructureNameChanged(string s)
+    {
+        StructureName = s;
+        InvokeAsync(StateHasChanged); 
+    }
+
+    private void DisplayChanged(string s)
+    {
+        displaySubmitButton = s;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void Change(bool b)
+    {
+        SaveChanges = b;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void ButtonTextChanged(string s)
+    {
+        ButtonText = s;
+        InvokeAsync(StateHasChanged);
+    }
+
+
+    private void FormIdChanged(string s)
+    {
+        FormId = s;
+        InvokeAsync(StateHasChanged);
+    }
+
+
+    void IDisposable.Dispose()
+    {
+        // Unsubscribe from the event when our component is disposed
+        appData.OnSaveChange -= Change;
+        appData.DisplaySubmitButtonChanged -= DisplayChanged;
+        appData.StructureNameChanged -= StructureNameChanged;
+    }
+
+    void SHMClick(MenuItemEventArgs args)
+    {
+        navigationManager.NavigateTo("SHM");
+    }
+
+    void DashClick(MenuItemEventArgs args)
+    {
+
+       
+        if (appData.Structure.Name.Trim() == "Antares")
+        {
+            navigationManager.NavigateTo("DashBoard2");
+        }
+        else
+        {
+            navigationManager.NavigateTo("DashBoard");
+        }
+
+
+       
+    }
+
+    void EquipementClick(MenuItemEventArgs args)
+    {
+
+        navigationManager.NavigateTo("Equipement");
+    }
+
+    void StructuralResponseClick(MenuItemEventArgs args)
+    {
+        navigationManager.NavigateTo("StructuralResponse");
+ 
+    }
+
+    void StatisticsClick(MenuItemEventArgs args)
+    {
+        navigationManager.NavigateTo("Statistics");
+    }
+
+    void SPClick(MenuItemEventArgs args)
+    {
+        List<Guid?> listIDs;
+        if (appData.CheckedNodeObjects is null || appData.CheckedNodeObjects.Count() == 0)
+        {
+          //  listIDs = AI.Helpers.GetTheChildren(appData.Structure.Elements);
+          //  string param = JsonSerializer.Serialize(listIDs);
+
+
+            navigationManager.NavigateTo("/SP");
+
+
+            // JsRuntime.InvokeVoidAsync("alert", "Please check one or more elements...");
+            // listIDs = new List<Guid?>();
+            // listIDs.Add(null);
+        }
+        else
+        {
+            listIDs = AI.Helpers.GetTheChildren(appData.CheckedNodeObjects);
+            string param = JsonSerializer.Serialize(listIDs);
+
+
+            navigationManager.NavigateTo("/SP/" + param);
+        }
+
+
+
+    }
+
+    void IdentificationClick(MenuItemEventArgs args)
+    {
+
+        navigationManager.NavigateTo("Identification");
+    }
+
+    void LearningClick(MenuItemEventArgs args)
+    {
+    
+        navigationManager.NavigateTo("Learning");
+    }
+
+
+}
+   

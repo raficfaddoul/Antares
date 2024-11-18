@@ -1,0 +1,51 @@
+﻿@page "/StructureTypeAttributeTypes/{CallerID:guid}"
+@using Models
+@using AliantWebS.Data
+@inject AliantWebS.Data.AppData AppData
+@inject EntitiesService entitiesService
+
+
+
+
+<AliantWebS.Pages.TypesPages.JunctionsComponent Titre=@titre
+                                                TItem1="StructureType"
+                                                TItem2="AttributeType"
+                                                TItem3="StructureTypeAttributeType"
+                                                CallerID=@CallerID
+                                                TItem1IdName="StructureTypeId"
+                                                TItem2IdName="AttributeTypeId"
+                                                InspectionResultTypeElementTypesCollection=@callerType.StructureTypeAttributeTypes
+                                                OnValidSubmit="@Update">
+
+</AliantWebS.Pages.TypesPages.JunctionsComponent>
+
+
+
+@code {
+
+    [Parameter]
+    public Guid CallerID { get; set; }
+
+    public string titre { get; set; }
+
+    StructureType callerType;
+
+    public override async Task SetParametersAsync(ParameterView parameters)
+    {
+        callerType = (StructureType)AppData.obj;
+        entitiesService.LoadCollection(callerType, "StructureTypeAttributeTypes");
+        await base.SetParametersAsync(parameters);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        titre = "Structure Type \"" + callerType.Name + "\" Attribute Types Association";
+    }
+
+    protected async void Update()
+    {
+        await entitiesService.UpdateEntityAsync(callerType);
+    }
+
+}

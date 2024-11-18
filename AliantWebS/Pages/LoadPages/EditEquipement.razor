@@ -1,0 +1,51 @@
+﻿@page "/EditEquipement/{EquipementID:guid}"
+@using AliantWebS.Data
+@using AliantWebS.Models
+@inject EntitiesService entitiesService
+@inject NavigationManager navigationManager
+@inject AppData appData
+@inject IJSRuntime js
+
+
+<NavigationLock OnBeforeInternalNavigation="appData.OnBeforeInternalNavigation" ConfirmExternalNavigation="appData.SaveConfirmation&& appData.SaveChanges" />
+
+<h2>Edit Equipement</h2>
+<hr />
+<EquipementForm EditContext="@EditContext" ButtonText=@buttonText Equipement="@equipement"
+           OnValidSubmit="@UpdateEvent" />
+
+
+
+
+
+@code {
+    string buttonText = "Updated";
+
+    [Parameter]
+    public EditContext EditContext { get; set; }
+
+    [Parameter]
+    public Guid EquipementID { get; set; }
+
+    Equipement equipement = new Equipement();
+
+    public override async Task SetParametersAsync(ParameterView parameters)
+    {
+        await base.SetParametersAsync(parameters);
+
+        await Task.WhenAll(entitiesService.tasksList);
+        equipement = await entitiesService.GetEntityAsync<Equipement>(EquipementID);
+        EditContext = new EditContext(equipement);
+    }
+
+
+    protected async void UpdateEvent()
+    {
+        await entitiesService.UpdateEntityAsync(equipement);
+        //navigationManager.NavigateTo("Structures");
+    }
+
+
+
+
+}

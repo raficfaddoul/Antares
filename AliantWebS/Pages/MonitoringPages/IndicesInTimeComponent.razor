@@ -1,0 +1,115 @@
+﻿@using System.Threading
+@using AliantWebS.Data
+@using System.Globalization;
+@inject NavigationManager navigationManager
+@inject IJSRuntime JSRuntime
+@inject DataUpdateService DataUpdateService
+
+
+<style>
+    #darkbg .dygraph-axis-label {
+        color: white;
+    }
+
+    .dygraph-legend {
+        text-align: right;
+    }
+
+    #darkbg .dygraph-legend {
+        background-color: #101015;
+    }
+
+</style>
+<Div Style="height: 100%; width:100%; display:flex">
+    <div id="@GraphId" style="height:300px; width:100%; display:flex"></div>
+</Div>
+
+@code {
+    [Parameter]
+    public string GraphId { get; set; }
+
+    [Parameter]
+    public List<Dictionary<DateTime, double>> Indices { get; set; }
+
+
+    private List<string> dataPoints = new List<string>(); // Use a list to store data points
+
+    [Parameter]
+    public List<string> Headers { get; set; } 
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+
+            //  dataPoints.Add($"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")},{0},{0},{0},\n");
+            await JSRuntime.InvokeVoidAsync("initializeDygraph", GraphId, "Date", "Score");
+
+            await DisplayData(Indices);
+        }
+    }
+
+    public async Task DisplayData(List<Dictionary<DateTime, double>> Indices)
+    {
+        dataPoints.Clear();
+        try{
+            string coco = ",";
+            string coci = string.Empty;
+            for(int i=1; i<Indices.Count; i++)
+            {
+                coci += ",";
+            }
+
+            //  string coci = ",,";
+            foreach(var dic in Indices)
+            {
+             
+                foreach (var i in dic)
+                {
+                    string newData = $"{i.Key.ToString("yyyy-MM-dd HH:mm:ss.fff")}{coco}{i.Value.ToString(CultureInfo.InvariantCulture)}{coci}\n";
+                    dataPoints.Add(newData);
+                 
+                 
+                }
+                coco += ",";
+                if (coci.Count() != 0) coci = coci.Remove(coci.Count() - 1);
+            }
+
+            // for (int i=0; i<dataPoints.Count; i++)
+            // {
+            //     dataPoints[i] = dataPoints[i].Trim('\n');
+            //     dataPoints[i] = dataPoints[i].Trim(',');
+            //     dataPoints[i] = dataPoints[i].Trim(',');
+            //     dataPoints[i] = dataPoints[i] + "\n";
+            // }
+
+            // foreach (var i in Indice2)
+            // {
+            //     string newData = $"{i.Key.ToString("yyyy-MM-dd HH:mm:ss.fff")},,{i.Value},\n";
+            //     dataPoints.Add(newData);
+            // }
+            // foreach (var i in Indice3)
+            // {
+            //     string newData = $"{i.Key.ToString("yyyy-MM-dd HH:mm:ss.fff")},,,{i.Value}\n";
+            //     dataPoints.Add(newData);
+            // }
+
+            string headers = String.Join(",", Headers);
+            var liveData = $"{headers}\n" + string.Join("\n", dataPoints);
+
+
+            await JSRuntime.InvokeVoidAsync("updateDygraph", "graphdiv2", liveData);      
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            int k = 1;
+        }
+    }
+
+ 
+
+ 
+
+
+}

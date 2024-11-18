@@ -1,0 +1,176 @@
+﻿@page "/Camera"
+@using Microsoft.AspNetCore.Hosting
+@using AliantWebS.Data;
+@using System.Media;
+@inject IJSRuntime js
+@inject IWebHostEnvironment Environment
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject IStringLocalizer<Languages> L
+
+
+
+<Div style="height:100%">
+<Div>
+
+    <video id="videoElement" controls autoplay style="opacity:1- @opacity"></video>
+
+        <canvas id="canvasPreview" style="opacity:@opacity"></canvas>
+
+</Div>
+
+
+    <Div class="camera-controls" Style="position:absolute; left:40%; bottom:0; display:flex">
+        <button class="round-button" id="capture" @onclick="(() => CaptureVideo())"><i class="fas fa-video-camera"></i></button>
+
+        @if (capturePreview)
+        {
+            <button class="miniround-button" id="capture" Style="z-index:3; opacity:@allowSave" @onclick="(() => CancelCapture())"> <i class="fas fa-times"></i></button>
+        }
+        <button class="round-button" id="capture" @onclick="(() => Capture())"></button>
+        @if (capturePreview)
+        {
+            <button class="miniround-button" id="capture" Style="z-index:3; opacity:@allowSave" @onclick="(() => SaveImage())"> <i class="fas fa-check"></i></button>
+        }
+    </Div>
+        <Div Style="position:absolute; top:0; left:0; display:flex">
+        <select id="videoSource"></select>
+        <select id="audioSource"></select>
+        <select id="resolution"></select>
+    
+</Div>
+</Div>
+
+@code {
+    bool capturePreview;
+
+    [Parameter]
+    public object obj { get; set; }
+
+    private bool videoShown = true;
+
+    private double opacity =0;
+
+    private double allowSave = 0;
+
+    private DotNetObjectReference<CameraComponent> _blazorPageReference;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+
+
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+
+
+            _blazorPageReference = DotNetObjectReference.Create(this);
+            await js.InvokeAsync<object>("setBlazorPageReference", _blazorPageReference);
+            await js.InvokeVoidAsync("rita");
+            capturePreview = await localStorage.GetItemAsync<bool>("capturePreview");
+        }
+
+        //  await js.InvokeVoidAsync("EnumerateCameras");
+
+
+        await base.OnAfterRenderAsync(firstRender);
+
+
+    }
+
+
+    private async Task CaptureVideo()
+    {
+    }
+
+    private async Task Capture()
+    {
+        try
+        {
+        await js.InvokeVoidAsync("capture", capturePreview);
+
+        SoundPlayer player = new SoundPlayer();
+        player.SoundLocation = Path.Combine(Environment.WebRootPath,"camera-shutter-click-01.wav");
+        player.Play();
+
+
+
+        if (capturePreview)
+        {
+            opacity = 1;
+            allowSave = 1;
+        }
+        else
+        {
+            SaveImage();
+        }
+        }
+        catch(Exception ex)
+        {
+            await js.InvokeVoidAsync("alert", @L["Access to the camera denied"]);
+        }
+
+    }
+
+    private async Task SaveImage()
+    {
+        await js.InvokeVoidAsync("SaveImage", DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss"));
+        if (capturePreview)
+        {
+            opacity = 0;
+            allowSave = 0;
+        }
+    }
+
+    
+
+    private async Task CancelCapture()
+    {
+        if (capturePreview)
+        {
+            opacity = 0;
+            allowSave = 0;
+        }
+    }
+
+
+
+    [JSInvokable]
+    public async Task<string> SaveFile(string fileName, string fileType)
+    {
+        var dataReference =  await js.InvokeAsync<IJSStreamReference>("fileDataStream"); //this is the function we exposed in the javascript above
+        await using var dataReferenceStream =
+            await dataReference.OpenReadStreamAsync(maxAllowedSize: 10_000_000);
+
+
+        string path = Path.Combine(Environment.ContentRootPath, "Images");
+
+        string filePath = FilesUpload.PreparePath(fileName, obj, path);
+
+
+
+        //  var filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", fileName);
+        FileStream createdFile;
+        try
+        {
+            createdFile = File.Create(filePath);
+            await dataReferenceStream.CopyToAsync(createdFile);
+            createdFile.Close();
+        }
+        catch(Exception ex)
+        {
+            await js.InvokeVoidAsync("alert", "Error: "+ex.Message);
+
+        }
+        await Task.CompletedTask;
+
+
+        return $"new file {fileName} created";
+    }
+
+
+
+}

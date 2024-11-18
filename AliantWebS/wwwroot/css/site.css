@@ -1,0 +1,256 @@
+@import url('open-iconic/font/css/open-iconic-bootstrap.min.css');
+
+html, body {
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+a, .btn-link {
+    color: #0366d6;
+}
+
+.btn-primary {
+    color: #fff;
+    background-color: #1b6ec2;
+    border-color: #1861ac;
+}
+
+.content {
+    padding-top: 1.1rem;
+}
+
+.valid.modified:not([type=checkbox]) {
+    outline: 1px solid #26b050;
+}
+
+.invalid {
+    outline: 1px solid red;
+}
+
+.validation-message {
+    color: red;
+}
+
+#blazor-error-ui {
+    background: lightyellow;
+    bottom: 0;
+    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+    display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+    #blazor-error-ui .dismiss {
+        cursor: pointer;
+        position: absolute;
+        right: 0.75rem;
+        top: 0.5rem;
+    }
+
+
+.rz-state-highlight td {
+    background-color: #ff6a00 !important;
+}
+
+
+.outfit {
+    line-height: 0;
+    position: relative;
+    width: auto;
+    height: auto;
+    background: gray;
+  /*  display: inline-block;
+    max-width: 420px;*/
+    
+
+}
+
+.outfit img {
+    width: 100%;
+    height: auto;
+    cursor: pointer;
+}
+
+
+.dot {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    background: white;
+    border-radius: 50%;
+    overflow: hidden;
+    cursor: pointer;
+    box-shadow: 0 0 3px 0 rgba(0, 0, 0, .2);
+    line-height: 24px;
+    font-size: 12px;
+    font-weight: bold;
+    transition: box-shadow .214s ease-in-out, transform .214s ease-in-out, background .214s ease-in-out;
+    }
+
+.ui-draggable-dragging {
+        box-shadow: 0 0 25px 0 rgba(0, 0, 0, .5);
+        transform: scale3d(1.5, 1.5, 1.5);
+        background: red;
+    }
+
+.tooltip-text {
+    visibility: hidden;
+    position: absolute;
+    z-index: 2;
+    width: 100px;
+    color: white;
+    font-size: 12px;
+    background-color: #192733;
+    border-radius: 10px;
+    padding: 10px 15px 10px 15px;
+}
+
+    .tooltip-text::before {
+        content: "";
+        position: absolute;
+        transform: rotate(45deg);
+        background-color: #192733;
+        padding: 5px;
+        z-index: 1;
+    }
+
+.hover-text:hover ~ .tooltip-text {
+    visibility: visible;
+}
+
+#top {
+    top: -25px;
+    left: -40px;
+}
+
+    #top::before {
+        top: 80%;
+        left: 45%;
+    }
+
+#bottom {
+    top: 25px;
+    left: -50%;
+}
+
+    #bottom::before {
+        top: -5%;
+        left: 45%;
+    }
+
+#left {
+    top: -8px;
+    right: 120%;
+}
+
+    #left::before {
+        top: 35%;
+        left: 94%;
+    }
+
+#right {
+    top: -8px;
+    left: 120%;
+}
+
+    #right::before {
+        top: 35%;
+        left: -2%;
+    }
+
+/*.hover-text {
+    position: relative;
+    display: inline-block;
+    margin: 40px;
+    font-family: Avenir;
+    text-align: center;
+}*/
+
+.nav-link {
+    margin-left: 7px;
+    margin-right: 7px;
+}
+
+.RadzenDataGrid{
+    z-index:0;
+}
+
+.file-input-zone {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: aquamarine;
+    color: white;
+    cursor: pointer;
+    position: relative;
+    width: fit-content;
+    height: fit-content;
+}
+
+    .file-input-zone:hover {
+        background-color: lightblue;
+    }
+
+    .file-input-zone input[type=file] {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        cursor: pointer;
+    }
+
+
+/* This is required to properly display (not behind) required validation for radzen components */
+.rz-messages-error {
+    display: block;
+}
+/*the following are used for lat long layout*/
+.input-group {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.flex-item {
+    flex: 1; /* Makes each flex-item take equal width */
+    padding: 0 5px; /* Adds some spacing between flex items */
+}
+
+.button-container {
+    flex: 0 0 auto; /* Prevents the button container from growing or shrinking */
+}
+
+/* Adjustments for smaller screens */
+@media (max-width: 768px) {
+    .input-group {
+        flex-direction: column;
+    }
+
+    .flex-item,
+    .button-container {
+        padding: 5px 0; /* Adjusts padding for vertical layout on small screens */
+    }
+}
+
+/* thead following datalist form BIM Viewer*/
+#viewerContainer {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+}
+
+canvas {
+    width: 100%;
+    height: 100%;
+}
+
+.tag {
+    position: absolute;
+    background-color: yellow;
+    padding: 5px;
+    pointer-events: none;
+    z-index: 100;
+}
+

@@ -1,0 +1,52 @@
+﻿@page "/EquipementTypeAttributeTypes/{CallerID:guid}"
+@using Models
+@using AliantWebS.Data
+@inject AliantWebS.Data.AppData AppData
+@inject EntitiesService entitiesService
+
+
+
+
+<AliantWebS.Pages.TypesPages.JunctionsComponent Titre=@titre
+                                                TItem1="EquipementType"
+                                                TItem2="AttributeType"
+                                                TItem3="EquipementTypeAttributeType"
+                                                CallerID=@CallerID
+                                                TItem1IdName="EquipementTypeId"
+                                                TItem2IdName="AttributeTypeId"
+                                                InspectionResultTypeElementTypesCollection=@callerType.EquipementTypeAttributeTypes
+                                                OnValidSubmit="@Update">
+
+</AliantWebS.Pages.TypesPages.JunctionsComponent>
+
+
+
+@code {
+
+    [Parameter]
+    public Guid CallerID { get; set; }
+
+
+    public string titre { get; set; }
+
+    EquipementType callerType;
+
+    public override async Task SetParametersAsync(ParameterView parameters)
+    {
+        callerType = (EquipementType)AppData.obj;
+        entitiesService.LoadCollection(callerType, "EquipementTypeAttributeTypes");
+        await base.SetParametersAsync(parameters);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        titre = "Equipement Type \"" + callerType.Name + "\" Attribute Types Association";
+    }
+
+    protected async void Update()
+    {
+        await entitiesService.UpdateEntityAsync(callerType);
+    }
+
+}

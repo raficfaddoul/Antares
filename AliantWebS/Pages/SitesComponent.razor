@@ -1,0 +1,168 @@
+﻿@page "/Sites"
+@using AliantWebS.Data
+@inject EntitiesService entitiesService
+@using Models
+@inject NavigationManager navigationManager
+@inject AppData appData;
+@inject IJSRuntime js
+@inject IStringLocalizer<Languages> L
+
+
+
+
+<Div Style="display: flex">
+    <h3>Sites Info</h3>
+    <div style="margin-left: auto; ">
+        <Label> Page Size: &nbsp;&nbsp;</Label>
+        <RadzenNumeric @bind-Value="PageSize" Style="width:60px"></RadzenNumeric>
+    </div>
+</Div>
+@if (sitesList is null)
+{
+    <p><em>@L["Loading"]... !</em></p>
+}
+else
+{
+    <Div Style="display: flex">
+    <NavLink class="nav-link" href="AddSite">
+        <span class="oi oi-plus" aria-hidden="true">@L["Add New"]</span>
+    </NavLink>
+        <a title="@L["Reporting"]" class="nav-link" @onclick="@(args => Report())" @onclick:preventDefault="true" href="">
+            <span class="oi oi-document" aria-hidden="true"></span>
+        </a>
+    </Div>
+        <RadzenSplitter Orientation="Radzen.Orientation.Horizontal" style="height: 100%; border: 1px solid rgba(0,0,0,.08);">
+        <RadzenSplitterPane Size="50%">
+        
+    <RadzenSplitter Orientation="Radzen.Orientation.Vertical" style="height: 100%; border: 1px solid rgba(0,0,0,.08);">
+        <RadzenSplitterPane Size="auto">
+
+
+            <RadzenDataGrid class="RadzenDataGrid" @ref="sitesGrid" AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="PageSize" RowSelect=@RowSelect
+                        Data="@sitesList" TItem="Site" ColumnWidth="150px">
+                <Columns>
+                    @*<RadzenDataGridColumn TItem="Site" Property="SiteId" Title="Site Id"></RadzenDataGridColumn>*@
+                    <RadzenDataGridColumn TItem="Site" Property="Name" Title="@L["Name"]"></RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="Site" Property="ShortDescription" Title="@L["Short Description"]"></RadzenDataGridColumn>
+
+                    <RadzenDataGridColumn TItem="Site" Property="Name" Title="@L["Action"]" Filterable="false" Sortable="false">
+                        <Template Context="data">
+                            <Div Style="display: flex">
+                                <a title="@L["Edit"]" class="nav-link" href="EditSite/@data.SiteId">
+                                    <span class="oi oi-pencil" aria-hidden="true"></span>
+                                </a>
+                                <a title="@L["Delete"]" @onclick="@(() => DeleteSite(data))" @onclick:preventDefault="true" href="">
+                                    <span class="oi oi-trash" aria-hidden="true"></span>
+                                </a>
+                                <a title="@L["Reporting"]" class="nav-link" @onclick="@(args => Report(data))" @onclick:preventDefault="true" href="">
+                                    <span class="oi oi-document" aria-hidden="true"></span>
+                                </a>
+                            </Div>
+                        </Template>
+
+                    </RadzenDataGridColumn>
+                </Columns>
+            </RadzenDataGrid>
+
+        </RadzenSplitterPane>
+        <RadzenSplitterPane>
+            @if (selectedSite != null)
+            {
+                <MediaComponent selectedObject="selectedSite"></MediaComponent>
+
+            }
+
+
+        </RadzenSplitterPane>
+
+    </RadzenSplitter>
+        </RadzenSplitterPane>
+        <RadzenSplitterPane>
+            @if (coordinates != null)
+            {
+                <AliantWebS.Pages.SharedComponents.MapComponent Coordinates="coordinates" Scale="9"></AliantWebS.Pages.SharedComponents.MapComponent>
+}
+        </RadzenSplitterPane>
+    </RadzenSplitter>
+
+
+
+}
+
+
+@code {
+
+
+    List<Site> sitesList;
+    List<Structure> structureList;
+
+    Site selectedSite;
+
+    int PageSize { get; set; } = 10;
+
+    RadzenDataGrid<Site> sitesGrid;
+
+    public List<(string id, string Type, string Name, double X, double Y, double C)?> coordinates { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        appData.Structure = null;
+        sitesList = await entitiesService.GetAllEntitiesAsync<Site>();
+        structureList = await entitiesService.GetAllEntitiesAsync<Structure>();
+
+        coordinates = sitesList.Select(a => a.Geolocation != null ? (a.SiteId.ToString(),"Site", a.Name, a.Geolocation.Coordinate.X, a.Geolocation.Coordinate.Y, 100) : ((string,string, string,double, double,double)?)null).ToList();
+        coordinates.AddRange(structureList.Select(a => a.Geolocation != null ? (a.StructureId.ToString(), "Structure", a.Name, a.Geolocation.Coordinate.X, a.Geolocation.Coordinate.Y, 100) : ((string, string, string, double, double, double)?)null).ToList());
+    }
+
+    async Task RowSelect(Site site)
+    {
+        //   navigationManager.NavigateTo(@"/defects");
+        selectedSite = site;
+        //   StateHasChanged();
+
+    }
+
+    async Task DeleteSite(Site site)
+    {
+        var isConfirmed = await js.InvokeAsync<bool>("confirm", $"Are you sure you want to delete this site?");
+
+        if (isConfirmed)
+        {
+            try
+            {
+                if (await entitiesService.DeleteEntityAsync(site))
+                {
+                    if (sitesList.Remove(site))
+                    {
+                        await sitesGrid.Reload();
+
+                    }
+                }
+            }
+            catch(Exception ex)
+            {
+                await js.InvokeVoidAsync("alert", "Error: " + ex.Message);
+            }
+
+        }
+        //    await js.InvokeVoidAsync("alert", $"Updated Successfully!");
+        //    sideEffectsList = await httpClient.GetFromJsonAsync<SideEffect[]>($"api/sideEffect/4/{EvaluationID}");
+        // uriHelper.NavigateTo("/patient/evaluations/" + PatientID);
+
+    }
+
+    async Task Report(Site site)
+    {
+        Reporting.Reporting rep = new Reporting.Reporting(site, entitiesService);
+
+    }
+
+    async Task Report()
+    {
+        Reporting.Reporting rep = new Reporting.Reporting(sitesList, entitiesService);
+
+    }
+
+
+
+}

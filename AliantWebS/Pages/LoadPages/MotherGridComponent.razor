@@ -1,0 +1,339 @@
+﻿@page "/MotherGridComponent/{EventID:guid}"
+@implements IDisposable
+@using AliantWebS.Data
+@inject EntitiesService entitiesService
+@inject NavigationManager navigationManager
+@inject IJSRuntime js
+@inject AliantWebS.Data.AppData AppData
+@using Models
+@inject IStringLocalizer<Languages> L
+
+@layout AntaresConceptionLayout
+@if (MPList is null)
+{
+    <p><em>@L["Loading"]... !</em></p>
+}
+else
+{
+    <Div Style="display: flex; align-items: center;">
+        <h3 style="margin: 0; padding: 0; line-height: 1.5;">@L[Title]</h3>
+        <div style="width: 20px; height: 20px; background-color: @GetLegendColor(); margin-left: 10px;"></div>
+
+        <a class="nav-link" @onclick="@(args => Insertmp())" @onclick:preventDefault="true" href="">
+            <span class="oi oi-plus" aria-hidden="true">@L["Add New"]</span>
+        </a>
+        <div style="margin-left: auto;">
+            <Label>@L["Page Size"]: &nbsp;&nbsp;</Label>
+            <RadzenNumeric @bind-Value="PageSize" Style="width:60px"></RadzenNumeric>
+        </div>
+    </Div>
+
+
+
+  
+    <EditForm Model="@MPList">
+   
+        <RadzenDataGrid @ref="MPGrid" AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="PageSize"
+                        Data="@MPList" TItem="MotherGridPalonnier"   SelectionMode="DataGridSelectionMode.Single" @bind-Value="@SelectedMPList">
+            <Columns>
+
+                <RadzenDataGridColumn Width="50" TItem="MotherGridPalonnier" Property="Name" >
+                    <HeaderTemplate>
+                        <span class="gridColumndStyle">@L["Nom"]</span>                    <br />
+                    </HeaderTemplate>
+                    <EditTemplate Context="mp">
+                        <InputTextArea @bind-Value="mp.Name" Style="width:100%" />
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn Width="50" TItem="MotherGridPalonnier" Property="Numero" TextAlign="TextAlign.Center">
+                    <HeaderTemplate>
+                        <span class="gridColumndStyle">@L["Element Type"]</span>                    <br />
+                    </HeaderTemplate>
+                  <Template Context="mp">
+                    @mp.ElementType.Name
+                </Template>
+                <EditTemplate Context="mp">
+                    <InputSelect class="form-control" @bind-Value=mp.ElementTypeId>
+                        @foreach (var elementType in ElementTypesList)
+                            {
+                            <option value="@elementType.ElementTypeId">@elementType.Name</option>
+                            }
+                    </InputSelect>
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn Width="6em" TItem="MotherGridPalonnier" Property="X1" TextAlign="TextAlign.Center">
+                    <HeaderTemplate>
+                        <span class="gridColumndStyle">@L["X1"]</span>   <br />
+                    </HeaderTemplate>
+                    <EditTemplate Context="mp">
+                        <InputNumber @bind-Value="mp.X1" Style="width:100%" />
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn Width="6em" TItem="MotherGridPalonnier" Property="Y1" TextAlign="TextAlign.Center">
+                    <HeaderTemplate>
+                        <span class="gridColumndStyle">@L["Y1"]</span>   <br />
+                    </HeaderTemplate>
+                    <EditTemplate Context="mp">
+                        <InputNumber @bind-Value="mp.Y1" Style="width:100%" />
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+
+
+                <RadzenDataGridColumn Width="6em" TItem="MotherGridPalonnier" Property="X2" TextAlign="TextAlign.Center">
+                    <HeaderTemplate>
+                        <span class="gridColumndStyle">@L["X2"]</span>   <br />
+                    </HeaderTemplate>
+                    <EditTemplate Context="mp">
+                        <InputNumber  @bind-Value="mp.X2" Style="width:100%" />
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn Width="6em" TItem="MotherGridPalonnier" Property="Y2" TextAlign="TextAlign.Center">
+                    <HeaderTemplate>
+                        <span class="gridColumndStyle">@L["Y2"]</span>   <br />
+                    </HeaderTemplate>
+                    <EditTemplate Context="mp">
+                        <InputNumber @bind-Value="mp.Y2" Style="width:100%" />
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn Width="10em" TItem="MotherGridPalonnier" Property="PULMONARY_TOXICITY" Title="@L["Action"]" Filterable="false" Sortable="false">
+                    <Template Context="data">
+                        <Div Style="display: flex; width: fit-content; justify-content: center; align-items: center;">
+                            <a title="@L["Edit"]" style="margin:0" class="nav-link" @onclick="@(args => EditRow(data))" @onclick:preventDefault="true" href="">
+                                <span class="oi oi-pencil" aria-hidden="true"></span>
+                            </a>
+                            <a title="@L["End Edit"]" style="margin:0" class="nav-link" @onclick="@(args => UpdateRow(data))" @onclick:preventDefault="true" href="">
+                                <span class="oi oi-check" aria-hidden="true"></span>
+                            </a>
+                            <a title="@L["Delete"]" style="margin:0" class="nav-link" @onclick="@(() => DeleteMP(data))" @onclick:preventDefault="true" href="">
+                                <span class="oi oi-trash" aria-hidden="true"></span>
+                            </a>
+                        </Div>
+                    </Template>
+                </RadzenDataGridColumn>
+
+            </Columns>
+        </RadzenDataGrid>
+
+
+     
+
+    </EditForm>
+
+        
+}
+
+
+@code {
+    int PageSize { get; set; } = 10;
+
+
+    private IList<MotherGridPalonnier> _selectedMPList = new List<MotherGridPalonnier>();
+
+
+    public IList<MotherGridPalonnier> SelectedMPList
+    {
+        get
+        {
+            // You can add logic here to filter or sort items when accessed.
+            return _selectedMPList;
+        }
+        set
+        {
+            // Validate input before setting.
+            if (value == null) throw new ArgumentNullException(nameof(value));
+            _selectedMPList = value;
+            SelectedMP = _selectedMPList.FirstOrDefault();
+        }
+    }
+
+    private MotherGridPalonnier _selectedMP;
+
+    [Parameter]
+    public MotherGridPalonnier SelectedMP
+    {
+        get => _selectedMP;
+        set
+        {
+            if (!Equals(_selectedMP, value))
+            {
+                _selectedMP = value;
+                SelectedMPChanged.InvokeAsync(_selectedMP);
+            }
+        }
+    }
+
+    [Parameter]
+    public string Title { get; set; }
+
+    [Parameter]
+    public EventCallback<MotherGridPalonnier> SelectedMPChanged { get; set; }
+
+    [Parameter]
+    public RadzenDataGrid<MotherGridPalonnier> MPGrid { get; set; }
+
+    [Parameter]
+    public EventCallback<RadzenDataGrid<MotherGridPalonnier>> MPGridChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<List<MotherGridPalonnier>> MotherGridPalonnierListChanged { get; set; }
+
+    [Parameter]
+    public List<MotherGridPalonnier> MPList{ get; set; }
+
+    [Parameter]
+    public Guid EventMpscenarioId { get; set; }
+
+    [Parameter]
+    public bool Famille { get; set; }
+
+
+    [Parameter]
+    public List<ElementType> ElementTypesList { get; set; }
+
+    public ElementType lastSelectedElementType = new ElementType();
+
+    private string GetLegendColor()
+    {
+        return Title == "MotherGrids" ? "yellow" : Title == "Palonniers" ? "green" : "transparent";
+    }
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        // ElementTypesList = await entitiesService.GetFilteredEntitiesAsync<ElementType>(x => x.Category.Name.ToLower() == "mothergridpalonnier", "Category");
+        // if (ElementTypesList.Count == 0)
+        // {
+        //     await js.InvokeVoidAsync("alert", $"Aucun type d'élements n'a été défini pour la catégorie MotherGridPalonnier");
+        // }
+        //       MPList = await entitiesService.GetFilteredEntitiesAsync<MotherGridPalonnier>(x => ((x.EventMpscenarioId == EventMpscenarioId) && (x.Famille == Famille)));
+        //   AppData.ScenarioChanged += zaza;
+
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+
+        // if ((MPList == null) || (MPList.Count == 0)||(MPList[0].EventMpscenarioId != EventMpscenarioId))
+        // {
+        //     MPList = await entitiesService.GetFilteredEntitiesAsync<MotherGridPalonnier>(x => ((x.EventMpscenarioId == EventMpscenarioId) && (x.Famille == Famille)));
+        // }
+    }
+
+    private async void zaza()
+    {
+        await MPGrid.Reload();
+        StateHasChanged();
+    }
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await MPGridChanged.InvokeAsync(MPGrid);
+        }
+
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+
+    public async Task DeleteMP(MotherGridPalonnier mp)
+    {
+        if (await entitiesService.DeleteEntityAsync(mp))
+        {
+            if (MPList.Remove(mp))
+            {
+                await MPGrid.Reload();
+                await MotherGridPalonnierListChanged.InvokeAsync(MPList);
+               // StateHasChanged();
+
+            }
+        }
+
+    }
+
+    async void EditRow(MotherGridPalonnier mp)
+    {
+
+        await MPGrid.EditRow(mp);
+        await MotherGridPalonnierListChanged.InvokeAsync(MPList);
+
+    }
+
+    async Task Insertmp()
+    {
+        MotherGridPalonnier mp = new MotherGridPalonnier();
+        mp.EventMpscenarioId = EventMpscenarioId;
+        mp.Famille = Famille;
+
+        if ((lastSelectedElementType == null) || (lastSelectedElementType.ElementTypeId == Guid.Empty))
+        {
+            lastSelectedElementType = ElementTypesList.FirstOrDefault();
+        }
+
+        if (lastSelectedElementType == null) return;
+
+        mp.ElementTypeId = lastSelectedElementType.ElementTypeId;
+
+        if ((await entitiesService.InsertEntityAsync(mp)) != null)
+        {
+            MPList.Add(mp);
+
+            await MPGrid.InsertRow(mp);
+
+        }
+        else
+        {
+            await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
+        }
+    }
+
+    public async Task Insertmp(double x1, double y1, double x2, double y2)
+    {
+        MotherGridPalonnier mp = new MotherGridPalonnier();
+        mp.EventMpscenarioId = EventMpscenarioId;
+        mp.Famille = Famille;
+        mp.ElementTypeId = lastSelectedElementType.ElementTypeId;
+
+
+        mp.X1 = x1;         mp.Y1 = y1;
+
+        mp.X2 = x2;         mp.Y2 = y2;
+
+        if ((await entitiesService.InsertEntityAsync(mp)) != null)
+        {
+            MPList.Add(mp);
+
+            await MPGrid.InsertRow(mp);
+            await MPGrid.UpdateRow(mp);
+        }
+        else
+        {
+            await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
+        }
+    }
+
+
+
+    async Task UpdateRow(MotherGridPalonnier mp)
+    {
+        if (await entitiesService.UpdateEntityAsync(mp))
+        {
+            await MPGrid.UpdateRow(mp);
+            lastSelectedElementType = mp.ElementType;
+        }
+    }
+
+    void IDisposable.Dispose()
+    {
+        //AppData.ScenarioChanged -= zaza;
+    }
+
+
+}
+

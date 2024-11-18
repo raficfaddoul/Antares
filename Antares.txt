@@ -1,0 +1,14 @@
+Object:Element, name: Noeuds
+Object:Element, category: Structural Elements, type: Noeud3d,  name: Noeud 1, parent:Noeuds, X:-28.88, Y:-33.34, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d,  name: Noeud 2, parent:Noeuds, X:-21.66, Y:-33.34, Z: 1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+
+
+
+
+
+
+Object:Element, name: Poutres
+Object:Element, name: Poutre B, parent: Poutres
+Object:Element, category: Structural Elements, type: Beam3d,  name: Poutre B-1, parent:Poutre B, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 174, Noeud2:Node2, b:736, h:985
+Object:Element, category: Structural Elements, type: Beam3d,  name: Poutre B-2, parent:Poutre B, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud2:Noeud 183, Noeud2:Node3, b:736, h:985
+

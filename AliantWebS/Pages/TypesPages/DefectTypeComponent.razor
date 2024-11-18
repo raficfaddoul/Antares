@@ -1,0 +1,196 @@
+@using AliantWebS.Data
+@using System.Drawing
+@inject EntitiesService entitiesService
+@inject NavigationManager navigationManager
+@inject IJSRuntime js
+@using Models
+@inject AliantWebS.Data.AppData AppData
+@inject IStringLocalizer<Languages> L
+
+
+
+<Div Style="display: flex">
+    <h3>@L["Defect Types"]</h3>
+    <div style="margin-left: auto; ">
+        <Label> @L["Page Size"]: &nbsp;&nbsp;</Label>
+        <RadzenNumeric @bind-Value="PageSize" Style="width:60px"></RadzenNumeric>
+    </div>
+</Div>
+@if (defectTypeList is null)
+{
+    <p><em>@L["Loading"]... !</em></p>
+}
+else
+{
+    <a class="nav-link" @onclick="@(args => InsertDefectType())" @onclick:preventDefault="true" href="">
+        <span class="oi oi-plus" aria-hidden="true">@L["Add New"]</span>
+    </a>
+
+    <EditForm Model="@defectTypeList">
+
+
+        <RadzenDataGrid class="RadzenDataGrid" @ref="defectsTypesGrid" AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="PageSize"
+                    Data="@defectTypeList" TItem="DefectType" ColumnWidth="150px" @bind-Value="@SelectedDefectTypes">
+            <Columns>
+
+                <RadzenDataGridColumn Width="50" TItem="DefectType" Property="Name">
+                    <HeaderTemplate>
+                        <span class="gridColumndStyle">@L["Name"]</span>                    <br />
+                    </HeaderTemplate>
+                    <EditTemplate Context="defectType">
+                        <InputTextArea @bind-Value="defectType.Name" Style="width:100%" />
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn Width="50" TItem="DefectType" Property="Description">
+                    <HeaderTemplate>
+                        <span class="gridColumndStyle">@L["Description"]</span>                    <br />
+                    </HeaderTemplate>
+                    <EditTemplate Context="defectType">
+                        <InputTextArea @bind-Value="defectType.Description" Style="width:100%" />
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn Width="30" TItem="DefectType" Title="@L["Icon"]" Property="Icon">
+                    <Template Context="data">
+                        <IconComponent TItem1="DefectType" data="data"></IconComponent>
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn Width="50" TItem="DefectType" Property="PULMONARY_TOXICITY" Title="@L["Action"]" Filterable="false" Sortable="false">
+                    <Template Context="data">
+                        <Div Style="display: flex">
+                            <a title="@L["Edit"]" class="nav-link" @onclick="@(args => EditRow(data))" @onclick:preventDefault="true" href="">
+                                <!--href="/patient/EditSideEffectComponent/@data.SideEffectID-->
+                                <span class="oi oi-pencil" aria-hidden="true"></span>
+                            </a>
+                            <a title="@L["End Edit"]" class="nav-link" @onclick="@(args => UpdateRow(data))" @onclick:preventDefault="true" href="">
+                                <span class="oi oi-check" aria-hidden="true"></span>
+                            </a>
+                            <a title="@L["Delete"]" class="nav-link" @onclick="@(() => DeleteDefectType(data))" @onclick:preventDefault="true" href="">
+                                <span class="oi oi-trash" aria-hidden="true"></span>
+                            </a>
+                        </Div>
+                        <Div Style="display: flex">
+                            <a title="@L["Flag Types"]" class="nav-link" @onclick="@(args => FlagTypes(data))" @onclick:preventDefault="true" href="">
+                                <span class="oi oi-flag" aria-hidden="true"></span>
+                            </a>
+                            <a title="@L["Element Types"]" class="nav-link" @onclick="@(args => ElementTypes(data))" @onclick:preventDefault="true" href="">
+                                <span class="fab fa-elementor" aria-hidden="true"></span>
+                            </a>
+                            <Div Style="display: flex">
+                                <a title="@L["Attributes Types"]" class="nav-link" @onclick="@(args => AttributesTypes(data))" @onclick:preventDefault="true" href="">
+                                    <span class="fa fa-tasks" aria-hidden="true"></span>
+                                </a>
+                            </Div>
+                        </Div>
+                    </Template>
+
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+    </EditForm>
+
+}
+
+
+@code {
+
+    int PageSize { get; set; } = 10;
+
+    IList<DefectType> SelectedDefectTypes { get; set; }
+
+    RadzenDataGrid<DefectType> defectsTypesGrid;
+
+    List<DefectType> defectTypeList;
+
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(entitiesService.tasksList);
+        defectTypeList = await entitiesService.GetAllEntitiesAsync<DefectType>();
+
+
+    }
+
+
+
+    async Task DeleteDefectType(DefectType defectType)
+    {
+
+        if (await entitiesService.DeleteEntityAsync(defectType))
+        {
+            if (defectTypeList.Remove(defectType))
+            {
+                await defectsTypesGrid.Reload();
+
+            }
+        }
+
+
+        //    await js.InvokeVoidAsync("alert", $"Updated Successfully!");
+        //    sideEffectsList = await httpClient.GetFromJsonAsync<SideEffect[]>($"api/sideEffect/4/{EvaluationID}");
+        // uriHelper.NavigateTo("/patient/evaluations/" + PatientID);
+
+    }
+
+    void EditRow(DefectType defectType)
+    {
+
+        defectsTypesGrid.EditRow(defectType);
+
+    }
+
+    async Task InsertDefectType()
+    {
+        DefectType defectType = new DefectType();
+
+        if ((await entitiesService.InsertEntityAsync(defectType)) != null)
+        {
+            defectTypeList.Add(defectType);
+
+            await defectsTypesGrid.InsertRow(defectType);
+
+        }
+        else
+        {
+            await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
+        }
+
+
+    }
+
+    async Task UpdateRow(DefectType defectType)
+    {
+        if (await entitiesService.UpdateEntityAsync(defectType))
+        {
+            await defectsTypesGrid.UpdateRow(defectType);
+        }
+    }
+
+    async Task FlagTypes(DefectType defectType)
+    {
+        AppData.obj = defectType;
+
+        navigationManager.NavigateTo("/DefectTypeFlagTypes/" + defectType.DefectTypeId);
+    }
+
+    async Task ElementTypes(DefectType defectType)
+    {
+        AppData.obj = defectType;
+
+        navigationManager.NavigateTo("/DefectTypeElementTypes/" + defectType.DefectTypeId);
+    }
+
+    async Task AttributesTypes(DefectType defectType)
+    {
+        AppData.obj = defectType;
+
+        navigationManager.NavigateTo("/DefectTypeAttributeTypes/" + defectType.DefectTypeId);
+    }
+
+
+
+
+}

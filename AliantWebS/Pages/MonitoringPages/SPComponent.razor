@@ -1,0 +1,1229 @@
+﻿@page "/SP/{ListJson}"
+@page "/SP"
+@using AliantWebS.Data
+@using AliantWebS.Models
+@using Microsoft.Extensions.Logging
+@using System.Net.Sockets
+@using System.Net
+@using System
+
+@using System.Net.WebSockets;
+@using System.Threading;
+
+@inject EntitiesService entitiesService
+@inject IJSRuntime JsRuntime
+@inject DataUpdateService DataUpdateService
+@implements IDisposable
+
+
+@using System.Numerics;
+@using Accord.Math;
+@using System.Text.Json;
+@using System.Globalization;
+@using System;
+@using System.Threading.Tasks;
+@inject Radzen.DialogService DialogService
+@inject ILogger<FilesUpload> Logger
+﻿@using Plotly.Blazor.LayoutLib
+@using Plotly.Blazor.Traces.ScatterLib
+@using System.Threading
+@using Structural
+
+@inject NavigationManager navigationManager
+@inject AppData appData
+@inject IStringLocalizer<Languages> L
+
+<NavigationLock OnBeforeInternalNavigation="appData.OnBeforeInternalNavigation" ConfirmExternalNavigation="appData.SaveConfirmation&& appData.SaveChanges" />
+
+@if (somethingToPresent)
+{
+    @if (channelDataTypeList is null)
+    {
+        <div>
+            <p><em>Loading... !</em></p>
+        </div>
+    }
+    else
+    {
+        <RadzenSplitter Orientation="Radzen.Orientation.Horizontal" style="margin:0px; width:100%; height: 100%; border: 1px solid rgba(0,0,0,.08);">
+            <RadzenSplitterPane Size="20%">
+
+                <RadzenSplitter Orientation="Radzen.Orientation.Vertical" style="height: 100%; border: 1px solid rgba(0,0,0,.08);">
+                    <RadzenSplitterPane Size="33%">
+
+                        <RadzenDataGrid AllowFiltering="false" AllowPaging="true" AllowSorting="false" PageSize="10"
+                                        Data="@sourceTypes" TItem="string" ColumnWidth="150px">
+                            <Columns>
+                                <RadzenDataGridColumn TItem="string" Property="Name" Title="@L["Source Type"]">
+                                    <Template Context="sourceType">
+                                        <Div Style="display: flex">
+                                            <Label>@sourceType</Label>
+                                            @if (sourceType == "Simulation")
+                                            {
+                                                <RadzenButton Click=@(args => OnClick("Extra Small button with text and icon")) Size=" ButtonSize.ExtraSmall" Style="margin:10px;">Parameters</RadzenButton>
+
+                                            }
+                                            @if (sourceType == "Live")
+                                            {
+                                                <Div Style="display: flex; margin-left: auto;">
+
+                                                <Label>Step size: </Label>
+                                                <InputNumber style="width:40px" @bind-Value="stepSize"></InputNumber>
+                                            </Div>
+                                            }
+
+                                        </Div>
+                                    </Template>
+                                </RadzenDataGridColumn>
+
+
+                                <RadzenDataGridColumn TItem="string" Property="Description" Title="@L["Action"]" Width="30px">
+                                    <Template Context="sourceType">
+                                        <Div Style="display: flex">
+                                            @if (sourceType == "Simulation")
+                                            {
+                                                @if (isSimulating)
+                                                {
+                                                    <i class="fas fa-spinner fa-spin"></i>
+                                                }
+                                                else
+                                                {
+                                                    <RadzenCheckBox TValue=bool @bind-Value=SimulationCheckBoxOn Change=@(args => OnChangeSelectedSourceTypes(args,sourceType))></RadzenCheckBox>
+
+                                                }
+                                            }
+                                            else
+                                            {
+                                                <RadzenCheckBox TValue=bool Change=@(args => OnChangeSelectedSourceTypes(args,sourceType))></RadzenCheckBox>
+                                            }
+                                        </Div>
+                                    </Template>
+
+                                </RadzenDataGridColumn>
+                            </Columns>
+                        </RadzenDataGrid>
+
+
+                    </RadzenSplitterPane>
+                    <RadzenSplitterPane Size="33%">
+
+                        <RadzenDataGrid AllowFiltering="false" AllowPaging="true" AllowSorting="false" PageSize="10"
+                                        Data="@chartsTypes" TItem="string" ColumnWidth="150px">
+                            <Columns>
+                                <RadzenDataGridColumn TItem="string" Property="Name" Title="@L["Chart Type"]">
+                                    <Template Context="chartType">
+                                        <Div Style="display: flex">
+                                            <Label>@chartType</Label>
+                                                @if (chartType == "ModalDeformation")
+                                            {
+                                                <InputNumber disabled="@(!selectedChartsTypes.Contains("ModalDeformation") || (str == null))" TValue="int" style="width:50px;" @bind-Value=@Vp></InputNumber>
+                                            }
+
+                                        </Div>
+                                    </Template>
+                                </RadzenDataGridColumn>
+
+
+                                <RadzenDataGridColumn TItem="string" Property="Description" Title="@L["Action"]" Width="30px">
+                                    <Template Context="chartType">
+                                        <Div Style="display: flex">
+                                            <RadzenCheckBox disabled="@(!selectedSourceTypes.Contains("Simulation") && (chartType == "ModalDeformation"))" TValue=bool Change=@(args => OnChangeSelectedChartTypes(args,chartType))></RadzenCheckBox>
+
+                                        </Div>
+                                    </Template>
+
+                                </RadzenDataGridColumn>
+                            </Columns>
+                        </RadzenDataGrid>
+
+                    </RadzenSplitterPane>
+
+
+                    <RadzenSplitterPane Size="33%">
+                        <div class="form-group ">
+                            <div>
+                                <label>@L["Start Date"] :</label>
+                                <div>
+                                    <InputDate Type="InputDateType.DateTimeLocal" @bind-Value="@startDate" />
+                                    @*           <ValidationMessage For="@(() => startDate)" />*@
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group ">
+                            <div>
+                                <label>@L["End Date"] :</label>
+                                <div>
+                                    <InputDate Type="InputDateType.DateTimeLocal" @bind-Value="@endDate" />
+                                    @*           <ValidationMessage For="@(() => startDate)" />*@
+                                </div>
+                            </div>
+                        </div>
+
+                        <Div Style="display: flex">
+                            <div class="file-input-zone">
+                                <a class="nav-link" @onclick="@AddData" href="dgfrdgh" @onclick:preventDefault="true">
+                                    <span align="center" style="width:30px" class="fas fa-stream" aria-hidden="true"></span>
+                                </a>
+                            </div>
+                            @*                                         <div class="file-input-zone">
+                    <a class="nav-link" @onclick="@Calculate" href="dgfrdgh" @onclick:preventDefault="true">
+                    <span align="center" style="width:30px" class="fas fa-stream" aria-hidden="true"></span>
+                    </a>
+                    </div> *@
+                        </Div>
+
+
+                    </RadzenSplitterPane>
+
+                </RadzenSplitter>
+
+            </RadzenSplitterPane>
+            <RadzenSplitterPane Size="80%">
+                <RadzenAccordion Multiple="true">
+                    <Items>
+                        <RadzenAccordionItem Text="Sensors" Icon="group_work" Selected=true>
+                            <RadzenDataGrid AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="10"
+                                            Data="@selectedElements" TItem="Element" ColumnWidth="150px">
+                                <Columns>
+                                    <RadzenDataGridColumn TItem="Element" Property="Name" Title="@L["Sensing Device"]" Width="60px"></RadzenDataGridColumn>
+
+                                    <RadzenDataGridColumn TItem="Element" Title="@L["Action"]" Width="30px">
+
+                                        <FilterTemplate>
+                                            <RadzenDropDown @bind-Value=@selectedChannelDataTypes Multiple="true" AllowSelectAll=false Style="width:100%;"
+                                                            Change=@OnChangeSelectedChannelDataTypes Data=@channelDataTypeList TextProperty="Name" ValueProperty="ChannelDataTypeId" />
+                                        </FilterTemplate>
+                                        <Template Context="element">
+                                            <Div Style="display: flex">
+                                                @foreach (ChannelDataType cdt in element.ElementType.ChannelDataTypeElementTypes.Select(x => x.ChannelDataType))
+                                                {
+                                                    <img src="@AI.Helpers.GetSource(cdt.Icon)" />
+                                                    <RadzenCheckBox TValue=bool Change=@(args =>plot(args,element,cdt))></RadzenCheckBox>
+                                                }
+                                            </Div>
+
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                </Columns>
+                            </RadzenDataGrid>
+                        </RadzenAccordionItem>
+                        @{
+                            foreach (var cst in selectedChartsTypes)
+                            {
+                                foreach (var sst in selectedSourceTypes)
+                                {
+                                    if (chartBundles.Keys.Contains(cst + sst))
+                                    {
+                                        string title = cst + " " + sst;
+                                        if (cst == "ModalDeformation")
+                                        {
+
+                                            <RadzenAccordionItem Text="@title" Icon="assessment" Selected=true>
+                                                <div style="display: flex">
+                                                    <PlotlyChart style="height:100%;width:100%" @bind-Config="chartBundles[cst+sst].Config" @bind-Layout="chartBundles[cst+sst].Layout" @bind-Data="chartBundles[cst+sst].Data" @ref=chartBundles[cst+sst].Chart />
+                                                    <div style="width:140px">
+                                                        <RadzenDataGrid AllowFiltering="false" AllowPaging="true" AllowSorting="false" PageSize="10"
+                                                                        Data="@ValeursPropres" TItem="double" ColumnWidth="90px">
+                                                            <Columns>
+                                                                <RadzenDataGridColumn TItem="double" Title="@L["Mode"]" Width="40px">
+                                                                    <Template Context="valeurPropre">
+                                                                        <Label>@ValeursPropres.IndexOf(valeurPropre)</Label>
+                                                                        </Template>
+                                                                    </RadzenDataGridColumn>
+
+                                                                    <RadzenDataGridColumn TItem="double" Title="@L["Eigen Value"]" Width="50px">
+                                                                        <Template Context="valeurPropre">
+                                                                            <Label>@valeurPropre</Label>
+                                                                        </Template>
+                                                                    </RadzenDataGridColumn>
+                                                                </Columns>
+                                                            </RadzenDataGrid>
+                                                        </div>
+                                                    </div>
+                                                </RadzenAccordionItem>
+                                        }
+                                        else if ((cst + sst) == "TimeDomainLive")
+                                        {
+                                            <RadzenAccordionItem Text="@title" Icon="assessment" Selected=@Selected>
+                                            <DyGraphComponent FilterAddress="filterAddress"></DyGraphComponent>
+                                            </RadzenAccordionItem>
+                                        }
+                                        else
+                                        {
+                                            <RadzenAccordionItem Text="@title" Icon="assessment" Selected=@Selected>
+                                                <PlotlyChart style="height:100%;width:100%" @bind-Config="chartBundles[cst+sst].Config" @bind-Layout="chartBundles[cst+sst].Layout" @bind-Data="chartBundles[cst+sst].Data" @ref=chartBundles[cst+sst].Chart />
+                                            </RadzenAccordionItem>
+                                        }
+                                    }
+                                }
+
+
+                            }
+
+                        }
+                    </Items>
+                </RadzenAccordion>
+
+
+
+            </RadzenSplitterPane>
+        </RadzenSplitter>
+
+    }
+
+}
+
+@code {
+
+    bool SimulationCheckBoxOn { get; set; } = false;
+    RadzenCheckBox<bool> SimulationRadzenCheckBox;
+
+    int stepSize { get; set; } = 20;
+
+    bool bundleUpdating = false;
+
+    bool isLoading = false;
+    bool isSimulating = false;
+
+    Structural.Structure str;
+    Structural.SimulationParameters simPa = new SimulationParameters();
+
+    List<LoadCase> loadCases = new List<LoadCase>();
+
+    Dictionary<LoadCase, double> selectedLoadCases = new Dictionary<LoadCase, double>();
+    Dictionary<Guid, double> coeficients = new Dictionary<Guid, double>();
+
+
+    double[,] qTime;
+    bool simpaChanged = true;
+
+    double[] ValeursPropres = null;
+    double[,] VecteursPropres = null;
+
+
+    private int vp = 6;
+
+    public int Vp
+    {
+        get
+        {
+            return vp;
+        }
+        set
+        {
+            string name = "Modal deformation " + vp;
+            PlotData(name, null, null, chartBundles["ModalDeformationSimulation"].Data);
+            vp = value;
+
+            if (selectedChartsTypes.Contains("ModalDeformation"))
+            {
+                List<object> X = new List<object>();
+                List<object> Y = new List<object>();
+
+                for (int i = 0; i < str.noeud.Count; i++)
+                {
+                    X.Add(str.noeud[i][0]);
+                    Y.Add(VecteursPropres[i * 3 + 1, vp]);
+                }
+                name = "Modal deformation " + vp;
+                PlotData(name, X, Y, chartBundles["ModalDeformationSimulation"].Data);
+                StateHasChanged();
+            }
+
+        }
+    }
+
+
+    static public CancellationTokenSource cts;
+    CancellationToken ct;
+
+    public class PlotlyChartBundle
+    {
+        public PlotlyChart Chart { get; set; }
+        public Plotly.Blazor.Config Config { get; set; }
+        public Plotly.Blazor.Layout Layout { get; set; }
+        public IList<ITrace> Data { get; set; }
+
+        public PlotlyChartBundle()
+        {
+            Chart = new PlotlyChart();
+            Config = new Plotly.Blazor.Config();
+            //  Layout = new Plotly.Blazor.Layout();
+
+            Layout = new Plotly.Blazor.Layout()
+                {
+                    //Title = new Title { Text = "Time Series Plot" },
+                    XAxis = new[]
+                                                                                                                    {
+                new XAxis
+                {
+                    Title = new Plotly.Blazor.LayoutLib.XAxisLib.Title
+                    {
+                        Text = "Index"
+                    },
+                    TickFormat = "%Y-%m-%d %H:%M:%S",
+
+                    //DTick=1,
+
+                }
+            }
+                };
+
+            Data = new List<ITrace>();
+
+        }
+    }
+
+    Dictionary<string, PlotlyChartBundle> chartBundles = new Dictionary<string, PlotlyChartBundle>();
+
+    bool Selected { get; set; } = true;
+    //Dictionary<string, bool> accordionItems = new Dictionary<string, bool>();
+
+    List<(Element, ChannelDataType)> toBeShown = new List<(Element, ChannelDataType)>();
+
+    bool somethingToPresent = false;
+
+    //AliantWebS.Models.Structure st = new AliantWebS.Models.Structure();
+
+    [Parameter]
+    public string ListJson { get; set; } = string.Empty;
+
+    List<Guid?> sensorsIDs;
+    IEnumerable<Guid?> elementTypesIDs;
+
+
+    DateTime startDate { get; set; } = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+    DateTime endDate { get; set; } = DateTime.UtcNow;
+
+
+
+
+    [Parameter] public EventCallback OnValidSubmit { get; set; }
+
+
+
+    private const string ServerHost = "localhost";
+    private const int ServerPort = 8000;
+
+    private Dictionary<string, string> filterAddress = new Dictionary<string, string>();
+
+    List<ChannelDataTypeElementType> channelDataTypeElementTypeList;
+
+
+
+    List<string> chartsTypes { get; set; } = new List<string>() { "TimeDomain", "Fourier", "Correlation", "ModalDeformation" };
+    List<string> selectedChartsTypes { get; set; } = new List<string>();
+
+    List<string> sourceTypes { get; set; } = new List<string>() { "History", "Live", "Simulation" };
+    List<string> selectedSourceTypes { get; set; } = new List<string>();
+
+    List<(Element, ChannelDataType)> selectedSensorsChannelDataTypes = new List<(Element, ChannelDataType)>();
+
+    (Dictionary<Guid, int> sensedNodesIndex, List<Element> sensors, List<Element> beamElements, List<Element> nodes, Dictionary<Guid, Guid?> sensorNodeDic) sensedNodes;
+
+    List<Element> sensors;
+    Dictionary<Guid, List<ChannelDataType>> listOfChannelsDataTypePerSensor = new Dictionary<Guid, List<ChannelDataType>>();
+    List<Element> selectedElements { get; set; } = new List<Element>();
+
+
+    List<ChannelDataType> channelDataTypeList;
+    List<Guid> selectedChannelDataTypes { get; set; } = new List<Guid>();
+
+
+    private TimeSpan MaxTimeWindow = new TimeSpan(0, 0, 0, 10, 0);
+
+    Dictionary<string, Queue<object>> dic = new Dictionary<string, Queue<object>>();
+
+    List<string> chartVarieties = new List<string>() { "TimeDomainHistory", "FourierHistory", "TimeDomainSimulation",
+    "ModalDeformationSimulation", "FourierSimulation", "TimeDomainLive", "FourierLive"};
+
+    protected override async Task OnInitializedAsync()
+    {
+        DataUpdateService.OnDataUpdated += UpdateUI;
+        foreach (string chartVarietie in chartVarieties)
+        {
+            chartBundles.Add(chartVarietie, new PlotlyChartBundle());
+            //accordionItems.Add(chartVarietie, true);
+
+        }
+
+        cts = new CancellationTokenSource();
+        ct = cts.Token;
+
+        loadCases = await entitiesService.GetAllEntitiesAsync<LoadCase>();
+        foreach (LoadCase lc in loadCases)
+        {
+            coeficients.Add(lc.LoadCaseId, 1);
+        }
+
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (!firstRender)
+        {
+
+            foreach (var cst in selectedChartsTypes)
+            {
+                foreach (var sst in selectedSourceTypes)
+                {
+                    if (chartBundles.Keys.Contains(cst + sst))
+                    {
+                        if (chartBundles[cst + sst].Chart != null)
+                        {
+                            try
+                            {
+                                bundleUpdating = true;
+                                chartBundles[cst + sst].Chart.Update();
+                                bundleUpdating = false;
+                            }
+                            catch (Exception ex)
+                            {
+                                int k = 1;
+                            }
+                        }
+                    }
+                }
+
+            }
+
+            // if (selectedSourceTypes.Contains("Live"))
+            // {
+            //     if (chartBundles["Live"].Chart != null)
+            //     {
+            //         chartBundles["Live"].Chart.Update();
+            //     }
+
+            // }
+
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        somethingToPresent = false;
+
+        var elligibleElementTypes = await entitiesService.GetFilteredEntitiesAsync<ElementType>(a => ((a.ChannelDataTypeElementTypes?.Count ?? 0) > 0), "ChannelDataTypeElementTypes");
+
+        var elligibleElementTypesID = elligibleElementTypes.Select(x => x.ElementTypeId).ToList();
+
+        if ((ListJson is null)||(ListJson == string.Empty))
+        {
+            sensors = await entitiesService.GetFilteredEntitiesAsync<Element>(a => ((a.StructureId == appData.Structure.StructureId) && (elligibleElementTypesID.Contains(a.ElementTypeId ?? new Guid()))), "ElementType.ChannelDataTypeElementTypes");
+
+        }
+        else
+        {
+
+            sensorsIDs = JsonSerializer.Deserialize<List<Guid?>>(ListJson);
+
+            sensors = await entitiesService.GetFilteredEntitiesAsync<Element>(a => (sensorsIDs.Contains(a.ElementId)
+                    && (elligibleElementTypesID.Contains(a.ElementTypeId ?? new Guid()))));
+            foreach(var s in sensors)
+            {
+                entitiesService.LoadCollection("ElementType.ChannelDataTypeElementTypes");
+            }
+
+
+        }
+        selectedElements = sensors;
+        listOfChannelsDataTypePerSensor.Clear();
+        foreach (Element sensor in sensors)
+        {
+
+            List<ChannelDataType> lcdt = new List<ChannelDataType>();
+            //lcdt = sensor.ElementType.ChannelDataTypeElementTypes.Select(x => x.ChannelDataType).ToList();
+            lcdt = await entitiesService.GetFilteredEntitiesAsync<ChannelDataType>(a => a.ChannelDataTypeElementTypes.Select(x => x.ElementType).Contains(sensor.ElementType));
+            listOfChannelsDataTypePerSensor.Add(sensor.ElementId, lcdt);
+
+        }
+
+        elementTypesIDs = sensors.Select(x => x.ElementTypeId);
+
+
+
+        //channelDataTypeElementTypeList = await entitiesService.GetFilteredEntitiesAsync<ChannelDataTypeElementType>(a => elementTypesIDs.Contains(a.ElementTypeId), "ChannelDataType");
+
+        //channelDataTypeList = channelDataTypeElementTypeList.Select(x => x.ChannelDataType).ToList();
+
+        channelDataTypeList = listOfChannelsDataTypePerSensor.Values.ToList().SelectMany(innerList => innerList).Distinct().ToList();  //    .Distinct().ToList();
+        selectedChannelDataTypes = channelDataTypeList.Select(x => x.ChannelDataTypeId).ToList();
+        if (channelDataTypeList.Count() > 0)
+        {
+            somethingToPresent = true;
+        }
+        else
+        {
+            await JsRuntime.InvokeVoidAsync("alert", "no DataChannels available...");
+        }
+
+    }
+
+
+
+
+    void PlotData(string name, IList<object> X, IList<object> Y, IList<ITrace> data, string BundelName = null)
+    {
+
+        ITrace it = data.FirstOrDefault(x => ((Scatter)x).Name == name);
+
+
+        if ((X != null) && (Y != null))
+        {
+            if (it != null) return;
+
+            Scatter sc = new Scatter();
+
+            sc.Name = name;
+
+            sc.XCalendar = Plotly.Blazor.Traces.ScatterLib.XCalendarEnum.Gregorian;
+
+            sc.Mode = Plotly.Blazor.Traces.ScatterLib.ModeFlag.Lines;
+
+            sc.X = X;
+            sc.Y = Y;
+
+            data.Add(sc);
+        }
+        else
+        {
+            if (it == null) return;
+            if (BundelName != null)
+            {
+                chartBundles[BundelName].Chart.DeleteTrace(it);
+            }
+            data.Remove(it);
+
+
+
+
+        }
+
+    }
+
+    private async Task<List<object[]>> GetLa(Element element, ChannelDataType channelDataType)
+    {
+        return await InfluxService.GetData(new List<string>() { element.ElementId.ToString() }, new List<string>() { channelDataType.ChannelDataTypeId.ToString() }, startDate, endDate);
+    }
+
+    private async Task<(IList<object> X, IList<object> Y)> GetXY(Element sensor, ChannelDataType channelDataType)
+    {
+        if (sensedNodes.nodes is null)
+        {
+            sensedNodes = await Task.Run(() => Structural.Simulation.GetSensedNodes(appData.Structure, entitiesService._appDBContext, sensors));
+        }
+        Guid? sensedNodeGuid = sensedNodes.sensorNodeDic[sensor.ElementId];
+        if (sensedNodeGuid == null)
+        {
+            return (null, null);
+        }
+        int index = sensedNodes.sensedNodesIndex[(Guid)sensedNodeGuid];
+
+        double[] column = qTime.GetColumn(index * 3 + channelDataTypeList.IndexOf(channelDataType));
+        double[] xs = Enumerable.Range(1, column.Count()).Select(i => (double)i).ToArray();
+
+        IList<object> X = xs.Cast<object>().ToList();
+        IList<object> Y = column.Cast<object>().ToList();
+
+        return (X, Y);
+    }
+
+    private async Task plot(bool args, Element sensor, ChannelDataType channelDataType)
+    {
+        if (args == true)
+        {
+            selectedSensorsChannelDataTypes.Add((sensor, channelDataType));
+            await ploti(args, sensor, channelDataType);
+        }
+        else
+        {
+            selectedSensorsChannelDataTypes.Remove((sensor, channelDataType));
+            await ploti(args, sensor, channelDataType);
+        }
+    }
+
+
+
+    private async Task ploti(bool args, Element sensor, ChannelDataType channelDataType)
+    {
+
+        if (sensor.AttributeElements.Count == 0)
+        {
+            entitiesService.LoadCollection(sensor, "AttributeElements");
+        }
+
+        string name = sensor.Name + " " + "Channel " + channelDataType.Name;
+        if (args)
+        {
+            if (!toBeShown.Contains((sensor, channelDataType))) toBeShown.Add((sensor, channelDataType));
+
+
+
+            if (selectedChartsTypes.Contains("TimeDomain") && selectedSourceTypes.Contains("History"))
+            {
+                List<object[]> la = await GetLa(sensor, channelDataType);
+
+                IList<object> X = la.Select(x => x[0]).ToList();
+                IList<object> Y = la.Select(x => x[2]).ToList();
+                PlotData(name, X, Y, chartBundles["TimeDomainHistory"].Data);
+            }
+
+            if (selectedChartsTypes.Contains("TimeDomain") && selectedSourceTypes.Contains("Simulation"))
+            {
+
+                var (X, Y) = await GetXY(sensor, channelDataType);
+
+                PlotData(name, X, Y, chartBundles["TimeDomainSimulation"].Data);
+
+            }
+
+            if (selectedChartsTypes.Contains("ModalDeformation") && selectedSourceTypes.Contains("Simulation"))
+            {
+
+
+
+
+
+            }
+
+            if (selectedChartsTypes.Contains("Fourier") && selectedSourceTypes.Contains("Simulation"))
+            {
+
+                var (X, Y) = await GetXY(sensor, channelDataType);
+
+                var rrr = Structural.SP.FFT2(Y.Select(x => Convert.ChangeType(x, typeof(double), CultureInfo.InvariantCulture)).Cast<double>().ToArray());
+                rrr[0] = 0;
+                Y = rrr.Select(x => Convert.ChangeType(x.Magnitude, typeof(object))).Cast<object>().ToArray();
+                PlotData(name, X, Y, chartBundles["FourierSimulation"].Data);
+
+            }
+
+
+
+            if (selectedChartsTypes.Contains("Fourier") && selectedSourceTypes.Contains("History"))
+            {
+                List<object[]> la = await GetLa(sensor, channelDataType);
+
+                IList<object> Y = la.Select(x => x[2]).ToList();
+                IList<object> X = Enumerable.Range(1, Y.Count()).Select(i => (object)i).ToList();
+
+
+                var rrr = Structural.SP.FFT2(Y.Select(x => Convert.ChangeType(x, typeof(double), CultureInfo.InvariantCulture)).Cast<double>().ToArray());
+                rrr[0] = 0;
+                Y = rrr.Select(x => Convert.ChangeType(x.Magnitude, typeof(object))).Cast<object>().ToArray();
+                PlotData(name, X, Y, chartBundles["FourierHistory"].Data);
+
+            }
+
+            if (selectedChartsTypes.Contains("TimeDomain") && selectedSourceTypes.Contains("Live"))
+            {
+
+                string? adressmapping = sensor.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name.Trim().ToLower() == "adressmapping").Value;
+                if (!filterAddress.ContainsKey(adressmapping))
+                    filterAddress.Add(adressmapping, name);
+
+
+                StateHasChanged();
+                try
+                {
+                    //  if (!updating)
+                    {
+                        //updating = true;
+                        await FillStack("TimeDomain", name);
+
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("errooooor");
+                }
+
+                //if (selectedChartsTypes.Count == 1) return;
+            }
+
+            if (selectedChartsTypes.Contains("Fourier") && selectedSourceTypes.Contains("Live"))
+            {
+                string? adressmapping = sensor.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name.Trim().ToLower() == "adressmapping").Value;
+                if (!filterAddress.ContainsKey(adressmapping))
+                    filterAddress.Add(adressmapping, name);
+
+                await FillStack("Fourier", name);
+            }
+
+
+        }
+        else
+        {
+            toBeShown.Remove((sensor, channelDataType));
+
+            if (selectedChartsTypes.Contains("TimeDomain") && selectedSourceTypes.Contains("History"))
+            {
+                PlotData(name, null, null, chartBundles["TimeDomainHistory"].Data, "TimeDomainHistory");
+
+            }
+            if (selectedChartsTypes.Contains("TimeDomain") && selectedSourceTypes.Contains("Simulation"))
+            {
+                PlotData(name, null, null, chartBundles["TimeDomainSimulation"].Data, "TimeDomainSimulation");
+            }
+            if (selectedChartsTypes.Contains("Fourier") && selectedSourceTypes.Contains("Simulation"))
+            {
+                PlotData(name, null, null, chartBundles["FourierSimulation"].Data, "FourierSimulation");
+            }
+            if (selectedChartsTypes.Contains("ModalDeformation") && selectedSourceTypes.Contains("Simulation"))
+            {
+                // name = "Modal deformation " + Vp;
+                //  PlotData(name, null, null, chartBundles["ModalDeformationSimulation"].Data);
+            }
+
+
+            if (selectedChartsTypes.Contains("Fourier") && selectedSourceTypes.Contains("History"))
+            {
+                PlotData(name, null, null, chartBundles["FourierHistory"].Data, "FourierHistory");
+            }
+
+            if (selectedChartsTypes.Contains("Fourier") && selectedSourceTypes.Contains("Live"))
+            {
+
+                while (bundleUpdating)
+                {
+                    System.Threading.Thread.Sleep(100);  // wait for 100 milliseconds
+                }
+                chartBundles["FourierLive"].Data = new List<ITrace>();
+
+                dic.Remove(name);
+
+                string? adressmapping = sensor.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name.Trim().ToLower() == "adressmapping").Value;
+                filterAddress.Remove(adressmapping);
+
+                PlotData(name, null, null, chartBundles["FourierLive"].Data, "FourierLive");
+            }
+
+
+            if (selectedChartsTypes.Contains("TimeDomain") && selectedSourceTypes.Contains("Live"))
+            {
+
+                string? adressmapping = sensor.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name.Trim().ToLower() == "adressmapping").Value;
+                filterAddress.Remove(adressmapping);
+
+                // ITrace it = chartBundles["TimeDomainLive"].Data.FirstOrDefault(x => ((Scatter)x).Name == name);
+
+                // if (it == null) return;
+                // await chartBundles["TimeDomainLive"].Chart.DeleteTrace(it);
+                // chartBundles["TimeDomainLive"].Data.Remove(it);
+
+
+            }
+
+        }
+    }
+
+
+    string message = string.Empty;
+    bool run = true;
+    async Task FillStack(string chartType, string name)
+    {
+        long diff = -1;
+        run = false;
+        await Task.Delay(1000);
+
+        DateTime lastSentTime = DateTime.MinValue;
+
+        using (TcpClient client = new TcpClient(ServerHost, ServerPort))
+        using (NetworkStream networkStream = client.GetStream())
+        using (StreamReader reader = new StreamReader(networkStream))
+        {
+            run = true;
+            while (run)
+            {
+                if ((DateTime.UtcNow - lastSentTime).TotalMilliseconds >= stepSize)
+                {
+                    int index = 0;
+                    while (index < filterAddress.Count)
+                    {
+
+                        message = await reader.ReadLineAsync();
+                        message = message.Trim();
+                        string[] parts = message.Split();
+
+                        string address = parts[0].ToString();
+                        long t = long.Parse(parts[1], CultureInfo.InvariantCulture) / 1000;// - 1692257501702; 1697497450736133
+                                                                                           // DateTimeOffset dateTimeOffset = DateTime.Now;// DateTimeOffset.FromUnixTimeMilliseconds(t);
+
+                        long timeNow = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+                        if (diff == -1)
+                        {
+                            diff = timeNow - t;
+                        }
+
+                        t = t + diff;
+
+                        double x = double.Parse(parts[2], CultureInfo.InvariantCulture);
+                        double y = double.Parse(parts[3], CultureInfo.InvariantCulture);
+                        double z = double.Parse(parts[4], CultureInfo.InvariantCulture);
+
+                        if (filterAddress.Keys.Contains(address))
+                        {
+
+                            DataUpdateService.UpdateData(chartType, filterAddress[address], address, t, x, y, z);
+                            index++;
+                        }
+                    }
+
+                    lastSentTime = DateTime.UtcNow;
+                }
+                else
+                {
+                    await reader.ReadLineAsync();
+                }
+            }
+        }
+    }
+    async Task UpdateDataFourier(string name)
+    {
+    Start:
+        try
+        {
+
+
+            DateTimeOffset dateTimeOffset = DateTimeOffset.FromUnixTimeMilliseconds(DataUpdateService.t);
+
+            foreach (var a in filterAddress)
+            {
+
+                if (a.Key == DataUpdateService.address)
+                {
+                    if (!dic.Keys.Contains(name))
+                    {
+                        dic.Add(name, new Queue<object>());
+                    }
+
+                    dic[name].Enqueue(DataUpdateService.y);
+                    if (dic[name].Count > 1000)
+                    {
+                        dic[name].Dequeue();
+                    }
+
+                    if (dic[name].Count < 20) continue;
+
+                    IList<object> X = Enumerable.Range(1, dic[name].Count).ToList().Cast<object>().ToList(); ;
+                    IList<object> Y = dic[name].ToList();
+
+                    var rrr = Structural.SP.FFT2(Y.Select(x => Convert.ChangeType(x, typeof(double), CultureInfo.InvariantCulture)).Cast<double>().ToArray());
+
+                    rrr[0] = 0;
+                    Y = rrr.Select(x => Convert.ChangeType(x.Magnitude, typeof(object))).Cast<object>().ToArray();
+
+                    ITrace it = chartBundles["FourierLive"].Data.FirstOrDefault(x => ((Scatter)x).Name == name);
+
+                    if (it == null)
+                    {
+                        Scatter sc = new Scatter();
+
+                        sc.Name = name;
+                        sc.XCalendar = Plotly.Blazor.Traces.ScatterLib.XCalendarEnum.Gregorian;
+                        sc.Mode = Plotly.Blazor.Traces.ScatterLib.ModeFlag.Lines;
+
+                        sc.X = X;
+                        sc.Y = Y;
+
+                        chartBundles["FourierLive"].Data.Add(sc);
+                    }
+                    else
+                    {
+                        ((Scatter)it).X = X;
+                        ((Scatter)it).Y = Y;
+                    }
+
+
+
+
+                }
+
+            }
+
+
+
+        }
+        catch (Exception ex)
+        {
+            await Task.Delay(100);
+            goto Start;
+
+        }
+
+    }
+
+    async Task UpdateDataTimeDomain(string name)
+    {
+        try
+        {
+            Random rand = new Random();
+
+
+            DateTimeOffset dateTimeOffset = DateTimeOffset.FromUnixTimeMilliseconds(DataUpdateService.t);
+
+            if (filterAddress.Keys.Contains(DataUpdateService.address))
+            {
+                chartBundles["TimeDomainLive"].Layout.XAxis[0].Range = new object[] { DateTime.Now - MaxTimeWindow, DateTime.Now };
+
+                ITrace it = chartBundles["TimeDomainLive"].Data.FirstOrDefault(x => ((Scatter)x).Name == name);
+
+                if (it == null)
+                {
+
+                    Scatter scatterData = new Scatter
+                        {
+                            Name = name,
+                            Mode = ModeFlag.Lines,
+                            X = new List<object>(),
+                            Y = new List<object>(),
+                            XCalendar = Plotly.Blazor.Traces.ScatterLib.XCalendarEnum.Gregorian
+
+                        };
+
+                    scatterData.Line = new Line();
+
+                    scatterData.Line.Color = $"rgb({rand.Next(256)}, {rand.Next(256)}, {rand.Next(256)})";
+
+
+                    chartBundles["TimeDomainLive"].Data.Add(scatterData);
+
+                }
+                else
+                {
+
+                    ((Scatter)it).X.Add(DateTime.Now);
+                    ((Scatter)it).Y.Add(DataUpdateService.y);
+                    // if (!letUpdateDataRun) break;
+                    var startTime = ((Scatter)it).X.First();
+                    var endTime = ((Scatter)it).X.Last();
+
+
+                    TimeSpan timeWindow = ((DateTime)endTime) - ((DateTime)startTime);
+
+
+                    if (timeWindow > MaxTimeWindow)
+                    {
+                        ((Scatter)it).X.RemoveAt(0); // Remove the oldest data point
+                        ((Scatter)it).Y.RemoveAt(0);
+                    }
+
+                }
+
+                //   if (!letUpdateDataRun) break;
+                await chartBundles["TimeDomainLive"].Chart.Update(ct);
+
+            }
+
+
+        }
+        catch (Exception ex)
+        {
+            await Task.Delay(100);
+            UpdateDataTimeDomain(name);
+        }
+
+    }
+
+
+
+
+    async void OnChangeSelectedChartTypes(bool args, string chartType)
+    {
+        if (args)
+        {
+            if (chartType == "ModalDeformation")
+            {
+                if (str == null)
+                {
+                    str = Structural.Simulation.CreateStructure(appData.Structure, null, entitiesService);
+                }
+
+                if ((ValeursPropres == null) || (VecteursPropres == null))
+                {
+                    ValeursPropres = Structural.StructuralVibration.Calcul_ValeursPropres(str.element,
+                    str.noeud, str.MasseNodale, str.CL, out VecteursPropres);
+                }
+            }
+
+
+            selectedChartsTypes.Add(chartType);
+
+            foreach (var v in selectedSensorsChannelDataTypes)
+            {
+                ploti(true, v.Item1, v.Item2);
+            }
+        }
+        else
+        {
+            foreach (var chb in chartBundles.Keys)
+            {
+                if (chb.Contains(chartType))
+                {
+                    if (chartBundles[chb].Data.Count != 0)
+                    {
+                        chartBundles[chb].Chart.Clear();
+                    }
+                }
+
+            }
+
+
+            if (chartType == "ModalDeformation")
+            {
+                ValeursPropres = null;
+                VecteursPropres = null;
+            }
+
+
+
+            selectedChartsTypes.Remove(chartType);
+
+            Selected = !Selected;
+            this.StateHasChanged();
+            await Task.Delay(100);
+            Selected = !Selected;
+
+            this.StateHasChanged();
+
+        }
+    }
+
+    async Task OnChangeSelectedSourceTypes(bool args, string sourceType)
+    {
+        if (args)
+        {
+            if (sourceType == "Simulation")
+            {
+                isSimulating = true;
+
+
+                if (str == null)
+                {
+                    str = await Task.Run(() => Structural.Simulation.CreateStructure(appData.Structure, selectedLoadCases, entitiesService));
+                }
+
+                if ((qTime == null) || simpaChanged)
+                {
+                    qTime = StructuralTimeIntegration.Calcul_Dynamique(duree: simPa.Duree, nbReponse: simPa.SamplingFrequency,
+        nbIntegration: simPa.SamplingFrequency * 10, nddl: str.nddl, noeud: str.noeud, element: str.element,
+         CL: str.CL, MasseNodale: str.MasseNodale,
+        str.ChargesStatiquePonctuelles, str.ChargesStatiqueReparties, str.ChargesDynamiquePonctuelles,
+           str.ChargesDynamiqueReparties, str.ChargesMobiles);
+
+                    if (simPa.WriteCSV)
+                    {
+                        string path = FileManagementService.GetFilesLocation(appData.Structure, @"wwwroot\CSVs").Item1;
+                        if (!Directory.Exists(path))
+                        {
+                            Directory.CreateDirectory(path);
+                        }
+                        string fileName = Path.Combine(path, "SimulationResults.csv");
+                        await AI.Helpers.WriteArrayToCsvAsync(qTime, fileName);
+
+                    }
+
+                    simpaChanged = false;
+                }
+                isSimulating = false;
+            }
+            selectedSourceTypes.Add(sourceType);
+
+            foreach (var v in selectedSensorsChannelDataTypes)
+            {
+                ploti(true, v.Item1, v.Item2);
+            }
+
+        }
+        else
+        {
+            if (sourceType == "Simulation")
+            {
+                str = null;
+                qTime = null;
+                simpaChanged = true;
+            }
+
+            foreach (var chb in chartBundles.Keys)
+            {
+                if (chb.Contains(sourceType))
+                {
+                    if (chartBundles[chb].Data.Count != 0)
+                    {
+                        chartBundles[chb].Chart.Clear();
+                    }
+                }
+
+            }
+
+            selectedSourceTypes.Remove(sourceType);
+
+            Selected = !Selected;
+            this.StateHasChanged();
+            await Task.Delay(100);
+            Selected = !Selected;
+
+            this.StateHasChanged();
+
+        }
+    }
+
+
+
+    void OnChangeSelectedChannelDataTypes(object value)
+    {
+        isLoading = true;
+        StateHasChanged();
+        selectedElements = sensors.Where(x => selectedChannelDataTypes.Intersect(x.ElementType.ChannelDataTypeElementTypes.Select(x => x.ChannelDataTypeId)).Count() > 0).ToList();
+        isLoading = false;
+        StateHasChanged();
+    }
+
+
+
+    private async Task AddData()
+    {
+        navigationManager.NavigateTo("/AddDataToInflux/" + ListJson);
+    }
+
+
+    public async Task OnBeforeInternalNavigation(LocationChangingContext context)
+    {
+        cts.Cancel();
+        appData.OnBeforeInternalNavigation(context);
+    }
+
+    private async Task OnClick(string text)
+    {
+        await DialogService.OpenAsync<SimPaComponent>($"Simulation Parameters",
+    new Dictionary<string, object>() { { "simPa", simPa } ,
+    {"LoadCases",loadCases},
+    {"SelectedLoadCases", selectedLoadCases},
+    {"Coeficients", coeficients}
+            },
+       new DialogOptions() { Width = "700px", Height = "570px" });
+        //NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Info, Summary = "Button Clicked", Detail = text });
+        simpaChanged = true;
+    }
+
+    private void UpdateUI(string chartType, string name)
+    {
+        if (chartType == "TimeDomain")
+        {
+        //    UpdateDataTimeDomain(name);
+        }
+        else if (chartType == "Fourier")
+        {
+            UpdateDataFourier(name);
+        }
+
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        DataUpdateService.OnDataUpdated -= UpdateUI;
+    }
+
+}

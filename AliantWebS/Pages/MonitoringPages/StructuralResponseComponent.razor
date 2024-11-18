@@ -1,0 +1,165 @@
+﻿@page "/StructuralResponse/"
+@using AliantWebS.Data
+@using AliantWebS.Models
+@using Structural
+@using AliantWebS.Pages.LoadPages
+@inject EntitiesService entitiesService
+@inject NavigationManager navigationManager
+@inject AppData appData
+@inject IStringLocalizer<Languages> L
+@layout InventoryElementPages.ElementsLayout
+
+<NavigationLock OnBeforeInternalNavigation="appData.OnBeforeInternalNavigation" ConfirmExternalNavigation="appData.SaveConfirmation&& appData.SaveChanges" />
+
+
+<div class="page" Style="display: flex">
+    <RadzenSplitter Orientation="Radzen.Orientation.Horizontal" style="height: 100%; border: 1px solid rgba(0,0,0,.08);">
+        <RadzenSplitterPane Size="30%">
+            <LoadCasesSelector LoadCases="@loadCases" SelectedLoadCases="@selectedLoadCases" Coeficients="coeficients"></LoadCasesSelector>
+        </RadzenSplitterPane>
+
+        <RadzenSplitterPane Size="70%">
+
+            <EditForm Model="simPa">
+                <DataAnnotationsValidator />
+                <Blazorise.Row>
+                    <Column ColumnSize="ColumnSize.Is8">
+                        <div class="form-group">
+                            <label>@L["Simulation Identifier"]:</label>
+                            <div>
+                                <InputText @bind-Value="@simPa.SimulationID" />
+                                <ValidationMessage For="@(() => simPa.SimulationID)" />
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>@L["Short Description"] :</label>
+                            <div>
+                                <textarea @bind="@simPa.ShortDescription" class="form-control"></textarea>
+                                <ValidationMessage For="@(() => simPa.ShortDescription)" />
+                            </div>
+                        </div>
+                        <div class="form-group ">
+                            <div>
+                                <label>@L["Signal Length (seconds)"]:</label>
+                                <div>
+                                    <InputNumber @bind-Value="@simPa.Duree" />
+                                    <ValidationMessage For="@(() => simPa.Duree)" />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group ">
+                            <div>
+                                <label>@L["Sampling Frequency"] :</label>
+                                <div>
+                                    <InputNumber @bind-Value="@simPa.SamplingFrequency" />
+                                    <ValidationMessage For="@(() => simPa.SamplingFrequency)" />
+                                </div>
+                            </div>
+                        </div>
+                    </Column>
+                    <Column ColumnSize="ColumnSize.Is4">
+
+
+
+                        <div class="form-group ">
+                            <div>
+                                <label>@L["Simulation Seed"]:</label>
+                                <div>
+                                    <InputNumber @bind-Value="@simPa.GlobalSeed" />
+                                    <ValidationMessage For="@(() => simPa.GlobalSeed)" />
+                                </div>
+                            </div>
+                        </div>
+
+
+                    </Column>
+                </Blazorise.Row>
+
+                <br />
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <button type="button" class="btn btn-success" @onclick="@Calcul">
+                                @L["Calcul"]
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+
+            </EditForm>
+
+
+        </RadzenSplitterPane>
+    </RadzenSplitter>
+
+
+</div>
+
+@code {
+    Structural.Structure structuralStructure;
+
+    Structural.SimulationParameters simPa = new SimulationParameters();
+
+    List<LoadCase> loadCases = new List<LoadCase>();
+
+    Dictionary<LoadCase, double> selectedLoadCases = new Dictionary<LoadCase, double>();
+    Dictionary<Guid, double> coeficients = new Dictionary<Guid, double>();
+
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (appData.Structure == null)
+        {
+            navigationManager.NavigateTo("Structures");
+        }
+
+        loadCases = await entitiesService.GetAllEntitiesAsync<LoadCase>();
+        foreach (LoadCase lc in loadCases)
+        {
+            coeficients.Add(lc.LoadCaseId, 1);
+        }
+
+
+
+
+    }
+
+
+
+    private async Task Calcul()
+    {
+        structuralStructure = Structural.Simulation.CreateStructure(appData.Structure, selectedLoadCases, entitiesService);
+
+        if (simPa.Duree == 0)
+        {
+            double[] q = new double[structuralStructure.nddl];
+            List<double[]> Fe = new List<double[]>();
+            Structural.StructuralStatic.StaticAnalysis(structuralStructure, q, Fe);
+        }
+        else
+        {
+            StructuralTimeIntegration.Calcul_Dynamique(simPa.Duree, simPa.SamplingFrequency,
+                nbIntegration: simPa.SamplingFrequency * 10,
+        nddl: structuralStructure.nddl, noeud: structuralStructure.noeud, element: structuralStructure.element, CL: structuralStructure.CL,
+              MasseNodale: structuralStructure.MasseNodale,
+                ChargesStatiquePonctuelles: structuralStructure.ChargesStatiquePonctuelles, ChargesStatiqueReparties: structuralStructure.ChargesStatiqueReparties,
+              ChargesDynamiquePonctuelles: structuralStructure.ChargesDynamiquePonctuelles, ChargesDynamiqueReparties: structuralStructure.ChargesDynamiqueReparties,
+              ChargesMobiles: structuralStructure.ChargesMobiles
+            );
+            /*structu(duree: simulationParameters.Duree, nbReponse: simulationParameters.SamplingFrequency,
+         nbIntegration: simulationParameters.SamplingFrequency * 10, element: Str.element, noeud: Str.noeud,
+             MasseNodale: structuralStructure.MasseNodale, CL: structuralStructure.CL,
+             ChargesStatiquePonctuelles:  structuralStructure.ChargesStatiquePonctuelles,
+             ChargesStatiqueReparties: structuralStructure.ChargesStatiqueReparties,
+             ChargesDynamiquePonctuelles: structuralStructure.ChargesDynamiquePonctuelles,
+             ChargesDynamiqueReparties: structuralStructure.ChargesDynamiqueReparties,
+             ChargesMobiles: structuralStructure.ChargesMobiles,
+             Vehicle,
+             out qt, out qTime);
+             */
+        }
+    }
+}

@@ -1,0 +1,305 @@
+﻿@page "/DashBoard2/"
+@using AliantWebS.Data
+@using AliantWebS.Models
+@using System.Text.Json;
+@inject EntitiesService entitiesService
+@inject NavigationManager navigationManager
+@inject AppData appData
+@inject IStringLocalizer<Languages> L
+@inject IJSRuntime js
+
+<style>
+    .chart-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 10px;
+        padding: 10px;
+        width: 100%;
+        height: auto;
+        overflow: auto;
+        max-height: 600px;
+        min-width: 100%;
+    }
+
+
+
+    .radzen-chart {
+        height: 300px; /* Fixed height for each chart */
+        width: 100%; /* Chart width is responsive to the grid column width */
+    }
+
+    .chart-container {
+        text-align: center; /* Centers the label and chart within the container */
+        margin: 10px; /* Optional: Adds some space around each chart container */
+    }
+
+    .chart-label {
+        margin-bottom: 5px; /* Spacing between the label and the chart */
+    }
+
+</style>
+
+<NavigationLock OnBeforeInternalNavigation="appData.OnBeforeInternalNavigation" ConfirmExternalNavigation="appData.SaveConfirmation&& appData.SaveChanges" />
+
+
+
+<RadzenSplitter Orientation="Radzen.Orientation.Horizontal" style="height: 80vh; border: 1px solid rgba(0,0,0,.08);">
+    <RadzenSplitterPane Size="50%">
+
+        <RadzenSplitter Orientation="Radzen.Orientation.Vertical" style="height: 100%; border: 1px solid rgba(0,0,0,.08);">
+            <RadzenSplitterPane Size="25%">
+
+                <RadzenSplitter Orientation="Radzen.Orientation.Horizontal" style="height: 100%; border: 1px solid rgba(0,0,0,.08);">
+                    <RadzenSplitterPane Size="33%">
+                        <div style="display: flex; flex-direction: column; align-items: center; width: 100%; height: 100%;">
+                            <div id="chart1" style="margin-top:15px; width:100%;"></div>
+                            <Label>Taux de travail moyen</Label>
+                        </div>
+                    </RadzenSplitterPane>
+                    <RadzenSplitterPane Size="33%">
+                        <div style="display: flex; flex-direction: column; align-items: center; width: 100%; height: 100%;">
+
+                            <div id="chart2" style="margin-top:15px; width:100%"></div>
+                            <Label>Taux de travail maximal</Label>
+                        </div>
+                    </RadzenSplitterPane>
+                    <RadzenSplitterPane Size="33%">
+                        <div style="display: flex; flex-direction: column; align-items: center; width: 100%; height: 100%;">
+
+                            <div id="chart3" style="margin-top:15px; width:100%"></div>
+                            <Label>Pourcentage d'éléments critiques </Label>
+                        </div>
+                    </RadzenSplitterPane>
+                </RadzenSplitter>
+
+
+            </RadzenSplitterPane>
+
+            <RadzenSplitterPane Size="75%">
+                <AliantWebS.Pages.InventoryElementPages.BIMComponent Rigidities="rigidities" Structure="appData.Structure"></AliantWebS.Pages.InventoryElementPages.BIMComponent>
+
+            </RadzenSplitterPane>
+
+            @*                <RadzenSplitterPane Size="33%">
+
+            </RadzenSplitterPane>*@
+        </RadzenSplitter>
+
+
+    </RadzenSplitterPane>
+
+    <RadzenSplitterPane Size="50%">
+
+        <RadzenSplitter Orientation="Radzen.Orientation.Vertical" style="height: 100%; border: 1px solid rgba(0,0,0,.08);">
+            <RadzenSplitterPane Size="50%">
+                @*                 @if (@present)
+                {
+
+                <h4>Rigidités des elements structuraux</h4>
+                <RadzenChart style="height: 600px; width:600px">
+                <RadzenBarSeries Data="@revenue2020" CategoryProperty="Quarter" Title="Rigidité" LineType="LineType.Dashed" ValueProperty="Revenue">
+                <RadzenSeriesDataLabels Visible="@showDataLabels" />
+                </RadzenBarSeries>
+
+                <RadzenValueAxis>
+                <RadzenGridLines Visible="true" />
+                <RadzenAxisTitle Text="Rigidité" />
+                </RadzenValueAxis>
+                <RadzenBarOptions Radius="5" />
+                </RadzenChart>
+
+                } *@
+                <IndicesInTimeComponent GraphId="g2" Headers="headers" Indices="indices"></IndicesInTimeComponent>
+            </RadzenSplitterPane>
+
+            <RadzenSplitterPane Size="50%">
+                @* <ModalShapesComponent structure="appData.Structure"></ModalShapesComponent> *@
+                @* <ModalShapesDygraphsComponent structure="appData.Structure"></ModalShapesDygraphsComponent> *@
+
+                <div class="chart-grid">
+                    @foreach (var d in dataItemsLists)
+                    {
+                        <div class="chart-container">
+                            <div class="chart-label">
+                                <Label>@d.Key</Label>
+                            </div>
+                            <RadzenChart class="radzen-chart">
+                                <RadzenPieSeries TItem="DataItem" Data="@d.Value" CategoryProperty="Quarter" Title="@d.Key" ValueProperty="Revenue">
+                                    <RadzenSeriesDataLabels Visible="@showDataLabels" />
+                                </RadzenPieSeries>
+                            </RadzenChart>
+                        </div>
+                    }
+                </div>
+            </RadzenSplitterPane>
+
+        </RadzenSplitter>
+    </RadzenSplitterPane>
+</RadzenSplitter>
+
+@code {
+
+    private int value1;
+    private int value2;
+    private int value3;
+
+
+
+    List<Dictionary<DateTime, double>> indices = new List<Dictionary<DateTime, double>>();
+
+
+    //string jsonlistIDs;
+
+    bool showDataLabels = true;
+    class DataItem
+    {
+        public string Quarter { get; set; }
+        public double Revenue { get; set; }
+    }
+
+
+    bool present = false;
+
+    Dictionary<Guid, double> rigidities = null; //new List<double>() { 1.0075, 0.9982, 0.9747, 0.9801, 1.0098, 1.0015, 0.9829, 0.9749, 0.9731, 0.9753, 0.9907, 0.9983, 1.014, 0.9677, 0.9569, 1.013, 0.9965, 1, 1.0004, 0.9945, 0.989, 0.9908, 0.9991, 0.9966, 0.9873, 0.991, 1.0008, 0.9973 };
+
+    List<string> headers = new List<string>();
+    // {
+    //     "Date","Index1","Index2","Index3" };
+
+    Dictionary<string, DataItem[]> dataItemsLists = new Dictionary<string, DataItem[]>();
+    Structural.IdentificationResult ir = new Structural.IdentificationResult();
+    protected override async Task OnInitializedAsync()
+    {
+        //// exemple de save
+        // Structural.IdentificationResult ir = new Structural.IdentificationResult();
+        // ir.Kpi1 = 76;
+        // ir.Kpi2 = 85;
+        // ir.Kpi3 = 58;
+        // Dictionary<Guid, double> d = new Dictionary<Guid, double>();
+
+        // var eles = await entitiesService.GetFilteredEntitiesAsync<Element>(x => (x.StructureId == appData.Structure.StructureId) && (x.ElementType?.Name == "Beam2d"), "ElementType");
+        // var ll = new List<double>() { 1.0075, 0.9982, 0.9747, 0.9801, 1.0098, 1.0015, 0.9829, 0.9749, 0.9731, 0.9753, 0.9907, 0.9983, 1.014, 0.9677, 0.9569, 1.013, 0.9965, 1, 1.0004, 0.9945, 0.989, 0.9908, 0.9991, 0.9966, 0.9873, 0.991, 1.0008, 0.9973 };
+        // int j = 0;
+        // foreach(var e in eles)
+        // {
+        //     d.Add(e.ElementId, ll[j]);
+        //     j++;
+        // }
+
+        // ir.Rigidités = d;
+
+
+        // await ir.Save(appData.Structure);
+
+        if (appData.Structure == null)
+        {
+            navigationManager.NavigateTo(@"/Structures");
+        }
+
+      
+        try
+        {
+            ir = await ir.Load(appData.Structure);
+        }
+        catch (Exception ex)
+        {
+            await js.InvokeVoidAsync("alert", ex.Message + " Most likely Identification was not done");
+            return;
+        }
+
+        value1 = (int)(ir.TauxMoyen * 100);
+        value2 = (int)(ir.TauxMaximal* 100*0.93);
+        value3 = (int)(ir.Ptaux75_100 * 100);
+
+    //    rigidities = ir.TauxDetravail;
+
+
+
+
+
+        // indices.Add(series1);
+        // indices.Add(series2);
+        // indices.Add(series3);
+
+        present = true;
+
+        if ((appData.Structure.Events is null) || (appData.Structure.Events.Count == 0))
+        {
+            entitiesService.LoadCollection(appData.Structure, "Events");
+        }
+        Dictionary<DateTime, double> tauxDic = new Dictionary<DateTime, double>();
+        foreach(var ev in appData.Structure.Events)
+        {
+            if ((ev.StartDate != null) && (ev.TauxMoyen != null))
+            {
+                tauxDic.Add((DateTime)ev.StartDate, (double)ev.TauxMoyen);
+            }
+        }
+   
+
+
+        headers.Add("Date");
+        indices.Add(tauxDic);
+        headers.Add("Taux d'utilisation Moyen");
+        // indices.Add(tauxDic);
+        // headers.Add("Taux d'utilisation Moyen");
+        // indices.Add(tauxDic);
+        // headers.Add("Taux d'utilisation Moyen");
+        await GetElementsPercentages();// not awaited on purpose so it dosnnt block BIM display
+
+
+      
+    }
+
+
+    private async Task GetElementsPercentages()
+    {
+          
+   
+            DataItem[] dataItem = new DataItem[4];
+            
+        dataItem[0] = new DataItem() { Quarter = "0-25%", Revenue = (int)(ir.Ptaux0_25 * 100) };
+        dataItem[1] = new DataItem() { Quarter = "25-50%", Revenue = (int)(ir.Ptaux25_50 * 100) };
+        dataItem[2] = new DataItem() { Quarter = "50-75%", Revenue = (int)(ir.Ptaux50_75 * 100) };
+        dataItem[3] = new DataItem() { Quarter = "75-100%", Revenue = (int)(ir.Ptaux75_100 * 100) };
+
+            string title = "Taux de travail";
+            dataItemsLists.Add(title, dataItem);
+
+
+       
+
+        StateHasChanged();
+
+    }
+
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await js.InvokeVoidAsync("renderChart", value1, value2, value3);
+            List<Element> els = await entitiesService.GetFilteredEntitiesAsync<Element>(x => x.StructureId == appData.Structure.StructureId && x.ElementType != null && x.ElementType.Name == "Beam3d", "ElementType");
+            Dictionary<long, Guid> instanceIdsList = els
+                .Where(x => x.BimId.HasValue)
+                .ToDictionary(x => x.BimId.Value, x => x.ElementId);
+
+            var colors = AliantWebS.Pages.InventoryElementPages.BIMComponent.GenerateBlueToRedColors(101);
+
+            int i = 0;
+            foreach (var inst in instanceIdsList)
+            //for (int i =0; i<l.Count; i++)
+            {
+                if (!ir.TauxDetravail.Keys.Contains(inst.Value)) continue;
+                var tt = (int)ir.TauxDetravail[inst.Value] * 100;
+
+                List<long> ins = new List<long>() { inst.Key };
+
+                await js.InvokeVoidAsync("ColorElement", tt, ins.ToArray(), colors[tt].r, colors[tt].g, colors[tt].b);
+                i++;
+            }
+            this.StateHasChanged();
+        }
+    }
+}

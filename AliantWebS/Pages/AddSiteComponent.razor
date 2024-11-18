@@ -1,0 +1,33 @@
+﻿@page "/AddSite"
+@using AliantWebS.Data
+@using AliantWebS.Models
+@inject EntitiesService entitiesService
+@inject NavigationManager NavigationManager
+@inject AppData appData
+
+<NavigationLock OnBeforeInternalNavigation="appData.OnBeforeInternalNavigation" ConfirmExternalNavigation="appData.SaveConfirmation&& appData.SaveChanges" />
+
+
+<SiteFormComponent EditContext="@EditContext" ButtonText="Create" Site="@site"
+                        OnValidSubmit="@CreateSite"
+                        Title="Add Site" />
+
+@code {
+    [Parameter]
+    public EditContext EditContext { get; set; }
+
+    Site site = new Site();
+
+    protected override async Task OnInitializedAsync()
+    {
+        EditContext = new EditContext(site);
+    }
+
+    protected async void CreateSite()
+    {
+        await entitiesService.InsertEntityAsync(site);
+
+        NavigationManager.NavigateTo("Sites");
+    }
+
+}

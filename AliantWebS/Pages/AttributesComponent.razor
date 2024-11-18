@@ -1,0 +1,237 @@
+﻿@using AliantWebS.Data
+@inject EntitiesService entitiesService
+@using Models
+@inject AliantWebS.Data.AppData AppData
+
+@typeparam Titem1
+@typeparam Titem2
+@typeparam Titem3
+
+
+
+
+@if (somethingToPresent)
+{
+@*    <h3>@title</h3>*@
+    @if (attributeElementsList is null)
+    {
+        <p><em>Loading... !</em></p>
+    }
+    else
+    {
+        <EditForm Model="@st" OnValidSubmit="@OnValidSubmit">
+
+
+      
+                <RadzenDataGrid @ref="AttributesGrid" AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="10" RowSelect=@RowSelect
+                            Data="@attributeElementsList" TItem="Titem1" ColumnWidth="90px" RowEdit=@RowChanged RowDeselect=@RowDeselect>
+                    <Columns>
+                        <RadzenDataGridColumn TItem="Titem1" Title="Attribute">
+                            <Template Context="attributeElement">
+                                @(((AttributeType)reflexion(attributeElement, "AttributeType"))?.Name)
+                            </Template>
+                        </RadzenDataGridColumn>
+
+
+                        <RadzenDataGridColumn  TItem="Titem1" Title="Value" Property="Value">
+
+                            <EditTemplate Context="attributeElement">
+                                <InputText ValueExpression="@(() => st.Name)" Value="@((string)(attributeElement.GetType().GetProperties().First(x => x.Name == "Value").GetValue(attributeElement)))" ValueChanged="@(args => OnChange(args, attributeElement))"></InputText>
+                            </EditTemplate>
+                        </RadzenDataGridColumn>
+
+                                         
+                        <RadzenDataGridColumn TItem="Titem1" Title="Unit">
+                            <Template Context="attributeElement">
+                                @(((AttributeType)reflexion(attributeElement, "AttributeType"))?.Units)
+                            </Template>
+                        </RadzenDataGridColumn>
+
+
+@*                        <RadzenDataGridColumn  TItem="Titem1" Property="Length" Title="Action">
+                            <Template Context="data">
+                                <Div Style="display: flex">
+                                    <a title="Edit" class="nav-link" @onclick="@(args => EditRow(data))" @onclick:preventDefault="true" href="">
+                                        <span class="oi oi-pencil" aria-hidden="true"></span>
+                                    </a>
+                                    <a title="End Edit" class="nav-link" @onclick="@(args => UpdateRow(data))" @onclick:preventDefault="true" href="">
+                                        <span class="oi oi-check" aria-hidden="true"></span>
+                                    </a>
+                                </Div>
+                            </Template>
+
+                        </RadzenDataGridColumn>*@
+                    </Columns>
+                </RadzenDataGrid>
+        
+
+
+        </EditForm>
+
+
+    }
+}
+
+
+@code {
+
+    bool somethingToPresent = false;
+
+    Structure st = new Structure();
+
+    [Parameter]
+    public Titem2 element { get; set; }
+
+    [Parameter]
+    public string CallerIdName { get; set; }
+
+    [Parameter]
+    public string CallerTypeIdName { get; set; }
+
+    [Parameter]
+    public string CallerTypeName { get; set; }
+
+    [Parameter]
+    public string JunctionPropName { get; set; }
+
+
+    [Parameter] public EventCallback OnValidSubmit { get; set; }
+
+
+    RadzenDataGrid<Titem1> AttributesGrid;
+
+
+
+    string title;
+
+    Guid? elementTypeID;
+    object elementID;
+
+    IEnumerable<AttributeType> attributeTypesList;
+    ICollection<Titem1> attributeElementsList;
+
+   
+
+    void OnChange(string args, Titem1 attributeElement)
+    {
+        AppData.SaveChanges = true;
+        attributeElement.GetType().GetProperties().First(x => x.Name == "Value").SetValue(attributeElement, args);
+    }
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        somethingToPresent = false;
+        if (element is null) return;
+
+
+
+
+    }
+
+    public override async Task SetParametersAsync(ParameterView parameters)
+    {
+        await base.SetParametersAsync(parameters);
+
+        elementTypeID = (Guid?)reflexion(element, CallerTypeIdName);
+
+        if (elementTypeID is null) return;
+
+        somethingToPresent = true;
+        entitiesService.LoadCollection(element, JunctionPropName);
+
+        attributeElementsList = (ICollection<Titem1>)reflexion(element, JunctionPropName);
+
+
+
+        elementID = reflexion(element, CallerIdName);
+
+        title = CallerTypeName + " " + elementID + " Attributes";
+
+        IEnumerable<Titem3> ertet = await entitiesService.GetFilteredEntitiesAsync<Titem3>(a => ((Guid?)reflexion(a, CallerTypeIdName)) == elementTypeID, "AttributeType");
+
+        attributeTypesList = ertet.Select(x => (AttributeType)reflexion(x, "AttributeType"));
+
+        //  attributeTypesList = await entitiesService.GetFilteredEntitiesAsync<AttributeType>(a => AttributeTypeIDsList.Contains(a.AttributeTypeId));
+
+        ///rafic te be reviewd for optimality
+   
+            foreach (var v in attributeTypesList)
+            {
+                if (!attributeElementsList.Select(x => (Guid)reflexion(x, "AttributeTypeId")).Contains(v.AttributeTypeId))
+                {
+                    await InsertAttributeElement(v.AttributeTypeId);
+
+                }
+                //    entitiesService.LoadReference(v, "AttributeType");
+            }
+
+       
+        StateHasChanged();
+    }
+
+    object reflexion(object ob, string IdName)
+    {
+        var res = ob.GetType().GetProperties().FirstOrDefault(x => x.Name == IdName).GetValue(ob);
+        return res;
+
+    }
+
+
+
+    void EditRow(Titem1 attributeElement)
+    {
+        AttributesGrid.EditRow(attributeElement);
+    }
+
+    async Task InsertAttributeElement(Guid AttributeTypeID)
+    {
+        Titem1 attributeElement = new Titem1();
+
+
+        var v = attributeElement.GetType().GetProperties();
+
+        v.First(x => x.Name == CallerIdName).SetValue(attributeElement, elementID);
+        v.First(x => x.Name == "AttributeTypeId").SetValue(attributeElement, AttributeTypeID);
+        //  v.First(x => x.Name == "Date").SetValue(attributeElement, DateTime.Now);
+
+        var rr = await entitiesService.InsertEntityAsync(attributeElement);
+        // if (rr != null)
+        // {
+        //     attributeElementsList.Add(attributeElement);
+        // }
+
+        //await entitiesService.UpdateEntityAsync(element);
+
+        await AttributesGrid.Reload();
+
+
+    }
+
+    async Task UpdateRow(Titem1 attributeElement)
+    {
+
+        if (await entitiesService.UpdateEntityAsync(attributeElement))
+        {
+            await AttributesGrid.UpdateRow(attributeElement);
+        }
+
+    }
+
+
+    void RowSelect(Titem1 attributeElement)
+    {
+        EditRow(attributeElement);
+    }
+
+    void RowDeselect(Titem1 attributeElement)
+    {
+        UpdateRow(attributeElement);
+    }
+    void RowChanged(Titem1 attributeElement)
+    {
+        AppData.SaveChanges = true;
+    }
+    
+}

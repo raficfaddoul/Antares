@@ -1,0 +1,1603 @@
+﻿@page "/BIMComponent"
+@using Microsoft.AspNetCore.Hosting
+@using AliantWebS.Data
+@using AliantWebS.Models
+@inject IJSRuntime js
+@inject IWebHostEnvironment Environment
+@inject AppData appData;
+@inject EntitiesService entitiesService
+
+@using System.Diagnostics
+@using System.Collections.Immutable
+@using Xbim.Ifc
+@using Xbim.Geometry
+@using Xbim.Common
+@using Xbim.IO
+@using Xbim.Ifc4.Kernel
+@using Xbim.ModelGeometry
+@using Xbim.Ifc4
+@using Xbim.Presentation
+@using Xbim.Tessellator
+@using Xbim.ModelGeometry.Scene
+@using Xbim.Common.Step21
+@using Xbim.Ifc4.SharedBldgElements
+@using Xbim.Ifc4.PropertyResource
+@using Xbim.Ifc4.MeasureResource
+
+
+@using Xbim.Ifc;
+@using Xbim.IO;
+@using Xbim.Ifc4.ActorResource;
+@using Xbim.Ifc4.DateTimeResource;
+@using Xbim.Ifc4.ExternalReferenceResource;
+@using Xbim.Ifc4.PresentationOrganizationResource;
+@using Xbim.Ifc4.GeometricConstraintResource;
+@using Xbim.Ifc4.GeometricModelResource;
+@using Xbim.Ifc4.GeometryResource;
+@using Xbim.Ifc4.Interfaces;
+@using Xbim.Ifc4.Kernel;
+@using Xbim.Ifc4.MaterialResource;
+@using Xbim.Ifc4.MeasureResource;
+@using Xbim.Ifc4.ProductExtension;
+@using Xbim.Ifc4.ProfileResource;
+@using Xbim.Ifc4.PropertyResource;
+@using Xbim.Ifc4.QuantityResource;
+@using Xbim.Ifc4.RepresentationResource;
+@using Xbim.Ifc4.SharedBldgElements;
+@using Xbim.Common.Geometry;
+@using Xbim.Ifc4.Interfaces;
+
+@if (bimPresent)
+{
+
+    <div style="height:80vh; overflow: auto;">
+
+        <div id="container" >
+            <div id="viewerContainer" style="width:100%; height:600px">
+                <canvas id="viewer"></canvas>
+                <div style="position: absolute; left: 0; bottom: 0; width: 400px; height: 200px;">
+                    <canvas id="viewer2"></canvas>
+                </div>
+            </div>
+            <div id="overlay">
+                <div>
+                    Status:
+                    <span id="progress" />
+                </div>
+                <div>
+                    Selected:
+                    <span id="ids"></span> <br>
+                    <span id="coords"></span>
+                </div>
+                <div>
+                    Hover-over:
+                    <span id="hoverid"></span> <br>
+                    <span id="hovercoords"></span>
+                </div>
+                <div>
+                    Framerate (FPS):
+                    <span id="fps"></span>
+                </div>
+                <div>
+                    WebGL version:
+                    <span id="webglVersion"></span>
+                </div>
+
+            </div>
+        </div>
+        <RadzenAccordion Expand=@(args => Expand(args))>
+            <Items>
+                <RadzenAccordionItem Text="Tools" Icon="account_balance_wallet">
+                    <div class="left-panel">
+                        @*    <div>
+                    Debug Rafic:
+                    <span id="ddebug" />
+                    </div>*@
+
+
+
+                        <div>
+                            <button onclick="@Jumlage">
+                                Jumelage
+                            </button>
+                            <button onclick="@DeJumlage">
+                                DeJumelage
+                            </button>
+                            <button onclick="@Create">
+                                Create
+                            </button>
+                            <button onclick="takeSnapshot()">
+                                Take snapshot
+                            </button>
+                            <br />
+                            <div id="snapshot"></div>
+                            <div id="initialSnapshot">
+                            </div>
+                        </div>
+                        <div id="errLog" style="color: red">
+                        </div>
+                    </div>
+                    <div class="right-panel">
+                        <div>
+                            <button onclick="viewer.navigationMode = 'orbit'">Orbit</button>
+                            <button onclick="viewer.navigationMode = 'free-orbit'">Free orbit</button>
+                            <button onclick="viewer.navigationMode = 'pan'">Pan</button>
+                            <button onclick="viewer.navigationMode = 'zoom'">Zoom</button>
+                            <button onclick="viewer.navigationMode = 'look-around'">Look around</button>
+                            <button onclick="viewer.navigationMode = 'walk'">Walk</button>
+                        </div>
+                        <div>
+                            <button onclick="viewer.show(ViewType.DEFAULT)">Default</button>
+                            <button onclick="viewer.show(ViewType.FRONT)">Front</button>
+                            <button onclick="viewer.show(ViewType.BACK)">Back</button>
+                            <button onclick="viewer.show(ViewType.TOP)">Top</button>
+                            <button onclick="viewer.show(ViewType.BOTTOM)">Bottom</button>
+                            <button onclick="viewer.show(ViewType.LEFT)">Left</button>
+                            <button onclick="viewer.show(ViewType.RIGHT)">Right</button>
+                            <button onclick="zoomToSelection()">Zoom to selection</button>
+                        </div>
+
+                        <div>
+                            <button onclick="clip();">
+                                Clip model
+                            </button>
+                            <button onclick="hideClippingControl();">
+                                Hide control
+                            </button>
+                            <button onclick="unclip();">
+                                Reset clipping
+                            </button>
+                            <button onclick="clipBox();">
+                                Clip model with box
+                            </button>
+                            <button onclick="releaseClipBox();">
+                                Release clip box
+                            </button>
+                        </div>
+                        <div>
+                            <button onclick="viewer.camera = CameraType.PERSPECTIVE;">
+                                Perspective
+                            </button>
+                            <button onclick="viewer.camera = CameraType.ORTHOGONAL;">
+                                Orthographic
+                            </button>
+                        </div>
+                        <div>
+                            <button onclick="makeWallsRed()">
+                                Make all walls red
+                            </button>
+                            <button onclick="hideWalls()">
+                                Hide all walls
+                            </button>
+                            <button onclick="resetWalls()">
+                                Reset walls
+                            </button>
+                            <button onclick="selectAllWalls()">
+                                Select
+                            </button>
+                        </div>
+                        <div>
+                            <button onclick="viewer.addState(states.HIDDEN, types.IFCSPACE)">
+                                Hide spaces
+                            </button>
+                            <button onclick="viewer.resetState(types.IFCSPACE)">
+                                Show spaces
+                            </button>
+                            <button onclick="playSpaces()"> Play spaces </button>
+                        </div>
+                        <div>
+                            <form>
+                                <label>
+                                    <input type="radio" name="radioHiding" value="hideOne" /> Hide on click
+                                </label>
+                                <label>
+                                    <input type="radio" name="radioHiding" value="hideType" /> Hide by type
+                                </label>
+                                <label>
+                                    <input type="radio" name="radioHiding" value="noHide" /> No hiding
+                                </label>
+                            </form>
+                            <button onclick="for (var i in types){ if (types[i] !== types.IFCSPACE) {viewer.resetState(+types[i])}}">
+                                Show all
+                            </button>
+                            <button onclick="for (var i in types){ if (types[i] !== types.IFCSPACE) {viewer.setStyle(1, +types[i])}}">
+                                Make all glass
+                            </button>
+                            <button onclick="for (var i in types){ if (types[i] !== types.IFCSPACE) {viewer.setStyle(2, +types[i])}}">
+                                Make all white
+                            </button>
+                            <button onclick="for (var i in types) { if (types[i] !== types.IFCSPACE) { viewer.setStyle(states.UNSTYLED, +types[i]) } }">
+                                Make all default
+                            </button>
+                        </div>
+                        <div>
+                            Rendering mode:
+                            <br />
+                            <label>
+                                <input type="radio" name="radioRenderingMode" value="normal" checked="checked"
+                                       onchange="viewer.renderingMode = RenderingMode.NORMAL;" /> Normal
+                            </label>
+                            <label>
+                                <input type="radio" name="radioRenderingMode" value="xray"
+                                       onchange="viewer.renderingMode = RenderingMode.XRAY;" /> X-Ray
+                            </label>
+                            <label>
+                                <input type="radio" name="radioRenderingMode" value="xray"
+                                       onchange="viewer.renderingMode = RenderingMode.XRAY_ULTRA;" /> Ultra X-Ray
+                            </label>
+                            <label>
+                                <input type="radio" name="radioRenderingMode" value="gray"
+                                       onchange="viewer.renderingMode = RenderingMode.GRAYSCALE;" /> Grayscale
+                            </label>
+                        </div>
+                        <div>
+                            Grid and navigation cube
+                            <br />
+                            <button onclick="stopCube()"> Stop cube </button>
+                            <button onclick="startCube()"> Start cube </button>
+                            <button onclick="stopGrid()"> Stop grid </button>
+                            <button onclick="startGrid()"> Start grid </button>
+                        </div>
+                        <div>
+                            Gamma:
+                            <input type="range" name="gamma" min="0" max="5" value="1.0" step="0.1" oninput="updateGamma(event)">
+                            Contrast:
+                            <input type="range" name="contrast" min="0" max="5" value="1.0" step="0.1" oninput="updateContrast(event)">
+                            Brightness:
+                            <input type="range" name="brightness" min="-1" max="1" value="0.0" step="0.1"
+                                   oninput="updateBrightness(event)">
+                        </div>
+                        <div>
+                            Init script:
+                            <textarea id="initScript"></textarea>
+                            <button onclick="eval(initScript.value)" style="border-radius: 0 0 5px 5px">Run</button>
+                        </div>
+                    </div>
+
+                </RadzenAccordionItem>
+                <RadzenAccordionItem Text="Tools" Icon="account_balance_wallet">
+                </RadzenAccordionItem>
+
+            </Items>
+        </RadzenAccordion>
+
+
+        @*<button @onclick="@gogo">nrelrnjkl</button>*@
+        <button @onclick="@ColorElement">Color</button>
+        @*<button @onclick="@CreateBiM">Create IFC File</button>*@
+        @*<button @onclick="@transformToWexBim">Transform IFC To WEX</button>*@
+    </div>
+}
+else
+{
+    <h1>No Bim file associated with this structure</h1>
+}
+
+
+
+@code {
+
+    [Parameter]
+    public Structure Structure { get; set; }
+
+    [Parameter]
+    public Event eventt {get; set;}
+
+    [Parameter]
+    public Dictionary<Guid, double> Rigidities { get; set; }
+
+    [Parameter]
+    public ImmutableList<Equipement> Equipements { get; set; }
+
+    [Parameter]
+    public EventCallback<Equipement> OnAddItem { get; set; }
+
+
+
+    [Parameter]
+    public List<EquipementType> EquipementTypes { get; set; } = new List<EquipementType>();
+
+    string fileName;// = @"C:\Users\rafic\Desktop\AliantWebS\AliantWebS\AliantWebS\wwwroot\data\BasicWallCopy.ifc";
+
+    bool bimPresent = true;
+
+    private DotNetObjectReference<BIMComponent>? objRef;
+
+    List<AliantWebS.Models.Element> selectedElements;
+
+    List<long> highlightedElementsBimIds = new List<long>();
+
+
+    bool NodeMode = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        objRef = DotNetObjectReference.Create(this);
+        appData.OncheckedNodeObjectsChange += checkedNodeObjectsChange;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await gogo();
+            if (Rigidities != null)
+            {
+                await Task.Delay(2000);
+                await VisualizeDefects(Rigidities);
+            }
+
+        }
+    }
+
+    protected override async void OnParametersSet()
+    {
+        base.OnParametersSet();
+        if (Equipements != null)
+        {
+            await DisplayEquipements();
+        }
+    }
+
+
+
+    private async void checkedNodeObjectsChange(IEnumerable<AliantWebS.Models.Element> loong)
+    {
+        if (!bimPresent) return;
+        selectedElements = loong.ToList();
+
+        await js.InvokeVoidAsync("ResetStates");
+
+        highlightedElementsBimIds.Clear();
+
+        await HighlightElement(selectedElements.Select(x => x.BimId).ToList());
+    }
+
+
+
+    private async Task GetPosition(long id, Element el, double px, double py, double pz)
+    {
+
+        //  List<string> paths = await FileManagementService.GetPathForFilesAsync(Structure, false, @"wwwroot\data");
+        //  string path = paths.Find(x => x.ToLower().Contains(".ifc"));
+
+        //  using (var model = IfcStore.Open(path))
+        {
+            //   var beam = model.Instances[(int)id] as IIfcBeam;
+
+            //     var context = new Xbim3DModelContext(model);
+            //     context.CreateContext();
+
+
+            //   var productShape = context.ShapeInstancesOf(beam).FirstOrDefault();
+
+
+            // var global_pos =  productShape.Transformation.Translation;
+
+            //  var transformationMatrix = productShape.Transformation;
+
+            //  var representation = beam.Representation;
+            //  var representationItems = beam.Representation.Representations.SelectMany(r => r.Items);
+            //        var extrusion = representationItems.OfType<IIfcPolyline>().FirstOrDefault();
+            //         var globalPoints = extrusion.Points.Select(p =>
+            // {
+            // var xPoint = new XbimPoint3D(p.X, p.Y, 0);
+            // return transformationMatrix.Transform(xPoint);
+            // }).ToList();
+
+            //         var extrusion = representationItems.OfType<IfcExtrudedAreaSolid>().FirstOrDefault();
+            //         var globalPoints = extrusion.Points.Select(p =>
+            // {
+            // var xPoint = new XbimPoint3D(p.X, p.Y, 0);
+            // return transformationMatrix.Transform(xPoint);
+            // }).ToList();
+
+
+
+            if (el.AttributeElements.Count == 0)
+            {
+                entitiesService.LoadCollection(el, "AttributeElements");
+            }
+
+            var attributes = await entitiesService.GetFilteredEntitiesAsync<AttributeElement>(e => e.ElementId == el.ElementId && e.AttributeType.Name.Contains("Noeud"), "AttributeType");
+            // var attributes = entitiesService._appDBContext.AttributeElements
+            //             .Include(a => a.AttributeType).Where(e => e.ElementId == el.ElementId && e.AttributeType.Name.Contains("Noeud"));
+
+            var at1 = attributes.FirstOrDefault(a => a.AttributeType.Name == "Noeud1");
+            var at2 = attributes.FirstOrDefault(a => a.AttributeType.Name == "Noeud2");
+
+
+            var nodes = await entitiesService.GetFilteredEntitiesAsync<Element>(n => (n.StructureId == Structure.StructureId) && ((n.Name == at1.Value) || (n.Name == at2.Value)));
+
+            foreach (var n in nodes)
+            {
+                entitiesService.LoadCollection(n, "AttributeElements");
+                foreach (var a in n.AttributeElements)
+                {
+                    entitiesService.LoadReference(a, "AttributeType");
+                }
+            }
+
+            double? xn0, yn0, zn0, xn1, yn1, zn1, x, y, z,t;
+
+
+            xn0 = Converter.ParseDoubleAttributes(nodes[0], "X") * 1000;
+            yn0 = Converter.ParseDoubleAttributes(nodes[0], "Y") * 1000;
+            zn0 = Converter.ParseDoubleAttributes(nodes[0], "Z") * 1000;
+            if (zn0 == null) zn0 = 6300;
+
+            xn1 = Converter.ParseDoubleAttributes(nodes[1], "X") * 1000;
+            yn1 = Converter.ParseDoubleAttributes(nodes[1], "Y") * 1000;
+            zn1 = Converter.ParseDoubleAttributes(nodes[1], "Z") * 1000;
+            if (zn1 == null) zn1 = 6300;
+
+            Element selectedHostElement;
+
+            if ((xn0 != null) && (yn0 != null) && (zn0 != null) && (xn1 != null) && (yn1 != null) && (zn1 != null))
+            {
+                if (NodeMode)
+                {
+
+                    if (dist(px, py, pz, (double)xn0, (double)yn0, (double)zn0) < dist(px, py, pz, (double)xn1, (double)yn1, (double)zn1))
+                    {
+                        x = xn0; y = yn0; z = zn0;
+                        selectedHostElement = nodes[0];
+                        t = 0;
+                    }
+                    else
+                    {
+                        x = xn1; y = yn1; z = zn1;
+                        selectedHostElement = nodes[1];
+                        t = 1;
+                    }
+                }
+                else
+                {
+                    (x,y,z,t) = ProjectPointOnSegment((double)xn0, (double)yn0, (double)zn0, (double)xn1, (double)yn1, (double)zn1, px, py, pz);
+                    selectedHostElement = el;
+                }
+
+                foreach (EquipementType eqt in EquipementTypes)
+                {
+                    Equipement eq = new Equipement();
+                    eq.EquipementTypeId = eqt.EquipementTypeId;
+                    eq.X = x;
+                    eq.Y = y;
+                    eq.Z = z;
+                    eq.ProjectionParameter = t;
+                    eq.EventId = eventt.EventId;
+                    eq.ElementId = selectedHostElement.ElementId;
+                    eq.Name = eqt.Name + selectedHostElement.Name;
+                    var r = await entitiesService.InsertEntityAsync(eq);
+                    //  Equipements.Add(r);
+                    if (OnAddItem.HasDelegate)
+                    {
+                        await OnAddItem.InvokeAsync(r);
+                    }
+                    var imagesrc = Convert.ToBase64String(eqt.Icon);
+                    await js.InvokeVoidAsync("AddEquipmentTag", x, y, z, imagesrc, eqt.Name, "Weight:"+ (eqt.Weight?.ToString()?? "Nan") + ". " + eqt.Description);
+                }
+
+
+            }
+
+
+            // for(int index =0; index<globalPoints.Count; index++)
+            // {
+            //     globalPoints[index] = new XbimPoint3D(globalPoints[index].X, globalPoints[index].Y - 4000, globalPoints[index].Z);
+
+            // }
+
+            // double[] AB = { globalPoints[1].X - globalPoints[0].X, globalPoints[1].Y - globalPoints[0].Y, globalPoints[1].Z - globalPoints[0].Z };
+            // double[] AP = { px - globalPoints[0].X, py - globalPoints[0].Y, pz - globalPoints[0].Z };
+
+            // double AB_dot_AB = DotProduct(AB, AB);
+            // double AP_dot_AB = DotProduct(AP, AB);
+
+            // double scale = AP_dot_AB / AB_dot_AB;
+            // double[] projection = { globalPoints[0].X + scale * AB[0], globalPoints[0].Y + scale * AB[1], globalPoints[0].Z + scale * AB[2] };
+            // double distance = Math.Sqrt(Math.Pow(projection[0] - globalPoints[0].X, 2) + Math.Pow(projection[1] - globalPoints[0].Y, 2) + Math.Pow(projection[2] - globalPoints[0].Z, 2));
+
+        }
+    }
+
+    public static (double x, double y, double?z, double?t) ProjectPointOnSegment(
+    double x0, double y0, double z0,
+    double x1, double y1, double z1,
+    double x, double y, double z)
+    {
+        // Direction vector from (X0, Y0, Z0) to (X1, Y1, Z1)
+        double dx = x1 - x0;
+        double dy = y1 - y0;
+        double dz = z1 - z0;
+
+        // Vector from (X0, Y0, Z0) to (PX, PY, PZ)
+        double vx = x - x0;
+        double vy = y - y0;
+        double vz = z - z0;
+
+        // Compute the dot products
+        double dotProduct = vx * dx + vy * dy + vz * dz;
+        double lenSq = dx * dx + dy * dy + dz * dz;
+
+        // Calculate the projection parameter of the point on the line
+        double t = dotProduct / lenSq;
+
+        // Ensure t is within the bounds of the segment
+        t = Math.Max(0, Math.Min(1, t));
+
+        // Calculate the projection coordinates using parameter t
+        double projX = x0 + t * dx;
+        double projY = y0 + t * dy;
+        double projZ = z0 + t * dz;
+
+        return (projX, projY, projZ,t);
+    }
+
+
+    async Task DisplayEquipements()
+    {
+        try
+        {
+            await js.InvokeVoidAsync("removeAllEquipmentTags");
+        }
+        catch(Exception ex)
+        {
+            int k = 1;
+        }
+        foreach (var eq in Equipements)
+        {
+            var eqt = eq.EquipementType;
+            var imagesrc = Convert.ToBase64String(eqt.Icon);
+
+            try
+            {
+                await js.InvokeVoidAsync("AddEquipmentTag", eq.X, eq.Y, eq.Z, imagesrc, eqt.Name, "Weight:" + (eqt.Weight?.ToString() ?? "Nan") + ". " + eqt.Description);
+            }
+            catch(Exception ex)
+            {
+                int k = 1;
+            }
+        }
+    }
+
+
+    [JSInvokable]
+    public async void Report(double px, double py)
+    {
+        int k = 1;
+    }
+
+
+    private static double DotProduct(double[] vector1, double[] vector2)
+    {
+        return vector1[0] * vector2[0] + vector1[1] * vector2[1] + vector1[2] * vector2[2];
+    }
+
+    private double dist(double p1x, double p1y, double p1z, double p2x, double p2y, double p2z)
+    {
+        return Math.Sqrt(Math.Pow(p1x - p2x, 2) + Math.Pow(p1y - p2y, 2) + Math.Pow(p1z - p2z, 2));
+    }
+
+    private async Task gogo()
+    {
+        if (Structure == null) return;
+        List<string> paths = await FileManagementService.GetPathForFilesAsync(Structure, false, @"wwwroot\data");
+        string path = paths.Find(x => x.ToLower().Contains(".wexbim"));
+        // path = null;
+        if (path == null)
+        {
+            path = paths.Find(x => x.ToLower().Contains(".ifc"));
+            // path = @"wwwroot\data\37b092ba-ed5c-ee11-8daf-5820b17cefc4\BasicWall.ifc";
+            path = await transformToWexBim(path);
+        }
+
+
+        string wexBimFilename = Path.GetFileName(path);
+        // File.Copy(path, Path.Combine("wwwroot/data/", wexBimFilename), true);
+
+        if ((wexBimFilename == null) || (wexBimFilename == string.Empty))
+        {
+            bimPresent = false;
+            StateHasChanged();
+            return;
+        }
+        // string pas = Path.GetFileName(wexBimFilename);
+        string pas = Path.Combine("../data/" + Structure.StructureId, wexBimFilename);
+
+        await js.InvokeVoidAsync("rafic", objRef, pas);
+    }
+
+    private async Task JumlageAuto()
+    {
+        List<Element> els = await entitiesService.GetFilteredEntitiesAsync<Element>(x => x.StructureId == Structure.StructureId && x.ElementType != null && x.ElementType.Name == "Beam3d", "ElementType");
+
+        int index = 0;
+        foreach (Element el in els)
+        {
+            if (index == highlightedElementsBimIds.Count) return;
+
+            el.BimId = highlightedElementsBimIds[index];
+
+
+
+            index++;
+        }
+        bool v = await entitiesService.UpdateEntitesAsync(selectedElements);
+
+        highlightedElementsBimIds.Clear();
+
+    }
+
+
+    private async Task Jumlage()
+    {
+        int index = 0;
+        foreach (Element el in selectedElements)
+        {
+            if (index == highlightedElementsBimIds.Count) return;
+
+            el.BimId = highlightedElementsBimIds[index];
+
+
+
+            index++;
+        }
+        bool v = await entitiesService.UpdateEntitesAsync(selectedElements);
+
+        highlightedElementsBimIds.Clear();
+
+    }
+    private async Task Create()
+    {
+        BIMGenerator bg = new BIMGenerator(entitiesService, appData);
+
+        await bg.Create();
+    }
+
+    private async Task DeJumlage()
+    {
+        if (selectedElements == null) return;
+        foreach (Element el in selectedElements)
+        {
+
+            el.BimId = null;
+
+        }
+        bool v = await entitiesService.UpdateEntitesAsync(selectedElements);
+
+
+    }
+
+    public static async Task<string> transformToWexBim(string fileName)
+    {
+        string wexBimFilename = string.Empty;
+
+        //const string fileName = @"C:\Users\rafic\Desktop\AliantWebS\AliantWebS\AliantWebS\wwwroot\data\OneWall.ifc";
+
+        try
+        {
+
+            using (var model = Xbim.Ifc.IfcStore.Open(fileName))
+            {
+                var context = new Xbim3DModelContext(model);
+                context.CreateContext(null, false);
+
+                wexBimFilename = Path.ChangeExtension(fileName, "wexBIM");
+                using (var wexBiMfile = File.Create(wexBimFilename))
+                {
+                    using (var wexBimBinaryWriter = new BinaryWriter(wexBiMfile))
+                    {
+                        model.SaveAsWexBim(wexBimBinaryWriter);
+                        wexBimBinaryWriter.Close();
+                    }
+                    wexBiMfile.Close();
+                }
+            }
+
+        }
+        catch (Exception ex)
+        {
+            int k = 1;
+        }
+
+
+
+
+        return wexBimFilename;
+
+
+    }
+
+
+    [JSInvokable]
+    public async void GetElementID(long id, int state, int refState, double px, double py, double pz)
+    {
+
+        if (appData.appDataElements == null) return;
+
+        var v = appData.appDataElements.Find(x => x.BimId == id);
+
+        if (EquipementTypes.Count != 0)
+        {
+
+            await GetPosition(id, v, px, py, pz);
+        }
+
+
+        if (state == 253)
+        {
+
+            if (!appData.CheckedNodeObjects.Contains(v))
+            {
+                appData.CheckedNodeObjects = appData.CheckedNodeObjects.Append(v);
+
+            }
+        }
+        else
+        {
+            var l = appData.CheckedNodeObjects.ToList();
+            l.Remove(v);
+            appData.CheckedNodeObjects = l.AsEnumerable();
+        }
+
+
+
+
+
+        if (state == 253)
+        {
+            if (highlightedElementsBimIds.Contains(id)) return;
+            highlightedElementsBimIds.Add(id);
+        }
+        else
+        {
+            highlightedElementsBimIds.Remove(id);
+        }
+
+        // appData.CheckedNodeObjects
+    }
+
+    private async Task HighlightElement(List<long?> instanceIdsList)
+    {
+        try
+        {
+            await js.InvokeVoidAsync("HighlightElement", instanceIdsList.ToArray());
+            highlightedElementsBimIds.AddRange(instanceIdsList.Where(n => n.HasValue)
+                  .Select(n => n.Value));
+        }
+        catch(Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+
+    }
+
+
+    private async Task ColorElement()
+    {
+
+        List<Element> els = await entitiesService.GetFilteredEntitiesAsync<Element>(x => x.StructureId == Structure.StructureId && x.ElementType != null && x.ElementType.Name == "Beam2d", "ElementType");
+
+        List<long> instanceIdsList = els.Where(x => x.BimId.HasValue).Select(x => x.BimId.Value).ToList();
+
+        await js.InvokeVoidAsync("ColorElement", 1, instanceIdsList.ToArray(), 0, 255, 0);
+
+        List<Element> els1 = await entitiesService.GetFilteredEntitiesAsync<Element>(x => x.Parent != null && x.Parent.Name == "Poteaux", "Parent");
+
+        List<long> instanceIdsList1 = els1.Where(x => x.BimId.HasValue).Select(x => x.BimId.Value).ToList();
+
+        await js.InvokeVoidAsync("ColorElement", 2, instanceIdsList1.ToArray(), 0, 0, 255);
+
+        // List<double> l = new List<double>() { 1.0075, 0.9982, 0.9747, 0.9801, 1.0098, 1.0015, 0.9829, 0.9749, 0.9731, 0.9753, 0.9907, 0.9983, 1.014, 0.9677, 0.9569, 1.013, 0.9965, 1, 1.0004, 0.9945, 0.989, 0.9908, 0.9991, 0.9966, 0.9873, 0.991, 1.0008, 0.9973 };
+
+        // for (int i =0; i<28; i++)
+        // {
+        //     int red = (int)Math.Ceiling((1 - (l[i]-0.9)*10)* 255);
+        //     if (red < 0) red = 0;
+        //     int green = (int)Math.Ceiling((l[i]-0.9)*10 * 255*0.8);
+        //     if (green > 255) green = 255;
+        //     List<long> ins = new List<long>() { instanceIdsList[i] };
+        //     await js.InvokeVoidAsync("ColorElement", i, ins.ToArray(), red, green, 0);
+        // }
+
+    }
+
+    public static (double r, double g, double b)[] GenerateBlueToRedColors(int numColors)
+    {
+        (double r, double g, double b)[] colorArray = new (double r, double g, double b)[numColors];
+        int startR = 0, startG = 0, startB = 255;  // Blue
+        int endR = 255, endG = 0, endB = 0;        // Red
+
+        for (int i = 0; i < numColors; i++)
+        {
+            // Calculate the interpolation factor
+            double fraction = (double)i / (numColors - 1);
+
+            // Interpolate the red, green, and blue values
+            int r = (int)(startR + fraction * (endR - startR));
+            int g = (int)(startG + fraction * (endG - startG));
+            int b = (int)(startB + fraction * (endB - startB));
+
+            // Create the color and add it to the array
+            colorArray[i] = (r, g, b);
+        }
+
+        return colorArray;
+    }
+
+    static public (int R, int G, int B) CalculateRgb(double rigidity)
+    {
+
+        double lt = 0.98, ht = 1;
+
+
+        int R, G, B;
+        double mid = lt + (ht - lt) / 2;
+
+        if (rigidity >= mid)
+        {
+            // Green to Blue transition
+            R = 0;
+            G = Convert.ToInt32(255 * (1 - (rigidity - mid) / 0.2));
+            B = Convert.ToInt32(255 * ((rigidity - mid) / 0.2));
+        }
+        else if (rigidity > lt)
+        {
+            // Blue to Red transition
+            R = Convert.ToInt32(255 * ((rigidity - lt) / 0.2));
+            G = 0;
+            B = Convert.ToInt32(255 * (1 - (rigidity - lt) / 0.2));
+        }
+        else
+        {
+            // Rigidity is 0.6 or less, color is red
+            R = 255;
+            G = 0;
+            B = 0;
+        }
+
+        // Clamp the values to ensure they are within the valid range for RGB components
+        R = Math.Clamp(R, 0, 255);
+        G = Math.Clamp(G, 0, 255);
+        B = Math.Clamp(B, 0, 255);
+
+        return (R, G, B);
+    }
+
+    private async Task VisualizeDefects(Dictionary<Guid, double> l)
+    {
+        List<Element> els = await entitiesService.GetFilteredEntitiesAsync<Element>(x => x.StructureId == Structure.StructureId && x.ElementType != null && x.ElementType.Name == "Beam2d", "ElementType");
+        Dictionary<long, Guid> instanceIdsList = els
+            .Where(x => x.BimId.HasValue)
+            .ToDictionary(x => x.BimId.Value, x => x.ElementId);
+
+
+        int i = 0;
+        foreach (var inst in instanceIdsList)
+        //for (int i =0; i<l.Count; i++)
+        {
+            if (!l.Keys.Contains(inst.Value)) continue;
+            var v = CalculateRgb(l[inst.Value]);
+            // int red = (int)Math.Ceiling((1 - (l[i]-0.9)*10)* 255);
+            // if (red < 0) red = 0;
+            // int green = (int)Math.Ceiling((l[i]-0.9)*10 * 255*0.8);
+            // if (green > 255) green = 255;
+            List<long> ins = new List<long>() { inst.Key };
+            await js.InvokeVoidAsync("ColorElement", i, ins.ToArray(), v.R, v.G, v.B);
+            i++;
+        }
+        this.StateHasChanged();
+
+    }
+
+
+
+    private async void CreateBiM()
+    {
+        await CreateBIM2();
+        await js.InvokeVoidAsync("alert", $"Updated Successfully!");
+    }
+
+    private async void CreateBIM1()
+    {
+        var editor = new XbimEditorCredentials
+            {
+                ApplicationDevelopersName = "Miror",
+                ApplicationFullName = "Aliant",
+                ApplicationIdentifier = "AliantWebS",
+                ApplicationVersion = "0.1",
+                EditorsFamilyName = "Santini Aichel",
+                EditorsGivenName = "Johann Blasius",
+                EditorsOrganisationName = "Independent Architecture"
+            };
+        using (var model = IfcStore.Create(editor, XbimSchemaVersion.Ifc4, XbimStoreType.InMemoryModel))
+        {
+            using (var txn = model.BeginTransaction("Hello Wall"))
+            {
+                //there should always be one project in the model
+                var project = model.Instances.New<IfcProject>(p => p.Name = "Basic Creation");
+                //our shortcut to define basic default units
+                project.Initialize(ProjectUnits.SIUnitsUK);
+
+                //create simple object and use lambda initializer to set the name
+                var wall = model.Instances.New<IfcWall>(w => w.Name = "The very first wall");
+
+                //set a few basic properties
+                model.Instances.New<IfcRelDefinesByProperties>(rel =>
+                {
+                    rel.RelatedObjects.Add(wall);
+                    rel.RelatingPropertyDefinition = model.Instances.New<IfcPropertySet>(pset =>
+                    {
+                        pset.Name = "Basic set of properties";
+                        pset.HasProperties.AddRange(new[] {
+                    model.Instances.New<IfcPropertySingleValue>(p =>
+                    {
+                        p.Name = "Text property";
+                        p.NominalValue = new IfcText("Any arbitrary text you like");
+                    }),
+                    model.Instances.New<IfcPropertySingleValue>(p =>
+                    {
+                        p.Name = "Length property";
+                        p.NominalValue = new IfcLengthMeasure(56.0);
+                    }),
+                    model.Instances.New<IfcPropertySingleValue>(p =>
+                    {
+                        p.Name = "Number property";
+                        p.NominalValue = new IfcNumericMeasure(789.2);
+                    }),
+                    model.Instances.New<IfcPropertySingleValue>(p =>
+                    {
+                        p.Name = "Logical property";
+                        p.NominalValue = new IfcLogical(true);
+                    })
+                });
+                    });
+                });
+
+                txn.Commit();
+            }
+
+            string path = Path.Combine(Environment.ContentRootPath, "wwwroot/data");
+
+            //path = Path.Combine(path, structure.Guid.ToString());
+
+
+
+            if (!Directory.Exists(path))
+            {
+                Directory.CreateDirectory(path);
+            }
+
+            fileName = Path.Combine(path, "BasicWall.ifc");
+
+            model.SaveAs(fileName);
+
+
+
+            await js.InvokeVoidAsync("alert", $"Updated Successfully!");
+
+        }
+    }
+
+    private async Task CreateBIM2()
+    {
+        //first create and initialise a model called Hello Wall
+        Console.WriteLine("Initialising the IFC Project....");
+        using (var model = CreateandInitModel("HelloWall"))
+        {
+            if (model != null)
+            {
+                IfcBuilding building = CreateBuilding(model, "Default Building");
+                IfcWallStandardCase wall = CreateWall(model, 4000, 300, 2400);
+
+                if (wall != null) AddPropertiesToWall(model, wall);
+                using (var txn = model.BeginTransaction("Add Wall"))
+                {
+                    building.AddElement(wall);
+                    txn.Commit();
+                }
+
+                if (wall != null)
+                {
+                    try
+                    {
+                        string path = Path.Combine(Environment.ContentRootPath, "wwwroot/data");
+
+                        //path = Path.Combine(path, structure.Guid.ToString());
+
+
+
+                        if (!Directory.Exists(path))
+                        {
+                            Directory.CreateDirectory(path);
+                        }
+
+                        fileName = Path.Combine(path, "HelloWallIfc4.ifc");
+
+
+
+
+                        //   Console.WriteLine("Standard Wall successfully created....");
+                        //write the Ifc File
+                        model.SaveAs(fileName, StorageType.Ifc);
+                        // Console.WriteLine("HelloWallIfc4.ifc has been successfully written");
+                    }
+                    catch (Exception e)
+                    {
+                        int k = 2;
+                        //   Console.WriteLine("Failed to save HelloWall.ifc");
+                        //    Console.WriteLine(e.Message);
+                    }
+                }
+            }
+            else
+            {
+
+                int k = 2;
+                //     Console.WriteLine("Failed to initialise the model");
+            }
+        }
+        //  Console.WriteLine("Press any key to exit to view the IFC file....");
+        //  Console.ReadKey();
+        // LaunchNotepad("HelloWallIfc4.ifc");
+
+    }
+
+
+
+    /// <summary>
+    /// Sets up the basic parameters any model must provide, units, ownership etc
+    /// </summary>
+    /// <param name="projectName">Name of the project</param>
+    /// <returns></returns>
+    private static IfcStore CreateandInitModel(string projectName)
+    {
+        //first we need to set up some credentials for ownership of data in the new model
+        var credentials = new XbimEditorCredentials
+            {
+                ApplicationDevelopersName = "xbim developer",
+                ApplicationFullName = "Hello Wall Application",
+                ApplicationIdentifier = "HelloWall.exe",
+                ApplicationVersion = "1.0",
+                EditorsFamilyName = "Team",
+                EditorsGivenName = "xbim",
+                EditorsOrganisationName = "xbim developer"
+            };
+        //now we can create an IfcStore, it is in Ifc4 format and will be held in memory rather than in a database
+        //database is normally better in performance terms if the model is large >50MB of Ifc or if robust transactions are required
+
+        var model = IfcStore.Create(credentials, XbimSchemaVersion.Ifc4, XbimStoreType.InMemoryModel);
+
+        //Begin a transaction as all changes to a model are ACID
+        using (var txn = model.BeginTransaction("Initialise Model"))
+        {
+
+            //create a project
+            var project = model.Instances.New<IfcProject>();
+            //set the units to SI (mm and metres)
+            project.Initialize(ProjectUnits.SIUnitsUK);
+            project.Name = projectName;
+            //now commit the changes, else they will be rolled back at the end of the scope of the using statement
+            txn.Commit();
+        }
+        return model;
+
+    }
+
+    private static IfcBuilding CreateBuilding(IfcStore model, string name)
+    {
+        using (var txn = model.BeginTransaction("Create Building"))
+        {
+            var building = model.Instances.New<IfcBuilding>();
+            building.Name = name;
+
+            building.CompositionType = IfcElementCompositionEnum.ELEMENT;
+            var localPlacement = model.Instances.New<IfcLocalPlacement>();
+            building.ObjectPlacement = localPlacement;
+            var placement = model.Instances.New<IfcAxis2Placement3D>();
+            localPlacement.RelativePlacement = placement;
+            placement.Location = model.Instances.New<IfcCartesianPoint>(p => p.SetXYZ(0, 0, 0));
+            //get the project there should only be one and it should exist
+            var project = model.Instances.OfType<IfcProject>().FirstOrDefault();
+            project?.AddBuilding(building);
+            txn.Commit();
+            return building;
+        }
+    }
+
+    /// <summary>
+    /// This creates a wall and it's geometry, many geometric representations are possible and extruded rectangular footprint is chosen as this is commonly used for standard case walls
+    /// </summary>
+    /// <param name="model"></param>
+    /// <param name="length">Length of the rectangular footprint</param>
+    /// <param name="width">Width of the rectangular footprint (width of the wall)</param>
+    /// <param name="height">Height to extrude the wall, extrusion is vertical</param>
+    /// <returns></returns>
+    static private IfcWallStandardCase CreateWall(IfcStore model, double length, double width, double height)
+    {
+        //
+        //begin a transaction
+        using (var txn = model.BeginTransaction("Create Wall"))
+        {
+            var wall = model.Instances.New<IfcWallStandardCase>();
+            wall.Name = "A Standard rectangular wall";
+
+            //represent wall as a rectangular profile
+            var rectProf = model.Instances.New<IfcRectangleProfileDef>();
+            rectProf.ProfileType = IfcProfileTypeEnum.AREA;
+            rectProf.XDim = width;
+            rectProf.YDim = length;
+
+            var insertPoint = model.Instances.New<IfcCartesianPoint>();
+            insertPoint.SetXY(0, 400); //insert at arbitrary position
+            rectProf.Position = model.Instances.New<IfcAxis2Placement2D>();
+            rectProf.Position.Location = insertPoint;
+
+            //model as a swept area solid
+            var body = model.Instances.New<IfcExtrudedAreaSolid>();
+            body.Depth = height;
+            body.SweptArea = rectProf;
+            body.ExtrudedDirection = model.Instances.New<IfcDirection>();
+            body.ExtrudedDirection.SetXYZ(0, 0, 1);
+
+            //parameters to insert the geometry in the model
+            var origin = model.Instances.New<IfcCartesianPoint>();
+            origin.SetXYZ(0, 0, 0);
+            body.Position = model.Instances.New<IfcAxis2Placement3D>();
+            body.Position.Location = origin;
+
+            //Create a Definition shape to hold the geometry
+            var shape = model.Instances.New<IfcShapeRepresentation>();
+            var modelContext = model.Instances.OfType<IfcGeometricRepresentationContext>().FirstOrDefault();
+            shape.ContextOfItems = modelContext;
+            shape.RepresentationType = "SweptSolid";
+            shape.RepresentationIdentifier = "Body";
+            shape.Items.Add(body);
+
+            //Create a Product Definition and add the model geometry to the wall
+            var rep = model.Instances.New<IfcProductDefinitionShape>();
+            rep.Representations.Add(shape);
+            wall.Representation = rep;
+
+            //now place the wall into the model
+            var lp = model.Instances.New<IfcLocalPlacement>();
+            var ax3D = model.Instances.New<IfcAxis2Placement3D>();
+            ax3D.Location = origin;
+            ax3D.RefDirection = model.Instances.New<IfcDirection>();
+            ax3D.RefDirection.SetXYZ(0, 1, 0);
+            ax3D.Axis = model.Instances.New<IfcDirection>();
+            ax3D.Axis.SetXYZ(0, 0, 1);
+            lp.RelativePlacement = ax3D;
+            wall.ObjectPlacement = lp;
+
+
+            // Where Clause: The IfcWallStandard relies on the provision of an IfcMaterialLayerSetUsage
+            var ifcMaterialLayerSetUsage = model.Instances.New<IfcMaterialLayerSetUsage>();
+            var ifcMaterialLayerSet = model.Instances.New<IfcMaterialLayerSet>();
+            var ifcMaterialLayer = model.Instances.New<IfcMaterialLayer>();
+            ifcMaterialLayer.LayerThickness = 10;
+            ifcMaterialLayerSet.MaterialLayers.Add(ifcMaterialLayer);
+            ifcMaterialLayerSetUsage.ForLayerSet = ifcMaterialLayerSet;
+            ifcMaterialLayerSetUsage.LayerSetDirection = IfcLayerSetDirectionEnum.AXIS2;
+            ifcMaterialLayerSetUsage.DirectionSense = IfcDirectionSenseEnum.NEGATIVE;
+            ifcMaterialLayerSetUsage.OffsetFromReferenceLine = 150;
+
+            // Add material to wall
+            var material = model.Instances.New<IfcMaterial>();
+            material.Name = "some material";
+            var ifcRelAssociatesMaterial = model.Instances.New<IfcRelAssociatesMaterial>();
+            ifcRelAssociatesMaterial.RelatingMaterial = material;
+            ifcRelAssociatesMaterial.RelatedObjects.Add(wall);
+
+            ifcRelAssociatesMaterial.RelatingMaterial = ifcMaterialLayerSetUsage;
+
+            // IfcPresentationLayerAssignment is required for CAD presentation in IfcWall or IfcWallStandardCase
+            var ifcPresentationLayerAssignment = model.Instances.New<IfcPresentationLayerAssignment>();
+            ifcPresentationLayerAssignment.Name = "some ifcPresentationLayerAssignment";
+            ifcPresentationLayerAssignment.AssignedItems.Add(shape);
+
+
+            // linear segment as IfcPolyline with two points is required for IfcWall
+            var ifcPolyline = model.Instances.New<IfcPolyline>();
+            var startPoint = model.Instances.New<IfcCartesianPoint>();
+            startPoint.SetXY(0, 0);
+            var endPoint = model.Instances.New<IfcCartesianPoint>();
+            endPoint.SetXY(4000, 0);
+            ifcPolyline.Points.Add(startPoint);
+            ifcPolyline.Points.Add(endPoint);
+
+            var shape2D = model.Instances.New<IfcShapeRepresentation>();
+            shape2D.ContextOfItems = modelContext;
+            shape2D.RepresentationIdentifier = "Axis";
+            shape2D.RepresentationType = "Curve2D";
+            shape2D.Items.Add(ifcPolyline);
+            rep.Representations.Add(shape2D);
+            txn.Commit();
+            return wall;
+        }
+
+    }
+
+    /// <summary>
+    /// Add some properties to the wall,
+    /// </summary>
+    /// <param name="model">XbimModel</param>
+    /// <param name="wall"></param>
+    static private void AddPropertiesToWall(IfcStore model, IfcWallStandardCase wall)
+    {
+        using (var txn = model.BeginTransaction("Create Wall"))
+        {
+            CreateElementQuantity(model, wall);
+            CreateSimpleProperty(model, wall);
+            txn.Commit();
+        }
+    }
+
+    private static void CreateSimpleProperty(IfcStore model, IfcWallStandardCase wall)
+    {
+        var ifcPropertySingleValue = model.Instances.New<IfcPropertySingleValue>(psv =>
+        {
+            psv.Name = "IfcPropertySingleValue:Time";
+            psv.Description = "";
+            psv.NominalValue = new IfcTimeMeasure(150.0);
+            psv.Unit = model.Instances.New<IfcSIUnit>(siu =>
+            {
+                siu.UnitType = IfcUnitEnum.TIMEUNIT;
+                siu.Name = IfcSIUnitName.SECOND;
+            });
+        });
+        var ifcPropertyEnumeratedValue = model.Instances.New<IfcPropertyEnumeratedValue>(pev =>
+        {
+            pev.Name = "IfcPropertyEnumeratedValue:Music";
+            pev.EnumerationReference = model.Instances.New<IfcPropertyEnumeration>(pe =>
+                {
+                    pe.Name = "Notes";
+                    pe.EnumerationValues.Add(new IfcLabel("Do"));
+                    pe.EnumerationValues.Add(new IfcLabel("Re"));
+                    pe.EnumerationValues.Add(new IfcLabel("Mi"));
+                    pe.EnumerationValues.Add(new IfcLabel("Fa"));
+                    pe.EnumerationValues.Add(new IfcLabel("So"));
+                    pe.EnumerationValues.Add(new IfcLabel("La"));
+                    pe.EnumerationValues.Add(new IfcLabel("Ti"));
+                });
+            pev.EnumerationValues.Add(new IfcLabel("Do"));
+            pev.EnumerationValues.Add(new IfcLabel("Re"));
+            pev.EnumerationValues.Add(new IfcLabel("Mi"));
+
+        });
+        var ifcPropertyBoundedValue = model.Instances.New<IfcPropertyBoundedValue>(pbv =>
+        {
+            pbv.Name = "IfcPropertyBoundedValue:Mass";
+            pbv.Description = "";
+            pbv.UpperBoundValue = new IfcMassMeasure(5000.0);
+            pbv.LowerBoundValue = new IfcMassMeasure(1000.0);
+            pbv.Unit = model.Instances.New<IfcSIUnit>(siu =>
+            {
+                siu.UnitType = IfcUnitEnum.MASSUNIT;
+                siu.Name = IfcSIUnitName.GRAM;
+                siu.Prefix = IfcSIPrefix.KILO;
+            });
+        });
+
+        var definingValues = new List<IfcReal> { new IfcReal(100.0), new IfcReal(200.0), new IfcReal(400.0), new IfcReal(800.0), new IfcReal(1600.0), new IfcReal(3200.0), };
+        var definedValues = new List<IfcReal> { new IfcReal(20.0), new IfcReal(42.0), new IfcReal(46.0), new IfcReal(56.0), new IfcReal(60.0), new IfcReal(65.0), };
+        var ifcPropertyTableValue = model.Instances.New<IfcPropertyTableValue>(ptv =>
+        {
+            ptv.Name = "IfcPropertyTableValue:Sound";
+            foreach (var item in definingValues)
+            {
+                ptv.DefiningValues.Add(item);
+            }
+            foreach (var item in definedValues)
+            {
+                ptv.DefinedValues.Add(item);
+            }
+            ptv.DefinedUnit = model.Instances.New<IfcContextDependentUnit>(cd =>
+            {
+                cd.Dimensions = model.Instances.New<IfcDimensionalExponents>(de =>
+                {
+                    de.LengthExponent = 0;
+                    de.MassExponent = 0;
+                    de.TimeExponent = 0;
+                    de.ElectricCurrentExponent = 0;
+                    de.ThermodynamicTemperatureExponent = 0;
+                    de.AmountOfSubstanceExponent = 0;
+                    de.LuminousIntensityExponent = 0;
+                });
+                cd.UnitType = IfcUnitEnum.FREQUENCYUNIT;
+                cd.Name = "dB";
+            });
+
+
+        });
+
+        var listValues = new List<IfcLabel> { new IfcLabel("Red"), new IfcLabel("Green"), new IfcLabel("Blue"), new IfcLabel("Pink"), new IfcLabel("White"), new IfcLabel("Black"), };
+        var ifcPropertyListValue = model.Instances.New<IfcPropertyListValue>(plv =>
+        {
+            plv.Name = "IfcPropertyListValue:Colours";
+            foreach (var item in listValues)
+            {
+                plv.ListValues.Add(item);
+            }
+        });
+
+        var ifcMaterial = model.Instances.New<IfcMaterial>(m =>
+        {
+            m.Name = "Brick";
+        });
+        var ifcPrValueMaterial = model.Instances.New<IfcPropertyReferenceValue>(prv =>
+        {
+            prv.Name = "IfcPropertyReferenceValue:Material";
+            prv.PropertyReference = ifcMaterial;
+        });
+
+
+        var ifcMaterialList = model.Instances.New<IfcMaterialList>(ml =>
+            {
+                ml.Materials.Add(ifcMaterial);
+                ml.Materials.Add(model.Instances.New<IfcMaterial>(m => { m.Name = "Cavity"; }));
+                ml.Materials.Add(model.Instances.New<IfcMaterial>(m => { m.Name = "Block"; }));
+            });
+
+
+        var ifcMaterialLayer = model.Instances.New<IfcMaterialLayer>(ml =>
+        {
+            ml.Material = ifcMaterial;
+            ml.LayerThickness = 100.0;
+        });
+        var ifcPrValueMatLayer = model.Instances.New<IfcPropertyReferenceValue>(prv =>
+        {
+            prv.Name = "IfcPropertyReferenceValue:MaterialLayer";
+            prv.PropertyReference = ifcMaterialLayer;
+        });
+
+        var ifcDocumentReference = model.Instances.New<IfcDocumentReference>(dr =>
+        {
+            dr.Name = "Document";
+            dr.Location = "c://Documents//TheDoc.Txt";
+        });
+        var ifcPrValueRef = model.Instances.New<IfcPropertyReferenceValue>(prv =>
+        {
+            prv.Name = "IfcPropertyReferenceValue:Document";
+            prv.PropertyReference = ifcDocumentReference;
+        });
+
+        var ifcTimeSeries = model.Instances.New<IfcRegularTimeSeries>(ts =>
+        {
+            ts.Name = "Regular Time Series";
+            ts.Description = "Time series of events";
+            ts.StartTime = new IfcDateTime("2015-02-14T12:01:01");
+            ts.EndTime = new IfcDateTime("2015-05-15T12:01:01");
+            ts.TimeSeriesDataType = IfcTimeSeriesDataTypeEnum.CONTINUOUS;
+            ts.DataOrigin = IfcDataOriginEnum.MEASURED;
+            ts.TimeStep = 604800; //7 days in secs
+        });
+
+        var ifcPrValueTimeSeries = model.Instances.New<IfcPropertyReferenceValue>(prv =>
+        {
+            prv.Name = "IfcPropertyReferenceValue:TimeSeries";
+            prv.PropertyReference = ifcTimeSeries;
+        });
+
+        var ifcAddress = model.Instances.New<IfcPostalAddress>(a =>
+        {
+            a.InternalLocation = "Room 101";
+            a.AddressLines.AddRange(new[] { new IfcLabel("12 New road"), new IfcLabel("DoxField") });
+            a.Town = "Sunderland";
+            a.PostalCode = "DL01 6SX";
+        });
+        var ifcPrValueAddress = model.Instances.New<IfcPropertyReferenceValue>(prv =>
+        {
+            prv.Name = "IfcPropertyReferenceValue:Address";
+            prv.PropertyReference = ifcAddress;
+        });
+        var ifcTelecomAddress = model.Instances.New<IfcTelecomAddress>(a =>
+        {
+            a.TelephoneNumbers.Add(new IfcLabel("01325 6589965"));
+            a.ElectronicMailAddresses.Add(new IfcLabel("bob@bobsworks.com"));
+        });
+        var ifcPrValueTelecom = model.Instances.New<IfcPropertyReferenceValue>(prv =>
+        {
+            prv.Name = "IfcPropertyReferenceValue:Telecom";
+            prv.PropertyReference = ifcTelecomAddress;
+        });
+
+
+
+        //lets create the IfcElementQuantity
+        var ifcPropertySet = model.Instances.New<IfcPropertySet>(ps =>
+        {
+            ps.Name = "Test:IfcPropertySet";
+            ps.Description = "Property Set";
+            ps.HasProperties.Add(ifcPropertySingleValue);
+            ps.HasProperties.Add(ifcPropertyEnumeratedValue);
+            ps.HasProperties.Add(ifcPropertyBoundedValue);
+            ps.HasProperties.Add(ifcPropertyTableValue);
+            ps.HasProperties.Add(ifcPropertyListValue);
+            ps.HasProperties.Add(ifcPrValueMaterial);
+            ps.HasProperties.Add(ifcPrValueMatLayer);
+            ps.HasProperties.Add(ifcPrValueRef);
+            ps.HasProperties.Add(ifcPrValueTimeSeries);
+            ps.HasProperties.Add(ifcPrValueAddress);
+            ps.HasProperties.Add(ifcPrValueTelecom);
+        });
+
+        //need to create the relationship
+        model.Instances.New<IfcRelDefinesByProperties>(rdbp =>
+        {
+            rdbp.Name = "Property Association";
+            rdbp.Description = "IfcPropertySet associated to wall";
+            rdbp.RelatedObjects.Add(wall);
+            rdbp.RelatingPropertyDefinition = ifcPropertySet;
+        });
+    }
+
+    private static void CreateElementQuantity(IfcStore model, IfcWallStandardCase wall)
+    {
+        //Create a IfcElementQuantity
+        //first we need a IfcPhysicalSimpleQuantity,first will use IfcQuantityLength
+        var ifcQuantityArea = model.Instances.New<IfcQuantityLength>(qa =>
+        {
+            qa.Name = "IfcQuantityArea:Area";
+            qa.Description = "";
+            qa.Unit = model.Instances.New<IfcSIUnit>(siu =>
+            {
+                siu.UnitType = IfcUnitEnum.LENGTHUNIT;
+                siu.Prefix = IfcSIPrefix.MILLI;
+                siu.Name = IfcSIUnitName.METRE;
+            });
+            qa.LengthValue = 100.0;
+
+        });
+        //next quantity IfcQuantityCount using IfcContextDependentUnit
+        var ifcContextDependentUnit = model.Instances.New<IfcContextDependentUnit>(cd =>
+            {
+                cd.Dimensions = model.Instances.New<IfcDimensionalExponents>(de =>
+                    {
+                        de.LengthExponent = 1;
+                        de.MassExponent = 0;
+                        de.TimeExponent = 0;
+                        de.ElectricCurrentExponent = 0;
+                        de.ThermodynamicTemperatureExponent = 0;
+                        de.AmountOfSubstanceExponent = 0;
+                        de.LuminousIntensityExponent = 0;
+                    });
+                cd.UnitType = IfcUnitEnum.LENGTHUNIT;
+                cd.Name = "Elephants";
+            });
+        var ifcQuantityCount = model.Instances.New<IfcQuantityCount>(qc =>
+        {
+            qc.Name = "IfcQuantityCount:Elephant";
+            qc.CountValue = 12;
+            qc.Unit = ifcContextDependentUnit;
+        });
+
+
+        //next quantity IfcQuantityLength using IfcConversionBasedUnit
+        var ifcConversionBasedUnit = model.Instances.New<IfcConversionBasedUnit>(cbu =>
+        {
+            cbu.ConversionFactor = model.Instances.New<IfcMeasureWithUnit>(mu =>
+            {
+                mu.ValueComponent = new IfcRatioMeasure(25.4);
+                mu.UnitComponent = model.Instances.New<IfcSIUnit>(siu =>
+                {
+                    siu.UnitType = IfcUnitEnum.LENGTHUNIT;
+                    siu.Prefix = IfcSIPrefix.MILLI;
+                    siu.Name = IfcSIUnitName.METRE;
+                });
+
+            });
+            cbu.Dimensions = model.Instances.New<IfcDimensionalExponents>(de =>
+            {
+                de.LengthExponent = 1;
+                de.MassExponent = 0;
+                de.TimeExponent = 0;
+                de.ElectricCurrentExponent = 0;
+                de.ThermodynamicTemperatureExponent = 0;
+                de.AmountOfSubstanceExponent = 0;
+                de.LuminousIntensityExponent = 0;
+            });
+            cbu.UnitType = IfcUnitEnum.LENGTHUNIT;
+            cbu.Name = "Inch";
+        });
+        var ifcQuantityLength = model.Instances.New<IfcQuantityLength>(qa =>
+        {
+            qa.Name = "IfcQuantityLength:Length";
+            qa.Description = "";
+            qa.Unit = ifcConversionBasedUnit;
+            qa.LengthValue = 24.0;
+        });
+
+        //lets create the IfcElementQuantity
+        var ifcElementQuantity = model.Instances.New<IfcElementQuantity>(eq =>
+        {
+            eq.Name = "Test:IfcElementQuantity";
+            eq.Description = "Measurement quantity";
+            eq.Quantities.Add(ifcQuantityArea);
+            eq.Quantities.Add(ifcQuantityCount);
+            eq.Quantities.Add(ifcQuantityLength);
+        });
+
+        //need to create the relationship
+        model.Instances.New<IfcRelDefinesByProperties>(rdbp =>
+        {
+            rdbp.Name = "Area Association";
+            rdbp.Description = "IfcElementQuantity associated to wall";
+            rdbp.RelatedObjects.Add(wall);
+            rdbp.RelatingPropertyDefinition = ifcElementQuantity;
+        });
+    }
+
+
+    private static void LaunchNotepad(string fileName)
+    {
+        Process p;
+        try
+        {
+
+            p = new Process { StartInfo = { FileName = fileName, CreateNoWindow = false } };
+            p.Start();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Exception Occurred :{0},{1}",
+                      ex.Message, ex.StackTrace);
+        }
+    }
+
+
+    //public IfcProfileDef getBasicProfileDescirption(IfcStore model)
+
+    //{
+
+
+    //        var ifcPolyline = model.Instances.New<IfcPolyline>();
+
+    //        var firstPoint = model.Instances.New<IfcCartesianPoint>();
+    //        firstPoint.SetXY(0, 0);
+
+    //        var secondPoint = model.Instances.New<IfcCartesianPoint>();
+    //        secondPoint.SetXY(100, 0);
+
+    //                    var thirdPoint = model.Instances.New<IfcCartesianPoint>();
+    //        thirdPoint.SetXY(100, 100);
+
+    //                    var fourthPoint = model.Instances.New<IfcCartesianPoint>();
+    //        fourthPoint.SetXY(0, 100);
+
+    //                                var fourthPoint = model.Instances.New<IfcCartesianPoint>();
+    //        fourthPoint.SetXY(0, 100);
+
+
+    //        ifcPolyline.Points.Add(startPoint);
+    //        ifcPolyline.Points.Add(endPoint);
+
+    //        var profile = model.Instances.New<IfcArbitraryClosedProfileDef>();
+    //        profile.OuterCurve = ifcPolyline;
+
+    //        profile.ProfileType = IfcProfileTypeEnum.AREA;
+
+
+
+
+
+    //    return profile;
+    //}
+
+    IEnumerable<InspectionResultType> InspectionResultTypesList;
+
+    private async Task Expand(int index)
+    {
+
+        if (index == 1)
+        {
+            List<Guid> elementTypesIds = Structure.Elements.Where(x => x.ElementTypeId.HasValue).Select(x => x.ElementTypeId.Value).ToList();
+            IEnumerable<InspectionResultTypeElementType> ertet = await entitiesService.GetFilteredEntitiesAsync<InspectionResultTypeElementType>(a => elementTypesIds.Contains(a.ElementTypeId), "InspectionResultType");
+            InspectionResultTypesList = ertet.Select(x => x.InspectionResultType);
+        }
+    }
+
+
+
+}

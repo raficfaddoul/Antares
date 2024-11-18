@@ -1,0 +1,1135 @@
+﻿@page "/Structura"
+@using AliantWebS.Data
+@using System.Text.RegularExpressions;
+@inject EntitiesService entitiesService
+@inject AliantWebContext aliantWebContext
+@using Models
+@using System.Text.Json;
+@using System.Drawing;
+@inject NavigationManager navigationManager
+@inject IJSRuntime JsRuntime
+@using System.Text.Json.Serialization;
+@using System.Collections.Generic;
+@using Microsoft.Extensions.Configuration
+@inject AppData appData;
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject IStringLocalizer<Languages> L
+
+<!--<NavLink class="nav-link" @onclick="OnClick" href="@($"AddElement/{StructureID}/{((Element)selectedNodeObject)?.ElementId }")">
+    <span class="oi oi-plus" aria-hidden="true">Add New</span>
+
+</NavLink>-->
+<style>
+    .f {
+        margin: 0px
+    }
+
+    .fullsize-tree {
+        width: 100%;
+        height: 100%;
+        overflow: auto; /* Adds scrollbars when content exceeds the container size */
+    }
+
+</style>
+
+<Row Style="margin:0px; padding:0px; border:0px">
+    <Column ColumnSize="ColumnSize.Is2">
+        <a title="@L["Add New Element"]" class="nav-link f" @onclick="@OnClickAddElement" href="" @onclick:preventDefault>
+            <span class="oi oi-plus" aria-hidden="true"></span>
+        </a>
+    </Column>
+    <Column ColumnSize="ColumnSize.Is2">
+        <a title="@L["Copy"]" class="nav-link f" @onclick="@OnClickCopyBranch" href="" @onclick:preventDefault>
+            <span class="fa fa-clone" aria-hidden="true"></span>
+        </a>
+    </Column>
+    <Column ColumnSize="ColumnSize.Is2">
+        <a title="@L["Cut"]" class="nav-link f" @onclick="@OnClickCutBranch" href="" @onclick:preventDefault>
+            <span class="fa fa-scissors" aria-hidden="true"></span>
+        </a>
+    </Column>
+    <Column ColumnSize="ColumnSize.Is2">
+        <a title="@L["Paste"]" class="nav-link f" @onclick="@OnClickPaste" href="" @onclick:preventDefault>
+            <span class="fa fa-clipboard" aria-hidden="true"></span>
+        </a>
+    </Column>
+    <Column ColumnSize="ColumnSize.Is2">
+        <a title="@L["Edit"]" class="nav-link f" @onclick="OnClickEditElement" href="" @onclick:preventDefault>
+            <span class="oi oi-pencil" aria-hidden="true"></span>
+        </a>
+    </Column>
+    <Column ColumnSize="ColumnSize.Is2">
+        <a title="@L["Delete"]" class="nav-link f" @onclick="OnClickDeleteBranch" href="" @onclick:preventDefault>
+            <span class="oi oi-trash" aria-hidden="true"></span>
+        </a>
+    </Column>
+    <Column ColumnSize="ColumnSize.Is2">
+        <a title="@L["Data"]" class="nav-link f" @onclick="OnClickData" href="" @onclick:preventDefault>
+            <span class="oi oi-bar-chart" aria-hidden="true"></span>
+        </a>
+    </Column>
+    <Column ColumnSize="ColumnSize.Is2">
+        <a title="@L["Structural"]" class="nav-link f" @onclick="OnClickStructural" href="" @onclick:preventDefault>
+            <i class="fas fa-building"></i>
+        </a>
+    </Column>
+    <Column ColumnSize="ColumnSize.Is2">
+        <a title="@L["Loads"]" class="nav-link f" @onclick="OnClickLoads" href="" @onclick:preventDefault>
+            <i class="fas fa-dolly"></i>
+        </a>
+    </Column>
+    <Column ColumnSize="ColumnSize.Is2">
+        <div class="file-input-zone" style="background-color:transparent; cursor:pointer; position: relative;z-index:15">
+            <InputFile class="f" style="position: absolute; top: 0;left: 0; width: 100%;height: 100%; opacity: 0; cursor: pointer; z-index: 10;" OnChange="@(args => OnClickImportStructure(args))" />
+
+            <a title="@L["Import Structure"]" class="nav-link f" style="background-color:transparent; cursor:pointer; color:blue" href="" @onclick:preventDefault="true">
+                @if (!isImporting)
+                {
+                    <span class="oi oi-code" aria-hidden="true" style="cursor:pointer; z-index:5"></span>
+                }
+                else
+                {
+                    <i class="fas fa-spinner fa-spin"></i>
+                }
+                
+              
+            </a>            
+
+        </div>
+    </Column>
+
+</Row>
+
+
+@if (!updating)
+{
+
+    @if (appData.appDataElements.Count() == 0)
+    {
+        <p><em>@L["No Elements in this structure"]... !</em></p>
+    }
+    else
+    {
+        <Div style="white-space: nowrap; ">
+            <label Style="display: inline">@L["Tree View"]</label>
+            <RadzenSwitch @bind-Value=@treeViewMode Style="display: inline-flex; margin-left:20px" />
+            <label Style="display: inline">@L["Grid View"]</label>
+        </Div>
+
+        <div>
+            @if (treeViewMode)
+            {
+                <RadzenDataGrid AllowFiltering="true" AllowRowSelectOnRowClick="true" AllowPaging="true" AllowSorting="true" PageSize="PageSize" SelectionMode="DataGridSelectionMode.Multiple"
+                    Data="@appData.appDataElements" TItem="Element" ColumnWidth="150px" @bind-Value=SelectedElements>
+                    <Columns>
+                        @*              <RadzenDataGridColumn TItem="Element" Property="Name" Title="Structure Id"></RadzenDataGridColumn>*@
+                        <RadzenDataGridColumn TItem="Element" Property="Name" Title="@L["Name"]"></RadzenDataGridColumn>
+                        <RadzenDataGridColumn TItem="Element" Property="ElementType.Name" Title="@L["Element Type"]"></RadzenDataGridColumn>
+                        <RadzenDataGridColumn TItem="Element" Property="Parent.Name" Title="@L["Parent Element"]"></RadzenDataGridColumn>
+
+
+                    </Columns>
+                </RadzenDataGrid>
+
+            }
+            else
+            {
+                <div class="page" style="width: 100vw; height: 80vh; overflow: auto;">
+                    <RadzenTree class="fullsize-tree" @ref=tree AllowCheckChildren="false" AllowCheckParents="false" AllowCheckBoxes="true" @bind-CheckedValues="@appData.CheckedNodeObjects" Change=@OnChange Data=@rootEmployees @bind-Value="@selectedNodeObject" Style="width: 100%; height: 100%">
+                    <RadzenTreeLevel  Expanded=@(e => true) Template="@FolderTemplate" TextProperty="Name" ChildrenProperty="InverseParent" HasChildren=@(e => (e as Element).InverseParent.Any()) />
+                </RadzenTree>
+                </div>
+         
+            }
+
+        </div>
+
+    }
+}
+
+@code {
+    bool isImporting = false;
+
+    bool copyAttributes;
+    bool settingEditElementOnSelect;
+
+    bool updating = false;
+    RadzenTree tree;
+
+    bool treeViewMode = false;
+
+    int PageSize { get; set; } = 10;
+
+    [Parameter]
+    public Structure Structure { get; set; }
+
+    //public Element selectedNode;
+
+    private object selectedNodeObject;
+
+
+
+    private IList<Element> selectedElements;
+
+    private IList<Element> SelectedElements
+    {
+        get { return selectedElements; }   // get method
+        set
+        {
+            if (selectedElements == value) return;
+            selectedElements = value;
+
+            appData.checkedNodeObjects = selectedElements;
+
+        }  // set method
+    }
+
+    List<Element> copiedElements = new List<Element>();
+
+
+
+
+
+    List<Element> rootEmployees;
+
+    RenderFragment<RadzenTreeItem> FolderTemplate = (context) => builder =>
+    {
+
+
+        // TreeNode objTreeNode = context.Value as TreeNode;
+        var et = ((Element)context.Value).ElementType;
+
+        if (et != null && et.Icon != null)
+        {
+            builder.OpenElement(0, "div"); // Opening a container div
+            builder.AddAttribute(1, "style", "display: flex; align-items: center;"); // Styling the container for horizontal alignment
+            builder.AddAttribute(2, "Title", ((Element)context.Value).ElementId); // Adding tooltip to the container
+
+            builder.OpenComponent<RadzenImage>(3);
+            var imagesrc = Convert.ToBase64String(et.Icon);
+            var imageDataURL = string.Format("data:image/jpeg;base64,{0}", imagesrc);
+            builder.AddAttribute(4, "Path", imageDataURL);
+            builder.CloseComponent();
+
+            builder.AddContent(5, context.Text);
+
+            builder.CloseElement(); // Closing the container div
+        }
+        else
+        {
+            builder.OpenElement(0, "div"); // Opening a container div
+            builder.AddAttribute(1, "Title", ((Element)context.Value).ElementId); // Adding tooltip to the container
+            builder.AddContent(2, context.Text);
+            builder.CloseElement();
+        }
+    };
+
+    // public override async Task SetParametersAsync(ParameterView parameters)
+    // {
+    //     await base.SetParametersAsync(parameters);
+
+    //     await Task.WhenAll(entitiesService.tasksList);
+    //     //  selectedNodeObject = await entitiesService.GetFilteredFirstEntityAsync<Element>(a => a.StructureId == Structure.StructureId);
+
+
+
+
+    // }
+
+    protected override async Task OnInitializedAsync()
+    {
+        appData.checkedNodeObjects = Enumerable.Empty<Element>();
+        appData.OnChange += stc;
+        appData.OnRootEmployeesChange += reloadRootEmployees;
+        appData.OncheckedNodeObjectsChange += AppDataCheckedNodeObjectsChanged;
+
+        updating = true;
+        //await Task.WhenAll(entitiesService.tasksList);
+        appData.appDataElements = await entitiesService.GetFilteredEntitiesAsync<Element>(e => e.StructureId == Structure.StructureId, "InverseParent");
+        foreach(Element el in appData.appDataElements)
+        {
+            entitiesService.LoadReference(el, "ElementType");
+        }
+        rootEmployees = appData.appDataElements.Where(e => e.ParentId == null).ToList();
+        updating = false;
+
+
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            copyAttributes = await localStorage.GetItemAsync<bool>("copyAttributes");
+            settingEditElementOnSelect = await localStorage.GetItemAsync<bool>("settingEditElementOnSelect");
+
+        }
+
+        //  await js.InvokeVoidAsync("EnumerateCameras");
+
+
+        await base.OnAfterRenderAsync(firstRender);
+
+
+    }
+
+    private void AppDataCheckedNodeObjectsChanged(IEnumerable<Element> ie)
+    {
+        //checkedNodeObjects = Enumerable.Empty<Element>();
+        //checkedNodeObjects = ie;
+
+        selectedElements = appData.CheckedNodeObjects.Select(x => (AliantWebS.Models.Element)x).ToList();
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        appData.OnChange -= stc;
+        appData.OnRootEmployeesChange -= reloadRootEmployees;
+    }
+
+
+
+    void stc()
+    {
+        this.StateHasChanged();
+    }
+
+    void reloadRootEmployees()
+    {
+        appData.appDataElements = entitiesService.GetFilteredEntitiesAsync<Element>(e => e.StructureId == Structure.StructureId, "InverseParent", "ElementType").Result;
+        rootEmployees = appData.appDataElements.Where(e => e.ParentId == null).ToList();
+    }
+
+    void OnClickEditElement()
+    {
+        if (appData.CheckedNodeObjects is null || appData.CheckedNodeObjects.Count() == 0)
+        {
+
+            JsRuntime.InvokeVoidAsync("alert", "Please check one or more elements...");
+        }
+        else
+        {
+
+            Element elem = (Element)appData.CheckedNodeObjects.First();
+
+            /*     var options = new JsonSerializerOptions
+                     {
+                     ReferenceHandler = ReferenceHandler.Preserve
+                 };
+
+                 string param = JsonSerializer.Serialize(elem, options);*/
+
+            navigationManager.NavigateTo("/EditElement/" + elem.ElementId);
+
+        }
+    }
+
+
+
+    void OnClickAddElement()
+    {
+        List<Guid?> listIDs = new List<Guid?>();
+
+        if (appData.CheckedNodeObjects is null || appData.CheckedNodeObjects.Count() == 0)
+        {
+
+            // JsRuntime.InvokeVoidAsync("alert", "Please check one or more elements...");
+            listIDs.Add(null);
+        }
+        else
+        {
+
+            foreach (Element v in appData.CheckedNodeObjects)
+            {
+                listIDs.Add(v.ElementId);
+            }
+
+
+
+        }
+        string param = JsonSerializer.Serialize(listIDs);
+
+        navigationManager.NavigateTo("/AddElement/" + Structure.StructureId + @"/" + param);
+
+    }
+
+    void OnClickCopyBranch()
+    {
+
+        if (appData.CheckedNodeObjects is null || appData.CheckedNodeObjects.Count() == 0)
+        {
+
+            JsRuntime.InvokeVoidAsync("alert", "Please check one or more elements...");
+
+        }
+        else
+        {
+            copiedElements.Clear();
+            foreach (Element el in appData.CheckedNodeObjects)
+            {
+                copiedElements.Add(el);
+            }
+
+        }
+
+        appData.checkedNodeObjects = Enumerable.Empty<Element>();
+
+    }
+
+    async Task DoBranchDelete()
+    {
+        navigationManager.NavigateTo("BlankElement/");
+        List<Element> elementsToBeDeleted = new List<Element>();
+
+        AI.Helpers.GetTheChildren(appData.CheckedNodeObjects, elementsToBeDeleted);
+
+
+
+        appData.CheckedNodeObjects = Enumerable.Empty<Element>();
+
+        appData.appDataElements.RemoveAll(x => elementsToBeDeleted.Contains(x));
+        rootEmployees = appData.appDataElements.Where(e => e.ParentId == null).ToList();
+
+        foreach(var el in elementsToBeDeleted)
+        {
+            el.ParentId = null;
+        }
+
+        await entitiesService.UpdateEntitesAsync(elementsToBeDeleted);
+        await entitiesService.DeleteElementsAsync(elementsToBeDeleted.ToArray());
+
+
+        this.StateHasChanged();
+    }
+
+    //async Task DoItemDelete()
+    //{
+    //    // List<Element> elementsToBeDeleted = new List<Element>();
+
+    //    //  GetTheChildren(CheckedNodeObjects, elementsToBeDeleted);
+
+    //    await entitiesService.DeleteEntitiesAsync(CheckedNodeObjects.ToArray());
+
+    //    // CheckedNodeObjects = Enumerable.Empty<Element>();
+
+    //    elements.RemoveAll(x => CheckedNodeObjects.Contains(x));
+    //    rootEmployees = elements.Where(e => e.ParentId == null).ToList();
+
+    //    this.StateHasChanged();
+    //}
+
+    async Task OnClickCutBranch()
+    {
+        if (appData.CheckedNodeObjects is null || appData.CheckedNodeObjects.Count() == 0)
+        {
+
+            JsRuntime.InvokeVoidAsync("alert", "Please check one or more elements...");
+
+        }
+        else
+        {
+            copiedElements.Clear();
+            foreach (Element el in appData.CheckedNodeObjects)
+            {
+                el.ParentId = Guid.Parse("9245fe4a-d402-451c-b9ed-9c1a04247482");
+                copiedElements.Add(el);
+            }
+
+        }
+
+
+
+    }
+
+    async Task OnClickDeleteBranch()
+    {
+
+
+        if (appData.CheckedNodeObjects is null || appData.CheckedNodeObjects.Count() == 0)
+        {
+
+            JsRuntime.InvokeVoidAsync("alert", "Please check one or more elements...");
+
+        }
+        else
+        {
+            var isConfirmed = await JsRuntime.InvokeAsync<bool>("confirm", $"Are you sure you want to delete this branch?");
+
+            if (isConfirmed)
+            {
+                await DoBranchDelete();
+
+            }
+        }
+
+    }
+
+    private int? ProposeNameSubFunction(Element element, Element el, int? maximum)
+    {
+        if (el.ElementId == element.ElementId) return maximum;
+
+        var v1 = AI.Helpers.SplitStringInStringAndNum(el.Name);
+        var v2 = AI.Helpers.SplitStringInStringAndNum(element.Name);
+
+        if (v1.Item1 == v2.Item1)
+        {
+            if (v1.Item2 == null)
+            {
+                return 0;
+            }
+            if (v1.Item2 > maximum)
+            {
+                maximum = v1.Item2;
+            }
+        }
+
+        return maximum;
+    }
+
+    private string ProposeName(Element parent, Element element)
+    {
+        //List<string> listOfBrothersName = new List<string>();
+
+        int? maximum = -4589;
+
+
+        if (parent != null)
+        {
+
+            foreach (Element el in parent.InverseParent)
+            {
+                if (el.Name == null) continue;
+                maximum = ProposeNameSubFunction(element, el, maximum);
+            }
+        }
+        else
+        {
+            foreach (Element el in Structure.Elements)
+            {
+                if (el.Name == null) el.Name = "";
+                maximum = ProposeNameSubFunction(element, el, maximum);
+            }
+        }
+        string proposedName;
+        if (maximum != -4589)
+        {
+
+            proposedName = AI.Helpers.SplitStringInStringAndNum(element.Name).Item1 + (maximum + 1).ToString();
+        }
+        else
+        {
+            proposedName = element.Name;
+        }
+
+        return proposedName;
+
+
+    }
+
+    async Task PasteElement(Guid? parentId, Element el, List<Guid> forbidens)
+    {
+
+        // if (depth >= maxDepth) return;
+        // depth++;
+
+
+
+        Element parent;
+        updating = true;
+        if (parentId != null)
+        {
+            parent = await entitiesService.GetEntityAsync<Element>((Guid)parentId);
+        }
+        else
+        {
+            parent = null;
+        }
+
+
+
+        Element element = (Element)entitiesService._appDBContext.Entry(el).CurrentValues.ToObject();
+        element.ElementId = Guid.Empty;
+        element.ParentId = parentId;
+        element.Name = ProposeName(parent, element);
+        if (copyAttributes)
+        {
+            foreach (var att in el.AttributeElements)
+            {
+                AttributeElement attribute = new AttributeElement();
+                //attribute.AttributeType = att.AttributeType;
+                attribute.AttributeTypeId = att.AttributeTypeId;
+                attribute.ElementId = att.ElementId;
+                attribute.Value = att.Value;
+                attribute.Date = att.Date;
+
+                element.AttributeElements.Add(attribute);
+            }
+        }
+        element = await entitiesService.InsertEntityAsync(element);
+        Structure.Elements.Add(element);
+
+
+
+        updating = false;
+        forbidens.Add(element.ElementId);
+        foreach (Element childEl in el.InverseParent)
+        {
+
+            if (forbidens.Contains(childEl.ElementId)) continue;
+            await PasteElement(element.ElementId, childEl, forbidens);
+        }
+
+
+    }
+
+    private int CalculateDepth(Element element, int depth)
+    {
+        depth++;
+        int maxLocalDepth = depth;
+
+
+        foreach (Element el in element.InverseParent)
+        {
+            int dep = CalculateDepth(el, depth);
+            if (dep > maxLocalDepth) maxLocalDepth = dep;
+        }
+
+
+        return maxLocalDepth;
+    }
+
+
+
+    async Task OnClickPaste()
+    {
+        if (copiedElements is null || copiedElements.Count() == 0)
+        {
+            await JsRuntime.InvokeVoidAsync("alert", "No elements in the clipboard....");
+            return;
+        }
+
+
+        if (appData.CheckedNodeObjects is null || appData.CheckedNodeObjects.Count() == 0)
+        {
+            if (copiedElements[0].ParentId == Guid.Parse("9245fe4a-d402-451c-b9ed-9c1a04247482"))
+            {
+                foreach (Element v1 in copiedElements)
+                {
+                    v1.ParentId = null;
+                    await entitiesService.UpdateEntityAsync(v1);
+                }
+            }
+            else
+            {
+
+                foreach (Element v1 in copiedElements)
+                {
+                    //int maxDepth = CalculateDepth(v1,0);
+                    List<Guid> forbidens = new List<Guid>();
+                    await PasteElement(null, v1, forbidens);
+                    appData.RootEmployeesChange();
+                }
+            }
+
+        }
+        else
+        {
+            if (copiedElements[0].ParentId == Guid.Parse("9245fe4a-d402-451c-b9ed-9c1a04247482"))
+            {
+                foreach (Element v in appData.CheckedNodeObjects)
+                {
+
+                    foreach (Element v1 in copiedElements)
+                    {
+                        v1.ParentId = v.ElementId;
+                        await entitiesService.UpdateEntityAsync(v1);
+                    }
+
+                }
+
+            }
+            else
+            {
+                /////////////
+                foreach (Element v in appData.CheckedNodeObjects)
+                {
+
+                    foreach (Element v1 in copiedElements)
+                    {
+                        //int maxDepth = CalculateDepth(v1, 0);
+                        List<Guid> forbidens = new List<Guid>();
+                        await PasteElement(v.ElementId, v1, forbidens);
+                    }
+
+                }
+            }
+        }
+    }
+
+    //async Task OnClickPasteElement()
+    //{
+    //    List<long?> parentsIDs = new List<long?>();
+
+    //    if (CheckedNodeObjects is null || CheckedNodeObjects.Count() == 0)
+    //    {
+
+    //        JsRuntime.InvokeVoidAsync("alert", "Please check one or more elements...");
+
+    //    }
+    //    else
+    //    {
+
+    //        foreach (Element v in CheckedNodeObjects)
+    //        {
+    //            parentsIDs.Add(v.ElementId);
+
+    //        }
+
+    //        foreach (Element el in copiedElements)
+    //        {
+
+    //            foreach (int? parentID in parentsIDs)
+    //            {
+    //                Element element = (Element)entitiesService._appDBContext.Entry(el).CurrentValues.ToObject();
+    //                element.ElementId = 0;
+    //                if (element.ParentId == null)
+    //                {
+
+    //                    element.ParentId = parentID;
+    //                }
+    //                Structure.Elements.Add(element);
+
+    //            }
+    //        }
+    //        updating = true;
+    //        await entitiesService.UpdateEntityAsync(Structure);
+    //        updating = false;
+
+    //    }
+
+
+
+    //}
+
+
+
+
+
+    void OnClickData()
+    {
+        List<Guid?> listIDs;
+        if (appData.CheckedNodeObjects is null || appData.CheckedNodeObjects.Count() == 0)
+        {
+
+            JsRuntime.InvokeVoidAsync("alert", "Please check one or more elements...");
+            listIDs = new List<Guid?>();
+            listIDs.Add(null);
+        }
+        else
+        {
+
+
+            listIDs = AI.Helpers.GetTheChildren(appData.CheckedNodeObjects);
+        }
+
+
+        string param = JsonSerializer.Serialize(listIDs);
+
+
+        navigationManager.NavigateTo("/Statistics/" + param);
+
+
+    }
+
+    void OnClickStructural()
+    {
+        List<Guid?> listIDs;
+        if (appData.CheckedNodeObjects is null || appData.CheckedNodeObjects.Count() == 0)
+        {
+
+            JsRuntime.InvokeVoidAsync("alert", "Please check one or more elements...");
+            listIDs = new List<Guid?>();
+            listIDs.Add(null);
+        }
+        else
+        {
+            listIDs = AI.Helpers.GetTheChildren(appData.CheckedNodeObjects);
+        }
+
+
+        string param = JsonSerializer.Serialize(listIDs);
+
+
+        navigationManager.NavigateTo("/SensorData/" + param);
+
+
+    }
+
+    void OnClickLoads()
+    {
+        // List<Guid?> listIDs;
+        // if (appData.CheckedNodeObjects is null || appData.CheckedNodeObjects.Count() == 0)
+        // {
+
+        //     JsRuntime.InvokeVoidAsync("alert", "Please check one or more elements...");
+        //     listIDs = new List<Guid?>();
+        //     listIDs.Add(null);
+        // }
+        // else
+        // {
+        //     listIDs = AI.Helpers.GetTheChildren(appData.CheckedNodeObjects);
+        // }
+
+
+        // string param = JsonSerializer.Serialize(listIDs);
+
+
+        navigationManager.NavigateTo("/LoadCases/");
+
+
+    }
+
+    public static Dictionary<string, object> ProcessLine(string line)
+    {
+        //string pattern = @"(\w+):\s*(\w+),?";
+        string pattern = @"([^:]+):\s*([^,]+),?";
+        var matches = Regex.Matches(line, pattern);
+
+        Dictionary<string, object> dict = new Dictionary<string, object>();
+
+        foreach (System.Text.RegularExpressions.Match match in matches)
+        {
+            string key = match.Groups[1].Value.Trim();
+            string value = match.Groups[2].Value.Trim();
+            bool booleanValue;
+            int intValue;
+
+            if (int.TryParse(value, out intValue))
+            {
+                dict.Add(key, intValue);
+            }
+            else if (bool.TryParse(value, out booleanValue))
+            {
+                dict.Add(key, booleanValue);
+            }
+            else
+            {
+                dict.Add(key, value);
+            }
+        }
+
+        return dict;
+    }
+
+    async void OnClickImportStructure(InputFileChangeEventArgs e)
+    {
+        isImporting = true;
+
+        List<string> categoriesWanted = new List<string>();
+        List<string> channelDataTypesWanted = new List<string>();
+        Dictionary<string, object> elementsTypesWanted = new Dictionary<string, object>();
+        Dictionary<string, object> attributesTypesWanted = new Dictionary<string, object>();
+        Dictionary<string, object> attributeTypeElementTypesWanted = new Dictionary<string, object>();
+
+        List<string> categoriesExcluded = new List<string>();
+        List<string> channelDataTypesExcluded = new List<string>();
+        List<string> elementsTypesExcluded = new List<string>();
+        List<string> attributesTypesExcluded = new List<string>();
+        List<string> attributeTypeElementTypesExcluded = new List<string>();
+
+        var categories = await entitiesService.GetAllEntitiesAsync<Category>();
+
+        Stream stream = e.File.OpenReadStream();
+
+        using (StreamReader reader = new StreamReader(stream))
+        {
+            string content = await reader.ReadToEndAsync();
+
+            // Split content into lines and process each line
+            string[] lines = content.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+
+
+            foreach(var line in lines)
+            //     while ((line = await reader.ReadLineAsync(System.Threading.CancellationToken.None)) != null)
+            {
+                StateHasChanged();
+                if (line.Trim() == String.Empty) continue;
+                Element el = null;
+
+
+                var dict = ProcessLine(line);
+
+                if (dict["Object"].ToString().ToLower() == "element")
+                {
+                    dict.Remove("Object");
+                    //nodes = entitiesService.GetFilteredEntitiesAsync<Element>(a => (elList.Contains(a.ElementId) && (a.ElementType?.Name == "Node")), "ElementType", "AttributeElements.AttributeType").Result;
+                    // elements = entitiesService.GetFilteredEntitiesAsync<Element>(a => (elList.Contains(a.ElementId) && ((a.ElementType?.Name == "Beam2d"))), "ElementType", "AttributeElements.AttributeType").Result;
+
+
+
+
+                    string categoryName = string.Empty;
+                    if (dict.Keys.Contains("category"))
+                    {
+                        categoryName = dict["category"].ToString().Trim();
+                        dict.Remove("category");
+                    }
+
+                    Category category = null;
+
+                    if (!categoriesWanted.Contains(categoryName) && !categoriesExcluded.Contains(categoryName) && !(categoryName == string.Empty))
+                    {
+                        category = categories.Find(a => a.Name == categoryName);
+                        if (category == null)
+                        {
+                            var isConfirmed = await JsRuntime.InvokeAsync<bool>("confirm", $"The Category {categoryName} does not exist.\nDo you want to create one automatically?");
+
+                            if (isConfirmed)
+                            {
+
+                                Category cat = new Category();
+                                cat.Name = categoryName;
+                                category = await entitiesService.InsertEntityAsync(cat);
+                                categoriesWanted.Add(category.Name);
+                            }
+                            else
+                            {
+                                categoriesExcluded.Add(categoryName);
+                            }
+
+                        }
+                        else
+                        {
+                            categoriesWanted.Add(category.Name);
+                        }
+                    }
+                    else
+                    {
+                        category = categories.Find(a => a.Name == categoryName);
+                    }
+
+                    ////////////////////////////
+                    List<string> channelDataTypesNames = new List<string>();
+                    if (dict.Keys.Contains("channelDataType"))
+                    {
+                        channelDataTypesNames = dict["channelDataType"].ToString().Split('|').ToList();
+                        dict.Remove("channelDataType");
+                    }
+
+                    foreach (string cdtn in channelDataTypesNames)
+                    {
+
+                        ChannelDataType channelDataType = null;
+
+
+
+                        if (!channelDataTypesWanted.Contains(cdtn) && !channelDataTypesExcluded.Contains(cdtn) && !(cdtn == string.Empty))
+                        {
+                            channelDataType = await entitiesService.GetFilteredFirstEntityAsync<ChannelDataType>(a => a.Name == cdtn);
+                            if (channelDataType == null)
+                            {
+                                var isConfirmed = await JsRuntime.InvokeAsync<bool>("confirm", $"The ChannelDataType {cdtn} does not exist.\nDo you want to create one automatically?");
+
+                                if (isConfirmed)
+                                {
+
+                                    ChannelDataType cdt = new ChannelDataType();
+                                    cdt.Name = cdtn;
+                                    channelDataType = await entitiesService.InsertEntityAsync(cdt);
+                                    channelDataTypesWanted.Add(channelDataType.Name);
+                                }
+                                else
+                                {
+                                    channelDataTypesExcluded.Add(cdtn);
+                                }
+
+                            }
+                            else
+                            {
+                                channelDataTypesWanted.Add(channelDataType.Name);
+                            }
+                        }
+                    }///
+                    ///////////////////////////
+
+                    var v = await AI.Helpers.CreateElementType(entitiesService, category, dict, elementsTypesWanted,
+                        elementsTypesExcluded, JsRuntime);
+
+                    var elementType = v.elementType;
+                    var typeName = v.typeName;
+
+                    ////////////////////////////////
+                    if (elementType != null)
+                    {
+                        var channelDataTypes = await entitiesService.GetFilteredEntitiesAsync<ChannelDataType>(a => channelDataTypesNames.Contains(a.Name));
+                        var channelDataTypesIds = channelDataTypes.Select(x => x.ChannelDataTypeId);
+
+                        foreach (Guid guid in channelDataTypesIds)
+                        {
+                            ChannelDataTypeElementType cdtet = await entitiesService.GetFilteredFirstEntityAsync<ChannelDataTypeElementType>(a => ((a.ElementTypeId == elementType.ElementTypeId) && (guid == a.ChannelDataTypeId)));
+                            if (cdtet == null)
+                            {
+                                cdtet = new ChannelDataTypeElementType() { ChannelDataTypeId = guid, ElementTypeId = elementType.ElementTypeId };
+                                cdtet = await entitiesService.InsertEntityAsync(cdtet);
+                            }
+                        }
+                    }
+
+
+                    el = new Element();
+                    if (typeName != null)
+                    {
+                        el.ElementTypeId = ((ElementType)elementsTypesWanted[typeName]).ElementTypeId;
+                    }
+
+                    string elementName = string.Empty;
+                    if (dict.Keys.Contains("name"))
+                    {
+                        elementName = dict["name"].ToString()?.Trim();
+                        dict.Remove("name");
+                    }
+                    el.Name = elementName;
+                    el.StructureId = Structure.StructureId;
+
+                    string parentName = string.Empty;
+                    if (dict.Keys.Contains("parent"))
+                    {
+                        parentName = dict["parent"].ToString();
+                        dict.Remove("parent");
+                    }
+                    Element parentElement = await entitiesService.GetFilteredFirstEntityAsync<Element>(a => (a.Name == parentName) && (a.StructureId == Structure.StructureId));
+                    if (parentElement != null)
+                    {
+                        el.ParentId = parentElement.ElementId;
+                    }
+
+                    el = await entitiesService.InsertEntityAsync(el);
+
+
+
+
+                    foreach (var pair in dict)
+                    {
+                        AttributeType attributeType = null;
+
+                        if (!attributesTypesWanted.Keys.Contains(pair.Key) && !attributesTypesExcluded.Contains(pair.Key))
+                        {
+
+                            attributeType = await entitiesService.GetFilteredFirstEntityAsync<AttributeType>(a => a.Name == pair.Key);
+
+                            if (attributeType == null)
+                            {
+                                var isConfirmed = true;// await JsRuntime.InvokeAsync<bool>("confirm", $"The Attibute Type {pair.Key} does not exist.\nDo you want to create one automatically?");
+
+                                if (isConfirmed)
+                                {
+
+                                    AttributeType at = new AttributeType();
+                                    at.Name = pair.Key?.Trim();
+                                    attributeType = await entitiesService.InsertEntityAsync(at);
+                                    attributesTypesWanted.Add(attributeType.Name, attributeType);
+
+                                }
+                                else
+                                {
+                                    attributesTypesExcluded.Add(pair.Key);
+                                    continue;
+                                }
+
+                            }
+                            else
+                            {
+                                attributesTypesWanted.Add(attributeType.Name, attributeType);
+                            }
+                        }
+
+                        attributeType = (AttributeType)attributesTypesWanted[pair.Key?.Trim()];
+
+                        AttributeTypeElementType attributeTypeElementType = null;
+
+                        if (!attributeTypeElementTypesWanted.Keys.Contains(pair.Key?.Trim() + el.ElementTypeId.ToString()) && !attributeTypeElementTypesExcluded.Contains(pair.Key?.Trim() + el.ElementTypeId.ToString()))
+                        {
+
+                            attributeTypeElementType = await entitiesService.GetFilteredFirstEntityAsync<AttributeTypeElementType>((a => (a.AttributeTypeId == attributeType.AttributeTypeId) && (a.ElementTypeId == ((ElementType)elementsTypesWanted[typeName]).ElementTypeId)));
+
+                            if (attributeTypeElementType == null)
+                            {
+
+                                AttributeTypeElementType atet = new AttributeTypeElementType();
+                                atet.ElementTypeId = ((ElementType)elementsTypesWanted[typeName]).ElementTypeId;
+                                atet.AttributeTypeId = attributeType.AttributeTypeId;
+                                attributeTypeElementType = await entitiesService.InsertEntityAsync(atet);
+                                attributeTypeElementTypesWanted.Add(pair.Key?.Trim() + el.ElementTypeId.ToString(), atet);
+
+                            }
+                            else
+                            {
+                                attributeTypeElementTypesWanted.Add(pair.Key + el.ElementTypeId.ToString(), attributeTypeElementType);
+                            }
+                        }
+
+                        AttributeElement ae = new AttributeElement();
+                        ae.ElementId = el.ElementId;
+                        ae.AttributeTypeId = attributeType.AttributeTypeId;
+                        ae.Value = pair.Value.ToString()?.Trim();
+                        ae = await entitiesService.InsertEntityAsync(ae);
+                        appData.RootEmployeesChange();
+                        this.StateHasChanged();
+
+
+                        //AttributeTypeElementType atet = new AttributeTypeElementType();
+                        //atet.ElementTypeId = ((ElementType)elementsTypesWanted[typeName]).ElementTypeId;
+                        //atet.AttributeTypeId = attributeType.AttributeTypeId;
+
+
+
+
+
+                        // Console.WriteLine($"{pair.Key}: {pair.Value}");
+                    }
+                }
+
+            }// end while lines
+
+            isImporting = false;
+            StateHasChanged();
+            await JsRuntime.InvokeVoidAsync("alert", "Creation completed...");
+        }
+
+    }
+
+
+    async void OnChange(TreeEventArgs args)
+    {
+        if (AI.Helpers.IsCurrentPage(navigationManager, "LoadCases"))
+        {
+
+        }
+        else
+        {
+
+            if ((settingEditElementOnSelect == null) || settingEditElementOnSelect)
+            {
+                Element elem = (Element)args.Value;
+                navigationManager.NavigateTo("/EditElement/" + elem.ElementId);
+            }
+        }
+
+
+        //  Log("Change", $"Item Text: {args.Text}");
+    }
+
+    //void OnExpand(TreeExpandEventArgs args)
+    //{
+    //    if (args.Value is Category category)
+    //    {
+    //        //   Log("Expand", $"Text: {category.CategoryName}");
+    //    }
+
+    //    if (args.Value is string text)
+    //    {
+    //        //   Log("Expand", $"Text: {text}");
+    //    }
+    //}
+}

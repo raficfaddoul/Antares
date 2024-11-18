@@ -1,0 +1,494 @@
+﻿@page "/AddDataToInflux/{ListJson}"
+@using AliantWebS.Data
+@using AliantWebS.Models
+@using Microsoft.Extensions.Logging
+@using System.Net.Sockets
+
+@inject EntitiesService entitiesService
+@inject IJSRuntime JsRuntime
+
+
+@using System.Numerics;
+@using Accord.Math;
+@using System.Text.Json;
+@using System.Globalization;
+@using System;
+@using System.Threading.Tasks;
+@inject Radzen.DialogService DialogService
+@inject ILogger<FilesUpload> Logger
+﻿@using Plotly.Blazor.LayoutLib
+@using Plotly.Blazor.Traces.ScatterLib
+@using System.Threading
+
+@inject NavigationManager navigationManager
+@inject AppData appData
+@inject IStringLocalizer<Languages> L
+@layout InventoryElementPages.ElementsLayout
+
+<NavigationLock OnBeforeInternalNavigation="appData.OnBeforeInternalNavigation" ConfirmExternalNavigation="appData.SaveConfirmation&& appData.SaveChanges" />
+
+@if (somethingToPresent)
+{
+    <h2>@title</h2>
+    @if (channelDataTypeList is null)
+    {
+        <p><em>Loading... !</em></p>
+    }
+    else
+    {
+
+        <div class="page" Style="display: flex">
+            <RadzenSplitter Orientation="Radzen.Orientation.Horizontal" style="height: 100%; border: 1px solid rgba(0,0,0,.08);">
+                <RadzenSplitterPane Size="30%">
+
+                    <Blazorise.Row>
+                        <Column>
+
+                            <RadzenDataGrid AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="10"
+                                    Data="@sensors" TItem="Element" ColumnWidth="150px">
+                                <Columns>
+                                    <RadzenDataGridColumn TItem="Element" Property="Name" Title="@L["Sensing Device"]" Width="60px"></RadzenDataGridColumn>
+                                    <RadzenDataGridColumn TItem="Element" Property="Description" Title="@L["Action"]" Width="30px">
+                                        <Template Context="element">
+                                            <Div Style="display: flex">
+                                                <RadzenCheckBox TValue=bool Value="selectedElements.Contains(element)" Change=@(args => OnChangeSelectedElements(args,element))></RadzenCheckBox>
+                                            </Div>
+                                        </Template>
+                                    </RadzenDataGridColumn>
+
+                                </Columns>
+                            </RadzenDataGrid>
+
+                            <RadzenDataGrid AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="10"
+                                    Data="@channelDataTypeList" TItem="ChannelDataType" ColumnWidth="150px">
+                                <Columns>
+                                    <RadzenDataGridColumn TItem="ChannelDataType" Property="Name" Title="@L["Channel"]"></RadzenDataGridColumn>
+                                    <RadzenDataGridColumn TItem="ChannelDataType" Property="Description" Title="@L["Action"]" Width="30px">
+                                        <Template Context="channelDataType">
+                                            <Div Style="display: flex">
+                                                <RadzenCheckBox TValue=bool Change=@(args => OnChangeSelectedChannelDataTypes(args,channelDataType.ChannelDataTypeId))></RadzenCheckBox>
+                                            </Div>
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                </Columns>
+                            </RadzenDataGrid>
+                            <div class="form-group ">
+                                <div>
+                                    <label>@L["Start Date"] :</label>
+                                    <div>
+                                        <InputDate Type="InputDateType.DateTimeLocal" @bind-Value="@startDate" />
+                                        @*           <ValidationMessage For="@(() => startDate)" />*@
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group ">
+                                <div>
+                                    <label>@L["End Date"] :</label>
+                                    <div>
+                                        <InputDate Type="InputDateType.DateTimeLocal" @bind-Value="@endDate" />
+                                        @*           <ValidationMessage For="@(() => startDate)" />*@
+                                    </div>
+                                </div>
+                            </div>
+
+                            <Div Style="display: flex">
+
+
+                                <div class="file-input-zone">
+
+                                    <NavLink class="nav-link" href="dgfrdgh" @onclick:preventDefault="true">
+                                        @if (isAdding)
+                                        {
+                                            <i class="fas fa-spinner fa-spin"></i>
+                                        }
+                                        else
+                                        {
+                                            <span align="center" style="width:30px" class="oi oi-plus" aria-hidden="true"></span>
+                                        }
+
+                                    </NavLink>
+                                    <InputFile OnChange="@AddData" />
+                                </div>
+
+@*                                <div class="file-input-zone">
+
+                                    <a class="nav-link" @onclick="@(args => QueryData())" href="dgfrdgh" @onclick:preventDefault="true">
+                                        <span align="center" style="width:30px" class="fas fa-stream" aria-hidden="true"></span>
+                                    </a>
+                                </div>*@
+
+                                <div class="file-input-zone">
+                                    <a class="nav-link" @onclick="@(args => DeleteData())" href="dgfrdgh" @onclick:preventDefault="true">
+                                        <span align="center" style="width:30px" class="oi oi-trash" aria-hidden="true"></span>
+                                    </a>
+                                </div>
+                                <div class="file-input-zone">
+                                    <a class="nav-link" title="Delete All Data" @onclick="@(args => DeleteAllData())" href="dgfrdgh" @onclick:preventDefault="true">
+                                        <span align="center" style="width:30px" class="oi oi-trash" aria-hidden="true"></span>
+                                    </a>
+                                </div>
+                            </Div>
+
+                        </Column>
+
+
+                    </Blazorise.Row>
+
+
+                </RadzenSplitterPane>
+
+            </RadzenSplitter>
+        </div>
+    }
+
+}
+
+@code {
+    bool letUpdateDataRun = true;
+    bool updating = false;
+    bool isAdding = false;
+
+
+    static public CancellationTokenSource cts;
+    CancellationToken ct;
+
+
+    bool somethingToPresent = false;
+
+    Structure st = new Structure();
+
+    [Parameter]
+    public string ListJson { get; set; }
+
+    List<Guid?> sensorsIDs;
+    IEnumerable<Guid?> elementTypesIDs;
+
+
+    DateTime startDate { get; set; } = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+    DateTime endDate { get; set; } = DateTime.UtcNow;
+
+
+
+
+    [Parameter] public EventCallback OnValidSubmit { get; set; }
+
+
+
+    string title;
+
+    // private const string ServerHost = "localhost";
+    //  private const int ServerPort = 8000;
+
+    private List<string> filterAddress = new List<string>();
+
+    List<ChannelDataTypeElementType> channelDataTypeElementTypeList;
+
+
+    List<Element> sensors;
+    Dictionary<string, List<ChannelDataType>> listOfChannelsDataTypePerSensor = new Dictionary<string, List<ChannelDataType>>();
+    List<Element> selectedElements { get; set; } = new List<Element>();
+
+
+    List<ChannelDataType> channelDataTypeList;
+    List<Guid> selectedChannelDataTypes { get; set; } = new List<Guid>();
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        cts = new CancellationTokenSource();
+        ct = cts.Token;
+
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        somethingToPresent = false;
+
+        var elligibleElementTypes = await entitiesService.GetFilteredEntitiesAsync<ElementType>(a => ((a.ChannelDataTypeElementTypes?.Count ?? 0) > 0), "ChannelDataTypeElementTypes");
+        var elligibleElementTypesID = elligibleElementTypes.Select(x => x.ElementTypeId).ToList();
+
+
+        sensorsIDs = JsonSerializer.Deserialize<List<Guid?>>(ListJson);
+
+        sensors = await entitiesService.GetFilteredEntitiesAsync<Element>(a => (sensorsIDs.Contains(a.ElementId)
+                    && (elligibleElementTypesID.Contains(a.ElementTypeId ?? new Guid()))));
+        foreach (var s in sensors)
+        {
+            entitiesService.LoadCollection("ElementType.ChannelDataTypeElementTypes");
+            entitiesService.LoadCollection("AttributeElements.AttributeType");
+        }
+        foreach (Element sensor in sensors)
+        {
+
+            List<ChannelDataType> lcdt = new List<ChannelDataType>();
+            //lcdt = sensor.ElementType.ChannelDataTypeElementTypes.Select(x => x.ChannelDataType).ToList();
+            lcdt = await entitiesService.GetFilteredEntitiesAsync<ChannelDataType>(a => a.ChannelDataTypeElementTypes.Select(x => x.ElementType).Contains(sensor.ElementType));
+            listOfChannelsDataTypePerSensor.Add(sensor.ElementId.ToString(), lcdt);
+
+        }
+
+        elementTypesIDs = sensors.Select(x => x.ElementTypeId);
+
+
+
+        //channelDataTypeElementTypeList = await entitiesService.GetFilteredEntitiesAsync<ChannelDataTypeElementType>(a => elementTypesIDs.Contains(a.ElementTypeId), "ChannelDataType");
+
+        //channelDataTypeList = channelDataTypeElementTypeList.Select(x => x.ChannelDataType).ToList();
+
+        channelDataTypeList = listOfChannelsDataTypePerSensor.Values.ToList().SelectMany(innerList => innerList).Distinct().ToList();  //    .Distinct().ToList();
+
+        if (channelDataTypeList.Count() > 0)
+        {
+            somethingToPresent = true;
+        }
+        else
+        {
+            await JsRuntime.InvokeVoidAsync("alert", "no DataChannels available...");
+        }
+
+    }
+
+
+
+    void OnChangeSelectedElements(bool args, Element element)
+    {
+        if (args)
+        {
+
+            selectedElements.Add(element);
+
+        }
+        else
+        {
+            selectedElements.Remove(element);
+
+        }
+    }
+
+    void OnChangeSelectedChannelDataTypes(bool args, Guid channelDataTypeID)
+    {
+        if (args)
+        {
+
+            selectedChannelDataTypes.Add(channelDataTypeID);
+
+        }
+        else
+        {
+            selectedChannelDataTypes.Remove(channelDataTypeID);
+
+        }
+    }
+
+
+
+    private async Task AddData(InputFileChangeEventArgs e)
+    {
+        isAdding = true;
+        foreach (var file in e.GetMultipleFiles())
+        {
+            try
+            {
+                if (file != null)
+                {
+                    if ((Path.GetExtension(file.Name) == ".csv"))
+                    {
+
+                        var data = await AI.Helpers.GetDataFromCSV2(file.OpenReadStream(file.Size));
+
+                        var lines = new List<string>();
+                        int count = 0;
+                        foreach (Element el in selectedElements)
+                        {
+                            List<ChannelDataTypeElementType> lcdte = el.ElementType.ChannelDataTypeElementTypes.ToList();
+
+                            var elChanenlDataType = lcdte.Select(x => x.ChannelDataType);
+
+                            var intersect = elChanenlDataType.AsQueryable().IntersectBy<ChannelDataType, Guid>(selectedChannelDataTypes, x => x.ChannelDataTypeId);
+
+                            var dictionary = intersect.ToDictionary(x => x.ChannelDataTypeId.ToString(), x => x.Name);
+
+
+                            
+                            foreach (var record in data)
+                            {
+                                string line = "SHM,";
+                                line += "sensor=" + el.ElementId.ToString() + " ";
+
+                                int sig = 0;
+                                foreach (var l in intersect)
+                                {
+                                    string header = el.Name + "|" + dictionary[l.ChannelDataTypeId.ToString()];
+
+                                    if (record.Keys.Contains(header))
+                                    {
+                                        line += l.ChannelDataTypeId.ToString() + "=" + record[header] + ",";
+                                        sig++;
+                                    }
+
+                                }
+
+                                line = line.TrimEnd(',') + " ";
+
+                                long r;
+
+                                if (!long.TryParse(record["TimeStamp"], out r))
+                                {
+                                    await JsRuntime.InvokeVoidAsync("alert", "Time stamp have an incorrect format...");
+                                    //  return;
+                                }
+                                if (sig > 0) count++;
+                                line += record["TimeStamp"];
+                                lines.Add(line);
+                            }
+
+                        }
+
+                        var linesArray = lines.ToArray();
+
+                        try
+                        {
+
+                            await InfluxService.WriteData(linesArray);
+                            await JsRuntime.InvokeVoidAsync("alert", count.ToString() + " records have been written to the database");
+
+                        }
+                        catch(Exception ex)
+                        {
+                            await JsRuntime.InvokeVoidAsync("alert", ex.Message);
+
+                        }
+
+
+
+                    }
+
+                    if ((Path.GetExtension(file.Name) == ".txt") || (Path.GetExtension(file.Name) == ""))
+                    {
+
+                        using var reader = new StreamReader(file.OpenReadStream());
+
+                        var lines = new List<string>();
+
+                        string line;
+                        while ((line = await reader.ReadLineAsync()) != null)
+                        {
+                            lines.Add(line);
+                        }
+                        var linesArray = lines.ToArray();
+
+                        await InfluxService.WriteData(linesArray);
+                    }
+                    if ((Path.GetExtension(file.Name) == ".json"))
+                    {
+
+                        string content;
+                        using (var streamReader = new StreamReader(file.OpenReadStream(512000000)))
+                        {
+                            content = await streamReader.ReadToEndAsync();
+                        }
+
+
+
+                        Dictionary<int, Dictionary<long, List<double>>> data = AI.Helpers.GetDataFromJson(content);
+                        var lines = new List<string>();
+                        foreach (Element el in selectedElements)
+                        {
+                            if (el.AttributeElements.Count ==0)
+                            {
+                                entitiesService.LoadCollection(el, "AttributeElements");
+                            }
+
+                            string val = el.AttributeElements.FirstOrDefault(x => x.AttributeType.Name.ToLower().Trim() == "adressmapping")?.Value;
+                            if (val == null)
+                            {
+                                await JsRuntime.InvokeVoidAsync("alert", el.Name + " has no Address Mapping");
+                                continue;
+                            }
+
+                            List<ChannelDataTypeElementType> lcdte = el.ElementType.ChannelDataTypeElementTypes.ToList();
+
+                            Dictionary<string, string> ls = lcdte.ToDictionary(x => x.ChannelDataType.Name.ToLower(), x => x.ChannelDataTypeId.ToString());
+
+                            //ist<(string, string)> ls = lcdte.Select(x => (x.ChannelDataTypeId.ToString(), x.ChannelDataType.Name)).ToList();
+
+                            if (int.TryParse(val, out int res))
+                            {
+                                foreach (var v in data[res])
+                                {
+                                    string line = "SHM,";
+                                    line += "sensor=" + el.ElementId.ToString() + " ";
+
+
+                                    line += ls[("Horizontal Acceleration 1").ToLower()] + "=" + v.Value[0].ToString() + ",";
+                                    line += ls[("Vertical Acceleration").ToLower()] + "=" + v.Value[1].ToString() + ",";
+                                    line += ls[("Horizontal Acceleration 2").ToLower()] + "=" + v.Value[2].ToString() + " ";
+                                    line += v.Key;
+
+                                    lines.Add(line);
+                                }
+                            }
+                        }
+
+                        var linesArray = lines.ToArray();
+
+                        await InfluxService.WriteData(linesArray);
+
+                    }
+
+                }
+                isAdding = false;
+            }
+            catch (Exception ex)
+            {
+                isAdding = false;
+                await JsRuntime.InvokeVoidAsync("alert", "No data written..." + ex.Message);
+                throw new Exception("some exeption in Files Upload");//???rafic deveopement mode
+                                                                     //Logger.LogError("File: {Filename} Error: {Error}",
+                                                                     //    file.Name, ex.Message);
+            }
+        }
+
+    }
+
+    private async Task DeleteData()
+    {
+        if (selectedElements.Count == 0)
+        {
+            await JsRuntime.InvokeVoidAsync("alert", "No Sensors selected...");
+            return;            
+        }
+
+
+        if (await JsRuntime.InvokeAsync<bool>("confirm", $"Data will be deleted. Are you sure you want to continue?"))
+        {
+            if(await InfluxService.DeleteData(startDate, endDate, selectedElements.Select(x => x.ElementId.ToString()).ToList()))
+            {
+                await JsRuntime.InvokeVoidAsync("alert", "Data deleted...");
+            }
+            else
+            {
+                await JsRuntime.InvokeVoidAsync("alert", "No Data deleted...");
+            }
+        }
+    }
+
+    private async Task DeleteAllData()
+    {
+
+        if (await JsRuntime.InvokeAsync<bool>("confirm", $"All Data will be deleted. Are you sure you want to continue?"))
+        {
+            if (await InfluxService.DeleteData(startDate, endDate, null))
+            {
+                await JsRuntime.InvokeVoidAsync("alert", "all data deleted...");
+            }
+            else
+            {
+                await JsRuntime.InvokeVoidAsync("alert", "No Data deleted...");
+            }
+        }
+    }
+
+
+
+}

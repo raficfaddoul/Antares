@@ -1,0 +1,51 @@
+@page "/FlagTypeDefectTypes/{CallerID:guid}"
+@using Models
+@using AliantWebS.Data
+@inject AliantWebS.Data.AppData AppData
+@inject EntitiesService entitiesService
+
+
+
+
+<AliantWebS.Pages.TypesPages.JunctionsComponent Titre=@titre
+                                                TItem1="FlagType"
+                                                TItem2="DefectType"
+                                                TItem3="FlagTypeDefectType"
+                                                CallerID=@CallerID
+                                                TItem1IdName="FlagTypeId"
+                                                TItem2IdName="DefectTypeId"
+                                                InspectionResultTypeElementTypesCollection=@flagType.FlagTypeDefectTypes
+                                                OnValidSubmit="@Update">
+
+</AliantWebS.Pages.TypesPages.JunctionsComponent>
+
+
+
+@code {
+
+    [Parameter]
+    public Guid CallerID { get; set; }
+
+    public string titre { get; set; }
+
+    FlagType flagType;
+
+    public override async Task SetParametersAsync(ParameterView parameters)
+    {
+        flagType = (FlagType)AppData.obj;
+        entitiesService.LoadCollection(flagType, "FlagTypeDefectTypes");
+        await base.SetParametersAsync(parameters);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        titre = "Flag Type \"" + flagType.Name + "\" Defect Types Association";
+    }
+
+    protected async void Update()
+    {
+        await entitiesService.UpdateEntityAsync(flagType);
+    }
+
+}

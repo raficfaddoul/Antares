@@ -1,0 +1,38 @@
+﻿@page "/AddEvent"
+@using AliantWebS.Data
+@using AliantWebS.Models
+@inject EntitiesService entitiesService
+@inject NavigationManager NavigationManager
+@inject AppData appData
+
+<NavigationLock OnBeforeInternalNavigation="appData.OnBeforeInternalNavigation" ConfirmExternalNavigation="appData.SaveConfirmation&& appData.SaveChanges" />
+
+
+<EventForm EditContext="@EditContext" ButtonText="Create" Eventt="@eventt"
+           OnValidSubmit="@CreateEvent"
+                   Title="Add Event" />
+
+@code {
+    [Parameter]
+    public EditContext EditContext { get; set; }
+
+    Event eventt = new Event();
+
+    bool initialized = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        eventt.StructureId = appData.Structure.StructureId;
+        eventt.Structure = appData.Structure;
+        EditContext = new EditContext(eventt);
+    }
+
+    protected async void CreateEvent()
+    {
+  
+        await entitiesService.InsertEntityAsync(eventt);
+
+        NavigationManager.NavigateTo("Events");
+    }
+
+}

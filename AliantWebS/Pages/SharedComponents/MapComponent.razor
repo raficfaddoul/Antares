@@ -1,0 +1,105 @@
+﻿@using AliantWebS.Data
+@using AliantWebS.Models
+@inject IJSRuntime js
+@inject AppData appData
+
+<div id="map" style="height: 400px; width: 100%;"></div>
+
+@code {
+
+    [Parameter]
+    public EventCallback<(double,double)> ValueChanged { get; set; }
+
+    [Parameter]
+    public List<(string id,string Type, string Name, double X,double Y, double C)?> Coordinates { get; set; }
+
+
+    [Parameter]
+    public int Scale { get; set; }
+
+    private DotNetObjectReference<MapComponent>? objRef;
+
+    string[] idArray, nameArray, typeArray;
+    double[] xArray,yArray, cArray;
+
+    private Structural.IdentificationResult ir;
+
+    protected override async Task OnInitializedAsync()
+    {
+        objRef = DotNetObjectReference.Create(this);
+        ir = new Structural.IdentificationResult();
+
+    }
+
+    public override async Task SetParametersAsync(ParameterView parameters)
+    {
+        await base.SetParametersAsync(parameters);
+
+        idArray = Coordinates.Where(c => c.HasValue).Select(c => c.Value.id).ToArray();
+        nameArray = Coordinates.Where(c => c.HasValue).Select(c => c.Value.Name).ToArray();
+        typeArray = Coordinates.Where(c => c.HasValue).Select(c => c.Value.Type).ToArray();
+        xArray = Coordinates.Where(c => c.HasValue).Select(c => c.Value.X).ToArray();
+        yArray = Coordinates.Where(c => c.HasValue).Select(c => c.Value.Y).ToArray();
+        cArray = Coordinates.Where(c => c.HasValue).Select(c => c.Value.C).ToArray();
+        //Structural.IdentificationResult ir = new Structural.IdentificationResult();
+        for (int i = 0; i < idArray.Length; i++)
+        {
+            if (typeArray[i] == "Structure")
+            {
+                Structure structure = new Structure();
+                structure.StructureId = Guid.Parse(idArray[i]);
+
+                try
+                {
+                    ir = await ir.Load(structure);
+                    if (ir == null)
+                    {
+                        ir = new Structural.IdentificationResult();
+                        continue;
+                    }
+                    cArray[i] = ir.Kpi1;
+                }
+                catch (Exception ex)
+                {
+                    //do not need this alert in maps
+                    await js.InvokeVoidAsync("alert", ex.Message + " Most likely Identification was not done");
+                    return;
+                }
+            }
+
+        }
+    }
+
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+ 
+
+
+
+        if (firstRender)
+        {
+
+            await js.InvokeVoidAsync("MakeMap", objRef, Coordinates[0].Value.X, Coordinates[0].Value.Y,Coordinates[0].Value.C, Scale);
+
+       
+
+            await js.InvokeVoidAsync("AddMarker", idArray,typeArray, nameArray, xArray, yArray, cArray);
+        }
+        else
+        {
+            await js.InvokeVoidAsync("MoveMarker", idArray, xArray, yArray,Scale);
+        
+        }
+
+    }
+
+    [JSInvokable]
+    public async Task OnMapClicked(double x, double y)
+    {
+        await ValueChanged.InvokeAsync((x,y));
+    }
+}

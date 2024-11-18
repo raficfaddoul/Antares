@@ -1,0 +1,51 @@
+﻿@page "/ChannelDataTypeElementTypes/{CallerID:guid}"
+@using Models
+@using AliantWebS.Data
+@inject AliantWebS.Data.AppData AppData
+@inject EntitiesService entitiesService
+
+
+
+
+<AliantWebS.Pages.TypesPages.JunctionsComponent Titre=@titre
+                                                TItem1="ChannelDataType"
+                                                TItem2="ElementType"
+                                                TItem3="ChannelDataTypeElementType"
+                                                CallerID=@CallerID
+                                                TItem1IdName="ChannelDataTypeId"
+                                                TItem2IdName="ElementTypeId"
+                                                InspectionResultTypeElementTypesCollection=@channelDataType.ChannelDataTypeElementTypes
+                                                OnValidSubmit="@Update">
+
+</AliantWebS.Pages.TypesPages.JunctionsComponent>
+
+
+
+@code {
+
+    [Parameter]
+    public Guid CallerID { get; set; }
+
+    public string titre { get; set; }
+
+    ChannelDataType channelDataType;
+
+    public override async Task SetParametersAsync(ParameterView parameters)
+    {
+        channelDataType = (ChannelDataType)AppData.obj;
+        entitiesService.LoadCollection(channelDataType, "ChannelDataTypeElementTypes");
+        await base.SetParametersAsync(parameters);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        titre = "Data Channel Type \"" + channelDataType.Name + "\" Element Types Association";
+    }
+
+    protected async void Update()
+    {
+        await entitiesService.UpdateEntityAsync(channelDataType);
+    }
+
+}

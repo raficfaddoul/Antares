@@ -1,0 +1,42 @@
+﻿@*@page "/ElementComponent/{StructureId:int}"*@
+
+@using AliantWebS.Data
+@inject AppData appData;
+@inject EntitiesService entitiesService
+
+@using Models
+
+@if (!(Structure is null))
+{
+
+<TreeViewComponent Structure="@Structure"></TreeViewComponent>
+}
+
+@code {
+
+    static public Guid StructureId { get; set; }
+
+
+    static public Structure Structure { get; set; }
+
+  /*  public override async Task SetParametersAsync(ParameterView parameters)
+    {
+
+
+        await base.SetParametersAsync(parameters);
+    }*/
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (appData.Structure != null)
+        {
+            Structure = appData.Structure;
+
+        }
+        else
+        {
+            Structure = await entitiesService.GetEntityAsync<Structure>(StructureId);
+        }
+    }
+
+}

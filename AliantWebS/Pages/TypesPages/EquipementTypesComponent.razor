@@ -1,0 +1,189 @@
+﻿@using AliantWebS.Data
+@inject EntitiesService entitiesService
+@inject NavigationManager navigationManager
+@inject IJSRuntime js
+@inject AliantWebS.Data.AppData AppData
+@using Models
+@inject IStringLocalizer<Languages> L
+
+
+<Div Style="display: flex">
+    <h3>@L["Equipement Types"]</h3>
+    <div style="margin-left: auto; ">
+        <Label> @L["Page Size"]: &nbsp;&nbsp;</Label>
+        <RadzenNumeric @bind-Value="PageSize" Style="width:60px"></RadzenNumeric>
+    </div>
+</Div>
+@if (equipementTypeList is null)
+{
+    <p><em>@L["Loading"]... !</em></p>
+}
+else
+{
+    <a class="nav-link" @onclick="@(args => InsertEquipementType())" @onclick:preventDefault="true" href="">
+        <span class="oi oi-plus" aria-hidden="true">@L["Add New"]</span>
+    </a>
+    <EditForm Model="@equipementTypeList">
+        <RadzenDataGrid @ref="equipementTypeGrid" AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="PageSize"
+                        Data="@equipementTypeList" TItem="EquipementType" ColumnWidth="150px" @bind-Value="@SelectedEquipementsTypes">
+            <Columns>
+
+                <RadzenDataGridColumn Width="50" TItem="EquipementType" Property="Name">
+                    <HeaderTemplate>
+                        <span class="gridColumndStyle">@L["Name"]</span>                    <br />
+                    </HeaderTemplate>
+                    <EditTemplate Context="equipementType">
+                        <InputTextArea @bind-Value="equipementType.Name" Style="width:100%" />
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn Width="50" TItem="EquipementType" Property="Description">
+                    <HeaderTemplate>
+                        <span class="gridColumndStyle">@L["Description"]</span>                    <br />
+                    </HeaderTemplate>
+                    <EditTemplate Context="equipementType">
+                        <InputTextArea @bind-Value="equipementType.Description" Style="width:100%" />
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn Width="50" TItem="EquipementType" Property="Weight">
+                    <HeaderTemplate>
+                        <span class="gridColumndStyle">@L["Weight"]</span>                    <br />
+                    </HeaderTemplate>
+                    <EditTemplate Context="equipementType">
+                        <InputNumber @bind-Value="equipementType.Weight" Style="width:100%" />
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn Width="30" TItem="EquipementType" Title="@L["Icon"]" Property="Icon">
+                    <Template Context="data">
+                        <IconComponent TItem1="EquipementType" data="data"></IconComponent>
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn Width="50" TItem="EquipementType" Property="PULMONARY_TOXICITY" Title="@L["Action"]" Filterable="false" Sortable="false">
+                    <Template Context="data">
+                        <Div Style="display: flex">
+                            <a title="@L["Edit"]" class="nav-link" @onclick="@(args => EditRow(data))" @onclick:preventDefault="true" href="">
+                                <!--href="/patient/EditSideEffectComponent/@data.SideEffectID-->
+                                <span class="oi oi-pencil" aria-hidden="true"></span>
+                            </a>
+                            <a title="@L["End Edit"]" class="nav-link" @onclick="@(args => UpdateRow(data))" @onclick:preventDefault="true" href="">
+                                <span class="oi oi-check" aria-hidden="true"></span>
+                            </a>
+                            <a title="@L["Delete"]" class="nav-link" @onclick="@(() => DeleteEquipementType(data))" @onclick:preventDefault="true" href="">
+                                <span class="oi oi-trash" aria-hidden="true"></span>
+                            </a>
+                        </Div>
+                        <Div Style="display: flex">            
+
+                            <a title="@L["Flag Types"]" class="nav-link" @onclick="@(args => FlagsTypes(data))" @onclick:preventDefault="true" href="">
+                                <span class="oi oi-flag" aria-hidden="true"></span>
+                            </a>
+
+                            <a title="@L["Attributes Types"]" class="nav-link" @onclick="@(args => AttributesTypes(data))" @onclick:preventDefault="true" href="">
+                                <span class="fa fa-tasks" aria-hidden="true"></span>
+                            </a>
+                        </Div>
+                    </Template>
+
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+
+
+
+
+    </EditForm>
+
+
+}
+
+
+@code {
+    int PageSize { get; set; } = 10;
+
+    IList<EquipementType> SelectedEquipementsTypes { get; set; }
+
+
+    RadzenDataGrid<EquipementType> equipementTypeGrid;
+
+
+    List<EquipementType> equipementTypeList;
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        equipementTypeList = await entitiesService.GetAllEntitiesAsync<EquipementType>();
+
+    }
+
+
+    async Task DeleteEquipementType(EquipementType equipementType)
+    {
+        if (await entitiesService.DeleteEntityAsync(equipementType))
+        {
+            if (equipementTypeList.Remove(equipementType))
+            {
+                await equipementTypeGrid.Reload();
+
+            }
+        }
+
+    }
+
+    void EditRow(EquipementType equipementType)
+    {
+
+        equipementTypeGrid.EditRow(equipementType);
+
+    }
+
+    async Task InsertEquipementType()
+    {
+        EquipementType equipementType = new EquipementType();
+
+        if ((await entitiesService.InsertEntityAsync(equipementType)) != null)
+        {
+            equipementTypeList.Add(equipementType);
+
+            await equipementTypeGrid.InsertRow(equipementType);
+
+        }
+        else
+        {
+            await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
+        }
+    }
+
+
+
+    async Task UpdateRow(EquipementType equipementType)
+    {
+        if (await entitiesService.UpdateEntityAsync(equipementType))
+        {
+            await equipementTypeGrid.UpdateRow(equipementType);
+        }
+    }
+
+
+
+
+  
+
+    async Task FlagsTypes(EquipementType equipementType)
+    {
+        AppData.obj = equipementType;
+
+        navigationManager.NavigateTo("/StructureTypeFlagTypes/" + equipementType.EquipementTypeId);
+    }
+
+    async Task AttributesTypes(EquipementType equipementType)
+    {
+        AppData.obj = equipementType;
+
+        navigationManager.NavigateTo("/EquipementTypeAttributeTypes/" + equipementType.EquipementTypeId);
+    }
+
+
+}

@@ -1,0 +1,50 @@
+
+networks:
+  AliantNetwork:
+
+services:
+  AliantDb:
+    container_name: AliantDbContainer
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    build:
+      context: ./sqlserver
+      dockerfile: Dockerfilesqlserver # Or just Dockerfile if you didn't rename it
+    ports:
+      - 8005:1433
+    volumes:
+      - ../data/sql/Aliant:/var/opt/mssql/data
+ 
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=password@12345# 
+      - MSSQL_SSL_CERTIFICATE_CREATION=disabled
+    networks:
+      - AliantNetwork
+
+
+  aliantwebs:
+    container_name: AliantWebContainer
+    image: ${DOCKER_REGISTRY-}aliantwebs
+    build:
+      context: .
+      dockerfile: AliantWebS/Dockerfile
+    ports:
+      - 8004:80
+      #- "9229:9229" # Add for debugger
+    volumes:
+      - ../data/images:/app/Images
+     # - ./AliantWebS:/app
+     # - ~/.vsdbg:/root/.vsdbg:rw
+
+    depends_on:
+      - AliantDb
+
+    environment:
+      - DB_HOST=AliantDb
+      - DB_NAME=AliantWeb
+      - DB_SA_PASSWORD=password@12345#
+      - MSSQL_SSL_CERTIFICATE_CREATION=disabled
+      - BasePath=Aliant1  
+
+    networks:
+      - AliantNetwork

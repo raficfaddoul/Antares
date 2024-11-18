@@ -1,0 +1,166 @@
+﻿@using System.Threading
+@using AliantWebS.Data
+@inject NavigationManager navigationManager
+@inject IJSRuntime JSRuntime
+@inject DataUpdateService DataUpdateService
+@implements IDisposable
+
+
+<style>
+    #darkbg .dygraph-axis-label {
+        color: white;
+    }
+
+    .dygraph-legend {
+        text-align: right;
+    }
+
+    #darkbg .dygraph-legend {
+        background-color: #101015;
+    }
+
+</style>
+<Div Style="height: 100%; width:100%; display:flex">
+
+<button class="btn btn-primary" @onclick="Stop">Stop/Restart Stream</button>
+<div id="graphdiv1" style="height:300px; width:100%; display:flex"></div>
+</Div>
+
+@code {
+    [Parameter]
+    public Dictionary<string, string> FilterAddress { get; set;}
+
+    private int currentCount = 0;
+    //  Random rnd = new Random();
+    DateTime cutoffTime;
+
+    private bool stop = false;
+
+    private CancellationTokenSource _cts = new CancellationTokenSource();
+
+    int numberOfChannels = 1;
+
+    private List<string> dataPoints = new List<string>(); // Use a list to store data points
+
+    protected override async Task OnInitializedAsync()
+    {
+        DataUpdateService.OnDataUpdated += UpdateUI;
+    }
+
+    string headers = "Date,Acceleration";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        { 
+
+            dataPoints.Add($"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")},{0}\n");
+            await JSRuntime.InvokeVoidAsync("initializeDygraph", "graphdiv1", "Date", "Acceleration");
+
+            // Timer _timer = new Timer(new TimerCallback(async _ =>
+            // {
+            //     await FetchLiveData(); // Fetch new data and update the graph
+            // }), null, 0, 50); // Adjust the interval as needed
+
+            //Start the background task
+            // _ = Task.Run(async () =>
+            // {
+            //     while ((!_cts.Token.IsCancellationRequested) && (!stop))
+            //     {
+            //         await InvokeAsync(async () =>
+            //         {
+            //             await FetchLiveData();
+            //         });
+
+            //         await Task.Delay(5); // Adjust the interval as needed
+            //     }
+            // }, _cts.Token);
+        }
+    }
+
+    private async Task FetchLiveData()
+    {
+        if (stop) return;
+        try
+        {
+            if (numberOfChannels != FilterAddress.Count)
+            {
+                dataPoints = new List<string>();
+                headers = "Date";
+                foreach (var v in FilterAddress)
+                {
+                    headers += "," + v.Value; 
+                }
+                headers += "\n";
+                numberOfChannels = FilterAddress.Count;
+            }
+
+            if (FilterAddress.Keys.Contains(DataUpdateService.address))
+            {
+                string value = string.Empty;
+                foreach (var v in FilterAddress)
+                {
+                    if (DataUpdateService.address != v.Key)
+                    {
+                        value += ",";
+                    }
+                    else
+                    {
+                        value += DataUpdateService.y + ",";
+                    }
+                }
+                value = value.Remove(value.Count() - 1);
+
+                string newData = $"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")},{value}\n";
+
+
+                // if (currentCount > 1000)
+                // {
+                //     dataPoints.RemoveAt(0);
+                // }
+                dataPoints.Add(newData);
+
+
+                // Keep only the data points within the last 30 seconds
+                cutoffTime = DateTime.Now.AddSeconds(-100);
+
+                dataPoints = dataPoints.Where(dp => DateTime.Parse(dp.Split(',')[0]) >= cutoffTime).ToList();
+
+                // Convert the filtered data points back to the expected CSV format
+                var liveData = $"{headers}\n" + string.Join("\n", dataPoints);
+
+
+                await JSRuntime.InvokeVoidAsync("updateTimeDygraph", "graphdiv1", liveData);
+
+                currentCount++;
+            }
+
+        }
+        catch (Exception ex)
+        {
+            int k = 1;
+        }
+    }
+
+    private void Stop()
+    {
+        stop = !stop;
+        // AliantWebS.Pages.AIPages.PredictW predict = new AIPages.PredictW();
+
+
+        //  navigationManager.NavigateTo("/Python");
+    }
+
+    private async void UpdateUI(string chartType, string name)
+    {
+        await FetchLiveData();
+    }
+
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _cts.Dispose();
+        DataUpdateService.OnDataUpdated -= UpdateUI;
+    }
+}
+

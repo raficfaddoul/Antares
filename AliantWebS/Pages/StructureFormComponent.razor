@@ -1,0 +1,462 @@
+﻿@implements IDisposable
+@using AliantWebS.Models
+@using AliantWebS.Data
+@using System.Text.Json
+@using AliantWebS.Pages.InventoryElementPages
+
+@inject EntitiesService entitiesService
+@inject NavigationManager navigationManager
+@inject AppData appData;
+@inject IStringLocalizer<Languages> L
+@inject Radzen.DialogService DialogService
+@inject IJSRuntime js
+
+
+@if (ButtonText != "Create")
+{
+    <div style="display: flex">
+        <div style="display: flex">
+            <div class="file-input-zone">
+                <NavLink title="BIM" class="nav-link" href="dgfrdgh" @onclick:preventDefault="true">
+                    <span align="center" style="width:30px" class="fa fa-cube" aria-hidden="true"></span>
+                </NavLink>
+                <InputFile OnChange="@LoadFiles" />
+            </div>
+            <div class="file-input-zone">
+                <a title="Create BIM" class="nav-link" @onclick="@CreateIFC" href="dgfrdgh" @onclick:preventDefault="true">
+                    @if (!isCreatingIFC)
+                    {
+                        <span align="center" style="width:30px" class="fa fa-cube" aria-hidden="true"></span>
+                    }
+                    else
+                    {
+                        <i class="fas fa-spinner fa-spin"></i>
+                    }
+
+                </a>
+
+            </div>
+        </div>
+
+        <div style="margin-left: auto; display: flex">
+            <Blazorise.Button Clicked="@OnCADButtonClicked" Color="Blazorise.Color.Primary">@L["CAD"]</Blazorise.Button>
+        </div>
+
+        <div style="margin-left: auto; display: flex">
+            <Blazorise.Button Clicked="@OnEventsButtonClicked" Color="Blazorise.Color.Primary">@L["Edit Structure Events"]</Blazorise.Button>
+        </div>
+        <div style="margin-left: auto; display: flex">
+
+            <Blazorise.Button Clicked="@OnEquipementsButtonClicked" Color="Blazorise.Color.Primary">@L["Edit Structure Equipements"]</Blazorise.Button>
+        </div>
+        <div style="margin-left: auto; display: flex">
+
+            <Blazorise.Button Clicked="@OnElementsButtonClicked" Color="Blazorise.Color.Primary">@L["Edit Structure Elements"]</Blazorise.Button>
+        </div>
+    </div>
+}
+<hr />
+@if (structureTypesList is null)
+{
+    <p><em>Loading... !</em></p>
+}
+else
+{
+    <RadzenSplitter Orientation="Radzen.Orientation.Vertical" style="height: 100%; border: 1px solid rgba(0,0,0,.08);">
+        <RadzenSplitterPane Size="auto">
+            <EditForm EditContext="@appData.StructureEditContext" id="StructureFormId" OnValidSubmit="@OnValidSubmit">
+                <DataAnnotationsValidator />
+                <Blazorise.Row>
+                    <Column ColumnSize="ColumnSize.Is6">
+                        <div class="form-group">
+                            <label>@L["Structure Name"] :</label>
+                            <div>
+                                <InputText @bind-Value="@Structure.Name" @oninput='(() =>areachanged("Name"))' />
+                                <ValidationMessage For="@(() => Structure.Name)" />
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>@L["Short Description"] :</label>
+                            <div>
+                                <textarea lang="fr" @bind="@Structure.ShortDescription" @oninput='(() =>areachanged("ShortDescription"))' class="form-control"></textarea>
+                                <ValidationMessage For="@(() => Structure.ShortDescription)" />
+                            </div>
+                        </div>
+                        <div class="form-group ">
+                            <div>
+                                <label>@L["Structure Size"] :</label>
+                                <div>
+                                    <InputNumber @bind-Value="@Structure.Length" @oninput='(() =>areachanged("Length"))' />
+                                    <ValidationMessage For="@(() => Structure.Length)" />
+                                </div>
+                            </div>
+                        </div>
+                    </Column>
+                    <Column ColumnSize="ColumnSize.Is6">
+                        <Blazorise.Row>
+                            <Column ColumnSize="ColumnSize.Is5">
+                                <div class="form-group ">
+                                    <div>
+                                        <label>@L["Year Built"] :</label>
+                                        <div>
+                                            <InputDate @bind-Value="@Structure.YearBuilt" />
+                                            <ValidationMessage For="@(() => Structure.YearBuilt)" />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="form-group ">
+                                    <div>
+                                        <label>@L["Design Load"] :</label>
+                                        <div>
+                                            <InputNumber @bind-Value="@Structure.DesignLoad" />
+                                            <ValidationMessage For="@(() => Structure.DesignLoad)" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </Column>
+                            <Column ColumnSize="ColumnSize.Is7">
+                                <div class="form-group">
+                                    <div class="input-group">
+                                        <div class="flex-item">
+                                            <label>Latitude</label>
+                                            <InputNumber TValue="double" @bind-Value="@Structure.Geolocation.Coordinate.X" class="form-control"></InputNumber>
+                                            @* <ValidationMessage For="@(() => Structure.Geolocation)" /> *@
+                                        </div>
+                                        <div class="flex-item">
+                                            <label>Longitude</label>
+                                            <InputNumber @bind-Value="@Structure.Geolocation.Coordinate.Y" class="form-control"></InputNumber>
+                                            @* <ValidationMessage For="@(() => Structure.Geolocation)" /> *@
+                                        </div>
+                                        <div class="flex-item button-container">
+                                            <Blazorise.Button Clicked="@OnLongLatButtonClicked" Color="Blazorise.Color.Primary">
+                                                <i class="fas fa-map-marker-alt"></i> <!-- Replace with your actual icon class -->
+                                            </Blazorise.Button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </Column>
+                        </Blazorise.Row>
+
+                        <div class="form-group">
+                            <label for="Category" class="control-label">@L["Structure Type"]</label>
+                            <InputSelect TValue="Guid?" class="form-control" @bind-Value="Structure.StructureTypeId">
+                                <option value="">@L["Select"]...</option>
+                                @foreach (var structureType in structureTypesList)
+                                {
+                                    <option value="@structureType.StructureTypeId">@structureType.Name</option>
+
+                                }
+                            </InputSelect>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="Category" class="control-label">@L["Site"]</label>
+                            <InputSelect TValue="Guid?" class="form-control" @bind-Value="Structure.SiteId">
+                                <option value="">@L["Select"]...</option>
+                                @foreach (var site in sitesList)
+                                {
+                                    <option value="@site.SiteId">@site.Name</option>
+
+                                }
+                            </InputSelect>
+                        </div>
+                    </Column>
+                </Blazorise.Row>
+            </EditForm>
+        </RadzenSplitterPane>
+        <RadzenSplitterPane>
+
+            @if (Title != @L["Add Structure"])
+            {
+
+                <RadzenSplitter Orientation="Radzen.Orientation.Horizontal" Style="height: auto; border: 1px solid rgba(0,0,0,.08);">
+                    <RadzenSplitterPane Style="height:auto">
+                        @if (!((@Structure.AttributeStructures == null) || (@Structure.AttributeStructures.Count == 0)))
+                        {
+                            <AttributesComponent Titem1="AttributeStructure" Titem2="Structure" Titem3="StructureTypeAttributeType" CallerIdName="StructureId"
+                                                 CallerTypeIdName="StructureTypeId" CallerTypeName="Structure" JunctionPropName="AttributeStructures"
+                                                 element="Structure"></AttributesComponent>
+                        }
+                        @if (coordinates != null)
+                        {
+                            <AliantWebS.Pages.SharedComponents.MapComponent Coordinates="coordinates" ValueChanged=@OnMapClicked Scale="13"></AliantWebS.Pages.SharedComponents.MapComponent>
+                        }
+                    </RadzenSplitterPane>
+                    <RadzenSplitterPane Style="height:auto">
+                        @* <div style="width:100%"> *@
+                        <div style="height:auto">
+                            <MediaComponent selectedObject="Structure"></MediaComponent>
+                        </div>
+
+                    </RadzenSplitterPane>
+                </RadzenSplitter>
+            }
+
+        </RadzenSplitterPane>
+    </RadzenSplitter>
+    <br />
+    <div class="row">
+
+        <div class="form-group">
+            @*                    <button type="submit" class="btn btn-success">
+        @ButtonText
+        </button>*@
+            <button disabled="@(Structure.StructureTypeId is null)" type="button" class="btn btn-success" @onclick="@InspectionButtonClick">
+                @L["Condition State"]
+            </button>
+            <button type="button" class="btn btn-success" @onclick="@Cancel">
+                @L["Cancel"]
+            </button>
+            <button type="button" class="btn btn-success" @onclick="@DeepLearning">
+                @L["Deep Learning"]
+            </button>
+            <button type="button" class="btn btn-success" @onclick="@FiniteElements">
+                @L["Finite Elements"]
+            </button>
+        </div>
+
+    </div>
+
+
+
+}
+
+
+
+
+@code {
+    bool isCreatingIFC = false;
+
+    [Parameter] public string ButtonText { get; set; } = "Save";
+
+    //[Parameter]
+    //public EditContext EditContext { get; set; }
+
+    [Parameter] public string Title { get; set; }
+
+
+    [Parameter] public EventCallback OnValidSubmit { get; set; }
+
+    [Parameter] public Structure Structure { get; set; }
+
+
+    List<StructureType> structureTypesList;
+    List<Site> sitesList;
+
+    private DotNetObjectReference<StructureFormComponent>? objRef;
+
+    public List<(string id, string Type, string Name, double X, double Y, double C)?> coordinates { get; set; }
+
+    public override async Task SetParametersAsync(ParameterView parameters)
+    {
+        await base.SetParametersAsync(parameters);
+
+        if (appData.StructureEditContext == null)
+        {
+            navigationManager.NavigateTo("Structures");
+            return;
+        }
+
+        appData.StructureEditContext.OnFieldChanged -= FieldChanged;
+        appData.StructureEditContext.OnFieldChanged += FieldChanged;
+
+
+
+    }
+
+    private void areachanged(string s)
+    {
+        appData.StructureEditContext.NotifyFieldChanged(appData.StructureEditContext.Field(s));
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        sitesList = await Task.Run(() => entitiesService.GetAllEntitiesAsync<Site>());
+
+        structureTypesList = await Task.Run(() => entitiesService.GetAllEntitiesAsync<StructureType>());
+
+
+        appData.ButtonText = ButtonText;
+
+        appData.FormId = "StructureFormId";
+        appData.DisplaySubmitButton = true;
+
+
+        objRef = DotNetObjectReference.Create(this);
+
+        if (Structure.Geolocation == null)
+        {
+            Structure.Geolocation = NetTopologySuite.Geometries.Geometry.DefaultFactory.CreatePoint(new NetTopologySuite.Geometries.Coordinate(0, 0));
+            Structure.Geolocation.SRID = 4326;
+        }
+
+        if (Structure.Site != null)
+        {
+            coordinates = new List<(string id, string Type, string Name, double X, double Y, double C)?>()
+        {
+            ((Structure.StructureId.ToString(),"Structure", Structure.Name, Structure.Geolocation.Coordinate.X, Structure.Geolocation.Coordinate.Y, 100))
+        };
+        }
+
+
+    }
+
+
+    private void FieldChanged(object sender, FieldChangedEventArgs arg)
+    {
+        appData.SaveChanges = true;
+    }
+
+
+    protected async void StructureTypeClicked(ChangeEventArgs countryEvent)
+    {
+
+        this.StateHasChanged();
+    }
+
+    void OnElementsButtonClicked()
+    {
+        //appData.obj = Structure;
+        appData.Structure = Structure;
+        InventoryElementPages.ElementComponent.StructureId = Structure.StructureId;
+
+        navigationManager.NavigateTo("BlankElement/");
+    }
+
+    void OnEquipementsButtonClicked()
+    {
+        appData.Structure = Structure;
+
+        navigationManager.NavigateTo("EquipementAssignment/");
+    }
+
+    void OnEventsButtonClicked()
+    {
+        appData.Structure = Structure;
+
+        navigationManager.NavigateTo("Events/");
+    }
+
+    void OnCADButtonClicked()
+    {
+        appData.Structure = Structure;
+
+        navigationManager.NavigateTo("BlockListing");
+    }
+
+    void Cancel()
+    {
+        navigationManager.NavigateTo("Structures");
+    }
+
+    async Task FiniteElements()
+    {
+        Structural.Structure frame = Structural.Simulation.CreateStructure3D(Structure, null, entitiesService);
+
+        double[] q = new double[frame.nddl];
+        List<double[]> Fe = new List<double[]>();
+
+        int j = 0;
+        foreach (var node in frame.noeud)
+        {
+        //        frame.ChargesStatiquePonctuelles.Add((node.ElementId, new List<int>() { j++ }, 1, 0));
+        }
+
+        Structural.StructuralStatic.StaticAnalysis(frame, q, Fe);
+
+    }
+
+
+
+    void DeepLearning()
+    {
+        appData.obj = Structure;
+        navigationManager.NavigateTo("LearningLayout");
+    }
+
+    void InspectionButtonClick()
+    {
+        appData.obj = Structure;
+
+        navigationManager.NavigateTo("/StructureInspections/" + Structure.StructureId);
+
+    }
+
+    private async Task LoadFiles(InputFileChangeEventArgs e)
+    {
+        await DialogService.OpenAsync<FilesUpload>($"Files Upload",
+    new Dictionary<string, object>() { { "obj", Structure }, { "e", e }, { "Folder", "wwwroot\\data" } },
+       new DialogOptions() { Width = "700px", Height = "570px" });
+
+        List<string> paths = await FileManagementService.GetPathForFilesAsync(Structure, false, @"wwwroot\data");
+        string path = paths.Find(x => x.ToLower().Contains(".wexbim"));
+
+        if (path == null)
+        {
+            path = paths.Find(x => x.ToLower().Contains(".ifc"));
+            path = await InventoryElementPages.BIMComponent.transformToWexBim(path);
+        }
+    }
+
+    private async Task CreateIFC()
+    {
+        isCreatingIFC = true;
+        await InvokeAsync(() =>
+        {
+            StateHasChanged();  // Request the UI to be re-rendered
+        });
+        StateHasChanged();
+        BIMGenerator bg = new BIMGenerator(entitiesService, appData);
+
+        await bg.Create();
+        isCreatingIFC = false;
+        await InvokeAsync(() =>
+     {
+         StateHasChanged();  // Request the UI to be re-rendered
+     });
+    }
+
+    void IDisposable.Dispose()
+    {
+        // Unsubscribe from the event when our component is disposed
+        if (appData.StructureEditContext != null)
+        {
+            appData.StructureEditContext.OnFieldChanged -= FieldChanged;
+        }
+
+    }
+
+    private async Task OnLongLatButtonClicked()
+    {
+        var result = await js.InvokeAsync<JsonElement>("getCoords");
+
+        List<double> l = result.Deserialize<List<double>>();
+
+        Structure.Geolocation.Coordinate.X = l[1];
+        Structure.Geolocation.Coordinate.Y = l[0];
+        appData.SaveChanges = true;
+        coordinates = new List<(string id, string Type, string Name, double X, double Y, double C)?>()
+        {
+            ((Structure.StructureId.ToString(),"Structure", Structure.Name, Structure.Geolocation.Coordinate.X, Structure.Geolocation.Coordinate.Y, 100))
+        };
+
+
+
+        StateHasChanged();
+    }
+
+
+    public void OnMapClicked((double x, double y) coor)
+    {
+        Structure.Geolocation.Coordinate.X = coor.x;
+        Structure.Geolocation.Coordinate.Y = coor.y;
+        appData.SaveChanges = true;
+        this.StateHasChanged();
+    }
+
+
+    //AAPK274607c7de9e4f4fb30c76c251512d7e4j3uZoIX1rKcsG7joh9KXVL81WsT8siX31STYOFn17sFq-kAr45ZAMMl2u0sibIp
+
+}

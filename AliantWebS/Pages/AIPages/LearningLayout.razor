@@ -1,0 +1,71 @@
+﻿@page "/LearningLayout/"
+@inherits LayoutComponentBase
+@using AliantWebS.Data
+@inject AppData appData;
+@inject NavigationManager navigationManager
+
+@layout MainLayout
+
+
+
+@*    <RadzenDialog />
+    <RadzenNotification />
+    <RadzenContextMenu />
+    <RadzenTooltip />*@
+
+
+
+<RadzenLayout Style="width:105%; margin-left:-35px; margin-top:-15px; height: 100vh; grid-template-areas: 'rz-header rz-header' 'rz-sidebar rz-body'">
+
+    <RadzenSidebar Style="height: 100%; width:100%; margin:0" @bind-Expanded="@sidebar2Expanded">
+        <RadzenSidebarToggle Click="@(() => sidebar2Expanded = !sidebar2Expanded)" />
+        <RadzenPanelMenu>
+            <RadzenPanelMenuItem Text="Simulation" Icon="line_style" Click="@Simulation" />
+            <RadzenPanelMenuItem Text="Training" Icon="group_work" Click="@Train" />
+            <RadzenPanelMenuItem Text="Prediction" Icon="lightbulb_outline" Click="@Predict" />
+        </RadzenPanelMenu>
+        <div class="rz-p-4">
+            Sidebar
+        </div>
+    </RadzenSidebar>
+    <RadzenBody Style="width:100%; height:100%; margin:0; padding:0">
+            <RadzenSplitter Orientation="Radzen.Orientation.Horizontal" style="height: 100%; width:100%; border: 1px solid rgba(0,0,0,.08);">
+                <RadzenSplitterPane Size="50%">
+      
+            @Body
+            </RadzenSplitterPane>
+            <RadzenSplitterPane Size="50%" Style="height:100%;">
+  
+            <AliantWebS.Pages.InventoryElementPages.BIMComponent Structure="appData.Structure"></AliantWebS.Pages.InventoryElementPages.BIMComponent>
+            </RadzenSplitterPane>
+        </RadzenSplitter>
+    </RadzenBody>
+</RadzenLayout>
+
+@* <Column ColumnSize="ColumnSize.Is6">
+    <AliantWebS.Pages.InventoryElementPages.BIMComponent Structure="appData.Structure"></AliantWebS.Pages.InventoryElementPages.BIMComponent>
+</Column>
+ *@
+@code {
+    bool sidebar2Expanded = true;
+
+
+    void Simulation()
+    {
+
+        navigationManager.NavigateTo("Simulation");
+    }
+
+    void Train()
+    {
+        navigationManager.NavigateTo("Training");
+
+
+    }
+
+    async Task Predict()
+    {
+        navigationManager.NavigateTo("Prediction");
+
+    }
+}

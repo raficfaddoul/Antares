@@ -1,0 +1,33 @@
+﻿@page "/Statistics/"
+@using AliantWebS.Data
+@using AliantWebS.Models
+@inject EntitiesService entitiesService
+@inject NavigationManager navigationManager
+@inject AppData appData
+@inject IStringLocalizer<Languages> L
+@layout InventoryElementPages.ElementsLayout
+
+<NavigationLock OnBeforeInternalNavigation="appData.OnBeforeInternalNavigation" ConfirmExternalNavigation="appData.SaveConfirmation&& appData.SaveChanges" />
+
+
+<div class="page" Style="display: flex">
+    <RadzenSplitter Orientation="Radzen.Orientation.Horizontal" style="height: 100%; border: 1px solid rgba(0,0,0,.08);">
+        <RadzenSplitterPane Size="30%">
+            <div class="sidebar" style="height:100vh;">
+            </div>
+        </RadzenSplitterPane>
+
+        <RadzenSplitterPane Size="70%">
+
+            <RadzenSplitter Orientation="Radzen.Orientation.Vertical" style="height: 100%; border: 1px solid rgba(0,0,0,.08);">
+                <RadzenSplitterPane Size="50%">
+
+                </RadzenSplitterPane>
+
+                <RadzenSplitterPane Size="50%">
+
+                </RadzenSplitterPane>
+            </RadzenSplitter>
+        </RadzenSplitterPane>
+    </RadzenSplitter>
+</div>

@@ -1,0 +1,121 @@
+﻿@page "/AntaresHome"
+
+@using AliantWebS.Data
+@inject EntitiesService entitiesService
+@inject AppData appData;
+@using Models
+
+
+
+@inject NavigationManager navigationManager
+
+
+
+<style>
+    body, html {
+        height: 100%;
+        margin: 0;
+        font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .button-container {
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        height: 80vh;
+        padding: 40px; /* Increased padding around the container */
+        gap: 20px; /* Space between the buttons */
+    }
+
+    .start-button {
+        background-color: #007bff;
+        border: none;
+        color: white;
+        text-align: center;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        border-radius: 10px;
+        cursor: pointer;
+        position: relative;
+        width: 27vw; /* Set width */
+        height: 30vw; /* Set height equal to width to make it square */
+        margin: 10px;
+    }
+
+        .start-button:hover {
+            background-color: #0056b3;
+        }
+
+        .start-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-size: cover;
+            background-position: center;
+            opacity: 0.5;
+            border-radius: 10px;
+            z-index: -1;
+        }
+
+</style>
+
+<div class="button-container">
+    <button class="start-button" @onclick='()=> HandleClick("Conception")' style="@($"background-image:url('/img/Background_Scenique.png');")font-size: 32px; font-weight: bold;">
+        Conception scénique
+    </button>
+    <button class="start-button" @onclick='()=> HandleClick("Surveillance")' style="@($"background-image:url('/img/Background_Surveillance.png');")font-size: 32px; font-weight: bold;">
+        Surveillance structurale
+    </button>
+    <button class="start-button" @onclick='()=> HandleClick("Administration")' style="@($"background-image:url('/img/Background_Admin.png');")font-size: 32px; font-weight: bold;">
+        Administration
+    </button>
+</div>
+
+
+@code {
+
+    Structure Structure { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        Structure = await entitiesService.GetFilteredFirstEntityAsync<Structure>(x => x.StructureId.ToString() == "84028ce7-6e17-ef11-ab4f-3c557678c0f7");
+        appData.Structure = Structure;
+
+    }
+
+    private void HandleClick(string buttonName)
+    {
+        switch (buttonName)
+        {
+            case "Conception":
+                // Code to execute for "Conception"
+                navigationManager.NavigateTo(@"/Events/" + Structure.StructureId);
+                break;
+
+            case "Surveillance":
+                // Code to execute for "OtherCase"
+                navigationManager.NavigateTo(@"/SurveillanceAntares/" + Structure.StructureId);
+                break;
+
+            case "Administration":
+                // Code to execute for "OtherCase"
+                navigationManager.NavigateTo(@"/settings");
+               // navigationManager.NavigateTo(@"/SVG");
+                break;
+
+            default:
+                // Code to execute if none of the above cases match
+            
+                break;
+        }
+
+
+    }
+}

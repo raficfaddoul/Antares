@@ -1,0 +1,88 @@
+@page "/EditElement/{ElementID:guid}"
+@using AliantWebS.Data
+@using AliantWebS.Models
+@inject EntitiesService entitiesService
+@inject NavigationManager navigationManager
+@inject AppData appData
+@inject IStringLocalizer<Languages> L
+@layout ElementsLayout
+
+<NavigationLock OnBeforeInternalNavigation="appData.OnBeforeInternalNavigation" ConfirmExternalNavigation="appData.SaveConfirmation&& appData.SaveChanges" />
+
+
+<h3>@L["Edit Element"]</h3>
+<hr />
+
+
+@if (!updating)
+{
+    <ElementFormComponent creating="false" ButtonText=@buttonText Element="@element" OnValidSubmit="@UpdateElement"></ElementFormComponent>
+}
+
+
+
+
+
+@code {
+
+    string buttonText = "Updated";
+
+
+    private EditContext EditContext { get; set; }
+
+    bool updating = false;
+
+    private Guid elementID;
+    [Parameter]
+    public Guid ElementID { 
+        get { return elementID; } 
+        set
+        {
+            elementID = value;
+            //  element = entitiesService.GetEntity<Element>(ElementID);
+            //  entitiesService.LoadReference(element, "ElementType", "Structure");
+        } 
+    }
+    Element element = new Element();
+
+    public override async Task SetParametersAsync(ParameterView parameters)
+    {
+
+
+        //      element = await entitiesService.GetEntityAsync<Element>(ElementID);
+        try
+        {
+            await base.SetParametersAsync(parameters);
+            element = await entitiesService.GetEntityAsync<Element>(ElementID);
+            appData.Element = element;
+            await entitiesService.LoadReferenceAsync(element, "ElementType", "Structure");
+            this.StateHasChanged();
+        }
+        catch(Exception ex)
+        {
+            navigationManager.NavigateTo("Structures");
+        }
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        if (EditContext is null)
+        {
+            EditContext = new EditContext(element);
+        }
+        //   element = await entitiesService.GetEntityAsync<Element>(ElementID);
+       // await entitiesService.LoadReference(element, "ElementType","Structure");
+    }
+
+
+    protected async void UpdateElement()
+    {
+        updating = true;
+        await entitiesService.UpdateEntityAsync(element);
+        updating = false;
+        this.StateHasChanged();
+        //  navigationManager.NavigateTo("/ElementComponent/" + element.StructureId);
+    }
+
+
+    }
+

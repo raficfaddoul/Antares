@@ -1,0 +1,105 @@
+﻿
+@using AliantWebS.Data
+@using Models
+@inject AliantWebS.Data.AppData AppData
+@inject EntitiesService entitiesService
+
+
+
+<Div Style="display: flex">
+    <h3>Element Type Inspection Results Types</h3>
+    <div style="margin-left: auto; ">
+        <Label> Page Size: &nbsp;&nbsp;</Label>
+        <RadzenNumeric @bind-Value="PageSize" Style="width:60px"></RadzenNumeric>
+    </div>
+</Div>
+@if (InspectionResultTypeList is null)
+{
+    <p><em>Loading... !</em></p>
+}
+else
+{
+
+    <RadzenDataGrid AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="PageSize"
+                    Data="@InspectionResultTypeList" TItem="InspectionResultType" ColumnWidth="150px">
+        <Columns>
+            <RadzenDataGridColumn TItem="InspectionResultType" Property="InspectionResultTypeID" Title="Inspection ResultType Type ID"></RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="InspectionResultType" Property="Name" Title="Name"></RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="InspectionResultType" Property="Description" Title="Description"></RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="InspectionResultType" Property="Length" Title="Action">
+                <Template Context="inspectionResultType">
+                    <RadzenCheckBox TValue=bool Value=@GetValue(inspectionResultType) Change=@(args => OnChange(args, inspectionResultType))></RadzenCheckBox>
+
+                </Template>
+
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+
+
+}
+
+@code {
+    int PageSize { get; set; } = 10;
+
+
+    [Parameter]
+    public Guid CallerID { get; set; }
+
+
+    ElementType elementType;
+
+
+
+    List<InspectionResultType> InspectionResultTypeList;
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+
+
+        elementType = (ElementType)AppData.obj;
+        //  InspectionResultTypeElementTypesList = ((ICollection<InspectionResultTypeElementType>)AppData.obj).ToList();
+        InspectionResultTypeList = await Task.Run(() => entitiesService.GetAllEntitiesAsync<InspectionResultType>());
+    }
+
+
+
+
+    bool GetValue(InspectionResultType inspectionResultType)
+    {
+        if (elementType.InspectionResultTypeElementTypes.Count(x =>x.InspectionResultTypeId == inspectionResultType.InspectionResultTypeId) > 0)
+        { return true; }
+        else
+        {
+            return false;
+        }
+    }
+
+    void OnChange(bool args, InspectionResultType inspectionResultType)
+    {
+        if (args && !GetValue(inspectionResultType))
+        {
+
+            Models.InspectionResultTypeElementType inspectionResultTypeElementType = new Models.InspectionResultTypeElementType();
+
+
+            inspectionResultTypeElementType.InspectionResultTypeId = inspectionResultType.InspectionResultTypeId;
+            inspectionResultTypeElementType.ElementTypeId = CallerID;
+            elementType.InspectionResultTypeElementTypes.Add(inspectionResultTypeElementType);
+
+            //     (await entitiesService.InsertEntityAsync(elementType)
+        }
+
+        if (!args && GetValue(inspectionResultType))
+        {
+
+            elementType.InspectionResultTypeElementTypes.Remove(elementType.InspectionResultTypeElementTypes.First(x => x.InspectionResultTypeId == inspectionResultType.InspectionResultTypeId));
+
+            //     (await entitiesService.InsertEntityAsync(elementType)
+        }
+    }
+
+}

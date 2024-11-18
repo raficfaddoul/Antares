@@ -1,0 +1,68 @@
+﻿@page "/Pages/LoadPages/EquipementsPlacement"
+@using AliantWebS.Data
+@using AliantWebS.Models
+@inject AppData appData;
+@inject EntitiesService entitiesService
+@inject IStringLocalizer<Languages> L
+
+@layout ElementsLayout
+
+<RadzenSplitter Orientation="Radzen.Orientation.Horizontal" style="height: 100%; border: 1px solid rgba(0,0,0,.08);">
+    <RadzenSplitterPane Size="50%">
+        <RadzenDataGrid AllowFiltering="false" AllowPaging="true" AllowSorting="false" PageSize="10"
+                        Data="@equipementTypes" TItem="EquipementType" ColumnWidth="150px">
+            <Columns>
+                <RadzenDataGridColumn TItem="EquipementType" Property="Name" Title="@L["Source Type"]">
+                    <Template Context="equipementType">
+                        <Div Style="display: flex">
+                            <Label>@equipementType.Name</Label>
+                        </Div>
+                    </Template>
+                </RadzenDataGridColumn>
+
+
+                <RadzenDataGridColumn TItem="EquipementType" Property="Description" Title="@L["Action"]" Width="30px">
+                    <Template Context="equipementType">
+                        <Div Style="display: flex">
+                            <RadzenCheckBox TValue=bool Change=@(args => OnChangeSelectedSourceTypes(args,equipementType))></RadzenCheckBox>
+                        </Div>
+                    </Template>
+
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+
+
+    </RadzenSplitterPane>
+    <RadzenSplitterPane>
+        <AliantWebS.Pages.InventoryElementPages.BIMComponent Structure="appData.Structure" EquipementTypes=selectedEquipementTypes></AliantWebS.Pages.InventoryElementPages.BIMComponent>
+    </RadzenSplitterPane>
+</RadzenSplitter>
+
+
+@code {
+    [Parameter]
+    public int StructureId { get; set; }
+
+    List<EquipementType> equipementTypes;
+
+    List<EquipementType> selectedEquipementTypes = new List<EquipementType>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        equipementTypes = await entitiesService.GetAllEntitiesAsync<EquipementType>();
+    }
+
+    async Task OnChangeSelectedSourceTypes(bool args, EquipementType equipementType)
+    {
+        if (args)
+        {
+            selectedEquipementTypes.Add(equipementType);
+        }
+        else
+        {
+            selectedEquipementTypes.Remove(equipementType);
+        }
+    }
+
+}

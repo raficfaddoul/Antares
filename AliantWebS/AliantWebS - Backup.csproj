@@ -1,0 +1,169 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net7.0</TargetFramework>
+    <UserSecretsId>aspnet-AliantWebS-DD001BB3-6D1A-4872-925E-AB78206AF01A</UserSecretsId>
+    <Nullable>annotations</Nullable>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DebugType>full</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="NpmJS\node_modules\**" />
+    <Content Remove="NpmJS\node_modules\**" />
+    <EmbeddedResource Remove="NpmJS\node_modules\**" />
+    <None Remove="NpmJS\node_modules\**" />
+    <TypeScriptCompile Remove="NpmJS\node_modules\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Remove="wwwroot\js\index.js" />
+    <Content Remove="wwwroot\Resources\StructuresComponent.Designer.cs" />
+    <Content Remove="wwwroot\Resources\StructuresComponent.en.resx" />
+    <Content Remove="wwwroot\Resources\StructuresComponent.fr.resx" />
+    <Content Remove="wwwroot\Resources\StructuresComponent.resx" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="wwwroot\Resources\StructuresComponent.Designer.cs">
+      <DependentUpon>StructuresComponent.resx</DependentUpon>
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="wwwroot\Resources\StructuresComponent.en.resx">
+      <Generator>PublicResXFileCodeGenerator</Generator>
+    </EmbeddedResource>
+    <EmbeddedResource Include="wwwroot\Resources\StructuresComponent.fr.resx">
+      <Generator>PublicResXFileCodeGenerator</Generator>
+    </EmbeddedResource>
+    <EmbeddedResource Include="wwwroot\Resources\StructuresComponent.resx">
+      <LastGenOutput>StructuresComponent.Designer.cs</LastGenOutput>
+      <Generator>PublicResXFileCodeGenerator</Generator>
+    </EmbeddedResource>
+  </ItemGroup>
+
+
+
+  <ItemGroup>
+    <None Include="Areas\Identity\Pages\Account\LogOut.cshtml" />
+    <None Include="Areas\Identity\Pages\Shared\_LoginPartial.cshtml" />
+    <None Include="Properties\serviceDependencies.local.json.user" />
+    <None Include="Shared\CarouselComponent.razor" />
+    <None Include="Shared\LoginDisplay.razor" />
+    <None Include="Shared\MainLayout.razor" />
+    <None Include="Shared\NavMenu.razor" />
+    <None Include="Shared\SurveyPrompt.razor" />
+    <None Include="wwwroot\.editorconfig" />
+    <None Include="wwwroot\css\bootstrap\bootstrap.min.css.map" />
+    <None Include="wwwroot\css\open-iconic\FONT-LICENSE" />
+    <None Include="wwwroot\css\open-iconic\font\fonts\open-iconic.svg" />
+    <None Include="wwwroot\css\open-iconic\ICON-LICENSE" />
+    <None Include="wwwroot\css\open-iconic\README.md" />
+    <None Include="wwwroot\css\site.css~RF1fed2ddc.TMP" />
+    <None Include="wwwroot\model.xkt" />
+    <None Include="wwwroot\rac_sample_project.xkt" />
+    <None Include="wwwroot\rafic.js" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Accord" Version="3.8.0" />
+    <PackageReference Include="Accord.Math" Version="3.8.0" />
+    <PackageReference Include="Blazored.LocalStorage" Version="4.3.0" />
+    <PackageReference Include="Blazorise" Version="0.9.4.4" />
+    <PackageReference Include="Blazorise.Bootstrap" Version="0.9.4.4" />
+    <PackageReference Include="Blazorise.Icons.FontAwesome" Version="0.9.4.4" />
+    <PackageReference Include="DiffSharp.Data" Version="1.0.7" />
+    <PackageReference Include="EntityFramework" Version="6.4.4" />
+    <PackageReference Include="ExifLibNet" Version="2.1.4" />
+    <PackageReference Include="HDF5-CSharp" Version="1.15.4.1" />
+    <PackageReference Include="InfluxDB.Client" Version="4.12.0" />
+    <PackageReference Include="IronPython" Version="2.7.12" />
+    <PackageReference Include="IronPython.StdLib" Version="2.7.12" />
+    <PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" Version="5.0.2" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="6.0.8" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.UI" Version="5.0.2" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="7.0.2">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="7.0.2" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer.NetTopologySuite" Version="7.0.2" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="7.0.2">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.Extensions.Localization" Version="7.0.2" />
+    <PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="5.0.2" />
+    <PackageReference Include="Plotly.Blazor" Version="2.25.1" />
+    <PackageReference Include="Radzen.Blazor" Version="4.15.5" />
+    <PackageReference Include="TorchSharp" Version="0.99.2" />
+    <PackageReference Include="TorchSharp-cpu" Version="0.99.2" />
+    <PackageReference Include="Xbim.Essentials" Version="5.1.341" />
+    <PackageReference Include="Xbim.Geometry" Version="5.1.437" />
+    <PackageReference Include="Xbim.ModelGeometry.Scene" Version="5.1.437" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AI\AI.csproj" />
+    <ProjectReference Include="..\Component\Components.csproj" />
+    <ProjectReference Include="..\Reporting\Reporting.csproj" />
+    <ProjectReference Include="..\Shared\Shared.csproj" />
+    <ProjectReference Include="..\Structural\Structural.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="BIM\24050175-dda4-ed11-8d9c-5820b17cefc4\" />
+    <Folder Include="BIM\588c2cfb-6ba9-ed11-8d9c-5820b17cefc4\" />
+    <Folder Include="CSVs\8c8f7354-6dc0-4444-a615-d5f0eb406864\4\" />
+    <Folder Include="CSVs\8c8f7354-6dc0-4444-a615-d5f0eb406864\6\" />
+    <Folder Include="Images\8c8f7354-6dc0-4444-a615-d5f0eb406864\6\" />
+    <Folder Include="Icons\" />
+    <Folder Include="NNModels\" />
+    <Folder Include="wwwroot\CSVs\" />
+    <Folder Include="wwwroot\data\" />
+  </ItemGroup>
+
+  
+  
+  
+    <ItemGroup>
+    <Content Include="BIM\AC20-FZK-Haus.wexBIM" />
+    <Content Include="Packages\Plotly.Blazor.dll">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Always</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
+
+  <ItemGroup>
+    <Compile Update="Pages\Languages.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Languages.resx</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="Pages\Languages.fr.resx">
+      <Generator>PublicResXFileCodeGenerator</Generator>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Pages\Languages.resx">
+      <Generator>PublicResXFileCodeGenerator</Generator>
+      <LastGenOutput>Languages.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
+
+
+
+  <!--<Target Name="PreBuild" BeforeTargets="PreBuildEvent">
+    <Exec Command="npm install" WorkingDirectory="NpmJS" />
+    <Exec Command="npm run build" WorkingDirectory="NpmJS" />
+  </Target>
+-->
+</Project>

@@ -1,0 +1,221 @@
+﻿@page "/Account/UserManager"
+
+@using AliantWebS.Data
+
+@inject EntitiesService entitiesService
+@inject NavigationManager navigationManager
+@inject IJSRuntime js
+@inject AliantWebS.Data.AppData appData
+@using AliantWebS.Pages
+@using Models
+@using Microsoft.AspNetCore.Identity
+
+@inject IStringLocalizer<Languages> L
+@inject RoleManager<IdentityRole> roleManager
+
+
+
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Administrator,Developer")]
+
+<div Style="display: flex">
+    <h3>@L["User Management"]</h3>
+    <div style="margin-left: auto; ">
+        <label> @L["Page Size"]: &nbsp;&nbsp;</label>
+        <RadzenNumeric @bind-Value="PageSize" Style="width:60px"></RadzenNumeric>
+    </div>
+</div>
+@if (userList is null)
+{
+    <p><em>@L["Loading"]... !</em></p>
+}
+else
+{
+    <a class="nav-link" @onclick="@(args => InsertUser())" @onclick:preventDefault="true" href="/nothing">
+        <span class="oi oi-plus" aria-hidden="true">@L["Add New"]</span>
+    </a>
+    <RadzenDataGrid TItem="AspNetUser" @ref="userGrid" Data="@userList" @bind-Value="@SelectedUsers"
+                    AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="PageSize">
+        <Columns>
+            <RadzenDataGridColumn Width="50" TItem="AspNetUser" Property="Email">
+                <HeaderTemplate>
+                    <span class="gridColumndStyle">@L["Email"]</span>                    <br />
+                </HeaderTemplate>
+                <EditTemplate Context="user">
+                    <InputTextArea class="InputTextAreaBlackFont" @bind-Value="user.Email" Style="width:100%" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn Width="50" TItem="AspNetUser" Title="Roles">
+                <Template Context="user">
+                    <RadzenDropDown ReadOnly=true TValue="List<string>"
+                                    Value="@user.Roles.Select(x => x?.Name).ToList()"
+                                    ValueChanged="@(value => OnMultiSelectChanged(value, user))"
+                                    Data=@rolesList TextProperty="Name" ValueProperty="Name" Name="DropDownMultipleChips"
+                                    Multiple=true AllowClear=true Placeholder="Select Roles" Chips=true Style="width: 100%; max-width: 400px;" />
+                </Template>
+                <EditTemplate Context="user">
+                    <RadzenDropDown TValue="List<string>"
+                                    Value="@user.Roles.Select(x => x?.Name).ToList()"
+                                    ValueChanged="@(value => OnMultiSelectChanged(value, user))"
+                                    Data=@rolesList TextProperty="Name" ValueProperty="Name" Name="DropDownMultipleChips"
+                                    Multiple=true AllowClear=true Placeholder="Select Roles" Chips=true Style="width: 100%; max-width: 400px;" />
+
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+
+            <RadzenDataGridColumn Width="50" TItem="AspNetUser" Title="@L["Action"]" Filterable="false" Sortable="false">
+                <Template Context="data">
+                    <div Style="display: flex">
+                        <a title="@L["Edit"]" class="nav-link" @onclick="@(args => EditRow(data))" @onclick:preventDefault="true" href="/nothing">
+                            <!--href="/patient/EditSideEffectComponent/@data.SideEffectID-->
+                            <span class="oi oi-pencil" aria-hidden="true"></span>
+                        </a>
+                        <a title="@L["End Edit"]" class="nav-link" @onclick="@(args => UpdateRow(data))" @onclick:preventDefault="true" href="/nothing">
+                            <span class="oi oi-check" aria-hidden="true"></span>
+                        </a>
+                        <a title="@L["Delete"]" class="nav-link" @onclick="@(() => DeleteUser(data))" @onclick:preventDefault="true" href="/nothing">
+                            <span class="oi oi-trash" aria-hidden="true"></span>
+                        </a>
+                    </div>
+                </Template>
+
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+     <AliantWebS.Pages.Utilities.ConfirmDelete @ref="confirmDeleteModal" Confirmed="OnConfirmedDelete" Cancelled="OnCancelledDelete"  />
+
+}
+
+
+@code {
+    private AliantWebS.Pages.Utilities.ConfirmDelete confirmDeleteModal;
+
+    int PageSize { get; set; } = 10;
+
+    IList<AspNetUser> SelectedUsers { get; set; }
+
+    AspNetUser selectedUser;
+
+    RadzenDataGrid<AspNetUser> userGrid;
+
+
+    List<AspNetUser> userList = new List<AspNetUser>();
+
+    List<AspNetRole> rolesList;
+
+    private async Task OnMultiSelectChanged(List<string> value, AspNetUser user)
+    {
+        if (value == null) return;
+
+        var vv = await appData.GetCurrentUserAsync();
+
+        if (vv.Email == user.Email)
+        {
+            var r = user.Roles.FirstOrDefault(x => x.Name == "Administrator");
+            user.Roles.Clear();
+            if( r != null)
+            {
+                user.Roles.Add(r);
+            }        
+
+        }
+        else
+        {
+            user.Roles.Clear();
+        }
+        foreach (var v in value)
+        {
+            var role = await entitiesService.GetFilteredFirstEntityAsync<AspNetRole>(x => x.Name == v);
+
+            user.Roles.Add(role);
+
+            // TokenAspNetRole tanr = new TokenAspNetRole();
+            // tanr.TokenId = user.TokenId;
+            // tanr.AspNetRolesId = role.Id;
+            // tanr.AspNetRoles = role;
+
+            // user.TokenAspNetRoles.Add(tanr);
+        }
+
+        StateHasChanged();
+
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        //await Task.WhenAll(entitiesService.tasksList);
+        userList = await entitiesService.GetAllEntitiesAsync<AspNetUser>("Roles");
+
+        rolesList = await entitiesService.GetAllEntitiesAsync<AspNetRole>();
+
+    }
+
+
+    async Task DeleteUser(AspNetUser user)
+    {
+        selectedUser = user;
+        confirmDeleteModal.Show();
+    }
+
+    private async Task OnConfirmedDelete()
+    {
+        var v = await appData.GetCurrentUserAsync();
+
+        if (v.Email == selectedUser.Email) return;
+
+        if (await entitiesService.DeleteEntityAsync(selectedUser))
+        {
+
+            if (userList.Remove(selectedUser))
+            {
+                await userGrid.Reload();
+                selectedUser = null;
+            }
+        }
+    }
+
+    private Task OnCancelledDelete()
+    {
+        // Handle cancellation
+        return Task.CompletedTask;
+    }
+
+    void EditRow(AspNetUser user)
+    {
+
+        userGrid.EditRow(user);
+
+    }
+
+    async Task InsertUser()
+    {
+        AspNetUser user = new AspNetUser();
+
+        
+
+        if ((await entitiesService.InsertEntityAsync(user)) != null)
+        {
+            userList.Add(user);
+
+            await userGrid.InsertRow(user);
+
+        }
+        else
+        {
+            await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
+        }
+    }
+
+
+
+    async Task UpdateRow(AspNetUser user)
+    {
+        if (await entitiesService.UpdateEntityAsync(user))
+        {
+            await userGrid.UpdateRow(user);
+        }
+    }
+
+
+
+} 

@@ -1,0 +1,874 @@
+﻿@page "/SVG"
+@using BlazorSvgEditor
+@using BlazorSvgEditor.SvgEditor
+@using BlazorSvgEditor.SvgEditor.Misc;
+@using BlazorSvgEditor.SvgEditor.Shapes;
+@using Models
+@using AliantWebS.Data
+@inject IJSRuntime js
+
+<style>
+    .toolbar-button {
+        width: 30px; /* Set a fixed width */
+        height: 40px; /* Set a fixed height if needed */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+</style>
+
+<PageTitle>BlazorSvgEditor Demo</PageTitle>
+
+
+@if (origPt != null)
+{
+    <div style="position: relative; display: inline-block;">
+        <svg id="no-scroll-svg" width="@width" height="@height" viewBox="@viewBox"
+             @onmousedown="OnMouseDown"
+             @onmousemove="OnMouseMove"
+             @onmouseup="OnMouseUp"
+             @onwheel="OnWheel"
+             @onwheel:stopPropagation
+             @onwheel:preventDefault
+             @onclick="OnClick"
+             style="border: 1px solid black; cursor: @(isPanning ? "grabbing" : "default");">
+            <image href="PLAN ANTARES-ALIANT.jpg" x="@GetSVGCoordinatesFromReal(origPt).X" y="@GetSVGCoordinatesFromReal(origPt).Y"
+                   width="@($"{imageScale * 100}%")" height="@($"{imageScale * 100}%")"
+                   preserveAspectRatio="xMidYMid meet" />
+            @if (currentLine != null)
+            {
+                <line x1="@GetSVGCoordinatesFromReal(currentLine?.Item1).X" y1="@GetSVGCoordinatesFromReal(currentLine?.Item1).Y" x2="@GetSVGCoordinatesFromReal(currentLine?.Item2).X" y2="@GetSVGCoordinatesFromReal(currentLine?.Item2).Y" stroke="black" stroke-width="2" />
+            }
+
+            @foreach (var line in lines)
+            {
+                <line x1="@GetSVGCoordinatesFromReal(line.Item1).X
+                                    " y1="@GetSVGCoordinatesFromReal(line.Item1).Y
+                                    " x2="@GetSVGCoordinatesFromReal(line.Item2).X
+                                    " y2="@GetSVGCoordinatesFromReal(line.Item2).Y
+                                    " stroke="black" stroke-width="2" />
+            }
+            @if (Palonniers != null)
+            {
+                @foreach (var pal in Palonniers)
+                {
+                    if ((pal.X1 != null) && (pal.Y1 != null) && (pal.X2 != null) && (pal.Y2 != null))
+                    {
+                        var p1 = new Point((double)pal.X1, (double)pal.Y1);
+                        var p2 = new Point((double)pal.X2, (double)pal.Y2);
+                        <line x1="@GetSVGCoordinatesFromReal(p1).X
+                                                                " y1="@GetSVGCoordinatesFromReal(p1).Y
+                                                                " x2="@GetSVGCoordinatesFromReal(p2).X
+                                                                " y2="@GetSVGCoordinatesFromReal(p2).Y"
+                              stroke="@(pal == selectedPalonnier ? "red" : pal == hoveredPalonnier ? "orange" : "green")"
+                              stroke-width="@(pal == selectedPalonnier ? "4" : pal == hoveredPalonnier ? "3" : "2")" />
+                    }
+                    }
+                }
+            }
+            @if (MotherGrids != null)
+            {
+                @foreach (var moth in MotherGrids)
+                {
+                    if ((moth.X1 != null) && (moth.Y1 != null) && (moth.X2 != null) && (moth.Y2 != null))
+                    {
+                        var p1 = new Point((double)moth.X1, (double)moth.Y1);
+                        var p2 = new Point((double)moth.X2, (double)moth.Y2);
+                        <line x1="@GetSVGCoordinatesFromReal(p1).X
+                                                                        " y1="@GetSVGCoordinatesFromReal(p1).Y
+                                                                        " x2="@GetSVGCoordinatesFromReal(p2).X
+                                                                        " y2="@GetSVGCoordinatesFromReal(p2).Y"
+                              stroke="@(moth == selectedPalonnier ? "blue" : moth == hoveredMotherGrid ? "orange" : "yellow")"
+                              stroke-width="@(moth == selectedPalonnier ? "4" : moth == hoveredMotherGrid ? "3" : "2")" />
+                    }
+                }
+            }
+
+            @foreach (var circle in circles)
+            {
+                <circle cx="@GetSVGCoordinatesFromReal(circle.Center).X" cy="@GetSVGCoordinatesFromReal(circle.Center).Y" r="@circle.Radius" fill="@circle.Color" />
+            }
+
+        </svg>
+        <div style="position: absolute; top: 10px; left: calc(100% + 10px);">
+            <button class="toolbar-button" @onclick="ZoomToExtent" title="Zoom to Extent">
+                <i class="fas fa-expand-arrows-alt"></i> <!-- FontAwesome icon -->
+            </button>
+            <button class="toolbar-button" @onclick="ToggleSnapping" title="Toggle Node Snapping"
+                    style="background-color: @(isSnappingEnabled ? "green" : "gray");">
+                <i class="fas fa-magnet"></i>
+            </button>
+            <button class="toolbar-button" @onclick="TogglePSnapping" title="Toggle Palonniers Snapping"
+                    style="background-color: @(isPalonniersSnappingEnabled ? "green" : "gray");">
+                P<i class="fas fa-magnet"></i>
+            </button>
+            <button class="toolbar-button" @onclick="ToggleMSnapping" title="Toggle Mothergrids Snapping"
+                    style="background-color: @(isMotherGridsSnappingEnabled ? "green" : "gray");">
+                M<i class="fas fa-magnet"></i>
+            </button>
+            <button class="toolbar-button" @onclick="ToggleSelecting" title="Selection"
+                    style="background-color: @(isSelectingEnabled ? "green" : "gray");">
+                <i class="fas fa-mouse-pointer"></i>
+            </button>
+            <button class="toolbar-button" @onclick="EraseSelected" title="Erase Selected"
+                    style="background-color: red; color: white;">
+                <i class="fas fa-eraser"></i>
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public EventCallback<(double x1, double y1, double x2, double y2)> LineDrawn { get; set; }
+
+    [Parameter]
+    public EventCallback<MotherGridPalonnier> OnErase { get; set; }
+
+    private double imageScale = 1.0; // Default scale is 100%
+
+    static int width = 754;
+    static int height = 400;
+
+    double realWidth = 65397 + 3000;
+    double realHeight = 18151 + 18150;
+
+    double x = -3000;
+    double y = -18150;
+    Point origPt;
+
+    int snapDistThreshold = 1000;
+    private bool isSnappingEnabled = false;
+    private bool isMotherGridsSnappingEnabled = false;
+    private bool isPalonniersSnappingEnabled = false;
+    private bool isSelectingEnabled = false;
+
+    private MotherGridPalonnier selectedPalonnier = null; // Track the selected palonnier
+    private MotherGridPalonnier hoveredPalonnier = null;  // Track the hovered palonnier
+    private MotherGridPalonnier hoveredMotherGrid = null;
+
+    private string viewBox = string.Empty; // Default viewBox, can be set dynamically
+    private List<(Point, Point)> lines = new List<(Point, Point)>();
+    private List<Circle> circles = new List<Circle>();
+
+    [Parameter]
+    public List<MotherGridPalonnier> MotherGrids { get; set; }
+
+    [Parameter]
+    public List<MotherGridPalonnier> Palonniers { get; set; }
+
+
+
+    private bool isDrawing = false;
+    private Point startPoint;
+    private (Point, Point)? currentLine;
+    private bool isPanning = false;
+    private bool freeSketch = false;
+    // private Point panStart;
+    private Point lastPanPoint;
+
+    Dictionary<(string, string), (double, double)> coordinates = new Dictionary<(string, string), (double, double)>();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Call the JavaScript function to prevent wheel event propagation
+            await js.InvokeVoidAsync("preventWheelPropagation", "no-scroll-svg");
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        origPt = new Point(x, y);
+        viewBox = $"{GetSVGCoordinatesFromReal(origPt).X} {GetSVGCoordinatesFromReal(origPt).Y} {width} {height}";
+
+        coordinates.Add(("J", "9"), (0, 15150));
+        coordinates.Add(("I", "9"), (3797, 15150));
+        coordinates.Add(("H", "9"), (10997, 15150));
+        coordinates.Add(("G", "9"), (18697, 15150));
+        coordinates.Add(("F", "9"), (25947, 15150));
+        coordinates.Add(("E", "9"), (33103, 15150));
+        coordinates.Add(("D", "9"), (40247, 15150));
+        coordinates.Add(("C", "9"), (47497, 15150));
+        coordinates.Add(("B", "9"), (55197, 15150));
+        coordinates.Add(("A", "9"), (62397, 15150));
+
+        coordinates.Add(("J", "8"), (0, 11050));
+        coordinates.Add(("I", "8"), (3797, 11050));
+        coordinates.Add(("H", "8"), (10997, 11050));
+        coordinates.Add(("G", "8"), (18697, 11050));
+        coordinates.Add(("F", "8"), (25947, 11050));
+        coordinates.Add(("E", "8"), (33103, 11050));
+        coordinates.Add(("D", "8"), (40247, 11050));
+        coordinates.Add(("C", "8"), (47497, 11050));
+        coordinates.Add(("B", "8"), (55197, 11050));
+        coordinates.Add(("A", "8"), (62397, 11050));
+
+        coordinates.Add(("J", "7"), (0, 7400));
+        coordinates.Add(("I", "7"), (3797, 7400));
+        coordinates.Add(("H", "7"), (10997, 7400));
+        coordinates.Add(("G", "7"), (18697, 7400));
+        coordinates.Add(("F", "7"), (25947, 7400));
+        coordinates.Add(("E", "7"), (33103, 7400));
+        coordinates.Add(("D", "7"), (40247, 7400));
+        coordinates.Add(("C", "7"), (47497, 7400));
+        coordinates.Add(("B", "7"), (55197, 7400));
+        coordinates.Add(("A", "7"), (62397, 7400));
+
+        coordinates.Add(("J", "6"), (0, 3700));
+        coordinates.Add(("I", "6"), (3797, 3700));
+        coordinates.Add(("H", "6"), (10997, 3700));
+        coordinates.Add(("G", "6"), (18697, 3700));
+        coordinates.Add(("F", "6"), (25947, 3700));
+        coordinates.Add(("E", "6"), (33103, 3700));
+        coordinates.Add(("D", "6"), (40247, 3700));
+        coordinates.Add(("C", "6"), (47497, 3700));
+        coordinates.Add(("B", "6"), (55197, 3700));
+        coordinates.Add(("A", "6"), (62397, 3700));
+
+        coordinates.Add(("J", "5"), (0, 0));
+        coordinates.Add(("I", "5"), (3797, 0));
+        coordinates.Add(("H", "5"), (10997, 0));
+        coordinates.Add(("G", "5"), (18697, 0));
+        coordinates.Add(("F", "5"), (25947, 0));
+        coordinates.Add(("E", "5"), (33103, 0));
+        coordinates.Add(("D", "5"), (40247, 0));
+        coordinates.Add(("C", "5"), (47497, 0));
+        coordinates.Add(("B", "5"), (55197, 0));
+        coordinates.Add(("A", "5"), (62397, 0));
+
+        coordinates.Add(("J", "4"), (0, -3700));
+        coordinates.Add(("I", "4"), (3797, -3700));
+        coordinates.Add(("H", "4"), (10997, -3700));
+        coordinates.Add(("G", "4"), (18697, -3700));
+        coordinates.Add(("F", "4"), (25947, -3700));
+        coordinates.Add(("E", "4"), (33103, -3700));
+        coordinates.Add(("D", "4"), (40247, -3700));
+        coordinates.Add(("C", "4"), (47497, -3700));
+        coordinates.Add(("B", "4"), (55197, -3700));
+        coordinates.Add(("A", "4"), (62397, -3700));
+
+        coordinates.Add(("J", "3"), (0, -7450));
+        coordinates.Add(("I", "3"), (3797, -7450));
+        coordinates.Add(("H", "3"), (10997, -7450));
+        coordinates.Add(("G", "3"), (18697, -7450));
+        coordinates.Add(("F", "3"), (25947, -7450));
+        coordinates.Add(("E", "3"), (33103, -7450));
+        coordinates.Add(("D", "3"), (40247, -7450));
+        coordinates.Add(("C", "3"), (47497, -7450));
+        coordinates.Add(("B", "3"), (55197, -7450));
+        coordinates.Add(("A", "3"), (62397, -7450));
+
+        coordinates.Add(("J", "2"), (0, -11050));
+        coordinates.Add(("I", "2"), (3797, -11050));
+        coordinates.Add(("H", "2"), (10997, -11050));
+        coordinates.Add(("G", "2"), (18697, -11050));
+        coordinates.Add(("F", "2"), (25947, -11050));
+        coordinates.Add(("E", "2"), (33103, -11050));
+        coordinates.Add(("D", "2"), (40247, -11050));
+        coordinates.Add(("C", "2"), (47497, -11050));
+        coordinates.Add(("B", "2"), (55197, -11050));
+        coordinates.Add(("A", "2"), (62397, -11050));
+
+        coordinates.Add(("J", "1"), (0, -15151));
+        coordinates.Add(("I", "1"), (3797, -15151));
+        coordinates.Add(("H", "1"), (10997, -15151));
+        coordinates.Add(("G", "1"), (18697, -15151));
+        coordinates.Add(("F", "1"), (25947, -15151));
+        coordinates.Add(("E", "1"), (33103, -15151));
+        coordinates.Add(("D", "1"), (40247, -15151));
+        coordinates.Add(("C", "1"), (47497, -15151));
+        coordinates.Add(("B", "1"), (55197, -15151));
+        coordinates.Add(("A", "1"), (62397, -15151));
+
+        foreach (var cor in coordinates)
+        {
+            circles.Add(new Circle(cor.Value.Item1, -cor.Value.Item2, 5));
+        }
+        // circles.Add(new Circle(-3000, 18151, 5));
+    }
+
+    // protected override async Task OnParametersSetAsync()
+    // {
+    //     StateHasChanged();
+
+    // }
+
+
+    private async Task OnMouseDown(MouseEventArgs e)
+    {
+        if (e.ShiftKey) // Check if Shift key is pressed for panning
+        {
+            lastPanPoint = new Point(e.ClientX, e.ClientY);
+            //panStart = new Point(e.ClientX, e.ClientY);
+            isPanning = true;
+        }
+        else // Otherwise, start drawing
+        {
+            if (!isSelectingEnabled)
+            {
+                await StartDrawing(e);
+            }
+        }
+    }
+
+    private async Task OnMouseMove(MouseEventArgs e)
+    {
+        if ((Palonniers != null) && (MotherGrids != null))
+        {
+            var hoverPoint = await GetSvgCoordinates(e.ClientX, e.ClientY);
+            hoverPoint = GetRealCoordinatesFromSVG(hoverPoint);
+
+            MotherGridPalonnier nearestPalonnier = null;
+            MotherGridPalonnier nearestMotherGrid = null;
+            double minPerpendicularDistance = double.MaxValue;
+
+            // Check for closest Palonnier
+            foreach (var pal in Palonniers)
+            {
+                var p1 = new Point((double)pal.X1, (double)pal.Y1);
+                var p2 = new Point((double)pal.X2, (double)pal.Y2);
+                double perpendicularDistance = GetPerpendicularDistance(hoverPoint, p1, p2);
+
+                if (perpendicularDistance < minPerpendicularDistance && perpendicularDistance <= snapDistThreshold)
+                {
+                    minPerpendicularDistance = perpendicularDistance;
+                    nearestPalonnier = pal;
+                }
+            }
+        
+        // Check for closest MotherGrid
+
+            foreach (var moth in MotherGrids)
+            {
+                var p1 = new Point((double)moth.X1, (double)moth.Y1);
+                var p2 = new Point((double)moth.X2, (double)moth.Y2);
+                double perpendicularDistance = GetPerpendicularDistance(hoverPoint, p1, p2);
+
+                if (perpendicularDistance < minPerpendicularDistance && perpendicularDistance <= snapDistThreshold)
+                {
+                    minPerpendicularDistance = perpendicularDistance;
+                    nearestMotherGrid = moth;
+                }
+            }
+            // Update hover state
+            hoveredPalonnier = nearestPalonnier;
+            hoveredMotherGrid = nearestMotherGrid;
+        }
+
+  
+
+        StateHasChanged(); // Trigger re-render to update hover effect
+        
+        
+        if (isPanning)
+        {
+            var dx = e.ClientX - lastPanPoint.X;
+            var dy = e.ClientY - lastPanPoint.Y;
+            UpdateViewBox(dx, dy);
+            lastPanPoint = new Point(e.ClientX, e.ClientY);
+        }
+        else if (isDrawing && !isSelectingEnabled)
+        {
+            await Draw(e);
+        }
+    }
+
+    private void UpdateViewBox(double dx, double dy)
+    {
+        // Parse current viewBox
+        var parts = viewBox.Split(' ');
+        var x = double.Parse(parts[0]);
+        var y = double.Parse(parts[1]);
+        var width = double.Parse(parts[2]);
+        var height = double.Parse(parts[3]);
+
+        // Update viewBox to new position
+        viewBox = $"{x - dx} {y - dy} {width} {height}";
+        StateHasChanged();
+    }
+
+    private async Task OnMouseUp(MouseEventArgs e)
+    {
+        if (isPanning)
+        {
+            isPanning = false;
+            StateHasChanged();
+        }
+        else if (isDrawing && !isSelectingEnabled)
+        {
+            await EndDrawing(e);
+        }
+    }
+
+    private async void OnWheel(WheelEventArgs e)
+    {
+        const double scaleFactor = 0.1; // How much to zoom in or out
+        var zoom = e.DeltaY > 0 ? (1 - scaleFactor) : (1 + scaleFactor); // Reversing the direction for a more intuitive zoom
+
+        var parts = viewBox.Split(' ');
+        var x = double.Parse(parts[0]);
+        var y = double.Parse(parts[1]);
+        var width = double.Parse(parts[2]);
+        var height = double.Parse(parts[3]);
+
+
+        // var mousePoint = await GetSvgCoordinates(e.ClientX, e.ClientY);
+        // var mouseX = mousePoint.X; // These should be SVG coordinates, convert from client if necessary
+        // var mouseY = mousePoint.Y;
+
+        // Simplified: Assume mouse is at the center of the current viewBox
+        double mouseX = x + width / 2;
+        double mouseY = y + height / 2;
+
+        // Calculate new width and height
+        var newWidth = width * zoom;
+        var newHeight = height * zoom;
+
+
+
+
+        // Adjust x and y to keep the zoom centered around the mouse cursor
+        var newX = x + (mouseX - x) - (mouseX - x) * zoom;
+        var newY = y + (mouseY - y) - (mouseY - y) * zoom;
+
+        viewBox = $"{newX} {newY} {newWidth} {newHeight}";
+        imageScale /= zoom;
+        StateHasChanged();
+    }
+    private async Task<MotherGridPalonnier> OnClick(MouseEventArgs e)
+    {
+        MotherGridPalonnier nearestObject = null;
+        double minPerpendicularDistance = double.MaxValue;
+
+        if (isSelectingEnabled)
+        {
+            var clickPoint = await GetSvgCoordinates(e.ClientX, e.ClientY);
+            clickPoint = GetRealCoordinatesFromSVG(clickPoint);
+
+            // Check Palonniers
+            foreach (var pal in Palonniers)
+            {
+                var p1 = new Point((double)pal.X1, (double)pal.Y1);
+                var p2 = new Point((double)pal.X2, (double)pal.Y2);
+
+                // Calculate perpendicular distance from the clickPoint to the line segment defined by p1 and p2
+                double perpendicularDistance = GetPerpendicularDistance(clickPoint, p1, p2);
+
+                // Check if this is the closest object within the snap distance threshold
+                if (perpendicularDistance < minPerpendicularDistance && perpendicularDistance <= snapDistThreshold)
+                {
+                    minPerpendicularDistance = perpendicularDistance;
+                    nearestObject = pal; // Update to the closest palonnier
+                }
+            }
+
+            // Check MotherGrids
+            foreach (var moth in MotherGrids)
+            {
+                var p1 = new Point((double)moth.X1, (double)moth.Y1);
+                var p2 = new Point((double)moth.X2, (double)moth.Y2);
+
+                // Calculate perpendicular distance from the clickPoint to the line segment defined by p1 and p2
+                double perpendicularDistance = GetPerpendicularDistance(clickPoint, p1, p2);
+
+                // Check if this is the closest object within the snap distance threshold
+                if (perpendicularDistance < minPerpendicularDistance && perpendicularDistance <= snapDistThreshold)
+                {
+                    minPerpendicularDistance = perpendicularDistance;
+                    nearestObject = moth; // Update to the closest mothergrid
+                }
+            }
+        }
+
+        selectedPalonnier = nearestObject; // Update the selected object
+
+        // Optionally: Call StateHasChanged() if needed to re-render
+        StateHasChanged();
+
+        return nearestObject;
+    }
+
+
+    // Helper method to calculate the perpendicular distance from a point to a line segment
+    private double GetPerpendicularDistance(Point p, Point p1, Point p2)
+    {
+        // Vector A to B
+        double A = p.X - p1.X;
+        double B = p.Y - p1.Y;
+        double C = p2.X - p1.X;
+        double D = p2.Y - p1.Y;
+
+        // Dot product of vector AB and vector AC
+        double dot = A * C + B * D;
+        double len_sq = C * C + D * D;
+        double param = -1;
+
+        // Avoid division by zero (case when p1 and p2 are the same point)
+        if (len_sq != 0) // if not a zero-length line segment
+        {
+            param = dot / len_sq;
+        }
+
+        double xx, yy;
+
+        if (param < 0)
+        {
+            xx = p1.X;
+            yy = p1.Y;
+        }
+        else if (param > 1)
+        {
+            xx = p2.X;
+            yy = p2.Y;
+        }
+        else
+        {
+            xx = p1.X + param * C;
+            yy = p1.Y + param * D;
+        }
+
+        // Calculate the distance from point p to the nearest point on the line segment
+        double dx = p.X - xx;
+        double dy = p.Y - yy;
+        return Math.Sqrt(dx * dx + dy * dy);
+    }
+
+
+
+
+    private async Task StartDrawing(MouseEventArgs e)
+    {
+        startPoint = await GetSvgCoordinates(e.ClientX, e.ClientY);
+        startPoint = GetRealCoordinatesFromSVG(startPoint);
+
+
+        if (isSnappingEnabled)
+        {
+            var nearestCircle = FindNearestCircle(startPoint, snapDistThreshold); // Adjust the threshold as needed
+            if (nearestCircle != null)
+            {
+                startPoint = nearestCircle.Center; // Snap to the center of the nearest circle
+            }
+        }
+
+        if (isMotherGridsSnappingEnabled)
+        {
+            var nearestPoint = FindNearestMotherGrid(startPoint, snapDistThreshold); // Adjust the threshold as needed
+            if (nearestPoint != null)
+            {
+                startPoint = nearestPoint;
+            }
+        }
+
+        if (isPalonniersSnappingEnabled)
+        {
+            var nearestPoint = FindNearestPalonnier(startPoint, snapDistThreshold); // Adjust the threshold as needed
+            if (nearestPoint != null)
+            {
+                startPoint = nearestPoint;
+            }
+        }
+
+
+        isDrawing = true;
+        currentLine = (startPoint, startPoint);
+    }
+
+    private async Task Draw(MouseEventArgs e)
+    {
+        if (freeSketch)
+        {
+            if (isDrawing)
+            {
+                var currentPoint = await GetSvgCoordinates(e.ClientX, e.ClientY);
+                currentPoint = GetRealCoordinatesFromSVG(currentPoint);
+                lines.Add((startPoint, currentPoint));
+                startPoint = currentPoint;
+                StateHasChanged();
+            }
+        }
+        else
+        {
+            var currentPoint = await GetSvgCoordinates(e.ClientX, e.ClientY);
+            currentPoint = GetRealCoordinatesFromSVG(currentPoint);
+
+            if (isSnappingEnabled)
+            {
+                var nearestCircle = FindNearestCircle(currentPoint, snapDistThreshold); // Adjust the threshold as needed
+                if (nearestCircle != null)
+                {
+                    currentPoint = nearestCircle.Center; // Snap to the center of the nearest circle
+                }
+            }
+
+            if (isMotherGridsSnappingEnabled)
+            {
+                var nearestPoint = FindNearestMotherGrid(currentPoint, snapDistThreshold); // Adjust the threshold as needed
+                if (nearestPoint != null)
+                {
+                    currentPoint = nearestPoint;
+                }
+            }
+
+            if (isPalonniersSnappingEnabled)
+            {
+                var nearestPoint = FindNearestPalonnier(currentPoint, snapDistThreshold); // Adjust the threshold as needed
+                if (nearestPoint != null)
+                {
+                    currentPoint = nearestPoint;
+                }
+            }
+
+
+
+            if (currentLine.HasValue)
+            {
+                currentLine = (startPoint, currentPoint);
+            }
+        }
+    }
+
+    private async Task EndDrawing(MouseEventArgs e)
+    {
+        if (isDrawing)
+        {
+            var endPoint = await GetSvgCoordinates(e.ClientX, e.ClientY);
+            endPoint = GetRealCoordinatesFromSVG(endPoint);
+
+            if (isSnappingEnabled)
+            {
+                var nearestCircle = FindNearestCircle(endPoint, snapDistThreshold); // Use the same threshold as in Draw
+                if (nearestCircle != null)
+                {
+                    endPoint = nearestCircle.Center; // Snap to the center of the nearest circle
+                }
+            }
+
+            if (isMotherGridsSnappingEnabled)
+            {
+                var nearestPoint = FindNearestMotherGrid(endPoint, snapDistThreshold); // Adjust the threshold as needed
+                if (nearestPoint != null)
+                {
+                    endPoint = nearestPoint;
+                }
+            }
+
+            if (isPalonniersSnappingEnabled)
+            {
+                var nearestPoint = FindNearestPalonnier(endPoint, snapDistThreshold); // Adjust the threshold as needed
+                if (nearestPoint != null)
+                {
+                    endPoint = nearestPoint;
+                }
+            }
+
+
+
+            if (currentLine.HasValue)
+            {
+                currentLine = (currentLine.Value.Item1, endPoint);
+                // lines.Add(currentLine.Value);
+                if (Distance(currentLine.Value.Item1, currentLine.Value.Item2) > 500)
+                {
+                    await LineDrawn.InvokeAsync((currentLine.Value.Item1.X,
+       currentLine.Value.Item1.Y, currentLine.Value.Item2.X, currentLine.Value.Item2.Y));
+                }
+
+                currentLine = null;
+                StateHasChanged();
+            }
+            isDrawing = false;
+        }
+    }
+
+    private double Distance(Point p1,Point p2)
+    {
+        double distance = Math.Sqrt(Math.Pow(p1.X - p2.X, 2) + Math.Pow(p1.Y - p2.Y, 2));
+
+        return distance;
+    }
+
+    private async Task<Point> GetSvgCoordinates(double clientX, double clientY)
+    {
+        return await js.InvokeAsync<Point>("getSvgCoordinates", clientX, clientY);
+    }
+
+    private Point GetRealCoordinatesFromSVG(Point pt)
+    {
+        double x = (pt.X / width) * realWidth;
+        double y = (pt.Y / height) * realHeight;
+
+        return new Point(x, y);
+    }
+
+    private Point GetSVGCoordinatesFromReal(Point pt)
+    {
+        double x = (pt.X / realWidth) * width;
+        double y = (pt.Y / realHeight) * height;
+
+        return new Point(x, y);
+    }
+
+    public void AddLine(double x1, double y1, double x2, double y2)
+    {
+        lines.Add((new Point(x1, y1), new Point(x2, y2)));
+        StateHasChanged();
+    }
+
+    private Circle FindNearestCircle(Point pt, double threshold)
+    {
+        Circle nearestCircle = null;
+        double minDistance = double.MaxValue;
+
+        foreach (var circle in circles)
+        {
+            double distance = Math.Sqrt(Math.Pow(circle.Center.X - pt.X, 2) + Math.Pow(circle.Center.Y - pt.Y, 2));
+            if (distance < minDistance && distance <= threshold)
+            {
+                minDistance = distance;
+                nearestCircle = circle;
+            }
+        }
+
+        return nearestCircle;
+    }
+
+    private Point FindNearestPalonnier(Point pt, double threshold)
+    {
+        Point nearestPoint = null;
+        double minDistance = double.MaxValue;
+
+        foreach (var pal in Palonniers)
+        {
+            var p1 = new Point((double)pal.X1, (double)pal.Y1);
+            var p2 = new Point((double)pal.X2, (double)pal.Y2);
+            double distance = Math.Sqrt(Math.Pow(p1.X - pt.X, 2) + Math.Pow(p1.Y - pt.Y, 2));
+            if (distance < minDistance && distance <= threshold)
+            {
+                minDistance = distance;
+                nearestPoint = p1;
+            }
+
+            distance = Math.Sqrt(Math.Pow(p2.X - pt.X, 2) + Math.Pow(p2.Y - pt.Y, 2));
+            if (distance < minDistance && distance <= threshold)
+            {
+                minDistance = distance;
+                nearestPoint = p2;
+            }
+
+        }
+
+        return nearestPoint;
+    }
+
+    private Point FindNearestMotherGrid(Point pt, double threshold)
+    {
+        Point nearestPoint = null;
+        double minDistance = double.MaxValue;
+
+        foreach (var pal in MotherGrids)
+        {
+            var p1 = new Point((double)pal.X1, (double)pal.Y1);
+            var p2 = new Point((double)pal.X2, (double)pal.Y2);
+            double distance = Math.Sqrt(Math.Pow(p1.X - pt.X, 2) + Math.Pow(p1.Y - pt.Y, 2));
+            if (distance < minDistance && distance <= threshold)
+            {
+                minDistance = distance;
+                nearestPoint = p1;
+            }
+
+            distance = Math.Sqrt(Math.Pow(p2.X - pt.X, 2) + Math.Pow(p2.Y - pt.Y, 2));
+            if (distance < minDistance && distance <= threshold)
+            {
+                minDistance = distance;
+                nearestPoint = p2;
+            }
+
+        }
+
+        return nearestPoint;
+    }
+
+    private void ZoomToExtent()
+    {
+        // Assuming you have predefined extents or you calculate them
+        viewBox = $"{GetSVGCoordinatesFromReal(origPt).X} {GetSVGCoordinatesFromReal(origPt).Y} {width} {height}";
+        imageScale = 1.0; // Reset image scale if necessary
+        StateHasChanged();
+    }
+
+    private void ToggleSnapping()
+    {
+        isSnappingEnabled = !isSnappingEnabled;
+        // StateHasChanged(); // Update UI or other elements if needed
+    }
+
+    private void TogglePSnapping()
+    {
+        isPalonniersSnappingEnabled = !isPalonniersSnappingEnabled;
+        //  StateHasChanged(); // Update UI or other elements if needed
+    }
+
+    private void ToggleMSnapping()
+    {
+        isMotherGridsSnappingEnabled = !isMotherGridsSnappingEnabled;
+        //  StateHasChanged(); // Update UI or other elements if needed
+    }
+
+    private void ToggleSelecting()
+    {
+        isSelectingEnabled = !isSelectingEnabled;
+
+      //  StateHasChanged(); // Update UI or other elements if needed
+    }
+
+    private async Task EraseSelected()
+    {
+        if (selectedPalonnier != null)
+        {
+            // if (Palonniers.Contains(selectedPalonnier))
+            // {
+            //     Palonniers.Remove(selectedPalonnier);
+            // }
+            // else if (MotherGrids.Contains(selectedPalonnier))
+            // {
+            //     MotherGrids.Remove(selectedPalonnier);
+            // }
+
+            // Invoke the EventCallback to notify any parent components or perform additional actions
+            await OnErase.InvokeAsync(selectedPalonnier);
+
+            selectedPalonnier = null; // Clear the selection after erasing
+            StateHasChanged(); // Trigger a re-render to update the SVG
+        }
+    }
+    
+
+    public class Point
+    {
+        public double X { get; set; }
+        public double Y { get; set; }
+
+        public Point(double x, double y)
+        {
+            X = x;
+            Y = y;
+        }
+    }
+
+    public class Circle
+    {
+        public Point Center { get; set; }
+        public double Radius { get; set; }
+        public string Color { get; set; } = "red"; // Default color is red
+
+        public Circle(double x, double y, double radius)
+        {
+            Center = new Point(x, y);
+            Radius = radius;
+        }
+    }
+
+}

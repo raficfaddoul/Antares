@@ -1,0 +1,31 @@
+﻿@page "/counter"
+@using System.Threading
+@using AliantWebS.Pages.MonitoringPages
+@inject NavigationManager navigationManager
+@inject IJSRuntime JSRuntime
+
+
+<h1>Counter</h1>
+
+<p>Current count: @currentCount</p>
+
+
+<button @onclick="Stop">Click me</button>
+<DyGraphComponent ></DyGraphComponent>
+
+
+@code {
+    private int currentCount = 0;
+    
+
+    private void Stop()
+    {
+    
+        // AliantWebS.Pages.AIPages.PredictW predict = new AIPages.PredictW();
+
+
+      //  navigationManager.NavigateTo("/Python");
+    }
+
+
+}

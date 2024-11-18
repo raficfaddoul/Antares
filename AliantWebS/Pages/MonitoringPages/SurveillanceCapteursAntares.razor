@@ -1,0 +1,106 @@
+﻿@using AliantWebS.Data
+@using Models
+@inject AppData appData;
+@inject EntitiesService entitiesService
+@inject NavigationManager navigationManager
+@inject IStringLocalizer<Languages> L
+
+
+
+@* @if (sensors is null)
+{
+    <p><em>@L["Loading"]... !</em></p>
+}
+else
+{ *@
+    <RadzenSplitter Orientation="Radzen.Orientation.Horizontal">
+        <RadzenSplitterPane>
+
+        <SelecteurDeCapteurComponent Structure=@Structure OnPlotRaised="@(p =>plot(p.Item1,p.Item2,p.Item3,p.Item4,p.Item5))"></SelecteurDeCapteurComponent>
+
+        </RadzenSplitterPane>
+        <RadzenSplitterPane>
+            <RadzenSplitter Orientation="Radzen.Orientation.Vertical">
+                <RadzenSplitterPane>
+                <IndicesInTimeComponent GraphId="g3" @ref="iitc" Headers="headers" Indices="indices.Select(x => x.Item2).ToList()"></IndicesInTimeComponent>
+
+                    </RadzenSplitterPane>
+            <RadzenSplitterPane>
+                <AliantWebS.Pages.CADPages.SVGComponent></AliantWebS.Pages.CADPages.SVGComponent>
+
+            </RadzenSplitterPane>
+            </RadzenSplitter>
+
+        </RadzenSplitterPane>
+    </RadzenSplitter>
+@* } *@
+
+@code {
+    IndicesInTimeComponent iitc;
+
+
+
+    List<Element> sensors;
+
+    [Parameter]
+    public Structure Structure { get; set; }
+
+    private IList<Element> selectedSensors {get; set;}
+
+ 
+    List<string> headers = new List<string>()
+     {
+         "Date" };
+    List<(string,Dictionary<DateTime, double>)> indices = new List<(string,Dictionary<DateTime, double>)>();
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        
+    }
+
+    private async Task plot(bool args, Element sensor, ChannelDataType channelDataType, DateTime startDate, DateTime endDate)
+    {
+        if (args)
+        {
+            Dictionary<DateTime, double> dic = new Dictionary<DateTime, double>();
+
+            List<object[]> la = await GetLa(sensor, channelDataType,startDate,endDate);
+
+            IList<object> X = la.Select(x => x[0]).ToList();
+            IList<object> Y = la.Select(x => x[2]).ToList();
+
+            foreach (var l in la)
+            {
+                dic.Add((DateTime)l[0], (double)l[2]);
+            }
+
+            headers.Add(sensor.Name + "|" + channelDataType.Name);
+            indices.Add((sensor.ElementId.ToString() + "|" + channelDataType.ChannelDataTypeId.ToString(), dic));
+           // iitc.Indices = indices.Select(x => x.Item2).ToList();
+            await iitc.DisplayData(indices.Select(x => x.Item2).ToList());
+            StateHasChanged();
+
+            
+        }
+        else
+        {
+            headers.Remove(sensor.Name + "|" + channelDataType.Name);
+            var d = indices.Find(x => x.Item1 == sensor.ElementId.ToString() + "|" + channelDataType.ChannelDataTypeId.ToString());
+            indices.Remove(d);
+            await iitc.DisplayData(indices.Select(x => x.Item2).ToList());
+            StateHasChanged();
+        }
+
+    }
+
+    private async Task<List<object[]>> GetLa(Element element, ChannelDataType channelDataType, DateTime startDate, DateTime endDate)
+    {
+        return await InfluxService.GetData(new List<string>() { element.ElementId.ToString() }, new List<string>() { channelDataType.ChannelDataTypeId.ToString() }, startDate, endDate);
+    }
+
+
+ 
+
+}

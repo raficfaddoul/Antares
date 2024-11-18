@@ -1,0 +1,779 @@
+﻿@page "/Training"
+@using AI
+@using AliantWebS.Models
+@using AliantWebS.Data
+@using Microsoft.AspNetCore.Hosting
+﻿@using Plotly.Blazor.LayoutLib
+@using Plotly.Blazor.Traces.ScatterLib
+@inject AppData appData;
+@inject EntitiesService entitiesService
+@inject IWebHostEnvironment Environment
+@inject NavigationManager navigationManager
+@inject IStringLocalizer<Languages> L
+
+@using HDF5CSharp;
+
+@layout LearningLayout
+
+<div style="height:100vh; overflow:auto">
+
+<h3>@L["Train Component"]</h3>
+
+<EditForm Model="trn">
+    <DataAnnotationsValidator />
+    <Blazorise.Row>
+        <Column ColumnSize="ColumnSize.Is6">
+            <div class="form-group">
+                <label>@L["Training Identifier"] :</label>
+                <div>
+                    <InputText @bind-Value="@trn.TrainingID" />
+                    <ValidationMessage For="@(() => trn.TrainingID)" />
+                </div>
+            </div>
+            <div class="form-group">
+                <label>@L["Short Description"] :</label>
+                <div>
+                    <textarea @bind="@trn.ShortDescription" class="form-control"></textarea>
+                    <ValidationMessage For="@(() => trn.ShortDescription)" />
+                </div>
+            </div>
+
+                        <div class="form-group ">
+                <div>
+                    <label>@L["Online Simulation"] :</label>
+                    <div>
+                        <InputCheckbox @bind-Value="trn.OnlineSimulation"></InputCheckbox>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>@L["Learning Dataset"] :</label>
+                <div>
+                    <InputSelect TValue="string" @bind-Value="@SelectedPath" class="form-control">
+                        @foreach (string p in pathsForFiles)
+                        {
+                            <option value="@p">@Path.GetFileName(p)</option>
+                        }
+
+                    </InputSelect>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>@L["Test"] :</label>
+                <div>
+
+                    @*                    <Blazorise.DropdownList data="@pathsForFiles" TValue="string" TItem="string" TextField="@((item)=>item)" ValueField="@((item)=>item)"
+                    @bind-SelectedValue="@SelectedPath" class="form-control">
+                    @foreach (string p in pathsForFiles)
+                    {
+                    <option value="@p">@Path.GetFileName(p)</option>
+                    }
+
+                    </Blazorise.DropdownList>*@
+                </div>
+            </div>
+
+
+
+            @if (simParameters != null)
+            {
+                <table>
+                    <tr>
+                        <th>@L["Simulation Parameters"]</th>
+                        <th>@L["Value"] </th>
+
+
+                    </tr>
+                    <tr>
+                        <td>@L["Simulation Identifier"]</td>
+                        <td>
+                            <div>
+                                @simParameters.SimulationID
+                            </div>
+                        </td>
+
+
+                    </tr>
+                    <tr>
+                        <td>@L["Short Description"]</td>
+                        <td>
+                            <div>
+                                @simParameters.ShortDescription
+                            </div>
+                        </td>
+
+                    </tr>
+                    <tr>
+                        <td>@L["File Batches"]</td>
+                        <td>
+                            <div>
+                                @simParameters.FileOpens
+                            </div>
+                        </td>
+
+                    </tr>
+                    <tr>
+                        <td>@L["Number of simulations per batch"]</td>
+                        <td>
+                            <div>
+                                @simParameters.SimulationNum
+                            </div>
+                        </td>
+
+                    </tr>
+                    <tr>
+                        <td>@L["Divider"] :</td>
+                        <td>
+                            <div>
+                                @simParameters.Divider
+                            </div>
+                        </td>
+
+                    </tr>
+                    <tr>
+                        <td>@L["Multiplicity"] :</td>
+                        <td>
+                            <div>
+                                @simParameters.Multiplicity
+                            </div>
+                        </td>
+
+                    </tr>
+                    <tr>
+                        <td>@L["Sampling Frequency"]</td>
+                        <td>
+                            <div>
+                                @simParameters.SamplingFrequency
+                            </div>
+                        </td>
+
+                    </tr>
+
+                    <tr>
+                        <td>@L["Signal Length"]</td>
+                        <td>
+                            <div>
+                                @simParameters.Duree
+                            </div>
+                        </td>
+
+                    </tr>
+                    <tr>
+                        <td>@L["Simulation Seed"]</td>
+                        <td>
+                            <div>
+                                @simParameters.GlobalSeed
+                            </div>
+                        </td>
+
+                    </tr>
+                    <tr>
+                        <td>@L["One Element at a Time"]</td>
+                        <td>
+                            <div>
+                                @simParameters.oneElementAtATime
+                            </div>
+                        </td>
+
+                    </tr>
+
+                </table>
+            }
+            else
+            {
+                <p><em>@L["The simulated dataset is not recognized..."] !</em></p>
+            }
+
+
+
+        </Column>
+        <Column ColumnSize="ColumnSize.Is6">
+
+            <div class="form-group ">
+                <div>
+                    <label>Elements :</label>
+                    <div>
+                        <InputText @bind-Value="@trn.ElementToTrain" />
+                        <ValidationMessage For="@(() => trn.ElementToTrain)" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group ">
+                <div>
+                    <label>Learning Rate (seconds):</label>
+                    <div>
+                        <InputText @bind-Value="@trn.LearningRate" />
+                        <ValidationMessage For="@(() => trn.LearningRate)" />
+                    </div>
+                </div>
+            </div>
+            <div class="form-group ">
+                <div>
+                    <label>Test Set Percentage :</label>
+                    <div>
+                        <InputText @bind-Value="@trn.TestSetPercentage" />
+                        <ValidationMessage For="@(() => trn.TestSetPercentage)" />
+                    </div>
+                </div>
+            </div>
+            <div class="form-group ">
+                <div>
+                    <label>Epochs Number :</label>
+                    <div>
+                        <InputText @bind-Value="@trn.EpochsNumber" />
+                        <ValidationMessage For="@(() => trn.EpochsNumber)" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group ">
+                <div>
+                    <label>Batch Size :</label>
+                    <div>
+                        <InputText @bind-Value="@trn.BatchSize" />
+                        <ValidationMessage For="@(() => trn.BatchSize)" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group ">
+                <div>
+                    <label>DropoutRate :</label>
+                    <div>
+                        <InputText @bind-Value="@trn.DropoutRate" />
+                        <ValidationMessage For="@(() => trn.DropoutRate)" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group ">
+                <div>
+                    <label>Batch Normalization :</label>
+                    <div>
+                        <InputCheckbox @bind-Value="trn.BatchNormalization"></InputCheckbox>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group ">
+                <div>
+                    <label>Shuffle :</label>
+                    <div>
+                        <InputCheckbox @bind-Value="trn.Shuffle"></InputCheckbox>
+                    </div>
+                </div>
+            </div>
+
+        </Column>
+    </Blazorise.Row>
+
+    <br />
+    <div class="row">
+        <div class="col-md-4">
+            <div class="form-group">
+                <button type="button" class="btn btn-success" @onclick="@Train">
+                    Train
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+</EditForm>
+
+
+
+
+<PlotlyChart style="height:100%" @bind-Config="config" @bind-Layout="layout" @bind-Data="data" @ref=chart />
+</div>
+
+@code {
+
+    class TrainingParameters
+    {
+
+        public bool Device { get; set; }
+        public string TrainingID { get; set; }
+        public string ShortDescription { get; set; }
+
+        public bool OnlineSimulation { get; set; } = false;
+
+
+        public List<int> elementsToTrain = null;
+
+        private string elementToTrain = "all";
+        [Parameter]
+        public string ElementToTrain
+        {
+            get => elementToTrain;
+            set
+            {
+                if (elementToTrain == value) return;
+                elementToTrain = value;
+                if (elementToTrain.Trim().ToLowerInvariant() == "all")
+                {
+                    elementsToTrain = null;
+                }
+                elementsToTrain = Helpers.ListFromString<int>(elementToTrain).ToList();
+
+            }
+        }
+
+
+
+
+
+        public List<int> epochsNumbers = new List<int>() { 10 };
+
+        private string epochsNumber = 10.ToString();
+        [Parameter]
+        public string EpochsNumber
+        {
+            get => epochsNumber;
+            set
+            {
+                if (epochsNumber == value) return;
+                epochsNumber = value;
+                epochsNumbers = Helpers.ListFromString<int>(epochsNumber).ToList();
+
+            }
+        }
+
+
+
+        public List<int> batchSizes = new List<int>() { 10 };
+
+        private string batchSize = 10.ToString();
+        [Parameter]
+        public string BatchSize
+        {
+            get => batchSize;
+            set
+            {
+                if (batchSize == value) return;
+                batchSize = value;
+                batchSizes = Helpers.ListFromString<int>(batchSize).ToList();
+
+            }
+        }
+
+
+
+        public List<double> learningRates = new List<double>() { 0.00001 };
+
+        private string learningRate = (0.00001).ToString();
+        [Parameter]
+        public string LearningRate
+        {
+            get => learningRate;
+            set
+            {
+                if (learningRate == value) return;
+                learningRate = value;
+                learningRates = Helpers.ListFromString<double>(learningRate).ToList();
+            }
+        }
+
+        public List<double> testSetPercentages = new List<double>() { 0.1 };
+
+        private string testSetPercentage = (0.1).ToString();
+        [Parameter]
+        public string TestSetPercentage
+        {
+            get => testSetPercentage;
+            set
+            {
+                if (testSetPercentage == value) return;
+                testSetPercentage = value;
+                testSetPercentages = Helpers.ListFromString<double>(testSetPercentage).ToList();
+            }
+        }
+
+
+
+
+        public List<double> dropoutRates = new List<double>() { 0 };
+
+        private string dropoutRate = (0).ToString();
+        [Parameter]
+        public string DropoutRate
+        {
+            get => dropoutRate;
+            set
+            {
+                if (dropoutRate == value) return;
+                dropoutRate = value;
+                dropoutRates = Helpers.ListFromString<double>(dropoutRate).ToList();
+            }
+        }
+
+
+        public List<bool> batchNormalizations = new List<bool>() { true };
+
+        private bool batchNormalization = true;
+        [Parameter]
+        public bool BatchNormalization
+        {
+            get => batchNormalization;
+            set
+            {
+                if (batchNormalization == value) return;
+                batchNormalization = value;
+                if (!IterateBatchNormalization)
+                {
+                    batchNormalizations = new List<bool>() { batchNormalization };
+                }
+            }
+        }
+
+        private bool iterateBatchNormalization = false;
+        [Parameter]
+        public bool IterateBatchNormalization
+        {
+            get => iterateBatchNormalization;
+            set
+            {
+                if (iterateBatchNormalization == value) return;
+                iterateBatchNormalization = value;
+                if (iterateBatchNormalization)
+                {
+                    BatchNormalization = false;
+                    batchNormalizations = new List<bool>() { false, true };
+                }
+
+            }
+        }
+
+        public List<bool> shuffles = new List<bool>() { true };
+
+        private bool shuffle = true;
+        [Parameter]
+        public bool Shuffle
+        {
+            get => shuffle;
+            set
+            {
+                if (shuffle == value) return;
+                shuffle = value;
+                if (!IterateShuffle)
+                {
+                    shuffles = new List<bool>() { shuffle };
+                }
+
+            }
+        }
+
+        private bool iterateShuffle = false;
+        [Parameter]
+        public bool IterateShuffle
+        {
+            get => iterateShuffle;
+            set
+            {
+                if (iterateShuffle == value) return;
+                iterateShuffle = value;
+                if (iterateShuffle)
+                {
+                    Shuffle = false;
+                    shuffles = new List<bool>() { false, true };
+                }
+
+            }
+        }
+
+    }
+
+    TrainingParameters trn = new TrainingParameters();
+
+
+
+
+    PlotlyChart chart;
+    Plotly.Blazor.Config config = new Plotly.Blazor.Config();
+    Plotly.Blazor.Layout layout = new Plotly.Blazor.Layout();
+    // Using of the interface IList is important for the event callback!
+    IList<ITrace> data = new List<ITrace>();
+    Scatter trainScatter;
+    Scatter testScatter;
+
+    List<string> pathsForFiles = new List<string>();
+
+
+    private string selectedPath;
+    [Parameter]
+    public string SelectedPath
+    {
+        get => selectedPath;
+        set
+        {
+            if (selectedPath == value) return;
+            selectedPath = value;
+
+            if (!File.Exists(selectedPath))
+            {
+                throw new FileNotFoundException(selectedPath);
+            }
+
+            if (selectedPath != null)
+            {
+                using (simParameters = new Structural.SimulationParameters())
+                {
+                    long fileId = Hdf5.OpenFile(selectedPath, true);
+
+
+
+                    simParameters = Hdf5.ReadObject(fileId, simParameters, "simulationParameters");
+                    PredictW.simPa = simParameters;
+
+                    Hdf5.CloseFile(fileId);
+
+                }
+            }
+
+
+        }
+    }
+
+
+
+    Structural.SimulationParameters simParameters = new Structural.SimulationParameters();
+
+
+    Structure structure;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        structure = (Structure)appData.obj;
+
+        if (structure == null)
+        {
+            navigationManager.NavigateTo("Structures");
+        }
+
+        PredictW.structuralStructure = Structural.Simulation.CreateStructure(structure,null, entitiesService);
+
+
+        var pff = await FileManagementService.GetPathForFilesAsync(structure,false, @"TrainingSets\");
+        pathsForFiles.AddRange(pff);
+        SelectedPath = pathsForFiles.FirstOrDefault();
+        PredictW.EpochEnding += EpochEnd;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+       // if (!firstRender)
+        {
+            await CalculateTrainingLoss(100);
+        }
+    }
+    private void AddNewScatters(int elementNumber, int runNumber)
+    {
+        trainScatter = new Scatter();
+        testScatter = new Scatter();
+
+        trainScatter.Name = "Train Element " + elementNumber.ToString() + " Run:" + runNumber.ToString();
+        trainScatter.Mode = Plotly.Blazor.Traces.ScatterLib.ModeFlag.Lines | Plotly.Blazor.Traces.ScatterLib.ModeFlag.Markers;
+        data.Add(trainScatter);
+
+        testScatter.Name = "Test";
+        testScatter.Mode = Plotly.Blazor.Traces.ScatterLib.ModeFlag.Lines | Plotly.Blazor.Traces.ScatterLib.ModeFlag.Markers;
+        data.Add(testScatter);
+
+        trainScatter.X = new List<Object>();
+        trainScatter.Y = new List<Object>();
+        testScatter.X = new List<Object>();
+        testScatter.Y = new List<Object>();
+    }
+
+    private async Task EpochEnd(object sender, params string[] ss)
+    {
+
+      
+        trainScatter.X.Add((object)ss[0]);
+        trainScatter.Y.Add((object)ss[1]);
+
+        testScatter.X.Add((object)ss[0]);
+        testScatter.Y.Add((object)ss[2]);
+
+
+        await chart.Update();
+
+    }
+
+
+
+
+    async Task Train()
+    {
+        //var letters = new string[] { "A", "B" };
+        //var numbers = new object[] { 1, 2, 3 };
+        //var symbols = new[] { "@", "#" };
+        //var empty = new string[] { };
+
+        //var collections = new IEnumerable<object>[] { letters, numbers, symbols, empty };
+        //var res = collections.Cartesian().Cast<object[]>()
+        //   // this is just for show
+        //   .Select(x => string.Join("", x.Cast<object>()))
+        //   .OrderBy(x => x);
+        ////.Dump(); // linqpad
+
+        // string s = "3.2,4.5";
+
+        // var ss = ListFromString<double>(s);
+
+
+
+        //    if (structure.Elements.Count == 0)
+        {
+            // entitiesService.LoadCollection(structure, "Elements");
+
+            structure = entitiesService.GetFilteredEntitiesAsync<Structure>(a => a.StructureId == structure.StructureId, "Elements.ElementType.Category").Result.FirstOrDefault();
+
+        }
+
+        var listOfSensedNdes = Structural.Simulation.GetSensedNodes(structure, entitiesService._appDBContext).sensedNodesIndex.Values.ToArray();
+
+        if (trn.elementsToTrain == null)
+        {
+            trn.elementsToTrain = new List<int>();
+            int numberOfStructuralElements = Structural.Simulation.GetSensedNodes(structure, entitiesService._appDBContext).beamElements.Count;
+            for (int i = 0; i < numberOfStructuralElements; i++)
+            {
+                trn.elementsToTrain.Add(i);
+            }
+
+        }
+
+        string NNModelPath = Path.Combine(Environment.ContentRootPath, "NNModels");
+
+        NNModelPath = Path.Combine(NNModelPath, structure.StructureId.ToString());
+
+
+
+        if (!Directory.Exists(NNModelPath))
+        {
+            Directory.CreateDirectory(NNModelPath);
+        }
+
+        int runNumber = 0;
+
+        foreach (int epochNum in trn.epochsNumbers)
+        {
+            foreach (int batchSize in trn.batchSizes)
+            {
+                foreach (double learningRate in trn.learningRates)
+                {
+                    foreach (double testSetPercentage in trn.testSetPercentages)
+                    {
+                        foreach (double dropoutRate in trn.dropoutRates)
+                        {
+                            foreach (bool batchNormalization in trn.batchNormalizations)
+                            {
+                                foreach (bool shuffle in trn.shuffles)
+                                {
+
+                                    foreach (int el in trn.elementsToTrain)
+                                    {
+                                        AddNewScatters(elementNumber: el, runNumber: runNumber);
+
+                                        var NNModelfilePath = Path.Combine(NNModelPath, trn.TrainingID + "nnmodel" + el.ToString() + ".dat");
+
+
+                                        await PredictW.Train(epochNum: epochNum, batchSize: batchSize, learningRate: learningRate,
+                                        dropoutRate: dropoutRate, batchNormalization: batchNormalization,
+                                        testSetPercentage: testSetPercentage, shuffle: shuffle, TrainingSetPath: SelectedPath,
+                                        NNModelfilePath: NNModelfilePath, sensedNodes: listOfSensedNdes, elementIndex: el, trn.OnlineSimulation);
+
+                                        //await PredictW.Train2(epochNum: epochNum, batchSize: batchSize, learningRate: learningRate,
+                                        //dropoutRate: dropoutRate, batchNormalization: batchNormalization,
+                                        //testSetPercentage: testSetPercentage, shuffle: shuffle, 
+                                        //TrainingSetPath: @"C:\Users\rafic\Desktop\AliantWebS\AliantWebS\AliantWebS\TrainingSets\3f91a7fc-c408-4afb-bdeb-fdd3472c8f79\392new.csv",
+                                        //TestSetPath: @"C:\Users\rafic\Desktop\AliantWebS\AliantWebS\AliantWebS\TrainingSets\3f91a7fc-c408-4afb-bdeb-fdd3472c8f79\130 othernew.csv",
+                                        //NNModelfilePath: NNModelfilePath, sensedNodes: listOfSensedNdes, elementIndex: el, trn.OnlineSimulation);
+
+
+
+                                    }
+                                    runNumber++;
+
+                                }
+
+
+                            }
+
+
+                        }
+
+
+                    }
+
+
+                }
+
+
+            }
+
+
+        }
+
+
+    }
+
+    public void Dispose()
+    {
+        PredictW.EpochEnding -= EpochEnd;
+    }
+
+    private async Task CalculateTrainingLoss(int epochs)
+    {
+        AddNewScatters(5, 1);
+        Random rng = new Random();
+
+        var losses = new List<double>();
+
+        for (int i = 0; i < epochs; i++)
+        {
+
+        }
+
+
+        var losses1 = new List<double>();
+
+        for (int i = 0; i < epochs / 2; i++)
+        {
+            double epochFraction1 = (double)i / (epochs / 2);
+            string str1 = (0.9 * Math.Exp(-2.5 * epochFraction1) + 0.1 * rng.NextDouble()).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            losses1.Add(0.9 * Math.Exp(-2.5 * epochFraction1) + 0.1 * rng.NextDouble());
+
+
+            double epochFraction = (double)i / (epochs / 2);
+            losses.Add(0.9 * Math.Exp(-5.0 * epochFraction) + 0.1 * rng.NextDouble());
+            string str = (0.9 * Math.Exp(-5.0 * epochFraction) + 0.1 * rng.NextDouble()).ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+            await EpochEnd(null, i.ToString(), str, str1, str1);
+        }
+
+        for (int i = epochs / 2; i < epochs; i++)
+        {
+            string str1 = (losses1[epochs / 2 - 1] * (1 + 0.02 * (i - epochs / 2 + 1)) + 0.1 * rng.NextDouble()).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            losses1.Add(losses1[epochs / 2 - 1] * (1 + 0.02 * (i - epochs / 2 + 1)) + 0.1 * rng.NextDouble());
+
+            double epochFraction = (double)i / (epochs / 2);
+            string str = (0.9 * Math.Exp(-5.0 * epochFraction) + 0.1 * rng.NextDouble()).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            losses.Add(0.9 * Math.Exp(-5.0 * epochFraction) + 0.1 * rng.NextDouble());
+
+            await EpochEnd(null, i.ToString(), str, str1, str1);
+        }
+
+        
+    }
+
+
+
+
+
+}

@@ -1,0 +1,37 @@
+﻿@page "/DeleteElement/{Id}"
+@using AliantWebS.Data
+@using AliantWebS.Models
+@inject EntitiesService entitiesService
+@inject NavigationManager NavigationManager
+
+@layout ElementsLayout
+
+<h2>Delete Structure</h2>
+<hr />
+<h3>Are you sure want to delete this?</h3>
+
+
+<ElementFormComponent ButtonText="Delete ]Element" Element="@element" OnValidSubmit="@DeleteElement"></ElementFormComponent>
+
+
+
+
+
+@code {
+    [Parameter]
+    public string Id { get; set; }
+    Element element = new Element();
+    protected override async Task OnInitializedAsync()
+    {
+        element = await Task.Run(() => entitiesService.GetEntityAsync<Element>(Convert.ToInt32(Id)));
+    }
+    protected async void DeleteElement()
+    {
+        await entitiesService.DeleteEntityAsync(element);
+        NavigationManager.NavigateTo("/ElementComponent/" + element.StructureId);
+    }
+    void Cancel()
+    {
+        NavigationManager.NavigateTo("/ElementComponent/" + element.StructureId);
+    }
+}

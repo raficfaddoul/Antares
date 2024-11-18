@@ -1,0 +1,528 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!-- 
+    Microsoft ResX Schema 
+    
+    Version 2.0
+    
+    The primary goals of this format is to allow a simple XML format 
+    that is mostly human readable. The generation and parsing of the 
+    various data types are done through the TypeConverter classes 
+    associated with the data types.
+    
+    Example:
+    
+    ... ado.net/XML headers & schema ...
+    <resheader name="resmimetype">text/microsoft-resx</resheader>
+    <resheader name="version">2.0</resheader>
+    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
+    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
+        <comment>This is a comment</comment>
+    </data>
+                
+    There are any number of "resheader" rows that contain simple 
+    name/value pairs.
+    
+    Each data row contains a name, and value. The row also contains a 
+    type or mimetype. Type corresponds to a .NET class that support 
+    text/value conversion through the TypeConverter architecture. 
+    Classes that don't support this are serialized and stored with the 
+    mimetype set.
+    
+    The mimetype is used for serialized objects, and tells the 
+    ResXResourceReader how to depersist the object. This is currently not 
+    extensible. For a given mimetype the value must be set accordingly:
+    
+    Note - application/x-microsoft.net.object.binary.base64 is the format 
+    that the ResXResourceWriter will generate, however the reader can 
+    read any of the formats listed below.
+    
+    mimetype: application/x-microsoft.net.object.binary.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
+            : and then encoded with base64 encoding.
+    
+    mimetype: application/x-microsoft.net.object.soap.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.bytearray.base64
+    value   : The object must be serialized into a byte array 
+            : using a System.ComponentModel.TypeConverter
+            : and then encoded with base64 encoding.
+    -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="About" xml:space="preserve">
+    <value>À propos</value>
+  </data>
+  <data name="Access to the camera denied" xml:space="preserve">
+    <value>Access to the camera denied</value>
+  </data>
+  <data name="Adaptif" xml:space="preserve">
+    <value>Adaptif</value>
+  </data>
+  <data name="Add New" xml:space="preserve">
+    <value>Ajouter</value>
+  </data>
+  <data name="Add New Element" xml:space="preserve">
+    <value>Ajouter un nouvel élément</value>
+  </data>
+  <data name="Add Structure" xml:space="preserve">
+    <value>Ajouter une structure</value>
+  </data>
+  <data name="Address" xml:space="preserve">
+    <value>Addresse</value>
+  </data>
+  <data name="Attributes" xml:space="preserve">
+    <value>Attributs</value>
+  </data>
+  <data name="Attributes Types" xml:space="preserve">
+    <value>Type d'attributs</value>
+  </data>
+  <data name="Automatic" xml:space="preserve">
+    <value>Automatique</value>
+  </data>
+  <data name="Backup Database" xml:space="preserve">
+    <value>Sauvegarde de la base de données</value>
+  </data>
+  <data name="Backup Database to Desktop" xml:space="preserve">
+    <value>Sauvegarder la base de données sur le bureau</value>
+  </data>
+  <data name="BIM" xml:space="preserve">
+    <value>BIM</value>
+  </data>
+  <data name="Cancel" xml:space="preserve">
+    <value>Annuler</value>
+  </data>
+  <data name="Categories" xml:space="preserve">
+    <value>Catégories</value>
+  </data>
+  <data name="Category" xml:space="preserve">
+    <value>Catégorie</value>
+  </data>
+  <data name="Channel" xml:space="preserve">
+    <value>Canal</value>
+  </data>
+  <data name="Channel Data Types List" xml:space="preserve">
+    <value>Liste des types de données de canal</value>
+  </data>
+  <data name="Child Elements" xml:space="preserve">
+    <value>Éléments enfants</value>
+  </data>
+  <data name="Choose Identification Technique" xml:space="preserve">
+    <value>Choisissez la technique d'identification</value>
+  </data>
+  <data name="Condition State" xml:space="preserve">
+    <value>Condition d'état</value>
+  </data>
+  <data name="Condition States Types" xml:space="preserve">
+    <value>Types d'états de condition</value>
+  </data>
+  <data name="Conditions States" xml:space="preserve">
+    <value>Conditions States</value>
+  </data>
+  <data name="Constant" xml:space="preserve">
+    <value>Constant</value>
+  </data>
+  <data name="Copy" xml:space="preserve">
+    <value>Copier</value>
+  </data>
+  <data name="Copy data files (with images)" xml:space="preserve">
+    <value>Copier les fichiers de données (avec images)</value>
+  </data>
+  <data name="Copy elements attributes when pasting elements in tree view" xml:space="preserve">
+    <value>Copier les attributs des éléments lors du collage d'éléments dans l'arborescence</value>
+  </data>
+  <data name="Cut" xml:space="preserve">
+    <value>Couper</value>
+  </data>
+  <data name="Data" xml:space="preserve">
+    <value>Data</value>
+  </data>
+  <data name="Data Channel Types" xml:space="preserve">
+    <value>Types de canaux de données</value>
+  </data>
+  <data name="Date" xml:space="preserve">
+    <value>Date</value>
+  </data>
+  <data name="Deep Learning" xml:space="preserve">
+    <value>Apprentissage profond</value>
+  </data>
+  <data name="Defect Deflection" xml:space="preserve">
+    <value>Déflexion de défaut</value>
+  </data>
+  <data name="Defect Type" xml:space="preserve">
+    <value>Type de défaut</value>
+  </data>
+  <data name="Defect Types" xml:space="preserve">
+    <value>Types de défauts</value>
+  </data>
+  <data name="Defect Types List" xml:space="preserve">
+    <value>Liste des types de défauts</value>
+  </data>
+  <data name="Defects" xml:space="preserve">
+    <value>Défauts</value>
+  </data>
+  <data name="Delete" xml:space="preserve">
+    <value>Supprimer</value>
+  </data>
+  <data name="Description" xml:space="preserve">
+    <value>Description</value>
+  </data>
+  <data name="Design Load" xml:space="preserve">
+    <value>Charge de conception</value>
+  </data>
+  <data name="Divider" xml:space="preserve">
+    <value>Diviseur</value>
+  </data>
+  <data name="Edit" xml:space="preserve">
+    <value>Edit</value>
+  </data>
+  <data name="Edit Element" xml:space="preserve">
+    <value>Modifier l'élément</value>
+  </data>
+  <data name="Edit Element On Select in the TreeView" xml:space="preserve">
+    <value>Modifier l'élément lors de la sélection dans l'arborescence</value>
+  </data>
+  <data name="Edit Structure" xml:space="preserve">
+    <value>Edit Structure</value>
+  </data>
+  <data name="Edit Structure Elements" xml:space="preserve">
+    <value>Modifier les éléments de structure</value>
+  </data>
+  <data name="Element Category" xml:space="preserve">
+    <value>Catégorie d'élément</value>
+  </data>
+  <data name="Element Name" xml:space="preserve">
+    <value>Nom de l'élément</value>
+  </data>
+  <data name="Element Type" xml:space="preserve">
+    <value>Type d'élément</value>
+  </data>
+  <data name="Element Types" xml:space="preserve">
+    <value>Types d'élément</value>
+  </data>
+  <data name="End Date" xml:space="preserve">
+    <value>Date de fin</value>
+  </data>
+  <data name="End Edit" xml:space="preserve">
+    <value>Fin de la modification</value>
+  </data>
+  <data name="Equipement" xml:space="preserve">
+    <value>Equipement</value>
+  </data>
+  <data name="File Batches" xml:space="preserve">
+    <value>Lots de fichiers</value>
+  </data>
+  <data name="Flag Types" xml:space="preserve">
+    <value>Types de marqueurs</value>
+  </data>
+  <data name="Functionality Class" xml:space="preserve">
+    <value>Classe de fonctionnalité</value>
+  </data>
+  <data name="Grid View" xml:space="preserve">
+    <value>Vue Grille</value>
+  </data>
+  <data name="H5 Data" xml:space="preserve">
+    <value>Données H5</value>
+  </data>
+  <data name="Home" xml:space="preserve">
+    <value>Accueil</value>
+  </data>
+  <data name="Import Structure" xml:space="preserve">
+    <value>Importer la structure</value>
+  </data>
+  <data name="In camera tool preview captured image before saving" xml:space="preserve">
+    <value>Dans l'outil de l'appareil photo, prévisualisez l'image capturée avant de l'enregistrer</value>
+  </data>
+  <data name="Include Descendants" xml:space="preserve">
+    <value>Inclure les descendants</value>
+  </data>
+  <data name="Inspection result Type" xml:space="preserve">
+    <value>Type du résultatd'inspection</value>
+  </data>
+  <data name="Inspection Result Types" xml:space="preserve">
+    <value>Types de résultats d'inspection</value>
+  </data>
+  <data name="Learning" xml:space="preserve">
+    <value>Apprentissage</value>
+  </data>
+  <data name="Learning Dataset" xml:space="preserve">
+    <value>Jeu de données d'apprentissage</value>
+  </data>
+  <data name="Length" xml:space="preserve">
+    <value>Longeur</value>
+  </data>
+  <data name="Loading" xml:space="preserve">
+    <value>Chargement</value>
+  </data>
+  <data name="Loads" xml:space="preserve">
+    <value>Chargements</value>
+  </data>
+  <data name="Log in" xml:space="preserve">
+    <value>Connectez-vous</value>
+  </data>
+  <data name="Log out" xml:space="preserve">
+    <value>Déconnectez-vous</value>
+  </data>
+  <data name="Model Identifier" xml:space="preserve">
+    <value>Identifiant du Modèle</value>
+  </data>
+  <data name="Multiplicity" xml:space="preserve">
+    <value>Multiplicité</value>
+  </data>
+  <data name="Name" xml:space="preserve">
+    <value>Nom</value>
+  </data>
+  <data name="Nb Analysis Steps" xml:space="preserve">
+    <value>Nombre d'étapes d'analyse</value>
+  </data>
+  <data name="Nb Series Averaging" xml:space="preserve">
+    <value>Nb de Moyennage des séries</value>
+  </data>
+  <data name="No Condition state types are defined for this type of element" xml:space="preserve">
+    <value>Aucun type de condition d'état n'est défini pour ce type d'élément</value>
+  </data>
+  <data name="No Condition state types are defined for this type of structure" xml:space="preserve">
+    <value>Aucun type de condition d'état n'est défini pour ce type de structure</value>
+  </data>
+  <data name="No defect types defined for this element type" xml:space="preserve">
+    <value>Aucun type de défaut n'est défini pour ce type d'élément</value>
+  </data>
+  <data name="No Elements in this structure" xml:space="preserve">
+    <value>Aucun élément dans cette structure</value>
+  </data>
+  <data name="No File Selected" xml:space="preserve">
+    <value>Aucun fichier sélectionné</value>
+  </data>
+  <data name="Non Structural" xml:space="preserve">
+    <value>Non Structural</value>
+  </data>
+  <data name="Number of modes" xml:space="preserve">
+    <value>Nombre de modes</value>
+  </data>
+  <data name="Number of simulations per batch" xml:space="preserve">
+    <value>Nombre de simulations par lot</value>
+  </data>
+  <data name="Number of time steps" xml:space="preserve">
+    <value>Nombre de pas de temps</value>
+  </data>
+  <data name="One Element At a Time" xml:space="preserve">
+    <value>Un élément à la fois</value>
+  </data>
+  <data name="Online Simulation" xml:space="preserve">
+    <value>Simulation en ligne</value>
+  </data>
+  <data name="Page Size" xml:space="preserve">
+    <value>Taille de la page</value>
+  </data>
+  <data name="Parent Element" xml:space="preserve">
+    <value>Élément parent</value>
+  </data>
+  <data name="Paste" xml:space="preserve">
+    <value>Coller</value>
+  </data>
+  <data name="Predict" xml:space="preserve">
+    <value>Prédire</value>
+  </data>
+  <data name="Prediction Component" xml:space="preserve">
+    <value>Module de la Prédiction</value>
+  </data>
+  <data name="Prediction Identifier" xml:space="preserve">
+    <value>Identifiant de la Prédiction</value>
+  </data>
+  <data name="Random Decrement" xml:space="preserve">
+    <value>Décrement aléatoire</value>
+  </data>
+  <data name="Register" xml:space="preserve">
+    <value>Inscrivez-vous</value>
+  </data>
+  <data name="Reporting" xml:space="preserve">
+    <value>Rapports</value>
+  </data>
+  <data name="Requires confirmation for saving when user navigate out of a given page" xml:space="preserve">
+    <value>Nécessite une confirmation pour l'enregistrement lorsque l'utilisateur quitte une page donnée</value>
+  </data>
+  <data name="Restore Database" xml:space="preserve">
+    <value>Restaurer la base de données</value>
+  </data>
+  <data name="Sampling Frequency" xml:space="preserve">
+    <value>Fréquence d'échantillonnage</value>
+  </data>
+  <data name="Select" xml:space="preserve">
+    <value>Choisir</value>
+  </data>
+  <data name="Sensing Device" xml:space="preserve">
+    <value>Capteur</value>
+  </data>
+  <data name="Settings" xml:space="preserve">
+    <value>Paramètres</value>
+  </data>
+  <data name="Shift Type" xml:space="preserve">
+    <value>Type de décalage</value>
+  </data>
+  <data name="SHM" xml:space="preserve">
+    <value>SHM</value>
+  </data>
+  <data name="Short Description" xml:space="preserve">
+    <value>Description courte</value>
+  </data>
+  <data name="Signal Length (seconds)" xml:space="preserve">
+    <value>Durée du signal (secondes)</value>
+  </data>
+  <data name="Simulate" xml:space="preserve">
+    <value>Simuler</value>
+  </data>
+  <data name="Simulation Identifier" xml:space="preserve">
+    <value>Identifiant de simulation</value>
+  </data>
+  <data name="Simulation Parameters" xml:space="preserve">
+    <value>Paramètres de simulation</value>
+  </data>
+  <data name="Simulation Seed" xml:space="preserve">
+    <value>Graine de la simulation</value>
+  </data>
+  <data name="Site" xml:space="preserve">
+    <value>Site</value>
+  </data>
+  <data name="Site Name" xml:space="preserve">
+    <value>Nom du site</value>
+  </data>
+  <data name="Sites" xml:space="preserve">
+    <value>Sites</value>
+  </data>
+  <data name="Start Date" xml:space="preserve">
+    <value>Date de début</value>
+  </data>
+  <data name="Statistics" xml:space="preserve">
+    <value>Statistiques</value>
+  </data>
+  <data name="Stress" xml:space="preserve">
+    <value>Solicitations</value>
+  </data>
+  <data name="String" xml:space="preserve">
+    <value>website Home</value>
+  </data>
+  <data name="Structural" xml:space="preserve">
+    <value>Structural</value>
+  </data>
+  <data name="Structural Response" xml:space="preserve">
+    <value>Réponse Structurale</value>
+  </data>
+  <data name="Structure Info" xml:space="preserve">
+    <value>Structure Info</value>
+  </data>
+  <data name="Structure Length" xml:space="preserve">
+    <value>Longeur de la structure</value>
+  </data>
+  <data name="Structure Name" xml:space="preserve">
+    <value>Nom de la structure</value>
+  </data>
+  <data name="Structure Size" xml:space="preserve">
+    <value>Taille de la structure</value>
+  </data>
+  <data name="Structure Type" xml:space="preserve">
+    <value>Type de la structure</value>
+  </data>
+  <data name="Structure Types" xml:space="preserve">
+    <value>Types de structures</value>
+  </data>
+  <data name="Structures" xml:space="preserve">
+    <value>Structures</value>
+  </data>
+  <data name="Structures Types" xml:space="preserve">
+    <value>Types de structures</value>
+  </data>
+  <data name="Test" xml:space="preserve">
+    <value>Test</value>
+  </data>
+  <data name="Time step" xml:space="preserve">
+    <value>Pas de temps</value>
+  </data>
+  <data name="Train Component" xml:space="preserve">
+    <value>Module d'apprentissage</value>
+  </data>
+  <data name="Training Identifier" xml:space="preserve">
+    <value>Identifiant d'apprentissage</value>
+  </data>
+  <data name="Tree View" xml:space="preserve">
+    <value>Vue Arborescente</value>
+  </data>
+  <data name="Types" xml:space="preserve">
+    <value>Types</value>
+  </data>
+  <data name="Units" xml:space="preserve">
+    <value>Unités</value>
+  </data>
+  <data name="Value" xml:space="preserve">
+    <value>Valeur</value>
+  </data>
+  <data name="Year Built" xml:space="preserve">
+    <value>Année de construction</value>
+  </data>
+</root>

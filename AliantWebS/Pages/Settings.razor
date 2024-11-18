@@ -1,0 +1,257 @@
+﻿@page "/settings"
+@using Microsoft.AspNetCore.Hosting
+@using AliantWebS.Models
+@using AliantWebS.Data
+@using Microsoft.Extensions.Configuration
+@inject AppData appData
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject IConfiguration configuration
+@inject IJSRuntime js
+@inject IWebHostEnvironment Environment
+@inject IStringLocalizer<Languages> L
+@inject NavigationManager navigationManager
+
+<EditForm Model="ec">
+    <div class="form-group " style="display: flex">
+
+        <label>@L["Edit Element On Select in the TreeView"] :   </label>
+        <div>
+            <InputCheckbox @bind-Value="SettingEditElementOnSelect"></InputCheckbox>
+        </div>
+    </div>
+    <div class="form-group " style="display: flex">
+
+        <label>@L["In camera tool preview captured image before saving"] :   </label>
+        <div>
+            <InputCheckbox @bind-Value="CapturePreview"></InputCheckbox>
+        </div>
+    </div>
+    <div class="form-group " style="display: flex">
+
+        <label>@L["Requires confirmation for saving when user navigate out of a given page"]:   </label>
+        <div>
+            <InputCheckbox @bind-Value="SaveConfirmation"></InputCheckbox>
+        </div>
+    </div>
+
+    <div class="form-group " style="display: flex">
+
+        <label>@L["Copy elements attributes when pasting elements in tree view"]:   </label>
+        <div>
+            <InputCheckbox @bind-Value="CopyAttributes"></InputCheckbox>
+        </div>
+    </div>
+
+    <div class="form-group " style="display: flex">
+
+        <label>@L["Role Manager"]:   </label>
+        <div>
+            <button @onclick="RoleManager">@L["Role Manager"]</button>
+        </div>
+    </div>
+
+    <div class="form-group " style="display: flex">
+
+        <label>@L["Role Manager"]:   </label>
+        <div>
+            <button @onclick="UserManager">@L["User Manager"]</button>
+        </div>
+    </div>
+
+    <div class="form-group " style="display: flex">
+
+        <label>@L["Backup Database to Desktop"]:   </label>
+        <div>
+            <button @onclick="BackupDatabase">@L["Backup Database"]</button>
+        </div>
+    </div>
+    <div class="form-group " style="display: flex">
+
+        <label>@L["Restore Database"]:   </label>
+        <div>
+            <button @onclick=@Restore>@L["Restore"]</button>
+        </div>
+    </div>
+    <div class="form-group " style="display: flex">
+
+        <label>@L["Copy data files (with images)"]:   </label>
+        <div>
+            <button @onclick=@CopyData> @L["Copy"]</button>
+        </div>
+    </div>
+
+
+
+</EditForm>
+
+
+@code {
+    Structure ec = new Structure();
+
+    bool settingEditElementOnSelect;
+
+    public bool SettingEditElementOnSelect
+    {
+        get { return settingEditElementOnSelect; }   // get method
+        set
+        {
+            if (settingEditElementOnSelect == value) return;
+            settingEditElementOnSelect = value;
+            localStorage.SetItemAsync("settingEditElementOnSelect", SettingEditElementOnSelect);
+        }
+    }
+
+    bool capturePreview;
+
+    public bool CapturePreview
+    {
+        get { return capturePreview; }   // get method
+        set
+        {
+            if (capturePreview == value) return;
+            capturePreview = value;
+            localStorage.SetItemAsync("capturePreview", CapturePreview);
+        }
+    }
+
+    bool saveConfirmation;
+
+    public bool SaveConfirmation
+    {
+        get { return saveConfirmation; }   // get method
+        set
+        {
+
+            if (saveConfirmation == value) return;
+            saveConfirmation = value;
+            localStorage.SetItemAsync("saveConfirmation", SaveConfirmation);
+            appData.SaveConfirmation = saveConfirmation;
+        }
+    }
+
+
+
+    bool copyAttributes;
+
+    public bool CopyAttributes
+    {
+        get { return copyAttributes; }   // get method
+        set
+        {
+            if (copyAttributes == value) return;
+            copyAttributes = value;
+            localStorage.SetItemAsync("copyAttributes", CopyAttributes);
+        }
+    }
+
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+
+        }
+
+        var cac = await localStorage.GetItemAsync<bool?>("capturePreview");
+        CapturePreview = (cac ?? false);
+
+
+        cac = await localStorage.GetItemAsync<bool?>("settingEditElementOnSelect");
+        SettingEditElementOnSelect = (cac ?? true);
+
+        cac = await localStorage.GetItemAsync<bool?>("saveConfirmation");
+        SaveConfirmation = (cac ?? true);
+
+        cac = await localStorage.GetItemAsync<bool?>("copyAttributes");
+        CopyAttributes = (cac ?? true);
+
+
+        StateHasChanged();
+
+    }
+
+    void RoleManager()
+    {
+        navigationManager.NavigateTo(@"/Account/Manage/TokenManager");
+    }
+
+    void UserManager()
+    {
+        navigationManager.NavigateTo(@"/Account/UserManager");
+    }
+
+    void BackupDatabase()
+    {
+        string sourcePath = string.Empty;
+        try
+        {
+            string connectString = configuration.GetConnectionString("DefaultConnection");
+            //DatabaseManagement.Detach(connectString);
+            string path = System.Environment.GetFolderPath(System.Environment.SpecialFolder.Desktop);
+
+            sourcePath = DatabaseManagement.BackupDatabase(connectString,path);
+            js.InvokeVoidAsync("alert", "Backup completed...");
+        }
+        catch (Exception ex)
+        {
+            js.InvokeVoidAsync("alert", "Error: " + ex.Message);
+        }
+
+
+    }
+
+    private void Restore()
+    {
+        try
+        {
+            string connectString = configuration.GetConnectionString("DefaultConnection");
+            string path = System.Environment.GetFolderPath(System.Environment.SpecialFolder.Desktop);
+           
+            DatabaseManagement.Restore(connectString, Path.Combine(path,"AliantWeb.bak"));
+
+            js.InvokeVoidAsync("alert", "Restore completed...");
+
+        }
+        catch (Exception ex)
+        {
+            js.InvokeVoidAsync("alert", "Error: " + ex.Message);
+        }
+    }
+
+
+    private void CopyData()
+    {
+        try
+        {
+            string sourceDir = Path.Combine(Environment.ContentRootPath, "Images");
+
+            string destinationDir = Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Desktop),"AliantWebData");
+
+            var allDirectories = Directory.GetDirectories(sourceDir, "*", SearchOption.AllDirectories);
+
+            foreach (string dir in allDirectories)
+            {
+                string dirToCreate = dir.Replace(sourceDir, destinationDir);
+                Directory.CreateDirectory(dirToCreate);
+            }
+
+            var allFiles = Directory.GetFiles(sourceDir, "*.*", SearchOption.AllDirectories);
+
+            foreach (string newPath in allFiles)
+            {
+                File.Copy(newPath, newPath.Replace(sourceDir, destinationDir), true);
+            }
+
+          
+
+            js.InvokeVoidAsync("alert", "Successfull copied data.");
+
+        }
+        catch (Exception ex)
+        {
+            js.InvokeVoidAsync("alert", "Error: " + ex.Message);
+        }
+    }
+
+}

@@ -1,0 +1,234 @@
+﻿@using AliantWebS.Data
+@using Models
+@inject AppData appData;
+@inject EntitiesService entitiesService
+@inject NavigationManager navigationManager
+@inject IStringLocalizer<Languages> L
+@inject IJSRuntime js
+
+<style>
+    .correlation-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+        .correlation-table th, .correlation-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+
+        .correlation-table th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+            font-size: 0.8em; /* Adjust the font size here */
+        }
+
+        .correlation-table td {
+            color: white;
+        }
+</style>
+
+@* @if (sensors is null)
+{
+    <p><em>@L["Loading"]... !</em></p>
+}
+else
+{ *@
+<RadzenSplitter Orientation="Radzen.Orientation.Horizontal">
+    <RadzenSplitterPane>
+
+        <SelecteurDeCapteurComponent Structure=@Structure OnPlotRaised="@(p =>plot(p.Item1,p.Item2,p.Item3,p.Item4,p.Item5))"></SelecteurDeCapteurComponent>
+
+    </RadzenSplitterPane>
+    <RadzenSplitterPane>
+        @if (correlationMatrix != null)
+        {
+            <table class="correlation-table">
+                <thead>
+                    <tr>
+                        <th></th>
+                        @for (int i = 0; i < correlationMatrix.Count; i++)
+                        {
+                            <th>@headers[i]</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (int i = 0; i < correlationMatrix.Count; i++)
+                    {
+                        <tr>
+                            <th>@headers[i]</th>
+                            @for (int j = 0; j < correlationMatrix[i].Count; j++)
+                            {
+                                <td style="background-color: @GetColor(correlationMatrix[i][j]);">
+                                    @correlationMatrix[i][j].ToString("0.00")
+                                </td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+        else
+        {
+            <p>Loading...</p>
+        }
+    </RadzenSplitterPane>
+</RadzenSplitter>
+@* } *@
+
+@code {
+
+
+    List<Element> sensors;
+
+    [Parameter]
+    public Structure Structure { get; set; }
+
+    private IList<Element> selectedSensors { get; set; }
+
+
+    List<string> headers = new List<string>();
+
+
+
+    public List<(string, Dictionary<DateTime, double>)> indices = new List<(string, Dictionary<DateTime, double>)>();
+
+    private List<List<double>> correlationMatrix;
+
+    protected override async Task OnInitializedAsync()
+    {
+      //  var correlationCalculator = new AI.CorrelationCalculator();
+          // Assume you have a method to get the indices
+       // var indices = GetIndicesAsync();
+       // correlationMatrix = correlationCalculator.CalculateCorrelationMatrix(indices);
+    
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+     
+
+    }
+
+    private List<(string, Dictionary<DateTime, double>)> GetIndicesAsync()
+    {
+        var indices = new List<(string, Dictionary<DateTime, double>)>
+{
+    (
+        "Series1",
+        new Dictionary<DateTime, double>
+        {
+            { new DateTime(2024, 1, 1), 1.0 },
+            { new DateTime(2024, 1, 2), 2.0 },
+            { new DateTime(2024, 1, 3), 3.0 },
+            { new DateTime(2024, 1, 4), 4.0 },
+            { new DateTime(2024, 1, 5), 5.0 }
+        }
+    ),
+    (
+        "Series2",
+        new Dictionary<DateTime, double>
+        {
+            { new DateTime(2024, 1, 1), 2.0 },
+            { new DateTime(2024, 1, 2), 4.0 },
+            { new DateTime(2024, 1, 3), 6.0 },
+            { new DateTime(2024, 1, 4), 8.0 },
+            { new DateTime(2024, 1, 5), 10.0 }
+        }
+    ),
+    (
+        "Series3",
+        new Dictionary<DateTime, double>
+        {
+            { new DateTime(2024, 1, 1), 5.0 },
+            { new DateTime(2024, 1, 2), 4.0 },
+            { new DateTime(2024, 1, 3), 3.0 },
+            { new DateTime(2024, 1, 4), 2.0 },
+            { new DateTime(2024, 1, 5), 1.0 }
+        }
+    ),
+    (
+        "Series4",
+        new Dictionary<DateTime, double>
+        {
+            { new DateTime(2024, 1, 1), 1.1 },
+            { new DateTime(2024, 1, 2), 2.1 },
+            { new DateTime(2024, 1, 3), 1.9 },
+            { new DateTime(2024, 1, 4), 2.2 },
+            { new DateTime(2024, 1, 5), 2.0 }
+        }
+    ),
+    (
+        "Series5",
+        new Dictionary<DateTime, double>
+        {
+            { new DateTime(2024, 1, 1), 10.0 },
+            { new DateTime(2024, 1, 2), 9.0 },
+            { new DateTime(2024, 1, 3), 8.0 },
+            { new DateTime(2024, 1, 4), 7.0 },
+            { new DateTime(2024, 1, 5), 6.0 }
+        }
+    )
+};
+
+        return indices;
+    }
+
+    private async Task plot(bool args, Element sensor, ChannelDataType channelDataType, DateTime startDate, DateTime endDate)
+    {
+        if (args)
+        {
+            Dictionary<DateTime, double> dic = new Dictionary<DateTime, double>();
+
+            List<object[]> la = await GetLa(sensor, channelDataType, startDate, endDate);
+
+            IList<object> X = la.Select(x => x[0]).ToList();
+            IList<object> Y = la.Select(x => x[2]).ToList();
+
+            foreach (var l in la)
+            {
+                dic.Add((DateTime)l[0], (double)l[2]);
+            }
+
+            headers.Add(sensor.Name + "|" + channelDataType.Name);
+            indices.Add((sensor.ElementId.ToString() + "|" + channelDataType.ChannelDataTypeId.ToString(), dic));
+
+
+
+            var correlationCalculator = new AI.CorrelationCalculator();
+            correlationMatrix = correlationCalculator.CalculateCorrelationMatrix(indices);
+
+            StateHasChanged();
+
+
+        }
+        else
+        {
+            headers.Remove(sensor.Name + "|" + channelDataType.Name);
+            var d = indices.Find(x => x.Item1 == sensor.ElementId.ToString() + "|" + channelDataType.ChannelDataTypeId.ToString());
+            indices.Remove(d);
+            var correlationCalculator = new AI.CorrelationCalculator();
+            correlationMatrix = correlationCalculator.CalculateCorrelationMatrix(indices);
+
+            StateHasChanged();
+        }
+
+    }
+
+    private async Task<List<object[]>> GetLa(Element element, ChannelDataType channelDataType, DateTime startDate, DateTime endDate)
+    {
+        return await InfluxService.GetData(new List<string>() { element.ElementId.ToString() }, new List<string>() { channelDataType.ChannelDataTypeId.ToString() }, startDate, endDate);
+    }
+    private string GetColor(double value)
+    {
+        // Convert the correlation value to a color
+        int red = (int)((1 - value) * 255);
+        int green = (int)(value * 255);
+        return $"rgb({red}, {green}, 0)";
+    }
+
+
+
+}

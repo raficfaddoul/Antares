@@ -1,0 +1,181 @@
+﻿@page "/SSI/{ListJson}"
+@using AliantWebS.Data
+@using AliantWebS.Models
+@using System.Text.Json;
+@inject IStringLocalizer<Languages> L
+
+@inject EntitiesService entitiesService
+
+@inject AliantWebS.Data.AppData appData
+
+<RadzenSplitter Orientation="Radzen.Orientation.Vertical" style="height: 100%; border: 1px solid rgba(0,0,0,.08);">
+    <RadzenSplitterPane Size="auto">
+        <EditForm Model="appData.Structure" id="StructureFormId" OnValidSubmit="@OnValidSubmit">
+            <DataAnnotationsValidator />
+            <Blazorise.Row>
+                <Column ColumnSize="ColumnSize.Is6">
+                    <div class="form-group ">
+                        <div>
+                            <label>@L["Number of times steps"] :</label>
+                            <div>
+                                <InputNumber @bind-Value="@nbTimeSteps" />
+                                <ValidationMessage For="@(() => nbTimeSteps)" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group ">
+                        <div>
+                            <label>@L["Time step"] :</label>
+                            <div>
+                                <InputNumber @bind-Value="@timeStep" />
+                                <ValidationMessage For="@(() => timeStep)" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group ">
+                        <div>
+                            <label>@L["Number of modes"] :</label>
+                            <div>
+                                <InputNumber @bind-Value="@nbModes" />
+                                <ValidationMessage For="@(() => nbModes)" />
+                            </div>
+                        </div>
+                    </div>
+                </Column>
+
+
+
+                <Column ColumnSize="ColumnSize.Is6">
+                    <div class="form-group ">
+                        <div>
+                            <label>@L["Time step"] :</label>
+                            <div>
+                                <InputNumber @bind-Value="@timeStep" />
+                                <ValidationMessage For="@(() => timeStep)" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group ">
+                        <div>
+                            <label>@L["Nb Analysis Steps"] :</label>
+                            <div>
+                                <InputNumber @bind-Value="@nbAnalysisSteps" />
+                                <ValidationMessage For="@(() => nbAnalysisSteps)" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group ">
+                        <div>
+                            <label>@L["Nb Series Averaging"] :</label>
+                            <div>
+                                <InputNumber @bind-Value="@nbSeriesAveraging" />
+                                <ValidationMessage For="@(() => nbSeriesAveraging)" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="Category" class="control-label">@L["Shift Type"]</label>
+                        <InputSelect TValue="string" class="form-control" @bind-Value="@shiftType">
+                            <option value="Automatic">@L["Automatic"]...</option>
+                            <option value="Constant">@L["Constant"]...</option>
+                            <option value="Adaptif">@L["Adaptif"]...</option>
+                        </InputSelect>
+                    </div>
+
+
+                </Column>
+            </Blazorise.Row>
+        </EditForm>
+    </RadzenSplitterPane>
+    <RadzenSplitterPane>
+
+
+
+    </RadzenSplitterPane>
+</RadzenSplitter>
+<br />
+<div class="row">
+
+    <div class="form-group">
+        @*                    <button type="submit" class="btn btn-success">
+        @ButtonText
+        </button>*@
+
+        @*        <button type="button" class="btn btn-success" @onclick="@Cancel">
+        @L["Cancel"]
+        </button>
+        <button type="button" class="btn btn-success" @onclick="@DeepLearning">
+        @L["Deep Learning"]
+        </button>*@
+    </div>
+
+</div>
+
+@code {
+
+
+
+    [Parameter] public EventCallback OnValidSubmit { get; set; }
+
+    [Parameter]
+    public string ListJson { get; set; }
+
+    [Parameter] public int nbDDL { get; set; }
+
+    int nbTimeSteps { get; set; }
+    double timeStep { get; set; }
+    string shiftType { get; set; }
+    int nbModes { get; set; }
+    int nbAnalysisSteps { get; set; }
+    int nbSeriesAveraging { get; set; }
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        List<Guid?> elementsIDs = JsonSerializer.Deserialize<List<Guid?>>(ListJson);
+
+        List<Element> sensors = await entitiesService.GetFilteredEntitiesAsync<Element>(a => (elementsIDs.Contains(a.ElementId) && (a.ElementType.ChannelDataTypeElementTypes.Count > 0)), "ElementType.ChannelDataTypeElementTypes");
+
+        // var v = Structural.Simulation.GetSensedNodes(appData.Structure, entitiesService, sensors);
+        var v = await Task.Run(() => Structural.Simulation.GetSensedNodes(appData.Structure, entitiesService._appDBContext, sensors));
+        int nbDDL = v.nodes.Count;
+        int[] ddlSensors = v.sensedNodesIndex.Values.ToArray();
+       
+
+
+    }
+
+    /// <summary>
+    ///
+    /// </summary>
+    /// <param name="nbDDL"></param>
+    /// <param name="ddlSensors"></param>
+    /// <param name="nbTimeSteps"></param>
+    /// <param name="timeStep"></param>
+    /// <param name="startingTimes"></param>
+    /// <param name="Xaccelerations"></param>
+    /// <param name="nbPseudoSeries"></param>
+    /// <param name="shiftType"></param>
+    /// <param name="initialShift"></param>
+    /// <param name="nbAnalysisSteps"></param>
+    /// <param name="nbModes"></param>
+    /// <param name="nbSeriesAveraging"></param>
+    /// <param name="frequency"></param>
+    /// <param name="modeShape"></param>
+
+    public void IdentifierIbrahim(int nbDDL, int[] ddlSensors,
+    int nbTimeSteps, double timeStep, double[] startingTimes, double[,,] Xaccelerations,
+    int nbPseudoSeries, string shiftType, int initialShift, int nbAnalysisSteps, int nbModes,
+    int nbSeriesAveraging,
+    out double[] frequency, out double[,] modeShape)
+    {
+
+        frequency = null;
+
+        modeShape = null;
+
+    }
+
+}

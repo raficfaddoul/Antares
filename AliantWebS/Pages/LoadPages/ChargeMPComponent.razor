@@ -1,0 +1,293 @@
+﻿@page "/ChargeMPComponent/{MotherGridPalonnierID:guid}"
+
+@using AliantWebS.Data
+@inject EntitiesService entitiesService
+@inject NavigationManager navigationManager
+@inject IJSRuntime js
+@inject AliantWebS.Data.AppData AppData
+@using Models
+@inject IStringLocalizer<Languages> L
+
+@layout AntaresConceptionLayout
+
+@if (chargeList is null)
+{
+    <p><em>@L["Loading"]... !</em></p>
+}
+else
+{
+<Div Style="display: flex; align-items: center;">
+
+@*     <h3>@L["Charge"]</h3> *@
+        <a class="nav-link" @onclick="@(args => Insertmp())" @onclick:preventDefault="true" href="">
+            <span class="oi oi-plus" aria-hidden="true">@L["Add New"]</span>
+        </a>
+    <div class="form-group " style="margin-right: 50px;">
+        <div>
+            <label>@L["Charge Totale"] :</label>
+            <div>
+                <InputNumber disabled="true" @bind-Value="@ChargeTotale" />
+                @*   <ValidationMessage For="@(() => Structure.DesignLoad)" /> *@
+            </div>
+        </div>
+    </div>
+    <div style="display: flex; align-items: center;">
+        <Blazorise.Button Color="Blazorise.Color.Primary" Clicked="Calcul">@L["Calcul Charpente"]</Blazorise.Button>
+    </div>
+    <div style="margin-left: auto; ">
+        <Label> @L["Page Size"]: &nbsp;&nbsp;</Label>
+        <RadzenNumeric @bind-Value="PageSize" Style="width:60px"></RadzenNumeric>
+    </div>
+
+</Div>
+
+
+
+
+    <EditForm Model="@chargeList">
+        <RadzenDataGrid @ref="chargeGrid" AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="PageSize"
+                        Data="@chargeList" TItem="ChargeMp" ColumnWidth="150px" SelectionMode="DataGridSelectionMode.Single" @bind-Value="@SelectedMPList">
+            <Columns>
+
+                <RadzenDataGridColumn Width="50" TItem="ChargeMp" Property="Name">
+                    <HeaderTemplate>
+                        <span class="gridColumndStyle">@L["Nom"]</span>                    <br />
+                    </HeaderTemplate>
+                    <EditTemplate Context="mp">
+                        <InputTextArea @bind-Value="mp.Name" Style="width:100%" />
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+@*                 <RadzenDataGridColumn Width="50" TItem="ChargeMp" Property="Numero" TextAlign="TextAlign.Center">
+                    <HeaderTemplate>
+                        <span class="gridColumndStyle">@L["Numéro"]</span>                    <br />
+                    </HeaderTemplate>
+                    <EditTemplate Context="mp">
+                        <InputNumber @bind-Value="mp.Numero" TValue="int?" Style="width:100%" />
+                    </EditTemplate>
+                </RadzenDataGridColumn> *@
+
+                <RadzenDataGridColumn Width="50" TItem="ChargeMp" Property="MotherGridPalonnierID" TextAlign="TextAlign.Center">
+                    <HeaderTemplate>
+                        <span class="gridColumndStyle">@L["MotherGrid/Palonnier"]</span>                    <br />
+                    </HeaderTemplate>
+                    <EditTemplate Context="mp">
+                        @mp.MotherGridPalonnier.Name
+                    </EditTemplate>
+                    <Template Context="mpp">
+                        @mpp.MotherGridPalonnier.Name
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn Width="50" TItem="ChargeMp" Property="X" TextAlign="TextAlign.Center">
+                    <HeaderTemplate>
+                        <span class="gridColumndStyle">@L["X"]</span>   <br />
+                    </HeaderTemplate>
+                    <EditTemplate Context="mp">
+                        <InputNumber @bind-Value="mp.X" Style="width:100%" />
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn Width="50" TItem="ChargeMp" Property="Charge" TextAlign="TextAlign.Center">
+                    <HeaderTemplate>
+                        <span class="gridColumndStyle">@L["Charge"]</span>   <br />
+                    </HeaderTemplate>
+                    <EditTemplate Context="mp">
+                        <InputNumber @bind-Value="mp.Charge" Style="width:100%" />
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+
+
+                <RadzenDataGridColumn Width="15em" TItem="ChargeMp" Property="PULMONARY_TOXICITY" Title="@L["Action"]" Filterable="false" Sortable="false">
+                    <Template Context="data">
+                        <Div Style="display: flex">
+                            <a title="@L["Edit"]" class="nav-link" @onclick="@(args => EditRow(data))" @onclick:preventDefault="true" href="">
+                                <span class="oi oi-pencil" aria-hidden="true"></span>
+                            </a>
+                            <a title="@L["End Edit"]" class="nav-link" @onclick="@(args => UpdateRow(data))" @onclick:preventDefault="true" href="">
+                                <span class="oi oi-check" aria-hidden="true"></span>
+                            </a>
+                            <a title="@L["Delete"]" class="nav-link" @onclick="@(() => DeleteMP(data))" @onclick:preventDefault="true" href="">
+                                <span class="oi oi-trash" aria-hidden="true"></span>
+                            </a>
+                        </Div>
+
+                    </Template>
+
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+
+
+
+
+    </EditForm>
+
+
+}
+
+
+@code {
+    int PageSize { get; set; } = 10;
+
+
+    private IList<ChargeMp> _selectedChargeList = new List<ChargeMp>();
+
+
+    public IList<ChargeMp> SelectedMPList
+    {
+        get
+        {
+            // You can add logic here to filter or sort items when accessed.
+            return _selectedChargeList;
+        }
+        set
+        {
+            // Validate input before setting.
+            if (value == null) throw new ArgumentNullException(nameof(value));
+            _selectedChargeList = value;
+            selectedChargeMP = _selectedChargeList.FirstOrDefault();
+        }
+    }
+
+    [Parameter]
+    public ChargeMp selectedChargeMP { get; set; }
+
+
+    RadzenDataGrid<ChargeMp> chargeGrid;
+
+
+    List<ChargeMp> chargeList;
+
+    [Parameter]
+    public Guid? MotherGridPalonnierID { get; set; }
+
+    [Parameter]
+    public Guid EventMpscenarioId { get; set; }
+
+    double ChargeTotale { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+
+
+    }
+    protected override async Task OnParametersSetAsync()
+    {
+        chargeList = await entitiesService.GetFilteredEntitiesAsync<ChargeMp>(x => ((x.MotherGridPalonnier.EventMpscenarioId == EventMpscenarioId)), "MotherGridPalonnier");
+        CalculateChargeTotale();
+    }
+
+
+    async Task DeleteMP(ChargeMp mp)
+    {
+        if (await entitiesService.DeleteEntityAsync(mp))
+        {
+            if (chargeList.Remove(mp))
+            {
+                await chargeGrid.Reload();
+
+            }
+        }
+        CalculateChargeTotale();
+    }
+
+    void EditRow(ChargeMp mp)
+    {
+
+        chargeGrid.EditRow(mp);
+        CalculateChargeTotale();
+    }
+
+    async Task Insertmp()
+    {
+        if (MotherGridPalonnierID == null) return;
+        ChargeMp mp = new ChargeMp();
+        mp.MotherGridPalonnierId = (Guid)MotherGridPalonnierID;
+
+        if ((await entitiesService.InsertEntityAsync(mp)) != null)
+        {
+            chargeList.Add(mp);
+
+            await chargeGrid.InsertRow(mp);
+
+        }
+        else
+        {
+            await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
+        }
+        CalculateChargeTotale();
+    }
+
+
+
+    async Task UpdateRow(ChargeMp mp)
+    {
+        if (await entitiesService.UpdateEntityAsync(mp))
+        {
+            await chargeGrid.UpdateRow(mp);
+        }
+        CalculateChargeTotale();
+    }
+
+    private void CalculateChargeTotale()
+    {
+        ChargeTotale = 0;
+        foreach (var v in chargeList)
+        {
+
+            ChargeTotale += v.Charge ?? 0;
+        }
+    }
+
+    private async void Calcul()
+    {
+        foreach(var charge in chargeList)
+        {
+            double x = charge.X ?? 0;
+            MotherGridPalonnier MP = charge.MotherGridPalonnier;
+            bool isMotherGrid = charge.MotherGridPalonnier.Famille;
+
+            double x1MP = charge.MotherGridPalonnier.X1 ?? 0;
+            double y1MP = charge.MotherGridPalonnier.Y1 ?? 0;
+            double x2MP = charge.MotherGridPalonnier.X2 ?? 0;
+            double y2MP = charge.MotherGridPalonnier.Y2 ?? 0;
+        }
+
+
+
+
+        // sortie des resultats
+        var scenario = (await entitiesService.GetFilteredEntitiesAsync<EventMpscenario>(x => (x.EventMpscenarioId == EventMpscenarioId))).FirstOrDefault();
+
+
+        //Example applle aux valeurs calcules pour la charpenmte
+        Models.Charpente charpente = await entitiesService.GetFilteredFirstEntityAsync<Models.Charpente>(x => (x.EventId == scenario.EventId));
+        if (charpente == null)
+        {
+            charpente = new Models.Charpente();
+            charpente.EventId = (Guid)scenario.EventId;
+            charpente = await entitiesService.InsertEntityAsync(charpente);
+            if (charpente != null)
+            {
+            }
+            else
+            {
+                await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
+            }
+        }
+
+
+
+        charpente.A4 = 43;
+        charpente.B7 = 50;
+        //etc/
+
+
+        await entitiesService.UpdateEntityAsync(charpente);
+
+    }
+
+
+
+}
+

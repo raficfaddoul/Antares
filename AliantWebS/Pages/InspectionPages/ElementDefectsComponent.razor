@@ -1,0 +1,279 @@
+﻿@implements IDisposable
+@page "/ElementDefects/{ElementID:guid}"
+@using AliantWebS.Data
+@inject EntitiesService entitiesService
+@inject NavigationManager navigationManager
+@using Models
+@inject AliantWebS.Data.AppData appData
+@inject IStringLocalizer<Languages> L
+
+
+<Div Style="display: flex">
+    <h3>@title</h3>
+    <div style="margin-left: auto; ">
+        <Label> Page Size: &nbsp;&nbsp;</Label>
+        <RadzenNumeric @bind-Value="PageSize" Style="width:60px"></RadzenNumeric>
+    </div>
+</Div>
+@if (element.Defects is null)
+{
+    <p><em>@L["Loading"]... !</em></p>
+}
+else if (DefectTypesList.Count() ==0)
+{
+    <h1><em>@L["No defect types defined for this element type"]... !</em></h1>
+}
+else
+{
+    <a class="nav-link" @onclick="@(args => InsertDefect())" @onclick:preventDefault="true" href="">
+        <span class="oi oi-plus" aria-hidden="true">@L["Add New"]</span>
+    </a>
+        <EditForm EditContext="@EditContext" id="DefectFormId" OnValidSubmit="@OnValidSubmit">
+<Blazorise.Row>
+            <RadzenDataGrid EditMode="DataGridEditMode.Multiple" @ref="defectsGrid" AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="PageSize" RowDeselect=@RowDeselect RowSelect=@RowSelect
+                    Data="@element.Defects" TItem="Defect" ColumnWidth="150px">
+        <Columns>
+@*            <RadzenDataGridColumn TItem="Defect" Property="DefectId" Title="Id"></RadzenDataGridColumn>*@
+            <RadzenDataGridColumn TItem="Defect" Title="@L["Defect Type"]">
+                <Template Context="defect">
+                    @defect?.DefectType?.Name
+                </Template>
+                <EditTemplate Context="defect">
+                    <InputSelect class="form-control" @bind-Value=defect.DefectTypeId>
+                        @foreach (var defectType in DefectTypesList)
+                            {
+                            <option value="@defectType.DefectTypeId">@defectType.Name</option>
+                            }
+                    </InputSelect>
+
+                </EditTemplate>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="Defect" Title="@L["Date"]">
+                <Template Context="defect">
+                    @defect?.Date
+                </Template>
+                <EditTemplate Context="defect">
+                    <InputDate @bind-Value="defect.Date"></InputDate>
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+
+            <RadzenDataGridColumn TItem="Defect" Property="Length" Title="@L["Action"]">
+                <Template Context="data">
+                    <Div Style="display: flex">
+                        <a title="@L["Edit"]" class="nav-link" @onclick="@(args => EditRow(data))" @onclick:preventDefault="true" href="">
+                            <!--href="/patient/EditSideEffectComponent/@data.SideEffectID-->
+                            <span class="oi oi-pencil" aria-hidden="true"></span>
+                        </a>
+                        <a title="@L["End Edit"]" class="nav-link" @onclick="@(args => UpdateRow(data))" @onclick:preventDefault="true" href="">
+                            <span class="oi oi-check" aria-hidden="true"></span>
+                        </a>
+                        <a title="@L["Delete"]" class="nav-link" @onclick="@(() => DeleteRow(data))" @onclick:preventDefault="true" href="">
+                            <span class="oi oi-trash" aria-hidden="true"></span>
+                        </a>
+                    </Div>
+                </Template>
+
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+</Blazorise.Row>
+
+        <Blazorise.Row>
+            <Column ColumnSize="ColumnSize.Is6">
+
+                @if (!updating)
+                {
+                    <AttributesComponent Titem1="AttributeDefect" Titem2="Defect" Titem3="AttributeTypeDefectType" CallerIdName="DefectId"
+                                         CallerTypeIdName="DefectTypeId" CallerTypeName="Defect" JunctionPropName="AttributeDefects"
+                                         element="selectedDefect"></AttributesComponent>
+                }
+                </Column>
+            <Column ColumnSize="ColumnSize.Is6">
+            <MediaComponent selectedObject="selectedDefect" SelectedDefect="selectedDefect"></MediaComponent>
+            </Column>
+        </Blazorise.Row>
+        </EditForm>
+    }
+
+
+@code {
+
+    [Parameter] public string ButtonText { get; set; } = "Save";
+
+    [Parameter]
+    public EditContext EditContext { get; set; }
+
+    [Parameter] public EventCallback OnValidSubmit { get; set; }
+
+    bool updating = false;
+    int PageSize { get; set; } = 10;
+
+    [Parameter]
+    public Guid ElementID { get; set; }
+
+    string ScrollHeight { get; set; }
+
+    RadzenDataGrid<Defect> defectsGrid;
+
+    Element element;
+
+    string title;
+
+    Defect selectedDefect;
+
+    IEnumerable<DefectType> DefectTypesList;
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        ScrollHeight = "400px";
+        element = (Element)appData.obj;
+
+
+
+        try
+        {
+            entitiesService.LoadCollection(element, "Defects");
+
+
+            ///rafic te be reviewd for optimality
+            /*   foreach (var v in element.Defects)
+                   {
+
+                   entitiesService.LoadReference(v, "DefectType");
+               }*/
+
+            Guid? elementTypeID = element.ElementTypeId;
+
+            title = "Element " + element.Name + " Defects";
+
+            IEnumerable<ElementTypeDefectType> etdt = await entitiesService.GetFilteredEntitiesAsync<ElementTypeDefectType>(a => a.ElementTypeId == elementTypeID, "DefectType");
+
+            DefectTypesList = etdt.Select(x => x.DefectType);
+
+
+
+
+            //    DefectTypesList = await entitiesService.GetFilteredEntitiesAsync<DefectType>(a => defectTypeIDsList.Contains(a.DefectTypeId));
+            //   AppData.SaveChanges = true;
+
+            EditContext = new EditContext(element);
+            //MainLayout.ButtonText = ButtonText;
+
+            //MainLayout.FormId = "DefectFormId";
+            appData.DisplaySubmitButton = false;
+        }
+        catch(Exception ex)
+        {
+            navigationManager.NavigateTo("Structures");
+        }
+
+    }
+
+    private void FieldChanged(object sender, FieldChangedEventArgs arg)
+    {
+        appData.SaveChanges = true;
+    }
+
+
+    async Task DeleteRow(Defect defect)
+    {
+        updating = true;
+        if (await entitiesService.DeleteEntityAsync(defect))
+        {
+            {
+                await defectsGrid.Reload();
+
+            }
+        }
+        selectedDefect = null;
+        updating = false;
+    }
+
+    void EditRow(Defect defect)
+    {
+
+        defectsGrid.EditRow(defect);
+
+    }
+
+    async Task InsertDefect()
+    {
+        updating = true;
+        Defect defect = new Defect();
+        defect.ElementId = element.ElementId;
+
+        defect.DefectTypeId = element.ElementType.ElementTypeDefectTypes.FirstOrDefault().DefectTypeId;
+        defect.Date = DateTime.Now;
+        await AddAttributes(defect);
+        element.Defects.Add(defect);        
+        await entitiesService.UpdateEntityAsync(element);
+
+        await defectsGrid.Reload();
+        updating = false;
+    }
+
+    private async Task AddAttributes(Defect defect)
+    {
+        var defectTypeID = defect.DefectTypeId;
+   
+        List<AttributeTypeDefectType> atet = await entitiesService.GetFilteredEntitiesAsync<AttributeTypeDefectType>(a => a.DefectTypeId == defect.DefectTypeId, "AttributeType");
+
+        var attributeTypesList = atet.Select(x => x.AttributeType);
+
+        foreach (var v in attributeTypesList)
+        {
+            AttributeDefect ae = new AttributeDefect();
+            ae.DefectId = defect.DefectId;
+            ae.AttributeTypeId = v.AttributeTypeId;
+            defect.AttributeDefects.Add(ae);
+
+        }
+    }
+
+    async Task UpdateRow(Defect defect)
+    {
+        updating = true;
+        if (await entitiesService.UpdateEntityAsync(defect))
+        {
+            await defectsGrid.UpdateRow(defect);
+        }
+        updating = false;
+    }
+
+    void OnResize(RadzenSplitterResizeEventArgs args)
+    {
+        ScrollHeight = (400 * args.NewSize).ToString() + "px";
+        StateHasChanged();
+    }
+
+
+
+
+
+    void RowSelect(Defect defect)
+    {
+        selectedDefect = defect;
+
+        //EditContext = new EditContext(defect);
+        //EditContext.OnFieldChanged -= FieldChanged;
+        //EditContext.OnFieldChanged += FieldChanged;
+
+    }
+
+    void RowDeselect(Defect defect)
+    {
+        //EditContext.OnFieldChanged -= FieldChanged;
+    }
+
+
+    void IDisposable.Dispose()
+    {
+        // Unsubscribe from the event when our component is disposed
+   
+
+    }
+
+}

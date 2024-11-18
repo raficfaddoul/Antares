@@ -1,0 +1,303 @@
+﻿@page "/ChargesSceniques/{EventID:guid}"
+
+@using AliantWebS.Data
+@inject EntitiesService entitiesService
+@inject NavigationManager navigationManager
+@inject IJSRuntime js
+@inject AliantWebS.Data.AppData AppData
+@using Models
+@inject IStringLocalizer<Languages> L
+
+@layout AntaresConceptionLayout
+
+<EditForm Model="@chargeSceniqueList">
+    <RadzenSplitter Orientation="Radzen.Orientation.Horizontal" Style="height: 90vh; border: 1px solid rgba(0,0,0,.08);">
+        <RadzenSplitterPane Size="50%">
+
+
+            @if (chargeSceniqueList is null)
+            {
+                <p><em>@L["Loading"]... !</em></p>
+            }
+            else
+            {
+     
+                <Div Style="display: flex; align-items: center;">
+                    <h3 style="margin: 0; padding: 0; line-height: 1.5;">@L["Charges Scéniques"]</h3>
+                    <a class="nav-link" @onclick="@(args => InsertChargeScenique())" @onclick:preventDefault="true" href="">
+                        <span class="oi oi-plus" aria-hidden="true">@L["Add New"]</span>
+                    </a>
+                <div style="margin-left: auto; ">
+                    <Label> @L["Page Size"]: &nbsp;&nbsp;</Label>
+                    <RadzenNumeric @bind-Value="PageSize" Style="width:60px"></RadzenNumeric>
+                </div>
+            </Div>
+  
+     
+
+                <RadzenDataGrid @ref="chargeSceniqueGrid" AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="PageSize"
+                                Data="@chargeSceniqueList" TItem="ChargesScenique" ColumnWidth="150px" @bind-Value="@SelectedChargesSceniques">
+                    <Columns>
+
+                        <RadzenDataGridColumn Width="50" TItem="ChargesScenique" Property="Name">
+                            <HeaderTemplate>
+                                <span class="gridColumndStyle">@L["Nom"]</span>  
+                                </HeaderTemplate>
+                            <EditTemplate Context="chargesScenique">
+                                <InputTextArea @bind-Value="chargesScenique.Name" Style="width:100%" />
+                            </EditTemplate>
+                        </RadzenDataGridColumn>
+@*                         <RadzenDataGridColumn Width="50" TItem="ChargesScenique" Property="Numero" TextAlign="TextAlign.Center">
+                            <HeaderTemplate>
+                                <span class="gridColumndStyle">@L["Numéro"]</span>       
+                            </HeaderTemplate>
+                            <EditTemplate Context="chargesScenique">
+                                <InputNumber @bind-Value="chargesScenique.Numero" TValue="int?" Style="width:100%" />
+                            </EditTemplate>
+                        </RadzenDataGridColumn> *@
+
+                        <RadzenDataGridColumn Width="50" TItem="ChargesScenique" Property="X" TextAlign="TextAlign.Center">
+                            <HeaderTemplate>
+                                <span class="gridColumndStyle">@L["X"]</span>               
+                            </HeaderTemplate>
+                            <EditTemplate Context="chargesScenique">
+                                <InputNumber @bind-Value="chargesScenique.X" Style="width:100%" />
+                            </EditTemplate>
+                        </RadzenDataGridColumn>
+
+                        <RadzenDataGridColumn Width="50" TItem="ChargesScenique" Property="Y" TextAlign="TextAlign.Center">
+                            <HeaderTemplate>
+                                <span class="gridColumndStyle">@L["Y"]</span>                  
+                            </HeaderTemplate>
+                            <EditTemplate Context="chargesScenique">
+                                <InputNumber @bind-Value="chargesScenique.Y" Style="width:100%" />
+                            </EditTemplate>
+                        </RadzenDataGridColumn>
+
+
+                        <RadzenDataGridColumn Width="50" TItem="ChargesScenique" Property="Charge" TextAlign="TextAlign.Center">
+                            <HeaderTemplate>
+                                <span class="gridColumndStyle">@L["Charge"]</span>                                              </HeaderTemplate>
+                            <EditTemplate Context="chargesScenique">
+                                <InputNumber @bind-Value="chargesScenique.Charge" Style="width:100%" />
+                            </EditTemplate>
+                        </RadzenDataGridColumn>
+
+
+                        <RadzenDataGridColumn Width="15em" TItem="ChargesScenique" Property="PULMONARY_TOXICITY" Title="@L["Action"]" Filterable="false" Sortable="false">
+                            <Template Context="data">
+                                <Div Style="display: flex">
+                                    <a title="@L["Edit"]" class="nav-link" @onclick="@(args => EditRow(data))" @onclick:preventDefault="true" href="">
+                                        <span class="oi oi-pencil" aria-hidden="true"></span>
+                                    </a>
+                                    <a title="@L["End Edit"]" class="nav-link" @onclick="@(args => UpdateRow(data))" @onclick:preventDefault="true" href="">
+                                        <span class="oi oi-check" aria-hidden="true"></span>
+                                    </a>
+                                    <a title="@L["Delete"]" class="nav-link" @onclick="@(() => DeleteChargeScenique(data))" @onclick:preventDefault="true" href="">
+                                        <span class="oi oi-trash" aria-hidden="true"></span>
+                                    </a>
+                                </Div>
+
+                            </Template>
+
+                        </RadzenDataGridColumn>
+                    </Columns>
+                </RadzenDataGrid>
+
+
+
+
+
+
+
+            }
+        </RadzenSplitterPane>
+        <RadzenSplitterPane Size="50%">
+
+
+            <RadzenSplitter Orientation="Radzen.Orientation.Vertical" Style="height: 100%; border: 1px solid rgba(0,0,0,.08);">
+                <RadzenSplitterPane Size="20">
+                    <div style="display: flex">
+                        <div class="form-group " style="margin-right: 50px;">
+                            <div>
+                                <label>@L["Charge Totale"] :</label>
+                                <div>
+                                    <InputNumber disabled="true" @bind-Value="@ChargeTotale" />
+                                    @*   <ValidationMessage For="@(() => Structure.DesignLoad)" /> *@
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center;">
+                            <Blazorise.Button Color="Blazorise.Color.Primary" Clicked="Calcul" >@L["Calcul MotherGrid"]</Blazorise.Button>
+                        </div>
+                    </div>
+
+                </RadzenSplitterPane>
+                <RadzenSplitterPane Size="80">
+                    <AliantWebS.Pages.CADPages.SVGComponent></AliantWebS.Pages.CADPages.SVGComponent>
+
+                </RadzenSplitterPane>
+            </RadzenSplitter>
+
+        </RadzenSplitterPane>
+    </RadzenSplitter>
+
+</EditForm>
+
+@code {
+    int PageSize { get; set; } = 10;
+
+    [CascadingParameter]
+    public AntaresConceptionLayout Layout { get; set; }
+
+    IList<ChargesScenique> SelectedChargesSceniques { get; set; }
+
+
+    RadzenDataGrid<ChargesScenique> chargeSceniqueGrid;
+
+
+    List<ChargesScenique> chargeSceniqueList;
+
+    [Parameter]
+    public Guid EventID { get; set; }
+
+    double ChargeTotale { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        chargeSceniqueList = await entitiesService.GetFilteredEntitiesAsync<ChargesScenique>(x => x.EventId == EventID);
+        CalculateChargeTotale();
+    }
+
+
+    async Task DeleteChargeScenique(ChargesScenique equipementType)
+    {
+        if (await entitiesService.DeleteEntityAsync(equipementType))
+        {
+            if (chargeSceniqueList.Remove(equipementType))
+            {
+                await chargeSceniqueGrid.Reload();
+
+            }
+        }
+        CalculateChargeTotale();
+    }
+
+    void EditRow(ChargesScenique chargeScenique)
+    {
+
+        chargeSceniqueGrid.EditRow(chargeScenique);
+
+    }
+
+    async Task InsertChargeScenique()
+    {
+        ChargesScenique chargeScenique = new ChargesScenique();
+        chargeScenique.EventId = EventID;
+
+        if ((await entitiesService.InsertEntityAsync(chargeScenique)) != null)
+        {
+            chargeSceniqueList.Add(chargeScenique);
+
+            await chargeSceniqueGrid.InsertRow(chargeScenique);
+
+        }
+        else
+        {
+            await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
+        }
+
+        CalculateChargeTotale();
+
+    }
+
+    private void CalculateChargeTotale()
+    {
+        ChargeTotale = 0;
+        foreach (var v in chargeSceniqueList)
+        {
+
+            ChargeTotale += v.Charge ?? 0;
+        }
+    }
+
+
+
+    async Task UpdateRow(ChargesScenique chargeScenique)
+    {
+        if (await entitiesService.UpdateEntityAsync(chargeScenique))
+        {
+            await chargeSceniqueGrid.UpdateRow(chargeScenique);
+        }
+        CalculateChargeTotale();
+    }
+
+    private async void Calcul()
+    {
+        foreach(var cs in chargeSceniqueList)
+        {
+            double x = cs.X ?? 0;
+            double y = cs.Y ?? 0;
+            double charge = cs.Charge ?? 0;
+        }
+
+
+
+
+        ////sortie des resultats
+
+        EventMpscenario emps = new EventMpscenario();
+        emps.EventId = EventID;
+        emps.Name = DateTime.Now.ToString();
+
+        if ((await entitiesService.InsertEntityAsync(emps)) != null)
+        {
+            
+        }
+        else
+        {
+            await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
+        }
+
+
+
+        List<MotherGridPalonnier> mgps = new List<MotherGridPalonnier>();
+
+        MotherGridPalonnier mgp = new MotherGridPalonnier();
+        mgp.EventMpscenarioId = emps.EventMpscenarioId;
+        mgp.X1 = 12.5;
+        mgp.Y1 = 0;
+        mgp.X2 = 1;
+        mgp.Y2 = 5;
+        mgp.Famille = true; // meaning it is a mothergrid not a palonnier.
+
+        mgps.Add(mgp);
+
+        foreach(var mg in mgps)
+        {
+            if ((await entitiesService.InsertEntityAsync(mg)) != null)
+            {
+            }
+            else
+            {
+                await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
+            }
+        }
+
+
+        Layout?.RequestRedraw();
+
+    }
+
+
+
+
+
+
+
+
+
+
+
+}
+

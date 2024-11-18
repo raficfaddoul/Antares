@@ -1,0 +1,10 @@
+/**
+ * @license
+ * Copyright 2010-2024 Three.js Authors
+ * SPDX-License-Identifier: MIT
+ */
+
+/**
+ * @license
+ * Credits to vagran (https://github.com/vagran/dxf-viewer) for the original code.
+ */

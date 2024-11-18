@@ -1,0 +1,65 @@
+﻿@using AliantWebS.Data
+@using System.Drawing
+@inject EntitiesService entitiesService
+
+@typeparam TItem1
+
+<Div Style="display: flex">
+    <div>
+
+        <img src="@GetSource((byte[])reflexion(data,"Icon"))" />
+
+    </div>
+    @if (DisplayButton)
+    {
+        <div class="file-input-zone" style="margin-left: auto; ">
+            <NavLink class="nav-link" href="dgfrdgh" @onclick:preventDefault="true">
+                <span align="center" style="width:10px; height:10px" class="oi oi-plus" aria-hidden="true"></span>
+            </NavLink>
+
+            <InputFile OnChange="@(args => LoadFiles(data,args))" />
+
+        </div>
+    }
+</Div>
+
+@code {
+
+    [Parameter]
+    public TItem1 data { get; set; }
+
+    [Parameter]
+    public bool DisplayButton { get; set; } = true;
+
+    private async Task LoadFiles(TItem1 defectType, InputFileChangeEventArgs e)
+    {
+        ImageConverter converter = new ImageConverter();
+
+        var resizedImageFile = await e.File.RequestImageFileAsync("image/png", 32, 32);
+
+        var buffer = new byte[resizedImageFile.Size];
+        await resizedImageFile.OpenReadStream().ReadAsync(buffer);
+
+        byte[] ba = buffer;
+
+
+        typeof(TItem1).GetProperties().First(x => x.Name == "Icon").SetValue(defectType, ba);
+
+        //defectType.Icon = ba;
+        await entitiesService.UpdateEntityAsync(defectType);
+    }
+
+    private string GetSource(byte[] imageBytes)
+    {
+        if (imageBytes == null) return string.Empty;
+        string imagesrc = Convert.ToBase64String(imageBytes);
+        string imageDataURL = string.Format("data:image/jpeg;base64,{0}", imagesrc);
+        return imageDataURL;
+    }
+
+    object reflexion(object ob, string IdName)
+    {
+        var v = ob.GetType().GetProperties().First(x => x.Name == IdName).GetValue(ob);
+        return v;
+    }
+}

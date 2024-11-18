@@ -1,0 +1,200 @@
+﻿@using AliantWebS.Data
+@inject EntitiesService entitiesService
+@inject NavigationManager navigationManager
+@inject IJSRuntime js
+@inject AliantWebS.Data.AppData AppData
+@using Models
+@inject IStringLocalizer<Languages> L
+
+
+
+
+
+
+<Div Style="display: flex">
+    <h3>@L["Structures Types"]</h3>
+    <div style="margin-left: auto; ">
+        <Label> @L["Page Size"]: &nbsp;&nbsp;</Label>
+        <RadzenNumeric @bind-Value="PageSize" Style="width:60px"></RadzenNumeric>
+    </div>
+</Div>
+@if (structureTypeList is null)
+{
+    <p><em>@L["Loading"]... !</em></p>
+}
+else
+{
+    <a class="nav-link" @onclick="@(args => InsertStructureType())" @onclick:preventDefault="true" href="">
+        <span class="oi oi-plus" aria-hidden="true">@L["Add New"]</span>
+    </a>
+    <EditForm Model="@structureTypeList">
+        <RadzenDataGrid @ref="structureTypeGrid" AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="PageSize"
+                        Data="@structureTypeList" TItem="StructureType" ColumnWidth="150px" @bind-Value="@SelectedStructuresTypes">
+            <Columns>
+
+                <RadzenDataGridColumn Width="50" TItem="StructureType" Property="Name">
+                    <HeaderTemplate>
+                        <span class="gridColumndStyle">@L["Name"]</span>                    <br />
+                    </HeaderTemplate>
+                    <EditTemplate Context="structureType">
+                        <InputTextArea @bind-Value="structureType.Name" Style="width:100%" />
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn Width="50" TItem="StructureType" Property="Description">
+                    <HeaderTemplate>
+                        <span class="gridColumndStyle">@L["Description"]</span>                    <br />
+                    </HeaderTemplate>
+                    <EditTemplate Context="structureType">
+                        <InputTextArea @bind-Value="structureType.Description" Style="width:100%" />
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn Width="50" TItem="StructureType" Property="PULMONARY_TOXICITY" Title="@L["Action"]" Filterable="false" Sortable="false">
+                    <Template Context="data">
+                        <Div Style="display: flex">
+                            <a title="@L["Edit"]" class="nav-link" @onclick="@(args => EditRow(data))" @onclick:preventDefault="true" href="">
+                                <!--href="/patient/EditSideEffectComponent/@data.SideEffectID-->
+                                <span class="oi oi-pencil" aria-hidden="true"></span>
+                            </a>
+                            <a title="@L["End Edit"]" class="nav-link" @onclick="@(args => UpdateRow(data))" @onclick:preventDefault="true" href="">
+                                <span class="oi oi-check" aria-hidden="true"></span>
+                            </a>
+                            <a title="@L["Delete"]" class="nav-link" @onclick="@(() => DeleteStructureType(data))" @onclick:preventDefault="true" href="">
+                                <span class="oi oi-trash" aria-hidden="true"></span>
+                            </a>
+                        </Div>
+                        <Div Style="display: flex">
+                            <a title="@L["Condition States Types"]" class="nav-link" @onclick="@(args => InspectionResultTypes(data))" @onclick:preventDefault="true" href="">
+                                <span class="oi oi-tag" aria-hidden="true"></span>
+                            </a>
+                            @*   <a class="nav-link" @onclick="@(args => DefectsTypes(data))" @onclick:preventDefault="true" href="">
+            <span class="oi oi-pencil" aria-hidden="true">Defect Types</span>
+        </a>*@
+   
+                            <a title="@L["Flag Types"]" class="nav-link" @onclick="@(args => FlagsTypes(data))" @onclick:preventDefault="true" href="">
+                                <span class="oi oi-flag" aria-hidden="true"></span>
+                            </a>
+            
+                            <a title="@L["Attributes Types"]" class="nav-link" @onclick="@(args => AttributesTypes(data))" @onclick:preventDefault="true" href="">
+                                <span class="fa fa-tasks" aria-hidden="true"></span>
+                            </a>
+                        </Div>
+                    </Template>
+
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+
+
+
+
+    </EditForm>
+
+
+}
+
+
+@code {
+    int PageSize { get; set; } = 10;
+
+    IList<StructureType> SelectedStructuresTypes { get; set; }
+
+
+    RadzenDataGrid<StructureType> structureTypeGrid;
+
+
+    List<StructureType> structureTypeList;
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        await Task.WhenAll(entitiesService.tasksList);
+        structureTypeList = await entitiesService.GetAllEntitiesAsync<StructureType>();
+
+    }
+
+
+    async Task DeleteStructureType(StructureType structureType)
+    {
+        if (await entitiesService.DeleteEntityAsync(structureType))
+        {
+            if (structureTypeList.Remove(structureType))
+            {
+                await structureTypeGrid.Reload();
+
+            }
+        }
+
+    }
+
+    void EditRow(StructureType structureType)
+    {
+
+            structureTypeGrid.EditRow(structureType);
+    
+    }
+
+    async Task InsertStructureType()
+    {
+        StructureType structureType = new StructureType();
+
+        if ((await entitiesService.InsertEntityAsync(structureType)) != null)
+        {
+            structureTypeList.Add(structureType);
+    
+                await structureTypeGrid.InsertRow(structureType);
+        
+        }
+        else
+        {
+            await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
+        }
+    }
+
+
+
+    async Task UpdateRow(StructureType structureType)
+    {
+        if (await entitiesService.UpdateEntityAsync(structureType))
+        {
+            await structureTypeGrid.UpdateRow(structureType);
+        }
+    }
+
+
+    async Task InspectionResultTypes(StructureType structureType)
+    {
+
+        AppData.obj = structureType;
+
+       
+
+        navigationManager.NavigateTo("/StructureTypeInspectionResultTypes/" + structureType.StructureTypeId);
+    }
+
+    async Task DefectsTypes(StructureType structureType)
+    {
+        AppData.obj = structureType;
+
+        //     navigationManager.NavigateTo("/ElementTypeDefectTypes/" + elementType.ElementTypeId);
+
+    }
+
+    async Task FlagsTypes(StructureType structureType)
+    {
+        AppData.obj = structureType;
+
+        navigationManager.NavigateTo("/StructureTypeFlagTypes/" + structureType.StructureTypeId);
+    }
+
+    async Task AttributesTypes(StructureType structureType)
+    {
+        AppData.obj = structureType;
+
+        navigationManager.NavigateTo("/StructureTypeAttributeTypes/" + structureType.StructureTypeId);
+    }
+
+
+}

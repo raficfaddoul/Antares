@@ -1,0 +1,33 @@
+﻿@page "/BlankElement/"
+
+@using AliantWebS.Data
+
+@inject AliantWebS.Data.AppData appData
+
+@layout ElementsLayout
+
+
+
+<div style="@($"background-image: url('{imagePath}'); opacity: 0.5; height: 100%; width: 100%;background-size: cover; background-position: center; background-repeat: no-repeat; ")">
+</div>
+
+
+
+
+@code {
+    string imagePath;
+
+    protected override async Task OnInitializedAsync()
+    {
+        List<string> paths = await FileManagementService.GetPathForFilesAsync(appData.Structure, false);
+        if (paths != null & paths.Count > 0)
+        {
+            string correctedPath = paths[0].Replace("\\", "/"); ;
+            imagePath = correctedPath;//  @"/Images/37b092ba-ed5c-ee11-8daf-5820b17cefc4/20210622_101236resized.jpg";
+        }
+        else
+        {
+            imagePath = "img/istockphoto-132074313-612x612.jpg";
+        }
+    }
+}

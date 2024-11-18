@@ -1,0 +1,64 @@
+﻿@using AliantWebS.Data
+@using AliantWebS.Models
+
+@inject IStringLocalizer<Languages> L
+
+<RadzenDataGrid AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="10"
+                Data="@LoadCases" TItem="LoadCase" ColumnWidth="150px">
+    <Columns>
+        <RadzenDataGridColumn TItem="LoadCase" Property="Name" Title="@L["Name"]"></RadzenDataGridColumn>
+
+
+        <RadzenDataGridColumn TItem="LoadCase" Property="Coeficient" Title="Coeficient">
+            <Template Context="loadCase">
+                <InputNumber TValue="double" Value="@GetCoefficient(loadCase.LoadCaseId)"
+                             ValueChanged="@(newValue => SetCoefficient(loadCase.LoadCaseId, newValue))"
+                             ValueExpression="@( () => coco )">
+                </InputNumber>
+            </Template>
+        </RadzenDataGridColumn>
+
+        <RadzenDataGridColumn TItem="LoadCase" Property="Description" Title="@L["Action"]" Width="30px">
+            <Template Context="loadCase">
+                <Div Style="display: flex">
+                    <RadzenCheckBox TValue=bool Value="@(SelectedLoadCases.Keys.Contains(loadCase))" Change=@(args => OnChangeSelectedLoadCases(args, loadCase, Coeficients[loadCase.LoadCaseId]))></RadzenCheckBox>
+
+                </Div>
+            </Template>
+
+        </RadzenDataGridColumn>
+    </Columns>
+</RadzenDataGrid>
+
+@code {
+    [Parameter] public List<LoadCase> LoadCases { get; set; } = new List<LoadCase>();
+    [Parameter] public Dictionary<LoadCase, double> SelectedLoadCases { get; set; } = new Dictionary<LoadCase, double>();
+    [Parameter] public Dictionary<Guid, double> Coeficients { get; set; } = new Dictionary<Guid, double>();
+
+    double coco;
+
+    void OnChangeSelectedLoadCases(bool args, LoadCase loadCase, double coef)
+    {
+        if (args)
+        {
+
+            SelectedLoadCases.Add(loadCase, coef);
+        }
+        else
+        {
+            SelectedLoadCases.Remove(loadCase);
+        }
+    }
+
+    private double GetCoefficient(Guid loadCaseId)
+    {
+
+        return Coeficients[loadCaseId];
+    }
+
+    private void SetCoefficient(Guid loadCaseId, double newValue)
+    {
+        Coeficients[loadCaseId] = newValue;
+    }
+
+}

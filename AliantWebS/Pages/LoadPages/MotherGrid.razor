@@ -1,0 +1,233 @@
+﻿@page "/MotherGrid/{EventMpscenarioId:guid}"
+@using AliantWebS.Pages
+@using Models
+@using AliantWebS.Data
+
+@inject AppData appData;
+@inject EntitiesService entitiesService
+@inject IJSRuntime js
+
+@layout AntaresConceptionLayout
+
+<style>
+    .selected-background {
+        background-color: rgba(0, 255, 0, 0.1); /* Very faint green color */
+    }
+</style>
+
+<RadzenSplitter Orientation="Radzen.Orientation.Vertical" Style="height:90vh; border: 1px solid rgba(0,0,0,.08);">
+<RadzenSplitterPane>
+    <RadzenSplitter Orientation="Radzen.Orientation.Horizontal" Style="height:100%; border: 1px solid rgba(0,0,0,.08);">
+        @* MotherGrid   *@
+            <RadzenSplitterPane Style="overflow: auto;" Size="50%">
+                @if (MList != null)
+                {
+                    <div class="@(palonnierComponentSelected ? "" : "selected-background" )" @onclick="MotherGridComponentClicked">
+                    <MotherGridComponent @ref="MotherGridGridRef" ElementTypesList="ElementTypesList" MPList="MList" Title="MotherGrids" MPGridChanged="HandleMGridChanged" MotherGridPalonnierListChanged="HandleMotherGridListChanged" Famille="true" EventMpscenarioId="@EventMpscenarioId" @bind-SelectedMP="selectedMotherGrid"></MotherGridComponent>
+            </div>
+                }
+            </RadzenSplitterPane>
+
+            @* Palonnier   *@
+            <RadzenSplitterPane Style="overflow: auto;" Size="50%">
+                          @if (PList != null)
+                {
+                    <div class="@(palonnierComponentSelected ? "selected-background" : "")"  @onclick="PalonnierComponentClicked">
+                  
+                        <MotherGridComponent  @ref="PalonnierGridRef" ElementTypesList="ElementTypesList" MPList="PList" Title="Palonniers" MPGridChanged="HandlePGridChanged" MotherGridPalonnierListChanged="HandlePalonnierListChanged" Famille="false" EventMpscenarioId="@EventMpscenarioId" @bind-SelectedMP="selectedPalonnier"></MotherGridComponent>
+                      
+                    </div>
+                }
+            </RadzenSplitterPane>
+        </RadzenSplitter>
+
+    </RadzenSplitterPane>
+
+
+
+    <RadzenSplitterPane >
+        <RadzenSplitter Orientation="Radzen.Orientation.Horizontal" style="height: 100%; border: 1px solid rgba(0,0,0,.08);">
+            @* Charge   *@
+            <RadzenSplitterPane Style="overflow: auto;" Size="50%">
+                <ChargeMPComponent EventMpscenarioId="@EventMpscenarioId" MotherGridPalonnierID="@(selectedMotherGrid?.MotherGridPalonnierId ?? selectedPalonnier?.MotherGridPalonnierId)" />
+            </RadzenSplitterPane>
+
+            @* Autocad   *@
+            <RadzenSplitterPane Style="overflow: auto;" @onwheel:stopPropagation Size="50%">
+                <AliantWebS.Pages.CADPages.SVGComponent OnErase="HandleErase" LineDrawn="HandleLineDrawn" Palonniers="PList" MotherGrids="MList"></AliantWebS.Pages.CADPages.SVGComponent>
+
+            </RadzenSplitterPane>
+        </RadzenSplitter>
+    </RadzenSplitterPane>
+
+</RadzenSplitter>
+
+
+@code {
+
+
+    [Parameter]
+    public Guid EventMpscenarioId { get; set; }
+
+
+    List<MotherGridPalonnier> MList { get; set; } = new List<MotherGridPalonnier>();
+
+
+    List<MotherGridPalonnier> PList { get; set; } = new List<MotherGridPalonnier>();
+
+
+    MotherGridComponent MotherGridGridRef;
+    MotherGridComponent PalonnierGridRef;
+
+    private MotherGridPalonnier selectedMotherGrid { get; set; }
+    private MotherGridPalonnier selectedPalonnier { get; set; }
+
+    RadzenDataGrid<MotherGridPalonnier> MGrid { get; set; }
+    RadzenDataGrid<MotherGridPalonnier> PGrid { get; set; }
+
+    public List<ElementType> ElementTypesList { get; set; } = new List<ElementType>();
+
+    bool palonnierComponentSelected = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        ElementTypesList = await entitiesService.GetFilteredEntitiesAsync<ElementType>(x => x.Category.Name.ToLower() == "mothergridpalonnier", "Category");
+        if (ElementTypesList.Count == 0)
+        {
+            await js.InvokeVoidAsync("alert", $"Aucun type d'élements n'a été défini pour la catégorie MotherGridPalonnier");
+        }
+
+
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        MList = await entitiesService.GetFilteredEntitiesAsync<MotherGridPalonnier>(x => ((x.EventMpscenarioId == EventMpscenarioId) && (x.Famille == true)));
+        PList = await entitiesService.GetFilteredEntitiesAsync<MotherGridPalonnier>(x => ((x.EventMpscenarioId == EventMpscenarioId) && (x.Famille == false)));
+
+    }
+    private void MotherGridComponentClicked(MouseEventArgs e)
+    {
+        palonnierComponentSelected = false;
+        PGrid.SelectRow(null);
+        selectedPalonnier = null;
+        StateHasChanged();
+    }
+
+    private void PalonnierComponentClicked(MouseEventArgs e)
+    {
+        palonnierComponentSelected = true;
+        MGrid.SelectRow(null);
+        selectedMotherGrid = null;
+        StateHasChanged();
+    }
+
+    private void HandleMGridChanged(RadzenDataGrid<MotherGridPalonnier> grid)
+    {
+        MGrid = grid;
+    }
+
+    private void HandlePGridChanged(RadzenDataGrid<MotherGridPalonnier> grid)
+    {
+        PGrid = grid;
+    }
+
+    private void HandleMotherGridListChanged(List<MotherGridPalonnier> l)
+    {
+        //   MList = l;
+        StateHasChanged();
+    }
+
+    private void HandlePalonnierListChanged(List<MotherGridPalonnier> l)
+    {
+        //  PList = l;
+        StateHasChanged();
+    }
+
+
+
+    private async void HandleErase(MotherGridPalonnier mp)
+    {
+        if (MList.Contains(mp))
+        {
+            await MotherGridGridRef.DeleteMP(mp);
+            //MList.Remove(mp);
+
+        }
+
+        if (PList.Contains(mp))
+        {
+            await PalonnierGridRef.DeleteMP(mp);
+            //PList.Remove(mp);
+        }
+    }
+
+    private async void HandleLineDrawn((double x1, double y1, double x2, double y2) t)
+    {
+        if (!palonnierComponentSelected)
+        {
+            if ((MotherGridGridRef.lastSelectedElementType == null) || (MotherGridGridRef.lastSelectedElementType.ElementTypeId == Guid.Empty))
+            {
+                MotherGridGridRef.lastSelectedElementType = ElementTypesList.FirstOrDefault();
+            }
+
+
+            MotherGridPalonnier mp = new MotherGridPalonnier();
+            mp.EventMpscenarioId = EventMpscenarioId;
+            mp.Famille = true;
+            mp.ElementTypeId = MotherGridGridRef.lastSelectedElementType.ElementTypeId;
+
+
+            mp.X1 = t.x1; mp.Y1 = t.y1;
+
+            mp.X2 = t.x2; mp.Y2 = t.y2;
+
+            if ((await entitiesService.InsertEntityAsync(mp)) != null)
+            {
+                MList.Add(mp);
+                StateHasChanged();
+
+                await MotherGridGridRef.MPGrid.InsertRow(mp);
+                await MotherGridGridRef.MPGrid.UpdateRow(mp);
+            }
+            else
+            {
+                await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
+            }
+        }
+        else
+        {
+            if ((PalonnierGridRef.lastSelectedElementType == null) || (PalonnierGridRef.lastSelectedElementType.ElementTypeId == Guid.Empty))
+            {
+                PalonnierGridRef.lastSelectedElementType = ElementTypesList.FirstOrDefault();
+            }
+
+
+            MotherGridPalonnier mp = new MotherGridPalonnier();
+            mp.EventMpscenarioId = EventMpscenarioId;
+            mp.Famille = false;
+            mp.ElementTypeId = MotherGridGridRef.lastSelectedElementType.ElementTypeId;
+
+
+            mp.X1 = t.x1; mp.Y1 = t.y1;
+
+            mp.X2 = t.x2; mp.Y2 = t.y2;
+
+            if ((await entitiesService.InsertEntityAsync(mp)) != null)
+            {
+                PList.Add(mp);
+                StateHasChanged();
+
+                await PalonnierGridRef.MPGrid.InsertRow(mp);
+                await PalonnierGridRef.MPGrid.UpdateRow(mp);
+            }
+            else
+            {
+                await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
+            }
+            //await PalonnierGridRef.Insertmp(t.x1, t.y1, t.x2, t.y2);
+        }
+
+    }
+
+}

@@ -1,0 +1,526 @@
+﻿@using AliantWebS.Data
+@using Models
+@using Microsoft.AspNetCore.Hosting;
+@using Microsoft.Extensions.Logging
+
+@using ExifLibrary;
+@using System.Text.Json;
+@inject NavigationManager navigationManager
+@inject ILogger<MediaComponent> Logger
+@inject EntitiesService structureService
+@inject AliantWebS.Data.AppData AppData
+@inject Radzen.DialogService DialogService
+@inject IJSRuntime js
+
+@*<style>
+    .file-input-zone {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: blue;
+        color: white;
+        cursor: pointer;
+        position: relative;
+        width: fit-content;
+        height: fit-content;
+    }
+
+        .file-input-zone:hover {
+            background-color: lightblue;
+        }
+
+        .file-input-zone input[type=file] {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+</style>*@
+
+@if (pathsForFiles.Count != 0)
+{
+
+
+    <TemplatedCarousel  @ref="templatedCarouselRef" Items="pathsForFiles" TItem="string" ShowNavigation="true" ActiveItemIndexChanged="@(args => DisplayTags(args))">
+        <ItemTemplate >
+            <div class="outfit">
+                <img class="center" src="@context" alt="@context" style="width: 100%; height: 100%; object-fit: fill;">
+            </div>
+
+            <Div Style="display: flex">
+                <div class="file-input-zone">
+
+                    <NavLink class="nav-link" href="dgfrdgh" @onclick:preventDefault="true">
+                        <span align="center" style="width:30px" class="oi oi-plus" aria-hidden="true"></span>
+                    </NavLink>
+                    <InputFile OnChange="@LoadFiles" />
+                </div>
+
+                <div class="file-input-zone">
+
+                    <a class="nav-link" @onclick="@(args => Capture())" href="dgfrdgh" @onclick:preventDefault="true">
+                        <span align="center" style="width:30px" class="oi oi-camera-slr" aria-hidden="true"></span>
+                    </a>
+                    @*   <input type="file" accept="image/*" capture>*@
+                    @*              <InputFile capture />*@
+                </div>
+
+                <div class="file-input-zone">
+                    <a class="nav-link" @onclick="@(args => DeleteFile(context))" href="dgfrdgh" @onclick:preventDefault="true">
+                        <span align="center" style="width:30px" class="oi oi-trash" aria-hidden="true"></span>
+                    </a>
+                </div>
+                @if (selectedObject.GetType() == typeof(Element))
+        {
+                <div class="file-input-zone">
+                    <a class="nav-link" @onclick="@Defects" href="dgfrdgh" @onclick:preventDefault="true">
+                        <span align="center" style="width:30px" class="oi oi-flag" aria-hidden="true"></span>
+                    </a>
+                </div>
+        }
+
+            </Div>
+
+
+        </ItemTemplate>
+
+    </TemplatedCarousel>
+
+}
+else
+
+{
+    <h3>Add Media here</h3>
+                <Div Style="display: flex">
+    <div class="file-input-zone">
+        <NavLink class="nav-link" href="dgfrdgh" @onclick:preventDefault="true">
+            <span align="center" style="width:30px" class="oi oi-plus" aria-hidden="true"></span>
+        </NavLink>
+        <InputFile OnChange="@LoadFiles" />
+    </div>
+    <div class="file-input-zone">
+
+        <a class="nav-link" @onclick="@(args => Capture())" href="dgfrdgh" @onclick:preventDefault="true">
+            <span align="center" style="width:30px" class="oi oi-camera-slr" aria-hidden="true"></span>
+        </a>
+        @*   <input type="file" accept="image/*" capture>*@
+        @*              <InputFile capture />*@
+    </div>
+    </Div>
+}
+
+@*    https://icon-sets.iconify.design/oi/page-3.html*@
+
+
+
+@code {
+
+    private int index = 0;
+
+    TemplatedCarousel<string> templatedCarouselRef;
+
+    [Parameter]
+    public object selectedObject { get; set; }
+
+    [Parameter]
+    public List<Element> ElementsToDispay { get; set; }
+
+    [Parameter]
+    public Element DefectSelectedElement { get; set; }
+
+    [Parameter]
+    public List<Defect> DefectList { get; set; } // if this parameter is null all tags will be displayed or else only those related to the list
+
+    private Defect selectedDefect;
+
+    [Parameter]
+    public Defect SelectedDefect
+    { // this parameter must be no null in order to insert new tags
+        get => selectedDefect;
+        set
+        {
+            if (selectedDefect == value) return;
+            selectedDefect = value;
+            if (selectedDefect != null)
+            {
+                js.InvokeVoidAsync("renderjQueryComponents", objRef, SelectedDefect.DefectId);
+            }
+        }
+    }
+
+    List<string> pathsForFiles = new List<string>();
+
+    private DotNetObjectReference<MediaComponent>? objRef;
+
+
+    [Parameter]
+    public EventCallback<Guid> OnNewTagForNewDefect { get; set; }
+
+    [Parameter]
+    public EventCallback<Guid> OnTagClicked { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        objRef = DotNetObjectReference.Create(this);
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        pathsForFiles = await GetPathForFiles();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // if (firstRender)
+        if (SelectedDefect != null)
+        {
+            await js.InvokeVoidAsync("renderjQueryComponents", objRef, SelectedDefect.DefectId);
+        }
+
+        DisplayTags(index);
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+
+    /* async Task StoreSelectedFiles(IFileListEntry[] files)
+         {
+         await fileManagementService.WriteSelectedFiles(files, selectedStructure);
+     }*/
+
+    private List<IBrowserFile> loadedFiles = new();
+    private long maxFileSize = 1024 * 15;
+    private int maxAllowedFiles = 3;
+
+
+    private async Task LoadFiles(InputFileChangeEventArgs e)
+    {
+        await DialogService.OpenAsync<FilesUpload>($"Files Upload",
+
+               new Dictionary<string, object>() { { "obj", selectedObject }, { "e", e }, { "Folder", "Images" } },
+               new DialogOptions() { Width = "700px", Height = "570px" });
+
+        pathsForFiles = await GetPathForFiles();
+
+    }
+
+    private async Task Capture()
+    {
+        // navigationManager.NavigateTo(@"/Camera");
+
+        var z = await DialogService.OpenAsync<CameraComponent>($"Camera",
+
+       new Dictionary<string, object>() { { "obj", selectedObject } },
+       new DialogOptions() { Width = "800px", Height = "570px", Draggable = true, Resizable=true });
+        try{
+            await js.InvokeVoidAsync("disposeCamera");
+        }
+        catch
+        {}
+        pathsForFiles = await GetPathForFiles();
+
+
+
+    }
+
+    private async Task DeleteFile(string fileName)
+    {
+        bool resetToZero = false;
+        if (templatedCarouselRef.ActiveItemIndex == pathsForFiles.Count - 1) resetToZero = true;
+
+        try
+        {
+            await FileManagementService.deleteFile(fileName);
+            pathsForFiles.Remove(fileName);
+            if (resetToZero)
+            {
+                templatedCarouselRef.ActiveItemIndex = 0;
+
+            }
+        }
+        catch
+        {
+        int k = 1;
+        }
+
+    }
+
+    private async Task Defects()
+    {
+
+        if (selectedObject.GetType() == typeof(Element))
+        {
+
+            Element el = (Element)selectedObject;
+
+            AppData.obj = el;
+
+
+
+            //     navigationManager.NavigateTo("/Structures");
+
+            navigationManager.NavigateTo("/defects/" + el.ElementId);
+        }
+
+    }
+
+
+
+    async Task<List<string>> GetPathForFiles()
+    {
+        List<string> paths = new List<string>();
+        if (ElementsToDispay != null)
+        {
+            foreach (Element el in ElementsToDispay)
+            {
+                paths.AddRange(await FileManagementService.GetPathForFilesAsync(el, false));
+            }
+        }
+        else
+        {
+            paths = await FileManagementService.GetPathForFilesAsync(selectedObject, false);
+        }
+
+
+        return paths;
+
+    }
+
+
+    private async Task DisplayTags(int index)
+    {
+        List<Tag> tags;
+
+        this.index = index;
+
+        ExifLibrary.ImageFile file;
+
+        try
+        {
+            file = ExifLibrary.ImageFile.FromFile(pathsForFiles[index]);
+        }
+        catch
+        {
+            await js.InvokeVoidAsync("renderTags", null, null, null);
+            return;
+        }
+
+        var reee = file.Properties.Get(ExifTag.ImageDescription);
+
+        try
+        {
+            var vv = JsonSerializer.Deserialize<List<Tag>>(reee?.ToString());
+            tags = vv;
+        }
+        catch
+        {
+            await js.InvokeVoidAsync("renderTags", null, null, null);
+            return;
+        }
+
+        List<string> ids = new List<string>();
+        List<double> xs = new List<double>();
+        List<double> ys = new List<double>();
+        List<Guid> defectIds = new List<Guid>();
+        List<string> comments = new List<string>();
+
+        List<Guid> defectIdList = DefectList?.Select(x => x.DefectId).ToList();
+
+        for (int i = 0; i < tags.Count; i++)
+        {
+            if ((defectIdList is null) || (defectIdList.Contains(tags[i].defectID)))
+            {
+                ids.Add(tags[i].id);
+                xs.Add(tags[i].x);
+                ys.Add(tags[i].y);
+                defectIds.Add(tags[i].defectID);
+                comments.Add(tags[i].comment);
+            }
+
+        }
+        await js.InvokeVoidAsync("renderTags", objRef, ids.ToArray(), xs.ToArray(), ys.ToArray(), comments.ToArray(), defectIds.ToArray());
+    }
+
+
+
+    [JSInvokable]
+    public async Task TagClicked(string _id)
+    {
+        if (Guid.TryParse(_id, out Guid r))
+        {
+
+            await OnTagClicked.InvokeAsync(r);
+        }
+    }
+
+
+
+    [JSInvokable]
+    public async Task SaveTag(bool save, string imageSource, double? left_perc, double? top_perc, string _id)
+    {
+        if (SelectedDefect == null && save) return;
+
+        if ((SelectedDefect != null) && (SelectedDefect.DefectId == Guid.Parse("7c9e6679-7425-40de-944b-e07fc1f90ae7")))
+        {
+            await OnNewTagForNewDefect.InvokeAsync(SelectedDefect.DefectId);
+        }
+
+
+
+        Tag tag = null;
+        if (save)
+        {
+            tag = new Tag() { id = _id, x = (double)left_perc, y = (double)top_perc, defectID = SelectedDefect.DefectId, comment = (DefectSelectedElement).Name + ": " + SelectedDefect.DefectType.Name };
+        }
+
+        List<Tag> aList;
+
+
+        var file = ExifLibrary.ImageFile.FromFile(imageSource);
+
+        var reee = file.Properties.Get(ExifTag.ImageDescription);
+
+        try
+        {
+            var vv = JsonSerializer.Deserialize<List<Tag>>(reee?.ToString());
+            aList = vv;
+        }
+        catch
+        {
+            aList = new System.Collections.Generic.List<Tag>();
+        }
+        if (save)
+        {
+            var ta = aList.Find(t => (t.id == _id));
+
+            if (ta == null)
+            {
+                aList.Add(tag);
+            }
+            else
+            {
+                aList.Remove(ta);
+                aList.Add(tag);
+            }
+        }
+        else
+        {
+
+            bool b = aList.Remove(aList.Find(t => (t.id == _id)));
+        }
+
+        var json = JsonSerializer.Serialize(aList);
+
+
+        file.Properties.Set(ExifTag.ImageDescription, json);
+
+
+
+        file.Save(imageSource);
+
+    }
+
+
+}
+@*
+<h1>Taggable Image</h1>
+
+<div style="position: relative;">
+    <img src="your-image-source.jpg" alt="Your Image" @ref="imageElement" />
+    @foreach (var tag in tags)
+    {
+        <div style="position: absolute; top: @tag.Top; left: @tag.Left;">
+            <button @onclick="@(() => RemoveTag(tag))">X</button>
+            <strong>@tag.Name</strong>
+        </div>
+    }
+</div>
+
+@functions {
+    List<Tag> tags = new List<Tag>();
+    ElementReference imageElement;
+
+    void AddTag(string name, int x, int y)
+    {
+        var rect = imageElement.GetBoundingClientRect();
+        var top = y - rect.Top;
+        var left = x - rect.Left;
+        tags.Add(new Tag { Name = name, Top = top, Left = left });
+    }
+
+    void RemoveTag(Tag tag)
+    {
+        tags.Remove(tag);
+    }
+
+    class Tag
+    {
+        public string Name { get; set; }
+        public int Top { get; set; }
+        public int Left { get; set; }
+    }
+}
+
+
+@using System.ComponentModel
+@using System.Linq
+@using System.Reflection
+
+<div class="image-container">
+    <img src="@ImageUrl" @onclick="@(() => IsEditing = true)" style="width: @Width; height: @Height;" />
+    @if (IsEditing)
+    {
+        <div class="tag-container">
+            @foreach (var tag in Tags)
+            {
+                <div class="tag" style="top: @tag.Top; left: @tag.Left;">
+                    <input type="text" value="@tag.Text" @onchange="@(e => tag.Text = e.Value.ToString())" />
+                    <button @onclick="@(() => Tags.Remove(tag))">X</button>
+                </div>
+            }
+        </div>
+        <button @onclick="@AddTag">Add Tag</button>
+        <button @onclick="@(() => IsEditing = false)">Save</button>
+    }
+@using System.ComponentModel
+@using System.Linq
+@using System.Reflection
+
+<div class="image-container">
+    <img src="@ImageUrl" @onclick="@(() => IsEditing = true)" style="width: @Width; height: @Height;" />
+Copy code
+@if (IsEditing)
+{
+    <div class="tag-container">
+        @foreach (var tag in Tags)
+        {
+            <div class="tag" style="top: @tag.Top; left: @tag.Left;">
+                <input type="text" value="@tag.Text" @onchange="@(e => tag.Text = e.Value.ToString())" />
+                <button @onclick="@(() => Tags.Remove(tag))">X</button>
+            </div>
+        }
+    </div>
+    <button @onclick="@AddTag">Add Tag</button>
+    <button @onclick="@(() => IsEditing = false)">Save</button>
+}
+</div>
+@code {
+private string ImageUrl { get; set; }
+private int Width { get; set; } = 500;
+private int Height { get; set; } = 500;
+private bool IsEditing { get; set; }
+private List<Tag> Tags { get; set; } = new List<Tag>();
+
+        private void AddTag()
+        {
+            Tags.Add(new Tag { Top = 0, Left = 0, Text = "" });
+        }
+
+        public class Tag
+        {
+            public int Top { get; set; }
+            public int Left { get; set; }
+            public string Text { get; set; }
+        }
+}
+*@

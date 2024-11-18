@@ -1,0 +1,102 @@
+﻿@using AliantWebS.Data
+@using Models
+@inject AppData appData;
+@inject EntitiesService entitiesService
+@inject NavigationManager navigationManager
+@inject IStringLocalizer<Languages> L
+
+<Div Style="display: flex">
+    <h3>Selecteur De Capteurs</h3>
+    <div style="margin-left: auto; ">
+        <Label> Page Size: &nbsp;&nbsp;</Label>
+        <RadzenNumeric @bind-Value="PageSize" Style="width:60px"></RadzenNumeric>
+    </div>
+</Div>
+    <RadzenDataGrid class="RadzenDataGrid" @ref="eventsGrid" AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="PageSize" RowSelect=@RowSelect
+                    Data="@sensors" @bind-Value=@selectedSensors SelectionMode="DataGridSelectionMode.Multiple" TItem="Element" ColumnWidth="150px">
+        <Columns>
+            <RadzenDataGridColumn TItem="Element" Property="Name" Title="@L["Name"]"></RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="Element" Property="Description" Title="@L["Description"]"></RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="Element" Title="@L["Action"]" Width="90px" Sortable=false Filterable=false>
+
+                <Template Context="element">
+                    <Div Style="display: flex">
+                        @foreach (ChannelDataType cdt in element.ElementType.ChannelDataTypeElementTypes.Select(x => x.ChannelDataType))
+                        {
+                            <img title="@cdt.Name" src="@AI.Helpers.GetSource(cdt.Icon)" alt="@cdt.Name" />
+                            <RadzenCheckBox TValue=bool Change=@(args =>plot(args,element,cdt))></RadzenCheckBox>
+                        }
+                    </Div>
+
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+    <div class="form-group ">
+        <div>
+            <label>@L["Start Date"] :</label>
+            <div>
+                <InputDate Type="InputDateType.DateTimeLocal" @bind-Value="@startDate" />
+                @*           <ValidationMessage For="@(() => startDate)" />*@
+            </div>
+        </div>
+    </div>
+    <div class="form-group ">
+        <div>
+            <label>@L["End Date"] :</label>
+            <div>
+                <InputDate Type="InputDateType.DateTimeLocal" @bind-Value="@endDate" />
+                @*           <ValidationMessage For="@(() => startDate)" />*@
+            </div>
+        </div>
+    </div>
+
+@code {
+
+    int PageSize { get; set; } = 10;
+
+    RadzenDataGrid<Element> eventsGrid;
+
+    List<Element> sensors;
+
+    [Parameter]
+    public Structure Structure { get; set; }
+
+    private IList<Element> selectedSensors { get; set; }
+
+    DateTime startDate { get; set; } = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+    DateTime endDate { get; set; } = DateTime.UtcNow;
+
+    [Parameter]
+    public EventCallback<(bool, Element, ChannelDataType, DateTime, DateTime)> OnPlotRaised { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var sensingDeviceTypes = await entitiesService.GetFilteredEntitiesAsync<ElementType>(x => x.Category?.Name?.ToLower() == "sensing device", "Category");
+        foreach (var sdt in sensingDeviceTypes)
+        {
+            entitiesService.LoadCollection(sdt, "ChannelDataTypeElementTypes");
+            foreach (var v in sdt.ChannelDataTypeElementTypes)
+            {
+                entitiesService.LoadReference(v, "ChannelDataType");
+            }
+        }
+
+
+        var sensingDeviceTypesIds = sensingDeviceTypes.Select(x => x.ElementTypeId);
+        sensors = await entitiesService.GetFilteredEntitiesAsync<Element>(a => ((a.StructureId == Structure.StructureId) && (sensingDeviceTypesIds.Contains(a.ElementTypeId ?? new Guid()))));
+    }
+
+    async Task RowSelect(Element sensor)
+    {
+
+        //   selectedEvent = sensor;
+    }
+
+    private async Task plot(bool args, Element sensor, ChannelDataType channelDataType)
+    {
+        await OnPlotRaised.InvokeAsync((args, sensor, channelDataType, startDate, endDate));
+    }
+
+}

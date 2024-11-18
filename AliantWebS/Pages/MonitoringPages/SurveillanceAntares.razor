@@ -1,0 +1,58 @@
+﻿@page "/SurveillanceAntares/{StructureID:guid}"
+@page "/SurveillanceAntares"
+
+@using AliantWebS.Data
+@using Models
+@inject AppData appData;
+@inject EntitiesService entitiesService
+@inject NavigationManager navigationManager
+@inject IStringLocalizer<Languages> L
+
+<RadzenTabs Change=@OnChange TabPosition="Radzen.TabPosition.Top" RenderMode="TabRenderMode.Server">
+    <Tabs>
+        <RadzenTabsItem Text="Tableau de bord">
+            <DashBoardComponent2></DashBoardComponent2>
+        </RadzenTabsItem>
+        <RadzenTabsItem Text="Surveillance">
+            @if (appData.Structure is null)
+            {
+                <p><em>@L["Loading"]... !</em></p>
+            }
+            else
+            {
+                <SurveillanceCapteursAntares Structure="appData.Structure" ></SurveillanceCapteursAntares>
+            }
+        </RadzenTabsItem>
+        <RadzenTabsItem Text="Corrélation">
+            <CorrelationComponent Structure="appData.Structure"></CorrelationComponent>
+        </RadzenTabsItem>
+    </Tabs>
+</RadzenTabs>
+
+@code {
+
+    [Parameter]
+    public Guid? StructureID { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (appData.Structure == null)
+        {
+            if (StructureID != null)
+            {
+                appData.Structure = await entitiesService.GetFilteredFirstEntityAsync<Structure>(x => x.StructureId.ToString() == StructureID.ToString());
+            }
+            if (appData.Structure == null)
+            {
+                navigationManager.NavigateTo(@"/Structures");
+            }
+        }
+
+    }
+
+    void OnChange(int index)
+    {
+
+    }
+
+}

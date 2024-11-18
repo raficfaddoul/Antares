@@ -1,0 +1,51 @@
+﻿@page "/InspectionResultTypeElementTypes/{CallerID:guid}"
+@using Models
+@using AliantWebS.Data
+@inject AliantWebS.Data.AppData AppData
+@inject EntitiesService entitiesService
+
+
+
+
+<AliantWebS.Pages.TypesPages.JunctionsComponent Titre=@titre
+                                                TItem1="InspectionResultType"
+                                                TItem2="ElementType"
+                                                TItem3="InspectionResultTypeElementType"
+                                                CallerID=@CallerID
+                                                TItem1IdName="InspectionResultTypeId"
+                                                TItem2IdName="ElementTypeId"
+                                                InspectionResultTypeElementTypesCollection=@inspectionResultType.InspectionResultTypeElementTypes
+                                                OnValidSubmit="@Update">
+
+</AliantWebS.Pages.TypesPages.JunctionsComponent>
+
+
+
+@code {
+
+    [Parameter]
+    public Guid CallerID { get; set; }
+
+    public string titre { get; set; }
+
+    InspectionResultType inspectionResultType;
+
+    public override async Task SetParametersAsync(ParameterView parameters)
+    {
+        inspectionResultType = (InspectionResultType)AppData.obj;
+        entitiesService.LoadCollection(inspectionResultType, "InspectionResultTypeElementTypes");
+        await base.SetParametersAsync(parameters);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        titre = "Defect Type \"" + inspectionResultType.Name + "\" Element Types Association";
+    }
+
+    protected async void Update()
+    {
+        await entitiesService.UpdateEntityAsync(inspectionResultType);
+    }
+
+}

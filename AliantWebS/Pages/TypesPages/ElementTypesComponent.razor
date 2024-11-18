@@ -1,0 +1,313 @@
+﻿@using AliantWebS.Data
+@inject EntitiesService entitiesService
+@inject NavigationManager navigationManager
+@inject IJSRuntime js
+@inject AliantWebS.Data.AppData AppData
+@using Models
+@inject IStringLocalizer<Languages> L
+
+<style>
+    .f {
+        margin: 0px
+    }
+
+</style>
+
+@if (categoriesList is null)
+{
+    <p><em>@L["Loading"]... !</em></p>
+}
+else
+{
+    <EditForm Model="@categoriesList">
+        <Div class="form-group">
+            <label for="Category" class="control-label">@L["Category"]</label>
+            <InputSelect TValue="Guid" class="form-control" @bind-Value=@CategoryID @onclick="CategoryClicked">
+                @foreach (var categ in categoriesList)
+                {
+                    <option value="@categ.CategoryId">@categ.Name</option>
+
+                }
+            </InputSelect>
+        </Div>
+    </EditForm>
+}
+
+
+
+<Div Style="display: flex">
+    <h3>@L["Elements Types"]</h3>
+    <div style="margin-left: auto; ">
+        <Label> @L["Page Size"]: &nbsp;&nbsp;</Label>
+        <RadzenNumeric @bind-Value="PageSize" Style="width:60px"></RadzenNumeric>
+    </div>
+</Div>
+
+
+@if (selectedCategory?.ElementTypes is null)
+{
+    <p><em>@L["Loading"]... !</em></p>
+}
+else
+{
+    <a class="nav-link" @onclick="@(args => InsertElementType())" @onclick:preventDefault="true" href="">
+    <span class="oi oi-plus" aria-hidden="true">@L["Add New"]</span>
+</a>
+
+    <EditForm Model="@selectedCategory.ElementTypes">
+
+
+        <RadzenDataGrid @ref="ElementTypeDataGrid" AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="PageSize"
+                    Data="@selectedCategory.ElementTypes" TItem="ElementType" @bind-Value="@SelectedElementTypes" ColumnWidth="150px"
+                    @onclick="OnChange">
+            <Columns>
+
+                <RadzenDataGridColumn Width="50" TItem="ElementType" Property="Name">
+                    <HeaderTemplate>
+                        <span class="gridColumndStyle">@L["Name"]</span>                    <br />
+                    </HeaderTemplate>
+                    <EditTemplate Context="elementType">
+                        <InputTextArea @bind-Value="elementType.Name" Style="width:100%" />
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn Width="50" TItem="ElementType" Property="Description">
+                    <HeaderTemplate>
+                        <span class="gridColumndStyle">@L["Description"]</span>                    <br />
+                    </HeaderTemplate>
+                    <EditTemplate Context="elementType">
+                        <InputTextArea @bind-Value="elementType.Description" Style="width:100%" />
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+
+
+
+                <RadzenDataGridColumn Width="50" TItem="ElementType">
+                    <HeaderTemplate>
+                        <span class="gridColumndStyle">@L["Element Category"]</span>                    <br />
+                    </HeaderTemplate>
+                    <Template Context="elementType">
+                        @elementType?.Category?.Name
+                    </Template>
+                    <EditTemplate Context="elementType">
+                        @*                        <InputSelect TValue="int" class="form-control" @bind-Value=elementType.CategoryId>
+                    @foreach (var category in categoriesList)
+                    {
+
+                    <option value="@category.CategoryId">@category.Name</option>
+
+                    }
+                    </InputSelect>*@
+
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+
+
+                <RadzenDataGridColumn Width="30" TItem="ElementType" Title="@L["Icon"]" Property="Icon">
+                    <Template Context="data">
+                        <IconComponent TItem1="ElementType" data="data"></IconComponent>
+                    </Template>
+                </RadzenDataGridColumn>
+
+                @* <RadzenAutoComplete Placeholder="Select a customer..." Data=@customers TextProperty="CompanyName" Change=@(args => OnChange(args, "AutoComplete with placeholder")) Style="width: 100%;" />*@
+
+
+                <RadzenDataGridColumn Width="50" TItem="ElementType" Property="PULMONARY_TOXICITY" Title="@L["Action"]" Filterable="false" Sortable="false">
+                    <Template Context="data">
+                        <Div Style="display: flex">
+                            <a title="@L["Edit"]" class="nav-link" @onclick="@(args => EditRow(data))" @onclick:preventDefault="true" href="">
+                                <!--href="/patient/EditSideEffectComponent/@data.SideEffectID-->
+                                <span class="oi oi-pencil" aria-hidden="true"></span>
+                            </a>
+                            <a title="@L["End Edit"]" class="nav-link" @onclick="@(args => UpdateRow(data))" @onclick:preventDefault="true" href="">
+                                <span class="oi oi-check" aria-hidden="true"></span>
+                            </a>
+                            <a title="@L["Delete"]" class="nav-link" @onclick="@(() => DeleteElementType(data))" @onclick:preventDefault="true" href="">
+                                <span class="oi oi-trash" aria-hidden="true"></span>
+                            </a>
+                        </Div>
+                        <Div Style="display: flex">
+                            <a title="@L["Inspection Result Types"]" class="nav-link f" @onclick="@(args => InspectionResultTypes(data))" @onclick:preventDefault="true" href="">
+                                <span class="oi oi-tag" aria-hidden="true"></span>
+                            </a>
+                            <a title="@L["Defect Types"]" class="nav-link f" @onclick="@(args => DefectsTypes(data))" @onclick:preventDefault="true" href="">
+                                <span class="fas fa-bug" aria-hidden="true"></span>
+                            </a>
+
+                            <a title="@L["Flag Types"]" class="nav-link f" @onclick="@(args => FlagsTypes(data))" @onclick:preventDefault="true" href="">
+                                <span class="oi oi-flag" aria-hidden="true"></span>
+                            </a>
+                            <a title="@L["Attributes Types"]" class="nav-link f" @onclick="@(args => AttributesTypes(data))" @onclick:preventDefault="true" href="">
+                                <span class="fa fa-tasks" aria-hidden="true"></span>
+                            </a>
+                            <a title="@L["Data Channel Types"]" class="nav-link f" @onclick="@(args => ChannelDataTypes(data))" @onclick:preventDefault="true" href="">
+                                <span class="fas fa-network-wired" aria-hidden="true"></span>
+                            </a>
+                        </Div>
+                    </Template>
+
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+    </EditForm>
+
+}
+
+
+@code {
+    int PageSize { get; set; } = 10;
+
+    [Parameter]
+    public EventCallback<IList<ElementType>> SelectedElementTypesChanged { get; set; }
+
+    [Parameter]
+    public IList<ElementType> SelectedElementTypes { get; set; }
+
+    RadzenDataGrid<ElementType> ElementTypeDataGrid;
+  
+
+
+
+    //      List<ElementType> elementTypesList = new List<ElementType>();
+
+    List<Category> categoriesList = new List<Category>();
+
+
+    Guid CategoryID { get; set; }
+    Category selectedCategory { get; set; }
+
+
+    //  IEnumerable<SideEffect> sideEffectsList;
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        await Task.WhenAll(entitiesService.tasksList);
+
+        categoriesList = await entitiesService.GetAllEntitiesAsync<Category>("ElementTypes");
+        if (categoriesList.Count > 0)
+        {
+            selectedCategory = categoriesList[0];
+            CategoryID = selectedCategory.CategoryId;
+
+        }
+        //    elementTypesList = await Task.Run(() => entitiesService.GetAllEntitiesAsync<ElementType>());
+
+    }
+
+
+    protected async void CategoryClicked()
+    {
+
+        //    int categoryID = Int32.Parse(categoryEvent.Value.ToString());
+
+        selectedCategory = categoriesList.Find(x => x.CategoryId == CategoryID);
+
+        //  elementTypesList = await Task.Run(() => entitiesService.GetFilteredEntitiesAsync<ElementType>(a => a.CategoryId == categoryID));
+
+
+        this.StateHasChanged();
+    }
+
+
+    async Task DeleteElementType(ElementType elementType)
+    {
+        if (await entitiesService.DeleteEntityAsync(elementType))
+        {
+            //   if (selectedCategory.ElementTypes.Remove(elementType))
+            //  {
+            await ElementTypeDataGrid.Reload();
+
+            //  }
+        }
+
+
+        //    await js.InvokeVoidAsync("alert", $"Updated Successfully!");
+        //    sideEffectsList = await httpClient.GetFromJsonAsync<SideEffect[]>($"api/sideEffect/4/{EvaluationID}");
+        // uriHelper.NavigateTo("/patient/evaluations/" + PatientID);
+
+    }
+
+    void EditRow(ElementType elementType)
+    {
+
+        ElementTypeDataGrid.EditRow(elementType);
+
+    }
+
+    async Task InsertElementType()
+    {
+        ElementType elementType = new ElementType();
+
+        if ((await entitiesService.InsertEntityAsync(elementType)) != null)
+        {
+            selectedCategory.ElementTypes.Add(elementType);
+
+            await ElementTypeDataGrid.InsertRow(elementType);
+
+        }
+        else
+        {
+            await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
+        }
+
+
+    }
+
+    async Task UpdateRow(ElementType elementType)
+    {
+        if (await entitiesService.UpdateEntityAsync(elementType))
+        {
+            await ElementTypeDataGrid.UpdateRow(elementType);
+        }
+
+
+    }
+
+
+    async Task InspectionResultTypes(ElementType elementType)
+    {
+
+        AppData.obj = elementType;
+
+        navigationManager.NavigateTo("/ElementTypeInspectionResultTypes/" + elementType.ElementTypeId);
+    }
+
+    async Task DefectsTypes(ElementType elementType)
+    {
+        AppData.obj = elementType;
+
+        navigationManager.NavigateTo("/ElementTypeDefectTypes/" + elementType.ElementTypeId);
+
+    }
+
+    async Task FlagsTypes(ElementType elementType)
+    {
+        AppData.obj = elementType;
+
+        navigationManager.NavigateTo("/ElementTypeFlagTypes/" + elementType.ElementTypeId);
+    }
+
+    async Task AttributesTypes(ElementType elementType)
+    {
+        AppData.obj = elementType;
+
+        navigationManager.NavigateTo("/ElementTypeAttributeTypes/" + elementType.ElementTypeId);
+    }
+
+    async Task ChannelDataTypes(ElementType elementType)
+    {
+        AppData.obj = elementType;
+
+        navigationManager.NavigateTo("/ElementTypeChannelDataTypes/" + elementType.ElementTypeId);
+    }
+
+    async Task OnChange()
+    {
+
+        await SelectedElementTypesChanged.InvokeAsync(SelectedElementTypes);
+
+
+    }
+
+
+}

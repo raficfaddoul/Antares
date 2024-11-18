@@ -1,0 +1,58 @@
+﻿@page "/EditStructure/{StructureID:guid}"
+@using AliantWebS.Data
+@using AliantWebS.Models
+@inject EntitiesService entitiesService
+@inject NavigationManager navigationManager
+@inject AppData appData
+@inject IJSRuntime js
+@inject IStringLocalizer<Languages> L
+
+
+<NavigationLock OnBeforeInternalNavigation="appData.OnBeforeInternalNavigation" ConfirmExternalNavigation="appData.SaveConfirmation&& appData.SaveChanges" />
+
+@if (structure != null)
+{
+    <StructureFormComponent Title="@L["Edit Structure"]" ButtonText=@buttonText Structure="@structure"
+                        OnValidSubmit="@UpdateStructure" />
+}
+
+
+
+
+
+@code {
+    string buttonText = "Updated";
+
+    private EditContext EditContext { get; set; }
+
+    [Parameter]
+    public Guid StructureID { get; set; }
+
+    Structure structure;
+
+    public override async Task SetParametersAsync(ParameterView parameters)
+    {
+
+        await base.SetParametersAsync(parameters);
+
+        //EditContext = new EditContext(structure);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        structure = await Task.Run(() => entitiesService.GetEntityAsync<Structure>(StructureID));
+        appData.Structure = structure;
+
+    }
+
+
+    protected async void UpdateStructure()
+    {
+        await entitiesService.UpdateEntityAsync(structure);
+        //navigationManager.NavigateTo("Structures");
+    }
+
+
+
+
+}

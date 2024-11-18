@@ -1,0 +1,432 @@
+﻿@page "/EquipementAssignment"
+@using AliantWebS.Data
+@using AliantWebS.Models
+@using System.Collections.Immutable
+@inject AppData appData;
+@inject NavigationManager navigationManager
+@inject EntitiesService entitiesService
+@inject IStringLocalizer<Languages> L
+@inject IJSRuntime js
+@layout MainLayout
+
+@if ((equipementsList is null) || (events is null))
+{
+    <p><em>@L["Loading"]... !</em></p>
+}
+<RadzenSplitter Orientation="Radzen.Orientation.Horizontal" Style="height: 100%; border: 1px solid rgba(0,0,0,.08);">
+    <RadzenSplitterPane Size="50%">
+        <RadzenSplitter Orientation="Radzen.Orientation.Vertical" style="height: 100%; border: 1px solid rgba(0,0,0,.08);">
+            <RadzenSplitterPane Size="40%">
+                <RadzenDataGrid AllowFiltering="false" AllowPaging="true" AllowSorting="false" PageSize="10"
+                                Data="@equipementTypes" TItem="EquipementType" ColumnWidth="100px" AllowColumnResize="true">
+                    <Columns>
+                        <RadzenDataGridColumn TItem="EquipementType" Property="Name" Title="@L["Name"]" />
+                        <RadzenDataGridColumn TItem="EquipementType" Property="Weight" Title="@L["Weight"]" Width="30px" />
+                        <RadzenDataGridColumn TItem="EquipementType" Property="Description" Title="@L["Description"]" />
+
+                        <RadzenDataGridColumn TItem="EquipementType" Property="Description" Title="@L["Action"]" Width="30px">
+                            <Template Context="equipementType">
+                                <Div Style="display: flex">
+                                    <RadzenCheckBox TValue=bool Change=@(args => OnChangeSelectedSourceTypes(args,equipementType))></RadzenCheckBox>
+                                </Div>
+                            </Template>
+
+                        </RadzenDataGridColumn>
+                    </Columns>
+                </RadzenDataGrid>
+            </RadzenSplitterPane>
+            <RadzenSplitterPane Size="60%">
+                <div style="display: flex; align-items: center; margin-left: auto;">
+                    <Label>Page Size: &nbsp;&nbsp;</Label>
+                    <RadzenNumeric @bind-Value="PageSize" Style="width: 60px; margin-right: 10px;"></RadzenNumeric>
+                    <RadzenDropDown @bind-Value="@SelectedEvent" AllowSelectAll="false" Style="width: 200px;"
+                                    Change="@EventChanged" Data="@events" TextProperty="Name" />
+                </div>
+
+                <RadzenDataGrid class="RadzenDataGrid" @ref="equipementsGrid" AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="PageSize" RowSelect=@RowSelect
+                                Data="@equipementsList" TItem="Equipement" AllowColumnResize="true">
+                    <Columns>
+                        <RadzenDataGridColumn TItem="Equipement" Property="Name" Title="@L["Name"]" Width="200px"></RadzenDataGridColumn>
+                        <RadzenDataGridColumn TItem="Equipement" Property="Description" Title="@L["Description"]"></RadzenDataGridColumn>
+
+                        <RadzenDataGridColumn TItem="Equipement" Property="Name" Title="@L["Action"]" Filterable="false" Sortable="false" Width="30px">
+                            <Template Context="data">
+                                <Div Style="display: flex">
+                                    <a title="@L["Delete"]" @onclick="@(() => DeleteEvent(data))" @onclick:preventDefault="true" href="">
+                                        <span class="oi oi-trash" aria-hidden="true"></span>
+                                    </a>
+                                </Div>
+                            </Template>
+
+                        </RadzenDataGridColumn>
+                    </Columns>
+                </RadzenDataGrid>
+
+
+            </RadzenSplitterPane>
+        </RadzenSplitter>
+
+    </RadzenSplitterPane>
+    <RadzenSplitterPane>
+
+        <RadzenSplitter Orientation="Radzen.Orientation.Vertical" style="height: 100%; border: 1px solid rgba(0,0,0,.08);">
+
+            <RadzenSplitterPane Size="40%">
+                <AliantWebS.Pages.InventoryElementPages.BIMComponent Structure="appData.Structure" EquipementTypes=selectedEquipementTypes Equipements="equipementsList" OnAddItem="HandleAddItem"
+                                                                     eventt="@SelectedEvent"></AliantWebS.Pages.InventoryElementPages.BIMComponent>
+            </RadzenSplitterPane>
+            <RadzenSplitterPane Size="60%">
+                <div style="margin-left: auto;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                        <Blazorise.Button Clicked="@Verify" Color="Blazorise.Color.Primary">
+                            @if (!isVerifying)
+                            {
+                                @L["Verify"]
+                            }
+                            else
+                            {
+                                <i class="fas fa-spinner fa-spin"></i>
+                            }
+                        </Blazorise.Button>
+
+                        <!-- Added a container div for the label with flex-grow to ensure it takes up available space -->
+                        <div style="text-align: center; flex-grow: 1;">
+                            <Blazorise.Label>
+                                <strong style="color: red;">@conclusion</strong>
+                            </Blazorise.Label>
+                        </div>
+                    </div>
+
+                    <RadzenDataGrid class="RadzenDataGrid" @ref="structuresGrid" AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="PageSize"
+                                    Data="@resultat" TItem="(Guid nodeid, double chargeAdmissible, double chargeReelle)" ColumnWidth="150px" AllowColumnResize="true">
+                        <Columns>
+                            @*                    <RadzenDataGridColumn TItem="Structure" Property="StructureId" Title="Structure Id"></RadzenDataGridColumn>*@
+                            <RadzenDataGridColumn TItem="(Guid nodeid, double chargeAdmissible, double chargeReelle)" Property="Name" Title="@L["Name"]" TextAlign="TextAlign.Center">
+                                <Template Context="context">
+                                    @nodemap[context.nodeid]                                   
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="(Guid nodeid, double chargeAdmissible, double chargeReelle)" Property="chargeReelle" Title="@L["Charge Reelle"]" TextAlign="TextAlign.Center">
+                                <Template Context="context">
+                                    @context.chargeReelle.ToString("0.#")
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="(Guid nodeid, double chargeAdmissible, double chargeReelle)" Property="chargeAdmissible" Title="@L["Charge Admissible"]" TextAlign="TextAlign.Center">
+                                <Template Context="context">
+                                    @context.chargeAdmissible
+                                </Template>
+                            </RadzenDataGridColumn>
+
+                            <RadzenDataGridColumn TItem="(Guid nodeid, double chargeAdmissible, double chargeReelle)" Property="Length" Title="@L["Taux d'utilisation"]" Filterable="false" Sortable="false" Width="200px" TextAlign="TextAlign.Center">
+                                <Template Context="context">
+                                    @{
+                                        // Check if chargeAdmissible is not zero to avoid division by zero error
+                                        if (context.chargeAdmissible != 0)
+                                        {
+                                            // Calculate the ratio and format it as a percentage
+                                            var utilization = (context.chargeReelle / context.chargeAdmissible) * 100;
+                                            <span>@utilization.ToString("0.##") %</span>
+                                            // Formats the number with two decimal places
+                                        }
+                                        else
+                                        {
+                                            <span>N/A</span>
+                                            // Display N/A or any other placeholder when chargeAdmissible is zero
+                                        }
+                                    }
+
+                                </Template>
+
+                            </RadzenDataGridColumn>
+                        </Columns>
+                    </RadzenDataGrid>
+                
+                
+                </div>
+            </RadzenSplitterPane>
+        </RadzenSplitter>
+    </RadzenSplitterPane>
+</RadzenSplitter>
+
+
+@code {
+
+    RadzenDataGrid<(Guid nodeid, double chargeAdmissible, double chargeReelle)> structuresGrid;
+
+    [Parameter]
+    public int StructureId { get; set; }
+
+    List<EquipementType> equipementTypes;
+
+    List<EquipementType> selectedEquipementTypes = new List<EquipementType>();
+
+    ImmutableList<Equipement> equipementsList;
+
+    Equipement selectedEquipement;
+
+    RadzenDataGrid<Equipement> equipementsGrid;
+
+    List<Event> events;
+
+    List<(Guid nodeid, double chargeAdmissible, double chargeReelle)> resultat = new List<(Guid, double, double)>();
+
+    Dictionary<Guid, string> nodemap = new Dictionary<Guid, string>();
+
+
+    private Event selectedEvent;
+
+    public Event SelectedEvent
+    {
+        get { return selectedEvent; }
+        set
+        {
+            selectedEvent = value;
+            //  EventChanged();
+        }
+    }
+
+    int PageSize { get; set; } = 10;
+
+    bool isVerifying = false;
+
+    string conclusion = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (appData.Structure == null)
+        {
+            navigationManager.NavigateTo(@"/Structures");
+        }
+        events = await entitiesService.GetFilteredEntitiesAsync<Event>(x => x.StructureId == appData.Structure.StructureId);
+        if (events.Count == 0)
+        {
+            await js.InvokeVoidAsync("alert", "No events are associated with this structure");
+            navigationManager.NavigateTo(@"/Structures");
+        }
+        selectedEvent = events.First();
+        appData.appDataElements = await entitiesService.GetFilteredEntitiesAsync<Element>(x => x.StructureId == appData.Structure.StructureId, "Equipements");
+        equipementTypes = await entitiesService.GetAllEntitiesAsync<EquipementType>();
+        equipementsList = appData.appDataElements.SelectMany(element => element.Equipements).Where(x => x.EventId == SelectedEvent.EventId).ToImmutableList();
+
+    }
+
+    void EventChanged()
+    {
+
+        equipementsList = appData.appDataElements.SelectMany(element => element.Equipements).Where(x => x.EventId == SelectedEvent.EventId).ToImmutableList();
+        StateHasChanged();
+    }
+
+    async Task OnChangeSelectedSourceTypes(bool args, EquipementType equipementType)
+    {
+        if (args)
+        {
+            selectedEquipementTypes.Add(equipementType);
+        }
+        else
+        {
+            selectedEquipementTypes.Remove(equipementType);
+        }
+    }
+
+    async Task RowSelect(Equipement equipement)
+    {
+        //   navigationManager.NavigateTo(@"/defects");
+        selectedEquipement = equipement;
+        //   StateHasChanged();
+
+    }
+
+    private async Task HandleAddItem(Equipement newItem)
+    {
+        equipementsList = equipementsList.Add(newItem);
+
+        await equipementsGrid.Reload();
+        StateHasChanged();
+    }
+
+    async Task DeleteEvent(Equipement equipement)
+    {
+        var isConfirmed = await js.InvokeAsync<bool>("confirm", $"Are you sure you want to delete this event?");
+
+        if (isConfirmed)
+        {
+            try
+            {
+                if (await entitiesService.DeleteEntityAsync(equipement))
+                {
+                    equipementsList = equipementsList.Remove(equipement);
+
+                    await equipementsGrid.Reload();
+
+
+                }
+            }
+            catch (Exception ex)
+            {
+                await js.InvokeVoidAsync("alert", "Error: " + ex.Message);
+            }
+        }
+    }
+
+    private async Task Verify()
+    {
+        if (isVerifying) return;
+
+        isVerifying = true;
+
+
+
+        StateHasChanged();
+        await Task.Delay(500);
+        resultat.Clear();
+        nodemap.Clear();
+
+
+        var v = await Structural.Simulation.Verify(appData.Structure, entitiesService);
+
+        resultat = v.resultat;
+
+        foreach(var n in v.noeudsSurCables)
+        {
+            nodemap.Add(n.nst.ElementId, n.nst.Name);
+
+        }
+
+        Dictionary<Guid, double> dic = new Dictionary<Guid, double>();
+
+        foreach(var res in resultat)
+        {
+            dic.Add(res.nodeid, res.chargeReelle / res.chargeAdmissible);
+        }
+        Dictionary<Guid, double> tauxUtilisation = new Dictionary<Guid, double>();
+        foreach(var b in v.beams)
+        {
+            if (b.AttributeElements.Count == 0)
+            {
+                entitiesService.LoadCollection(b, "AttributeElements");
+            }
+
+            var attributes = await entitiesService.GetFilteredEntitiesAsync<AttributeElement>(e => e.ElementId == b.ElementId && e.AttributeType.Name.Contains("Noeud"), "AttributeType");
+            // var attributes = entitiesService._appDBContext.AttributeElements
+            //             .Include(a => a.AttributeType).Where(e => e.ElementId == el.ElementId && e.AttributeType.Name.Contains("Noeud"));
+
+            var at1 = attributes.FirstOrDefault(a => a.AttributeType.Name == "Noeud1");
+            var at2 = attributes.FirstOrDefault(a => a.AttributeType.Name == "Noeud2");
+
+            var localNodes = await entitiesService.GetFilteredEntitiesAsync<Element>(n => (n.StructureId == appData.Structure.StructureId) && ((n.Name == at1.Value) || (n.Name == at2.Value)));
+
+            var n1 = localNodes.Find(x => x.Name == at1.Value);
+            var n2 = localNodes.Find(x => x.Name == at2.Value);
+            double tau =0 ;
+
+            if (dic.Keys.Contains(n1.ElementId))
+            {
+                tau = dic[n1.ElementId];
+            }
+            if (dic.Keys.Contains(n2.ElementId))
+            {
+                if (dic[n2.ElementId] > tau)
+                {
+                    tau = dic[n2.ElementId];
+                }
+            }
+
+            tauxUtilisation.Add(b.ElementId, Math.Min(tau,1));
+
+            if (tau > 0.99)
+            {
+                conclusion = "Structure instable   ";
+            }
+
+        }
+
+        if (conclusion == string.Empty)
+        {
+            conclusion = "Structure stable   ";
+        }
+
+        List<Element> els = await entitiesService.GetFilteredEntitiesAsync<Element>(x => x.StructureId == appData.Structure.StructureId && x.ElementType != null && x.ElementType.Name == "Beam3d", "ElementType");
+        Dictionary<long, Guid> instanceIdsList = els
+            .Where(x => x.BimId.HasValue)
+            .ToDictionary(x => x.BimId.Value, x => x.ElementId);
+
+        var colors = AliantWebS.Pages.InventoryElementPages.BIMComponent.GenerateBlueToRedColors(101);
+
+        int i = 0;
+        foreach (var inst in instanceIdsList)
+        //for (int i =0; i<l.Count; i++)
+        {
+            if (!tauxUtilisation.Keys.Contains(inst.Value)) continue;
+            var tt = (int)tauxUtilisation[inst.Value] * 100;
+
+            List<long> ins = new List<long>() { inst.Key };
+
+            await js.InvokeVoidAsync("ColorElement", tt, ins.ToArray(), colors[tt].r, colors[tt].g, colors[tt].b);
+            i++;
+        }
+        this.StateHasChanged();
+
+
+        isVerifying = false;
+        await structuresGrid.Reload();
+        StateHasChanged();
+
+        double tauxMoyen =0;
+        double TauxMaximal = 0;
+        double ptaux0_25 =0;
+        double ptaux25_50 =0;
+        double ptaux50_75 =0;
+        double ptaux75_100 =0;
+        foreach(var t in tauxUtilisation)
+        {
+            tauxMoyen += t.Value;
+            if (t.Value > TauxMaximal)
+            {
+                TauxMaximal = t.Value;
+            }
+
+            if (t.Value < 0.25)
+            {
+                ptaux0_25++;
+            }
+            else if (t.Value<0.5)
+            {
+                ptaux25_50++;
+            }
+            else if (t.Value < 0.75)
+            {
+                ptaux50_75++;
+            }
+            else
+            {
+                ptaux75_100++;
+            }
+
+
+        }
+
+        tauxMoyen = 2*tauxMoyen / tauxUtilisation.Count;
+
+        ptaux0_25 = ptaux0_25 / tauxUtilisation.Count;
+        ptaux25_50 = ptaux25_50 / tauxUtilisation.Count;
+        ptaux50_75 = ptaux50_75 / tauxUtilisation.Count;
+        ptaux75_100 = ptaux75_100 / tauxUtilisation.Count;
+
+        Structural.IdentificationResult ir = new Structural.IdentificationResult();
+        ir.TauxMoyen = tauxMoyen;
+        ir.Ptaux0_25 = ptaux0_25;
+        ir.Ptaux25_50 = ptaux25_50;
+        ir.Ptaux50_75 = ptaux50_75;
+        ir.Ptaux75_100 = ptaux75_100;
+        ir.TauxMaximal = TauxMaximal;
+        ir.TauxDetravail = tauxUtilisation;
+
+        
+
+         await ir.Save(appData.Structure);
+
+
+    }
+
+}

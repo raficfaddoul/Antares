@@ -1,0 +1,426 @@
+﻿@page "/SensorData/{ListJson}"
+@using AliantWebS.Data
+@inject EntitiesService entitiesService
+@using Models
+@inject AliantWebS.Data.AppData AppData
+@using System.Numerics;
+@using Accord.Math;
+@using System.Text.Json;
+@using System.Globalization;
+@using System;
+@using System.Threading.Tasks;
+@inject Radzen.DialogService DialogService
+
+@layout InventoryElementPages.ElementsLayout
+
+
+@if (somethingToPresent)
+{
+    <h2>@title</h2>
+    @if (channelDataTypeList is null)
+    {
+        <p><em>Loading... !</em></p>
+    }
+    else
+    {
+        <EditForm Model="@st" OnValidSubmit="@OnValidSubmit">
+
+            <Blazorise.Row>
+                <Column ColumnSize="ColumnSize.Is4">
+
+                    <RadzenDataGrid AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="10" RowSelect=@RowSelect
+                            Data="@channelDataTypeList" TItem="ChannelDataType" ColumnWidth="150px">
+                        <Columns>
+                            <RadzenDataGridColumn TItem="ChannelDataType" Property="Name" Title="Channel Data Type"></RadzenDataGridColumn>
+
+
+                            <RadzenDataGridColumn TItem="ChannelDataType" Property="Description" Title="Action" Width="30px">
+                                <Template Context="channelDataType">
+                                    <Div Style="display: flex">
+                                        <RadzenCheckBox TValue=bool Change=@(args => OnChangeSelectedChannelDataType(args,channelDataType))></RadzenCheckBox>
+
+                                    </Div>
+                                </Template>
+
+                            </RadzenDataGridColumn>
+                        </Columns>
+                    </RadzenDataGrid>
+                </Column>
+                <Column ColumnSize="ColumnSize.Is4">
+                    <RadzenDataGrid AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="10" RowSelect=@RowSelect
+                            Data="@elements" TItem="Element" ColumnWidth="150px">
+                        <Columns>
+                            <RadzenDataGridColumn TItem="Element" Property="Name" Title="Element"></RadzenDataGridColumn>
+
+
+                            <RadzenDataGridColumn TItem="Element" Property="Description" Title="Action" Width="30px">
+                                <Template Context="element">
+                                    <Div Style="display: flex">
+                                        <RadzenCheckBox TValue=bool Change=@(args => OnChangeSelectedElement(args,element))></RadzenCheckBox>
+
+                                    </Div>
+                                </Template>
+
+                            </RadzenDataGridColumn>
+                        </Columns>
+                    </RadzenDataGrid>
+
+
+
+                </Column>
+
+                 <Column ColumnSize="ColumnSize.Is4">
+                     </Column>
+
+            </Blazorise.Row>
+            <Blazorise.Row>
+                <PlotlyChart style="height:100%" @bind-Config="config" @bind-Layout="layout" @bind-Data="data" @ref=chart />
+            </Blazorise.Row>
+            <Blazorise.Row>
+                <PlotlyChart style="height:100%" @bind-Config="config1" @bind-Layout="layout1" @bind-Data="data1" @ref=chart1 />
+            </Blazorise.Row>
+
+
+        </EditForm>
+
+
+    }
+    @if (oneElement)
+    {
+        <label>
+            Upload up to @maxAllowedFiles of up to @maxFileSize bytes:
+            <InputFile OnChange="@LoadDataFiles" multiple>kjkkh5</InputFile>
+
+        </label>
+    }
+
+}
+
+
+@code {
+    private static readonly string Token = "YwhDlJHxjnsQgGON-mj2yKNPuVeKQZuz4MEeAUtHWP2k39pOmn2a_KtXLdro6foOMq9Pnz4iyoJKijp7XbBWfg==";
+
+
+    private long maxFileSize = 1024 * 15;
+    private int maxAllowedFiles = 3;
+
+    PlotlyChart chart;
+    Plotly.Blazor.Config config = new Plotly.Blazor.Config();
+    Plotly.Blazor.Layout layout = new Plotly.Blazor.Layout();
+    // Using of the interface IList is important for the event callback!
+    IList<ITrace> data = new List<ITrace>();
+
+    PlotlyChart chart1;
+    Plotly.Blazor.Config config1 = new Plotly.Blazor.Config();
+    Plotly.Blazor.Layout layout1 = new Plotly.Blazor.Layout();
+    // Using of the interface IList is important for the event callback!
+    IList<ITrace> data1 = new List<ITrace>();
+
+    bool somethingToPresent = false;
+    bool oneElement = false;
+
+    Structure st = new Structure();
+
+    [Parameter]
+    public string ListJson { get; set; }
+
+    List<Guid?> elementsIDs;
+    IEnumerable<Guid?> elementTypesIDs;
+
+    List<Element> elements;
+    public List<Element> selectedElements { get; set; } = new List<Element>();
+
+
+    [Parameter] public EventCallback OnValidSubmit { get; set; }
+
+
+
+    string title;
+
+    List<string> pathsForFiles;
+
+
+
+    List<ChannelDataTypeElementType> channelDataTypeElementTypeList;
+    List<ChannelDataType> channelDataTypeList;
+
+    public List<ChannelDataType> selectedChannelDataType { get; set; } = new List<ChannelDataType>();
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+
+
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (chart != null)
+        {
+            await chart.Update();
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        somethingToPresent = false;
+
+        elementsIDs = JsonSerializer.Deserialize<List<Guid?>>(ListJson);
+
+        elements = await entitiesService.GetFilteredEntitiesAsync<Element>(a => (elementsIDs.Contains(a.ElementId) && (a.ElementType.ChannelDataTypeElementTypes.Count > 0)), "ElementType.ChannelDataTypeElementTypes");
+
+
+        elementTypesIDs = elements.Select(x => x.ElementTypeId);
+
+        channelDataTypeElementTypeList = await entitiesService.GetFilteredEntitiesAsync<ChannelDataTypeElementType>(a => elementTypesIDs.Contains(a.ElementTypeId), "ChannelDataType");
+
+        channelDataTypeList = channelDataTypeElementTypeList.Select(x => x.ChannelDataType).ToList();
+
+        if (channelDataTypeList.Count() > 0)
+        {
+            somethingToPresent = true;
+            if (elements.Count == 1)
+            {
+                oneElement = true;
+            }
+
+
+        }
+
+
+        gogo();
+
+    }
+
+    async Task gogo()
+    {
+
+        Dictionary<DateTime, double> l = new System.Collections.Generic.Dictionary<DateTime, double>();
+        bool qc = false;
+
+
+        
+
+        //using var client = new InfluxDBClient("http://localhost:8086", Token);
+
+        //var flux = "from(bucket:\"AliantWebT\") |> range(start: 0) |> filter(fn: (r) => r._field == \"VerticalAcceleration\" or r._field == \"HorizontalAcceleration1\" or r._field == \"HorizontalAcceleration2\") |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")";
+
+        //var queryApi = client.GetQueryApi();
+        ////
+        //// QueryData
+        ////
+        //await queryApi.QueryAsync(flux, record =>
+        //{
+        //    //
+        //    // The callback to consume a FluxRecord.
+        //    //
+        //    l.Add(record.GetTime().Value.ToDateTimeUtc(), (double)record.GetValueByKey("VerticalAcceleration"));
+        //    //Console.WriteLine($"{record.GetTime()}: {record.GetValueByKey("HorizontalAcceleration1")}");
+
+        //}, exception =>
+        //{
+        //    //
+        //    // The callback to consume any error notification.
+        //    //
+        //    Console.WriteLine($"Error occurred: {exception.Message}");
+        //}, () =>
+        //{
+        //    //
+        //    // The callback to consume a notification about successfully end of stream.
+        //    //
+        //    //Console.WriteLine("Query completed");
+        //    qc = true;
+        //}, "96c29f41f7624afe");
+
+
+
+    }
+
+    async Task gogoold()
+    {
+        List<int> channelsNums = new List<int>();
+        List<string> elementsNames = new List<string>();
+        pathsForFiles = new List<string>();
+        foreach (Element element in elements)
+        {
+
+            var pff = await FileManagementService.GetPathForFilesAsync(element, false, @"CSVs\");
+            pathsForFiles.AddRange(pff);
+
+
+            for (int i = 0; i < pff.Count; i++)
+            {
+                channelsNums.Add(element.ElementType.ChannelDataTypeElementTypes.Count());
+                elementsNames.Add(element.Name);
+            }
+        }
+
+        var glo = ReadFromCSV(pathsForFiles, channelsNums, ',');
+
+        List<object[,]> v = glo.Item1;
+
+        var vv = v.Copy<List<object[,]>>();
+
+
+        int index = 0;
+        foreach (var ar in vv)
+        {
+            for (int i = 0; i < (ar.Columns() - 1); i++)
+            {
+
+                var ttt = ar.GetColumn(i + 1).Select(x => Convert.ChangeType(x, typeof(double), CultureInfo.InvariantCulture)).Cast<double>();
+                var rrr = Structural.SP.FFT2(ttt.ToArray());
+                ar.SetColumn(i + 1, rrr.Select(x => Convert.ChangeType(x.Magnitude, typeof(object))).Cast<object>().ToArray());
+
+                //  data.Add(sc);
+
+            }
+            index++;
+        }
+
+
+
+        List<string[]> headers = glo.Item2;
+
+        if (v.Count > 0)
+        {
+            PlotData(v, elementsNames, headers, data);
+
+        }
+
+        if (vv.Count > 0)
+        {
+            PlotData(vv, elementsNames, headers, data1);
+
+        }
+    }
+
+    void PlotData(List<object[,]> v, List<string> names, List<string[]> headers, IList<ITrace> data)
+    {
+        data.Clear();
+
+        int index = 0;
+        foreach (var ar in v)
+        {
+            for (int i = 0; i < (ar.Columns() - 1); i++)
+            {
+                Scatter sc = new Scatter();
+                sc.Name = names[index] + "Channel " + headers[index][i + 1];
+                sc.XCalendar = Plotly.Blazor.Traces.ScatterLib.XCalendarEnum.Gregorian;
+
+                sc.Mode = Plotly.Blazor.Traces.ScatterLib.ModeFlag.Lines | Plotly.Blazor.Traces.ScatterLib.ModeFlag.Markers;
+                sc.X = (ar.GetColumn(0)).ToList();
+                sc.Y = (ar.GetColumn(i + 1)).ToList();
+
+                data.Add(sc);
+
+            }
+            index++;
+        }
+
+
+    }
+
+    void OnChangeSelectedChannelDataType(bool args, ChannelDataType channelDataType)
+    {
+        if (args)
+        {
+            selectedChannelDataType.Add(channelDataType);
+        }
+        else
+        {
+            selectedChannelDataType.Remove(channelDataType);
+        }
+    }
+
+
+    void OnChangeSelectedElement(bool args, Element element)
+    {
+        if (args)
+        {
+            selectedElements.Add(element);
+        }
+        else
+        {
+            selectedElements.Remove(element);
+        }
+    }
+
+
+
+    void RowSelect()
+    {
+
+    }
+
+    private (List<object[,]>, List<string[]>) ReadFromCSV(List<string> filesPaths, List<int> channelNums, char SplitChar)
+    {
+        List<object[,]> aa = new List<object[,]>();
+        List<string[]> headers = new List<string[]>();
+
+        int ind = 0;
+        foreach (string filePath in filesPaths)
+        {
+
+            object[,] a = new object[0, channelNums[ind] + 1];
+            var reader = new StreamReader(File.OpenRead(filePath));
+
+            string line = string.Empty;
+
+
+            int index = 0;
+            line = reader.ReadLine();
+            line = reader.ReadLine();
+            headers.Add(line.Split(SplitChar));
+
+            while (!reader.EndOfStream)
+            {
+                line = reader.ReadLine();
+                var values = line.Split(SplitChar);
+                object[] d = new object[channelNums[ind] + 1];
+                try
+                {
+                    d[0] = (values[0]);
+                    for (int i = 0; i < channelNums[ind]; i++)
+                    {
+
+                        d[i + 1] = (values[i + 1]);
+
+                    }
+                    a = a.InsertRow(d);
+                    index++;
+
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception();
+                }
+
+
+            }
+            ind++;
+            aa.Add(a);
+        }
+
+        return (aa, headers);
+    }
+
+    private async Task LoadDataFiles(InputFileChangeEventArgs e)
+    {
+        await DialogService.OpenAsync<FilesUpload>($"Files Upload",
+        new Dictionary<string, object>() { { "obj", elements.FirstOrDefault() }, { "e", e }, { "Folder", "CSVs" } },
+               new DialogOptions() { Width = "700px", Height = "570px" });
+
+        // GetPathForFiles();
+        await gogo();
+        if (chart != null)
+        {
+            await chart.Update();
+        }
+
+
+    }
+
+}
+

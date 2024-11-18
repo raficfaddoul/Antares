@@ -1,0 +1,137 @@
+﻿@inherits LayoutComponentBase
+
+@using AliantWebS.Data
+@using Models
+@inject AppData appData;
+@inject EntitiesService entitiesService
+@inject NavigationManager navigationManager
+@inject DialogService dialogService
+
+@layout MainLayout
+
+<div class="main-container">
+    <header>
+        <div class="top-row px-4 auth" style="display: flex; align-items: center; position: sticky; top: 0; background-color: #fff; z-index: 1000;">
+            <!-- Breadcrumbs -->
+            <div style="flex-grow: 1;">
+                <Breadcrumb Mode="BreadcrumbMode.Auto">
+                    <BreadcrumbItem Active>
+                        <BreadcrumbLink To="@($"/ChargesSceniques/{appData.EventID.ToString()}")">Charges Scéniques</BreadcrumbLink>
+                    </BreadcrumbItem>
+                    <BreadcrumbItem>
+                        <BreadcrumbLink To="@($"/MotherGrid/{selectedScenario?.EventMpscenarioId ?? Guid.Empty}")">Mother Grid</BreadcrumbLink>
+                    </BreadcrumbItem>
+                    <BreadcrumbItem>
+                        <BreadcrumbLink To="@($"/Charpente/{appData.EventID.ToString()}")">Charpente</BreadcrumbLink>
+                    </BreadcrumbItem>
+                </Breadcrumb>
+            </div>
+            @if (navigationManager.Uri.Contains("MotherGrid"))
+            {
+
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="Radzen.JustifyContent.Center" Gap="0.5rem">
+                    <RadzenLabel id="DropDownEditLabel" Text="Scénario" Component="DropDownEdit" />
+                    <RadzenDropDown @ref=rdzd Change="ScenarioChanged" @bind-Value=@selectedScenario Placeholder="Select a scenario" Data=@Scenarios TextProperty="Name" Style="width: 100%; max-width: 400px;" Name="DropDownEdit">
+
+                    </RadzenDropDown>
+                    <button class="btn-primary" style="width:20em" @onclick="addScenario">Ajouter un scénario</button>
+                    <button class="btn-primary" style="width:20em" @onclick="DeleteScenario">Suprimer le scénario</button>
+                </RadzenStack>
+            }
+        </div>
+    </header>
+
+    @*     <div class="sidebar">
+    <!-- Sidebar content -->
+    </div> *@
+
+    <main>
+        <CascadingValue Value="this">
+            @Body
+        </CascadingValue>
+    </main>
+
+    @*     <footer>
+    <!-- Footer content -->
+    </footer> *@
+</div>
+
+@code {
+    RadzenDropDown<EventMpscenario> rdzd;
+
+    private List<EventMpscenario> Scenarios = new List<EventMpscenario>();
+    EventMpscenario selectedScenario;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (appData.EventID == Guid.Empty)
+        {
+            navigationManager.NavigateTo("AntaresHome");
+        }
+
+        Scenarios = await entitiesService.GetFilteredEntitiesAsync<EventMpscenario>(x => x.EventId == appData.EventID);
+        selectedScenario = Scenarios.FirstOrDefault();
+    }
+
+    public async void RequestRedraw()
+    {
+        Scenarios = await entitiesService.GetFilteredEntitiesAsync<EventMpscenario>(x => x.EventId == appData.EventID);
+        selectedScenario = Scenarios.FirstOrDefault();
+    }
+
+    private async Task addScenario()
+    {
+        EventMpscenario emp = new EventMpscenario();
+        emp.EventId = appData.EventID;
+        // emp.Name = DateTime.Now.ToString();
+
+        var res = await dialogService.OpenAsync<LoadPages.ScenarioNameDialog>($"Scenario",
+               new Dictionary<string, object>() { { "emp", emp } },
+               new DialogOptions()
+                   {
+                       Resizable = true,
+                       Draggable = true,
+                       Width = "400px",
+                       Height = "180px",
+                       Left = null,
+                       Top = null
+                   });
+
+        if (res == true)
+        {
+            if ((await entitiesService.InsertEntityAsync(emp)) != null)
+            {
+                Scenarios.Add(emp);
+                selectedScenario = emp;
+            }
+            await ScenarioChanged();
+        }
+    }
+
+    private async Task DeleteScenario()
+    {
+        if (await entitiesService.DeleteEntityAsync(selectedScenario))
+        {
+            if (Scenarios.Remove(selectedScenario))
+            {
+                selectedScenario = null;
+
+                StateHasChanged();
+                await ScenarioChanged();
+            }
+        }
+    }
+
+    private async Task ScenarioChanged()
+    {
+        // var v = appData.EventID;
+        //NavigationOptions op = new NavigationOptions();
+        
+        navigationManager.NavigateTo($"MotherGrid/{selectedScenario?.EventMpscenarioId ?? Guid.Empty}");
+      //  appData.EventMpscenarioId = selectedScenario?.EventMpscenarioId ?? Guid.Empty;
+    }
+
+
+}
+
+

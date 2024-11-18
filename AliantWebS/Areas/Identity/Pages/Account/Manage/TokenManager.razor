@@ -1,0 +1,211 @@
+﻿@page "/Account/Manage/TokenManager"
+
+@using AliantWebS.Data
+
+@inject EntitiesService entitiesService
+@inject NavigationManager navigationManager
+@inject IJSRuntime js
+@inject AliantWebS.Data.AppData AppData
+@using AliantWebS.Pages
+@using Models
+@using Microsoft.AspNetCore.Identity
+
+@inject IStringLocalizer<Languages> L
+@inject RoleManager<IdentityRole> roleManager
+
+
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Administrator,Developer")]
+
+
+
+<div Style="display: flex">
+    <h3>@L["Token Management"]</h3>
+    <div style="margin-left: auto; ">
+        <label> @L["Page Size"]: &nbsp;&nbsp;</label>
+        <RadzenNumeric @bind-Value="PageSize" Style="width:60px"></RadzenNumeric>
+    </div>
+</div>
+@if (tokenList is null)
+{
+    <p><em>@L["Loading"]... !</em></p>
+}
+else
+{
+    <a class="nav-link" @onclick="@(args => InsertToken())" @onclick:preventDefault="true" href="/nothing">
+        <span class="oi oi-plus" aria-hidden="true">@L["Add New"]</span>
+    </a>
+    <RadzenDataGrid TItem="Token" @ref="tokenGrid" Data="@tokenList" @bind-Value="@SelectedTokens"
+                    AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="PageSize">
+        <Columns>
+            <RadzenDataGridColumn Width="50" TItem="Token" Property="TokenId" Title="Token Id">
+@*                 <HeaderTemplate>
+                    <span class="gridColumndStyle">@L["Token Id"]</span>                    <br />
+                </HeaderTemplate>
+                <EditTemplate Context="token">
+                    <InputTextArea class="InputTextAreaBlackFont" @bind-Value="token.TokenId" Style="width:100%" />
+                </EditTemplate> *@
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn Width="50" TItem="Token" Property="Value">
+                <HeaderTemplate>
+                    <span class="gridColumndStyle">@L["Description"]</span>                    <br />
+                </HeaderTemplate>
+                <EditTemplate Context="token">
+                    <InputTextArea class="InputTextAreaBlackFont" @bind-Value="token.Value" Style="width:100%" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn Width="50" TItem="Token" Title="Roles">
+                <Template Context="token">
+                    <RadzenDropDown ReadOnly=true TValue="List<string>"
+                                    Value="@token.TokenAspNetRoles.Select(x => x?.AspNetRoles?.Name).ToList()"
+                                    ValueChanged="@(value => OnMultiSelectChanged(value, token))"
+                                    Data=@rolesList TextProperty="Name" ValueProperty="Name" Name="DropDownMultipleChips"
+                                    Multiple=true AllowClear=true Placeholder="Select Roles" Chips=true Style="width: 100%; max-width: 400px;" />
+                </Template>
+                <EditTemplate Context="token">
+                    <RadzenDropDown TValue="List<string>"
+                        Value="@token.TokenAspNetRoles.Select(x => x?.AspNetRoles?.Name).ToList()"
+                                    ValueChanged="@(value => OnMultiSelectChanged(value, token))"
+                                
+                    
+                    Data=@rolesList TextProperty="Name" ValueProperty="Name" Name="DropDownMultipleChips"
+                                    Multiple=true AllowClear=true Placeholder="Select Roles" Chips=true Style="width: 100%; max-width: 400px;" />
+
+</EditTemplate>
+            </RadzenDataGridColumn> 
+
+@*             <RadzenDataGridColumn TItem="Token" Title="@L["Role"]">
+                <Template Context="token">
+                    @rolesList.FirstOrDefault(x => x.Id == token.AspNetRolesId)?.Name                    
+                </Template>
+                <EditTemplate Context="token">
+                    <InputSelect class="form-control" @bind-Value=token.AspNetRolesId>
+                        @foreach (var role in rolesList)
+                        {
+                            <option value="@role.Id">@role.Name</option>
+                        }
+                    </InputSelect>
+
+                </EditTemplate>
+            </RadzenDataGridColumn> *@
+
+           
+            <RadzenDataGridColumn Width="50" TItem="Token" Title="@L["Action"]" Filterable="false" Sortable="false">
+                <Template Context="data">
+                    <div Style="display: flex">
+                        <a title="@L["Edit"]" class="nav-link" @onclick="@(args => EditRow(data))" @onclick:preventDefault="true" href="/nothing">
+                        <span class="oi oi-pencil" aria-hidden="true"></span>
+                        </a>
+                        <a title="@L["End Edit"]" class="nav-link" @onclick="@(args => UpdateRow(data))" @onclick:preventDefault="true" href="/nothing">
+                            <span class="oi oi-check" aria-hidden="true"></span>
+                        </a>
+                        <a title="@L["Delete"]" class="nav-link" @onclick="@(() => DeleteToken(data))" @onclick:preventDefault="true" href="/nothing">
+                            <span class="oi oi-trash" aria-hidden="true"></span>
+                        </a>
+                    </div> 
+                </Template>
+
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+
+
+}
+
+
+@code {
+
+    public List<string> SelectedRoles { get; set; } = new List<string>();
+    private async Task OnMultiSelectChanged(List<string> value,Token token)
+    {
+        if (value == null) return;
+        token.TokenAspNetRoles.Clear();
+        foreach (var v in value)
+        {
+            var role = await entitiesService.GetFilteredFirstEntityAsync<AspNetRole>(x => x.Name == v);
+
+            TokenAspNetRole tanr = new TokenAspNetRole();
+            tanr.TokenId = token.TokenId;
+            tanr.AspNetRolesId = role.Id;
+            tanr.AspNetRoles = role;
+
+            token.TokenAspNetRoles.Add(tanr);
+        }
+
+        StateHasChanged();
+
+    }
+
+
+    int PageSize { get; set; } = 10;
+
+    IList<Token> SelectedTokens { get; set; }
+
+
+    RadzenDataGrid<Token> tokenGrid;
+
+
+    List<Token> tokenList = new List<Token>();
+    List<AspNetRole> rolesList;
+
+    protected override async Task OnInitializedAsync()
+    {
+        //await Task.WhenAll(entitiesService.tasksList);
+        tokenList = await entitiesService.GetAllEntitiesAsync<Token>("TokenAspNetRoles.AspNetRoles");
+
+        rolesList = await entitiesService.GetAllEntitiesAsync<AspNetRole>();        
+
+    }
+
+
+    async Task DeleteToken(Token token)
+    {
+        if (await entitiesService.DeleteEntityAsync(token))
+        {
+            if (tokenList.Remove(token))
+            {
+                await tokenGrid.Reload();
+
+            }
+        }
+
+    }
+
+    void EditRow(Token token)
+    {
+
+        tokenGrid.EditRow(token);
+
+    }
+
+    async Task InsertToken()
+    {
+        Token token = new Token();
+
+
+
+        if ((await entitiesService.InsertEntityAsync(token)) != null)
+        {
+            tokenList.Add(token);
+
+            await tokenGrid.InsertRow(token);
+
+        }
+        else
+        {
+            await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
+        }
+    }
+
+
+
+    async Task UpdateRow(Token token)
+    {
+        if (await entitiesService.UpdateEntityAsync(token))
+        {
+            await tokenGrid.UpdateRow(token);
+        }
+    }
+
+ 
+} 

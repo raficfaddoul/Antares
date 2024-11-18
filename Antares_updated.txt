@@ -1,0 +1,759 @@
+Object:Element, name: Noeuds
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 1, parent:Noeuds, X:-28.88, Y:-30.23, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 2, parent:Noeuds, X:-21.66, Y:-30.23, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 3, parent:Noeuds, X:-14.44, Y:-30.23, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 4, parent:Noeuds, X:-7.22, Y:-30.23, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 5, parent:Noeuds, X:0.0, Y:-30.23, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 6, parent:Noeuds, X:7.22, Y:-30.23, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 7, parent:Noeuds, X:14.44, Y:-30.23, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 8, parent:Noeuds, X:21.66, Y:-30.23, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 9, parent:Noeuds, X:28.88, Y:-30.23, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 10, parent:Noeuds, X:-28.88, Y:-27.12, Z:2.35, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 11, parent:Noeuds, X:-21.66, Y:-27.12, Z:2.5, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 12, parent:Noeuds, X:-14.44, Y:-27.12, Z:2.5, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 13, parent:Noeuds, X:-7.22, Y:-27.12, Z:2.5, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 14, parent:Noeuds, X:0.0, Y:-27.12, Z:2.5, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 15, parent:Noeuds, X:7.22, Y:-27.12, Z:2.5, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 16, parent:Noeuds, X:14.44, Y:-27.12, Z:2.5, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 17, parent:Noeuds, X:21.66, Y:-27.12, Z:2.5, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 18, parent:Noeuds, X:28.88, Y:-27.12, Z:2.35, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 19, parent:Noeuds, X:-28.88, Y:-24.01, Z:3.05, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 20, parent:Noeuds, X:-21.66, Y:-24.01, Z:3.3, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 21, parent:Noeuds, X:-14.44, Y:-24.01, Z:3.35, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 22, parent:Noeuds, X:-7.22, Y:-24.01, Z:3.388, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 23, parent:Noeuds, X:0.0, Y:-24.01, Z:3.4, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 24, parent:Noeuds, X:7.22, Y:-24.01, Z:3.388, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 25, parent:Noeuds, X:14.44, Y:-24.01, Z:3.35, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 26, parent:Noeuds, X:21.66, Y:-24.01, Z:3.3, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 27, parent:Noeuds, X:28.88, Y:-24.01, Z:3.05, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 28, parent:Noeuds, X:-28.88, Y:-20.9, Z:3.488, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 29, parent:Noeuds, X:-21.66, Y:-20.9, Z:3.8, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 30, parent:Noeuds, X:-14.44, Y:-20.9, Z:3.95, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 31, parent:Noeuds, X:-7.22, Y:-20.9, Z:4.063, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 32, parent:Noeuds, X:0.0, Y:-20.9, Z:4.1, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 33, parent:Noeuds, X:7.22, Y:-20.9, Z:4.063, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 34, parent:Noeuds, X:14.44, Y:-20.9, Z:3.95, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 35, parent:Noeuds, X:21.66, Y:-20.9, Z:3.8, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 36, parent:Noeuds, X:28.88, Y:-20.9, Z:3.488, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 37, parent:Noeuds, X:-28.88, Y:-17.79, Z:3.794, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 38, parent:Noeuds, X:-21.66, Y:-17.79, Z:4.15, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 39, parent:Noeuds, X:-14.44, Y:-17.79, Z:4.4, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 40, parent:Noeuds, X:-7.22, Y:-17.79, Z:4.588, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 41, parent:Noeuds, X:0.0, Y:-17.79, Z:4.65, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 42, parent:Noeuds, X:7.22, Y:-17.79, Z:4.588, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 43, parent:Noeuds, X:14.44, Y:-17.79, Z:4.4, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 44, parent:Noeuds, X:21.66, Y:-17.79, Z:4.15, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 45, parent:Noeuds, X:28.88, Y:-17.79, Z:3.794, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 46, parent:Noeuds, X:-28.88, Y:-14.68, Z:4.1, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 47, parent:Noeuds, X:-21.66, Y:-14.68, Z:4.461, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 48, parent:Noeuds, X:-14.44, Y:-14.68, Z:4.81, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 49, parent:Noeuds, X:-7.22, Y:-14.68, Z:5.019, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 50, parent:Noeuds, X:0.0, Y:-14.68, Z:5.089, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 51, parent:Noeuds, X:7.22, Y:-14.68, Z:5.019, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 52, parent:Noeuds, X:14.44, Y:-14.68, Z:4.81, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 53, parent:Noeuds, X:21.66, Y:-14.68, Z:4.461, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 54, parent:Noeuds, X:28.88, Y:-14.68, Z:4.1, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 55, parent:Noeuds, X:-28.88, Y:-11.07, Z:4.265, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 56, parent:Noeuds, X:-21.66, Y:-11.07, Z:4.689, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 57, parent:Noeuds, X:-14.44, Y:-11.07, Z:5.122, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 58, parent:Noeuds, X:-7.22, Y:-11.07, Z:5.447, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 59, parent:Noeuds, X:0.0, Y:-11.07, Z:5.555, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 60, parent:Noeuds, X:7.22, Y:-11.07, Z:5.447, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 61, parent:Noeuds, X:14.44, Y:-11.07, Z:5.122, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 62, parent:Noeuds, X:21.66, Y:-11.07, Z:4.689, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 63, parent:Noeuds, X:28.88, Y:-11.07, Z:4.265, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 64, parent:Noeuds, X:-28.88, Y:-7.46, Z:4.409, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 65, parent:Noeuds, X:-21.66, Y:-7.46, Z:4.853, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 66, parent:Noeuds, X:-14.44, Y:-7.46, Z:5.371, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 67, parent:Noeuds, X:-7.22, Y:-7.46, Z:5.759, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 68, parent:Noeuds, X:0.0, Y:-7.46, Z:5.888, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 69, parent:Noeuds, X:7.22, Y:-7.46, Z:5.759, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 70, parent:Noeuds, X:14.44, Y:-7.46, Z:5.371, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 71, parent:Noeuds, X:21.66, Y:-7.46, Z:4.853, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 72, parent:Noeuds, X:28.88, Y:-7.46, Z:4.409, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 73, parent:Noeuds, X:-28.88, Y:-3.73, Z:4.498, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 74, parent:Noeuds, X:-21.66, Y:-3.73, Z:4.955, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 75, parent:Noeuds, X:-14.44, Y:-3.73, Z:5.526, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 76, parent:Noeuds, X:-7.22, Y:-3.73, Z:5.953, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 77, parent:Noeuds, X:0.0, Y:-3.73, Z:6.096, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 78, parent:Noeuds, X:7.22, Y:-3.73, Z:5.953, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 79, parent:Noeuds, X:14.44, Y:-3.73, Z:5.526, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 80, parent:Noeuds, X:21.66, Y:-3.73, Z:4.955, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 81, parent:Noeuds, X:28.88, Y:-3.73, Z:4.498, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 82, parent:Noeuds, X:-28.88, Y:0.0, Z:4.528, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 83, parent:Noeuds, X:-21.66, Y:0.0, Z:4.989, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 84, parent:Noeuds, X:-14.44, Y:0.0, Z:5.577, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 85, parent:Noeuds, X:-7.22, Y:0.0, Z:6.018, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 86, parent:Noeuds, X:0.0, Y:0.0, Z:6.165, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 87, parent:Noeuds, X:7.22, Y:0.0, Z:6.018, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 88, parent:Noeuds, X:14.44, Y:0.0, Z:5.577, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 89, parent:Noeuds, X:21.66, Y:0.0, Z:4.989, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 90, parent:Noeuds, X:28.88, Y:0.0, Z:4.528, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 91, parent:Noeuds, X:-28.88, Y:3.73, Z:4.498, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 92, parent:Noeuds, X:-21.66, Y:3.73, Z:4.955, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 93, parent:Noeuds, X:-14.44, Y:3.73, Z:5.526, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 94, parent:Noeuds, X:-7.22, Y:3.73, Z:5.953, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 95, parent:Noeuds, X:0.0, Y:3.73, Z:6.096, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 96, parent:Noeuds, X:7.22, Y:3.73, Z:5.953, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 97, parent:Noeuds, X:14.44, Y:3.73, Z:5.526, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 98, parent:Noeuds, X:21.66, Y:3.73, Z:4.955, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 99, parent:Noeuds, X:28.88, Y:3.73, Z:4.498, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 100, parent:Noeuds, X:-28.88, Y:7.46, Z:4.409, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 101, parent:Noeuds, X:-21.66, Y:7.46, Z:4.853, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 102, parent:Noeuds, X:-14.44, Y:7.46, Z:5.371, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 103, parent:Noeuds, X:-7.22, Y:7.46, Z:5.759, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 104, parent:Noeuds, X:0.0, Y:7.46, Z:5.888, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 105, parent:Noeuds, X:7.22, Y:7.46, Z:5.759, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 106, parent:Noeuds, X:14.44, Y:7.46, Z:5.371, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 107, parent:Noeuds, X:21.66, Y:7.46, Z:4.853, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 108, parent:Noeuds, X:28.88, Y:7.46, Z:4.409, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 109, parent:Noeuds, X:-28.88, Y:11.07, Z:4.265, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 110, parent:Noeuds, X:-21.66, Y:11.07, Z:4.689, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 111, parent:Noeuds, X:-14.44, Y:11.07, Z:5.122, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 112, parent:Noeuds, X:-7.22, Y:11.07, Z:5.447, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 113, parent:Noeuds, X:0.0, Y:11.07, Z:5.555, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 114, parent:Noeuds, X:7.22, Y:11.07, Z:5.447, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 115, parent:Noeuds, X:14.44, Y:11.07, Z:5.122, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 116, parent:Noeuds, X:21.66, Y:11.07, Z:4.689, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 117, parent:Noeuds, X:28.88, Y:11.07, Z:4.265, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 118, parent:Noeuds, X:-28.88, Y:14.68, Z:4.1, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 119, parent:Noeuds, X:-21.66, Y:14.68, Z:4.49, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 120, parent:Noeuds, X:-14.44, Y:14.68, Z:4.81, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 121, parent:Noeuds, X:-7.22, Y:14.68, Z:5.019, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 122, parent:Noeuds, X:0.0, Y:14.68, Z:5.089, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 123, parent:Noeuds, X:7.22, Y:14.68, Z:5.019, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 124, parent:Noeuds, X:14.44, Y:14.68, Z:4.81, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 125, parent:Noeuds, X:21.66, Y:14.68, Z:4.49, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 126, parent:Noeuds, X:28.88, Y:14.68, Z:4.1, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 127, parent:Noeuds, X:-28.88, Y:17.79, Z:3.794, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 128, parent:Noeuds, X:-21.66, Y:17.79, Z:4.15, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 129, parent:Noeuds, X:-14.44, Y:17.79, Z:4.4, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 130, parent:Noeuds, X:-7.22, Y:17.79, Z:4.588, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 131, parent:Noeuds, X:0.0, Y:17.79, Z:4.65, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 132, parent:Noeuds, X:7.22, Y:17.79, Z:4.588, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 133, parent:Noeuds, X:14.44, Y:17.79, Z:4.4, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 134, parent:Noeuds, X:21.66, Y:17.79, Z:4.15, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 135, parent:Noeuds, X:28.88, Y:17.79, Z:3.794, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 136, parent:Noeuds, X:-28.88, Y:20.9, Z:3.488, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 137, parent:Noeuds, X:-21.66, Y:20.9, Z:3.8, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 138, parent:Noeuds, X:-14.44, Y:20.9, Z:3.95, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 139, parent:Noeuds, X:-7.22, Y:20.9, Z:4.063, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 140, parent:Noeuds, X:0.0, Y:20.9, Z:4.1, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 141, parent:Noeuds, X:7.22, Y:20.9, Z:4.063, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 142, parent:Noeuds, X:14.44, Y:20.9, Z:3.95, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 143, parent:Noeuds, X:21.66, Y:20.9, Z:3.8, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 144, parent:Noeuds, X:28.88, Y:20.9, Z:3.488, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 145, parent:Noeuds, X:-28.88, Y:24.01, Z:3.05, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 146, parent:Noeuds, X:-21.66, Y:24.01, Z:3.3, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 147, parent:Noeuds, X:-14.44, Y:24.01, Z:3.35, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 148, parent:Noeuds, X:-7.22, Y:24.01, Z:3.388, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 149, parent:Noeuds, X:0.0, Y:24.01, Z:3.4, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 150, parent:Noeuds, X:7.22, Y:24.01, Z:3.388, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 151, parent:Noeuds, X:14.44, Y:24.01, Z:3.35, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 152, parent:Noeuds, X:21.66, Y:24.01, Z:3.3, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 153, parent:Noeuds, X:28.88, Y:24.01, Z:3.05, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 154, parent:Noeuds, X:-28.88, Y:27.12, Z:2.35, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 155, parent:Noeuds, X:-21.66, Y:27.12, Z:2.5, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 156, parent:Noeuds, X:-14.44, Y:27.12, Z:2.5, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 157, parent:Noeuds, X:-7.22, Y:27.12, Z:2.5, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 158, parent:Noeuds, X:0.0, Y:27.12, Z:2.5, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 159, parent:Noeuds, X:7.22, Y:27.12, Z:2.5, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 160, parent:Noeuds, X:14.44, Y:27.12, Z:2.5, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 161, parent:Noeuds, X:21.66, Y:27.12, Z:2.5, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 162, parent:Noeuds, X:28.88, Y:27.12, Z:2.35, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 163, parent:Noeuds, X:-28.88, Y:30.23, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 164, parent:Noeuds, X:-21.66, Y:30.23, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 165, parent:Noeuds, X:-14.44, Y:30.23, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 166, parent:Noeuds, X:-7.22, Y:30.23, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 167, parent:Noeuds, X:0.0, Y:30.23, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 168, parent:Noeuds, X:7.22, Y:30.23, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 169, parent:Noeuds, X:14.44, Y:30.23, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 170, parent:Noeuds, X:21.66, Y:30.23, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 171, parent:Noeuds, X:28.88, Y:30.23, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 172, parent:Noeuds, X:-36.655, Y:-28.146695028848022, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 173, parent:Noeuds, X:-42.34669502884802, Y:-22.455000000000002, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 174, parent:Noeuds, X:-44.43, Y:-14.68, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 175, parent:Noeuds, X:-44.43, Y:-7.46, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 176, parent:Noeuds, X:-44.43, Y:0.0, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 177, parent:Noeuds, X:-44.43, Y:7.46, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 178, parent:Noeuds, X:-44.43, Y:14.68, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 179, parent:Noeuds, X:-42.34669502884802, Y:22.455000000000002, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 180, parent:Noeuds, X:-36.655, Y:28.146695028848022, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 181, parent:Noeuds, X:-35.23, Y:-25.67852262806237, Z:2.26, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 182, parent:Noeuds, X:-39.87852262806237, Y:-21.03, Z:2.17, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 183, parent:Noeuds, X:-41.58, Y:-14.68, Z:2.08, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 184, parent:Noeuds, X:-41.58, Y:-7.46, Z:2.188, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 185, parent:Noeuds, X:-41.58, Y:0.0, Z:2.222, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 186, parent:Noeuds, X:-41.58, Y:7.46, Z:2.188, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 187, parent:Noeuds, X:-41.58, Y:14.68, Z:2.08, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 188, parent:Noeuds, X:-39.87852262806237, Y:21.03, Z:2.17, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 189, parent:Noeuds, X:-35.23, Y:25.67852262806237, Z:2.26, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 190, parent:Noeuds, X:-33.7575, Y:-23.128077813917198, Z:2.933333333333333, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 191, parent:Noeuds, X:-37.3280778139172, Y:-19.5575, Z:2.8166666666666664, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 192, parent:Noeuds, X:-38.635, Y:-14.68, Z:2.7, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 193, parent:Noeuds, X:-38.635, Y:-7.46, Z:2.854, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 194, parent:Noeuds, X:-38.635, Y:0.0, Z:2.914, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 195, parent:Noeuds, X:-38.635, Y:7.46, Z:2.854, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 196, parent:Noeuds, X:-38.635, Y:14.68, Z:2.7, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 197, parent:Noeuds, X:-37.3280778139172, Y:19.5575, Z:2.8166666666666664, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 198, parent:Noeuds, X:-33.7575, Y:23.128077813917198, Z:2.933333333333333, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 199, parent:Noeuds, X:-32.245, Y:-20.508350967469273, Z:3.3920000000000003, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 200, parent:Noeuds, X:-34.70835096746927, Y:-18.045, Z:3.2960000000000003, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 201, parent:Noeuds, X:-35.61, Y:-14.68, Z:3.2, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 202, parent:Noeuds, X:-35.61, Y:-7.46, Z:3.432, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 203, parent:Noeuds, X:-35.61, Y:0.0, Z:3.513, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 204, parent:Noeuds, X:-35.61, Y:7.46, Z:3.432, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 205, parent:Noeuds, X:-35.61, Y:14.68, Z:3.2, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 206, parent:Noeuds, X:-34.70835096746927, Y:18.045, Z:3.2960000000000003, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 207, parent:Noeuds, X:-32.245, Y:20.508350967469273, Z:3.3920000000000003, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 208, parent:Noeuds, X:-30.7, Y:-17.83233246977536, Z:3.7126666666666663, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 209, parent:Noeuds, X:-32.03233246977536, Y:-16.500000000000004, Z:3.631333333333333, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 210, parent:Noeuds, X:-32.52, Y:-14.68, Z:3.55, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 211, parent:Noeuds, X:-32.52, Y:-7.46, Z:3.809, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 212, parent:Noeuds, X:-32.52, Y:0.0, Z:3.905, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 213, parent:Noeuds, X:-32.52, Y:7.46, Z:3.809, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 214, parent:Noeuds, X:-32.52, Y:14.68, Z:3.55, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 215, parent:Noeuds, X:-32.03233246977536, Y:16.500000000000004, Z:3.631333333333333, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 216, parent:Noeuds, X:-30.7, Y:17.83233246977536, Z:3.7126666666666663, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 217, parent:Noeuds, X:36.655, Y:-28.146695028848022, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 218, parent:Noeuds, X:42.34669502884802, Y:-22.455000000000002, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 219, parent:Noeuds, X:44.43, Y:-14.68, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 220, parent:Noeuds, X:44.43, Y:-7.46, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 221, parent:Noeuds, X:44.43, Y:0.0, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 222, parent:Noeuds, X:44.43, Y:7.46, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 223, parent:Noeuds, X:44.43, Y:14.68, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 224, parent:Noeuds, X:42.34669502884802, Y:22.455000000000002, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 225, parent:Noeuds, X:36.655, Y:28.146695028848022, Z:1.3, Constraint_X: True, Constraint_Y:True, Constraint_Z:True
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 226, parent:Noeuds, X:35.23, Y:-25.67852262806237, Z:2.26, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 227, parent:Noeuds, X:39.87852262806237, Y:-21.03, Z:2.17, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 228, parent:Noeuds, X:41.58, Y:-14.68, Z:2.08, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 229, parent:Noeuds, X:41.58, Y:-7.46, Z:2.188, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 230, parent:Noeuds, X:41.58, Y:0.0, Z:2.222, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 231, parent:Noeuds, X:41.58, Y:7.46, Z:2.188, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 232, parent:Noeuds, X:41.58, Y:14.68, Z:2.08, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 233, parent:Noeuds, X:39.87852262806237, Y:21.03, Z:2.17, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 234, parent:Noeuds, X:35.23, Y:25.67852262806237, Z:2.26, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 235, parent:Noeuds, X:33.7575, Y:-23.128077813917198, Z:2.933333333333333, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 236, parent:Noeuds, X:37.3280778139172, Y:-19.5575, Z:2.8166666666666664, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 237, parent:Noeuds, X:38.635, Y:-14.68, Z:2.7, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 238, parent:Noeuds, X:38.635, Y:-7.46, Z:2.854, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 239, parent:Noeuds, X:38.635, Y:0.0, Z:2.914, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 240, parent:Noeuds, X:38.635, Y:7.46, Z:2.854, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 241, parent:Noeuds, X:38.635, Y:14.68, Z:2.7, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 242, parent:Noeuds, X:37.3280778139172, Y:19.5575, Z:2.8166666666666664, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 243, parent:Noeuds, X:33.7575, Y:23.128077813917198, Z:2.933333333333333, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 244, parent:Noeuds, X:32.245, Y:-20.508350967469273, Z:3.3920000000000003, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 245, parent:Noeuds, X:34.70835096746927, Y:-18.045, Z:3.2960000000000003, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 246, parent:Noeuds, X:35.61, Y:-14.68, Z:3.2, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 247, parent:Noeuds, X:35.61, Y:-7.46, Z:3.432, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 248, parent:Noeuds, X:35.61, Y:0.0, Z:3.513, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 249, parent:Noeuds, X:35.61, Y:7.46, Z:3.432, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 250, parent:Noeuds, X:35.61, Y:14.68, Z:3.2, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 251, parent:Noeuds, X:34.70835096746927, Y:18.045, Z:3.2960000000000003, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 252, parent:Noeuds, X:32.245, Y:20.508350967469273, Z:3.3920000000000003, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 253, parent:Noeuds, X:30.7, Y:-17.83233246977536, Z:3.7126666666666663, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 254, parent:Noeuds, X:32.03233246977536, Y:-16.500000000000004, Z:3.631333333333333, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 255, parent:Noeuds, X:32.52, Y:-14.68, Z:3.55, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 256, parent:Noeuds, X:32.52, Y:-7.46, Z:3.809, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 257, parent:Noeuds, X:32.52, Y:0.0, Z:3.905, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 258, parent:Noeuds, X:32.52, Y:7.46, Z:3.809, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 259, parent:Noeuds, X:32.52, Y:14.68, Z:3.55, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 260, parent:Noeuds, X:32.03233246977536, Y:16.500000000000004, Z:3.631333333333333, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, category: Structural Elements, type: Noeud3d, name: Noeud 261, parent:Noeuds, X:30.7, Y:17.83233246977536, Z:3.7126666666666663, Constraint_X: False, Constraint_Y:False, Constraint_Z:False
+Object:Element, name: Poutres
+Object:Element, name: Poutre B, parent: Poutres
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre B-1, parent:Poutre B, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 174, Noeud2:Noeud 183, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre B-2, parent:Poutre B, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 183, Noeud2:Noeud 192, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre B-3, parent:Poutre B, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 192, Noeud2:Noeud 201, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre B-4, parent:Poutre B, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 201, Noeud2:Noeud 210, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre B-5, parent:Poutre B, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 210, Noeud2:Noeud 46, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre B-6, parent:Poutre B, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 46, Noeud2:Noeud 47, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre B-7, parent:Poutre B, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 47, Noeud2:Noeud 48, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre B-8, parent:Poutre B, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 48, Noeud2:Noeud 49, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre B-9, parent:Poutre B, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 49, Noeud2:Noeud 50, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre B-10, parent:Poutre B, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 50, Noeud2:Noeud 51, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre B-11, parent:Poutre B, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 51, Noeud2:Noeud 52, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre B-12, parent:Poutre B, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 52, Noeud2:Noeud 53, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre B-13, parent:Poutre B, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 53, Noeud2:Noeud 54, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre B-14, parent:Poutre B, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 54, Noeud2:Noeud 255, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre B-15, parent:Poutre B, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 255, Noeud2:Noeud 246, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre B-16, parent:Poutre B, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 246, Noeud2:Noeud 237, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre B-17, parent:Poutre B, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 237, Noeud2:Noeud 228, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre B-18, parent:Poutre B, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 228, Noeud2:Noeud 219, b:0.736, h:0.985
+Object:Element, name: Poutre F, parent: Poutres
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre F-1, parent:Poutre F, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 178, Noeud2:Noeud 187, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre F-2, parent:Poutre F, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 187, Noeud2:Noeud 196, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre F-3, parent:Poutre F, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 196, Noeud2:Noeud 205, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre F-4, parent:Poutre F, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 205, Noeud2:Noeud 214, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre F-5, parent:Poutre F, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 214, Noeud2:Noeud 118, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre F-6, parent:Poutre F, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 118, Noeud2:Noeud 119, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre F-7, parent:Poutre F, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 119, Noeud2:Noeud 120, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre F-8, parent:Poutre F, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 120, Noeud2:Noeud 121, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre F-9, parent:Poutre F, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 121, Noeud2:Noeud 122, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre F-10, parent:Poutre F, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 122, Noeud2:Noeud 123, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre F-11, parent:Poutre F, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 123, Noeud2:Noeud 124, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre F-12, parent:Poutre F, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 124, Noeud2:Noeud 125, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre F-13, parent:Poutre F, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 125, Noeud2:Noeud 126, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre F-14, parent:Poutre F, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 126, Noeud2:Noeud 259, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre F-15, parent:Poutre F, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 259, Noeud2:Noeud 250, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre F-16, parent:Poutre F, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 250, Noeud2:Noeud 241, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre F-17, parent:Poutre F, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 241, Noeud2:Noeud 232, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre F-18, parent:Poutre F, Fonction:Principale Longitudinale, Matériau:GL30h, Noeud1:Noeud 232, Noeud2:Noeud 223, b:0.736, h:0.985
+Object:Element, name: Poutre 2, parent: Poutres
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 2-1, parent:Poutre 2, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 1, Noeud2:Noeud 10, b:0.448, h:0.875
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 2-2, parent:Poutre 2, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 10, Noeud2:Noeud 19, b:0.448, h:0.875
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 2-3, parent:Poutre 2, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 19, Noeud2:Noeud 28, b:0.448, h:0.875
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 2-4, parent:Poutre 2, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 28, Noeud2:Noeud 37, b:0.448, h:0.875
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 2-5, parent:Poutre 2, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 37, Noeud2:Noeud 46, b:0.448, h:0.875
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 2-6, parent:Poutre 2, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 46, Noeud2:Noeud 55, b:0.448, h:0.875
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 2-7, parent:Poutre 2, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 55, Noeud2:Noeud 64, b:0.448, h:0.875
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 2-8, parent:Poutre 2, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 64, Noeud2:Noeud 73, b:0.448, h:0.875
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 2-9, parent:Poutre 2, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 73, Noeud2:Noeud 82, b:0.448, h:0.875
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 2-10, parent:Poutre 2, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 82, Noeud2:Noeud 91, b:0.448, h:0.875
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 2-11, parent:Poutre 2, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 91, Noeud2:Noeud 100, b:0.448, h:0.875
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 2-12, parent:Poutre 2, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 100, Noeud2:Noeud 109, b:0.448, h:0.875
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 2-13, parent:Poutre 2, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 109, Noeud2:Noeud 118, b:0.448, h:0.875
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 2-14, parent:Poutre 2, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 118, Noeud2:Noeud 127, b:0.448, h:0.875
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 2-15, parent:Poutre 2, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 127, Noeud2:Noeud 136, b:0.448, h:0.875
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 2-16, parent:Poutre 2, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 136, Noeud2:Noeud 145, b:0.448, h:0.875
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 2-17, parent:Poutre 2, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 145, Noeud2:Noeud 154, b:0.448, h:0.875
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 2-18, parent:Poutre 2, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 154, Noeud2:Noeud 163, b:0.448, h:0.875
+Object:Element, name: Poutre 3, parent: Poutres
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 3-1, parent:Poutre 3, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 2, Noeud2:Noeud 11, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 3-2, parent:Poutre 3, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 11, Noeud2:Noeud 20, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 3-3, parent:Poutre 3, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 20, Noeud2:Noeud 29, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 3-4, parent:Poutre 3, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 29, Noeud2:Noeud 38, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 3-5, parent:Poutre 3, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 38, Noeud2:Noeud 47, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 3-6, parent:Poutre 3, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 47, Noeud2:Noeud 56, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 3-7, parent:Poutre 3, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 56, Noeud2:Noeud 65, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 3-8, parent:Poutre 3, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 65, Noeud2:Noeud 74, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 3-9, parent:Poutre 3, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 74, Noeud2:Noeud 83, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 3-10, parent:Poutre 3, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 83, Noeud2:Noeud 92, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 3-11, parent:Poutre 3, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 92, Noeud2:Noeud 101, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 3-12, parent:Poutre 3, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 101, Noeud2:Noeud 110, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 3-13, parent:Poutre 3, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 110, Noeud2:Noeud 119, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 3-14, parent:Poutre 3, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 119, Noeud2:Noeud 128, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 3-15, parent:Poutre 3, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 128, Noeud2:Noeud 137, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 3-16, parent:Poutre 3, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 137, Noeud2:Noeud 146, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 3-17, parent:Poutre 3, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 146, Noeud2:Noeud 155, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 3-18, parent:Poutre 3, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 155, Noeud2:Noeud 164, b:0.736, h:0.985
+Object:Element, name: Poutre 9, parent: Poutres
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 9-1, parent:Poutre 9, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 8, Noeud2:Noeud 17, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 9-2, parent:Poutre 9, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 17, Noeud2:Noeud 26, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 9-3, parent:Poutre 9, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 26, Noeud2:Noeud 35, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 9-4, parent:Poutre 9, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 35, Noeud2:Noeud 44, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 9-5, parent:Poutre 9, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 44, Noeud2:Noeud 53, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 9-6, parent:Poutre 9, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 53, Noeud2:Noeud 62, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 9-7, parent:Poutre 9, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 62, Noeud2:Noeud 71, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 9-8, parent:Poutre 9, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 71, Noeud2:Noeud 80, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 9-9, parent:Poutre 9, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 80, Noeud2:Noeud 89, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 9-10, parent:Poutre 9, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 89, Noeud2:Noeud 98, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 9-11, parent:Poutre 9, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 98, Noeud2:Noeud 107, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 9-12, parent:Poutre 9, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 107, Noeud2:Noeud 116, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 9-13, parent:Poutre 9, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 116, Noeud2:Noeud 125, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 9-14, parent:Poutre 9, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 125, Noeud2:Noeud 134, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 9-15, parent:Poutre 9, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 134, Noeud2:Noeud 143, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 9-16, parent:Poutre 9, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 143, Noeud2:Noeud 152, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 9-17, parent:Poutre 9, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 152, Noeud2:Noeud 161, b:0.736, h:0.985
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 9-18, parent:Poutre 9, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 161, Noeud2:Noeud 170, b:0.736, h:0.985
+Object:Element, name: Poutre 10, parent: Poutres
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 10-1, parent:Poutre 10, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 9, Noeud2:Noeud 18, b:0.448, h:0.875
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 10-2, parent:Poutre 10, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 18, Noeud2:Noeud 27, b:0.448, h:0.875
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 10-3, parent:Poutre 10, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 27, Noeud2:Noeud 36, b:0.448, h:0.875
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 10-4, parent:Poutre 10, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 36, Noeud2:Noeud 45, b:0.448, h:0.875
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 10-5, parent:Poutre 10, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 45, Noeud2:Noeud 54, b:0.448, h:0.875
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 10-6, parent:Poutre 10, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 54, Noeud2:Noeud 63, b:0.448, h:0.875
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 10-7, parent:Poutre 10, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 63, Noeud2:Noeud 72, b:0.448, h:0.875
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 10-8, parent:Poutre 10, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 72, Noeud2:Noeud 81, b:0.448, h:0.875
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 10-9, parent:Poutre 10, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 81, Noeud2:Noeud 90, b:0.448, h:0.875
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 10-10, parent:Poutre 10, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 90, Noeud2:Noeud 99, b:0.448, h:0.875
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 10-11, parent:Poutre 10, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 99, Noeud2:Noeud 108, b:0.448, h:0.875
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 10-12, parent:Poutre 10, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 108, Noeud2:Noeud 117, b:0.448, h:0.875
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 10-13, parent:Poutre 10, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 117, Noeud2:Noeud 126, b:0.448, h:0.875
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 10-14, parent:Poutre 10, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 126, Noeud2:Noeud 135, b:0.448, h:0.875
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 10-15, parent:Poutre 10, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 135, Noeud2:Noeud 144, b:0.448, h:0.875
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 10-16, parent:Poutre 10, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 144, Noeud2:Noeud 153, b:0.448, h:0.875
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 10-17, parent:Poutre 10, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 153, Noeud2:Noeud 162, b:0.448, h:0.875
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 10-18, parent:Poutre 10, Fonction:Principale Transversale, Matériau:GL30h, Noeud1:Noeud 162, Noeud2:Noeud 171, b:0.448, h:0.875
+Object:Element, name: Poutre 4, parent: Poutres
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 4-1, parent:Poutre 4, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 3, Noeud2:Noeud 12, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 4-2, parent:Poutre 4, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 12, Noeud2:Noeud 21, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 4-3, parent:Poutre 4, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 21, Noeud2:Noeud 30, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 4-4, parent:Poutre 4, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 30, Noeud2:Noeud 39, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 4-5, parent:Poutre 4, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 39, Noeud2:Noeud 48, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 4-6, parent:Poutre 4, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 48, Noeud2:Noeud 57, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 4-7, parent:Poutre 4, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 57, Noeud2:Noeud 66, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 4-8, parent:Poutre 4, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 66, Noeud2:Noeud 75, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 4-9, parent:Poutre 4, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 75, Noeud2:Noeud 84, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 4-10, parent:Poutre 4, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 84, Noeud2:Noeud 93, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 4-11, parent:Poutre 4, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 93, Noeud2:Noeud 102, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 4-12, parent:Poutre 4, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 102, Noeud2:Noeud 111, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 4-13, parent:Poutre 4, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 111, Noeud2:Noeud 120, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 4-14, parent:Poutre 4, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 120, Noeud2:Noeud 129, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 4-15, parent:Poutre 4, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 129, Noeud2:Noeud 138, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 4-16, parent:Poutre 4, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 138, Noeud2:Noeud 147, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 4-17, parent:Poutre 4, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 147, Noeud2:Noeud 156, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 4-18, parent:Poutre 4, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 156, Noeud2:Noeud 165, b:0.184, h:1.35
+Object:Element, name: Poutre 5, parent: Poutres
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 5-1, parent:Poutre 5, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 4, Noeud2:Noeud 13, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 5-2, parent:Poutre 5, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 13, Noeud2:Noeud 22, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 5-3, parent:Poutre 5, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 22, Noeud2:Noeud 31, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 5-4, parent:Poutre 5, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 31, Noeud2:Noeud 40, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 5-5, parent:Poutre 5, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 40, Noeud2:Noeud 49, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 5-6, parent:Poutre 5, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 49, Noeud2:Noeud 58, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 5-7, parent:Poutre 5, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 58, Noeud2:Noeud 67, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 5-8, parent:Poutre 5, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 67, Noeud2:Noeud 76, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 5-9, parent:Poutre 5, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 76, Noeud2:Noeud 85, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 5-10, parent:Poutre 5, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 85, Noeud2:Noeud 94, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 5-11, parent:Poutre 5, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 94, Noeud2:Noeud 103, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 5-12, parent:Poutre 5, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 103, Noeud2:Noeud 112, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 5-13, parent:Poutre 5, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 112, Noeud2:Noeud 121, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 5-14, parent:Poutre 5, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 121, Noeud2:Noeud 130, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 5-15, parent:Poutre 5, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 130, Noeud2:Noeud 139, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 5-16, parent:Poutre 5, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 139, Noeud2:Noeud 148, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 5-17, parent:Poutre 5, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 148, Noeud2:Noeud 157, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 5-18, parent:Poutre 5, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 157, Noeud2:Noeud 166, b:0.184, h:1.35
+Object:Element, name: Poutre 6, parent: Poutres
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 6-1, parent:Poutre 6, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 5, Noeud2:Noeud 14, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 6-2, parent:Poutre 6, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 14, Noeud2:Noeud 23, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 6-3, parent:Poutre 6, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 23, Noeud2:Noeud 32, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 6-4, parent:Poutre 6, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 32, Noeud2:Noeud 41, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 6-5, parent:Poutre 6, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 41, Noeud2:Noeud 50, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 6-6, parent:Poutre 6, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 50, Noeud2:Noeud 59, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 6-7, parent:Poutre 6, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 59, Noeud2:Noeud 68, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 6-8, parent:Poutre 6, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 68, Noeud2:Noeud 77, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 6-9, parent:Poutre 6, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 77, Noeud2:Noeud 86, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 6-10, parent:Poutre 6, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 86, Noeud2:Noeud 95, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 6-11, parent:Poutre 6, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 95, Noeud2:Noeud 104, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 6-12, parent:Poutre 6, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 104, Noeud2:Noeud 113, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 6-13, parent:Poutre 6, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 113, Noeud2:Noeud 122, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 6-14, parent:Poutre 6, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 122, Noeud2:Noeud 131, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 6-15, parent:Poutre 6, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 131, Noeud2:Noeud 140, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 6-16, parent:Poutre 6, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 140, Noeud2:Noeud 149, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 6-17, parent:Poutre 6, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 149, Noeud2:Noeud 158, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 6-18, parent:Poutre 6, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 158, Noeud2:Noeud 167, b:0.184, h:1.35
+Object:Element, name: Poutre 7, parent: Poutres
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 7-1, parent:Poutre 7, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 6, Noeud2:Noeud 15, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 7-2, parent:Poutre 7, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 15, Noeud2:Noeud 24, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 7-3, parent:Poutre 7, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 24, Noeud2:Noeud 33, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 7-4, parent:Poutre 7, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 33, Noeud2:Noeud 42, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 7-5, parent:Poutre 7, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 42, Noeud2:Noeud 51, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 7-6, parent:Poutre 7, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 51, Noeud2:Noeud 60, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 7-7, parent:Poutre 7, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 60, Noeud2:Noeud 69, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 7-8, parent:Poutre 7, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 69, Noeud2:Noeud 78, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 7-9, parent:Poutre 7, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 78, Noeud2:Noeud 87, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 7-10, parent:Poutre 7, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 87, Noeud2:Noeud 96, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 7-11, parent:Poutre 7, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 96, Noeud2:Noeud 105, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 7-12, parent:Poutre 7, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 105, Noeud2:Noeud 114, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 7-13, parent:Poutre 7, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 114, Noeud2:Noeud 123, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 7-14, parent:Poutre 7, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 123, Noeud2:Noeud 132, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 7-15, parent:Poutre 7, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 132, Noeud2:Noeud 141, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 7-16, parent:Poutre 7, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 141, Noeud2:Noeud 150, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 7-17, parent:Poutre 7, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 150, Noeud2:Noeud 159, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 7-18, parent:Poutre 7, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 159, Noeud2:Noeud 168, b:0.184, h:1.35
+Object:Element, name: Poutre 8, parent: Poutres
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 8-1, parent:Poutre 8, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 7, Noeud2:Noeud 16, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 8-2, parent:Poutre 8, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 16, Noeud2:Noeud 25, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 8-3, parent:Poutre 8, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 25, Noeud2:Noeud 34, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 8-4, parent:Poutre 8, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 34, Noeud2:Noeud 43, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 8-5, parent:Poutre 8, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 43, Noeud2:Noeud 52, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 8-6, parent:Poutre 8, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 52, Noeud2:Noeud 61, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 8-7, parent:Poutre 8, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 61, Noeud2:Noeud 70, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 8-8, parent:Poutre 8, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 70, Noeud2:Noeud 79, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 8-9, parent:Poutre 8, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 79, Noeud2:Noeud 88, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 8-10, parent:Poutre 8, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 88, Noeud2:Noeud 97, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 8-11, parent:Poutre 8, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 97, Noeud2:Noeud 106, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 8-12, parent:Poutre 8, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 106, Noeud2:Noeud 115, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 8-13, parent:Poutre 8, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 115, Noeud2:Noeud 124, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 8-14, parent:Poutre 8, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 124, Noeud2:Noeud 133, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 8-15, parent:Poutre 8, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 133, Noeud2:Noeud 142, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 8-16, parent:Poutre 8, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 142, Noeud2:Noeud 151, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 8-17, parent:Poutre 8, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 151, Noeud2:Noeud 160, b:0.184, h:1.35
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre 8-18, parent:Poutre 8, Fonction:Secondaire 1, Matériau:GL30h, Noeud1:Noeud 160, Noeud2:Noeud 169, b:0.184, h:1.35
+Object:Element, name: Poutre SO1, parent: Poutres
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre SO1-1, parent:Poutre SO1, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 172, Noeud2:Noeud 181, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre SO1-2, parent:Poutre SO1, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 181, Noeud2:Noeud 190, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre SO1-3, parent:Poutre SO1, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 190, Noeud2:Noeud 199, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre SO1-4, parent:Poutre SO1, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 199, Noeud2:Noeud 208, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre SO1-5, parent:Poutre SO1, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 208, Noeud2:Noeud 46, b:0.112, h:0.75
+Object:Element, name: Poutre SO2, parent: Poutres
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre SO2-1, parent:Poutre SO2, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 173, Noeud2:Noeud 182, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre SO2-2, parent:Poutre SO2, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 182, Noeud2:Noeud 191, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre SO2-3, parent:Poutre SO2, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 191, Noeud2:Noeud 200, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre SO2-4, parent:Poutre SO2, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 200, Noeud2:Noeud 209, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre SO2-5, parent:Poutre SO2, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 209, Noeud2:Noeud 46, b:0.112, h:0.75
+Object:Element, name: Poutre Ouest1, parent: Poutres
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre Ouest1-1, parent:Poutre Ouest1, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 175, Noeud2:Noeud 184, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre Ouest1-2, parent:Poutre Ouest1, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 184, Noeud2:Noeud 193, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre Ouest1-3, parent:Poutre Ouest1, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 193, Noeud2:Noeud 202, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre Ouest1-4, parent:Poutre Ouest1, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 202, Noeud2:Noeud 211, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre Ouest1-5, parent:Poutre Ouest1, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 211, Noeud2:Noeud 64, b:0.112, h:0.75
+Object:Element, name: Poutre Ouest2, parent: Poutres
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre Ouest2-1, parent:Poutre Ouest2, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 176, Noeud2:Noeud 185, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre Ouest2-2, parent:Poutre Ouest2, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 185, Noeud2:Noeud 194, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre Ouest2-3, parent:Poutre Ouest2, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 194, Noeud2:Noeud 203, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre Ouest2-4, parent:Poutre Ouest2, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 203, Noeud2:Noeud 212, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre Ouest2-5, parent:Poutre Ouest2, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 212, Noeud2:Noeud 82, b:0.112, h:0.75
+Object:Element, name: Poutre Ouest3, parent: Poutres
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre Ouest3-1, parent:Poutre Ouest3, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 177, Noeud2:Noeud 186, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre Ouest3-2, parent:Poutre Ouest3, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 186, Noeud2:Noeud 195, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre Ouest3-3, parent:Poutre Ouest3, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 195, Noeud2:Noeud 204, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre Ouest3-4, parent:Poutre Ouest3, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 204, Noeud2:Noeud 213, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre Ouest3-5, parent:Poutre Ouest3, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 213, Noeud2:Noeud 100, b:0.112, h:0.75
+Object:Element, name: Poutre NO1, parent: Poutres
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre NO1-1, parent:Poutre NO1, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 179, Noeud2:Noeud 188, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre NO1-2, parent:Poutre NO1, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 188, Noeud2:Noeud 197, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre NO1-3, parent:Poutre NO1, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 197, Noeud2:Noeud 206, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre NO1-4, parent:Poutre NO1, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 206, Noeud2:Noeud 215, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre NO1-5, parent:Poutre NO1, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 215, Noeud2:Noeud 118, b:0.112, h:0.75
+Object:Element, name: Poutre NO2, parent: Poutres
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre NO2-1, parent:Poutre NO2, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 180, Noeud2:Noeud 189, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre NO2-2, parent:Poutre NO2, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 189, Noeud2:Noeud 198, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre NO2-3, parent:Poutre NO2, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 198, Noeud2:Noeud 207, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre NO2-4, parent:Poutre NO2, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 207, Noeud2:Noeud 216, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre NO2-5, parent:Poutre NO2, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 216, Noeud2:Noeud 118, b:0.112, h:0.75
+Object:Element, name: Poutre SE1, parent: Poutres
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre SE1-1, parent:Poutre SE1, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 217, Noeud2:Noeud 226, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre SE1-2, parent:Poutre SE1, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 226, Noeud2:Noeud 235, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre SE1-3, parent:Poutre SE1, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 235, Noeud2:Noeud 244, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre SE1-4, parent:Poutre SE1, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 244, Noeud2:Noeud 253, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre SE1-5, parent:Poutre SE1, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 253, Noeud2:Noeud 54, b:0.112, h:0.75
+Object:Element, name: Poutre SE2, parent: Poutres
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre SE2-1, parent:Poutre SE2, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 218, Noeud2:Noeud 227, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre SE2-2, parent:Poutre SE2, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 227, Noeud2:Noeud 236, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre SE2-3, parent:Poutre SE2, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 236, Noeud2:Noeud 245, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre SE2-4, parent:Poutre SE2, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 245, Noeud2:Noeud 254, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre SE2-5, parent:Poutre SE2, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 254, Noeud2:Noeud 54, b:0.112, h:0.75
+Object:Element, name: Poutre Est1, parent: Poutres
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre Est1-1, parent:Poutre Est1, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 220, Noeud2:Noeud 229, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre Est1-2, parent:Poutre Est1, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 229, Noeud2:Noeud 238, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre Est1-3, parent:Poutre Est1, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 238, Noeud2:Noeud 247, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre Est1-4, parent:Poutre Est1, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 247, Noeud2:Noeud 256, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre Est1-5, parent:Poutre Est1, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 256, Noeud2:Noeud 72, b:0.112, h:0.75
+Object:Element, name: Poutre Est2, parent: Poutres
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre Est2-1, parent:Poutre Est2, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 221, Noeud2:Noeud 230, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre Est2-2, parent:Poutre Est2, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 230, Noeud2:Noeud 239, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre Est2-3, parent:Poutre Est2, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 239, Noeud2:Noeud 248, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre Est2-4, parent:Poutre Est2, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 248, Noeud2:Noeud 257, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre Est2-5, parent:Poutre Est2, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 257, Noeud2:Noeud 90, b:0.112, h:0.75
+Object:Element, name: Poutre Est3, parent: Poutres
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre Est3-1, parent:Poutre Est3, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 222, Noeud2:Noeud 231, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre Est3-2, parent:Poutre Est3, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 231, Noeud2:Noeud 240, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre Est3-3, parent:Poutre Est3, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 240, Noeud2:Noeud 249, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre Est3-4, parent:Poutre Est3, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 249, Noeud2:Noeud 258, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre Est3-5, parent:Poutre Est3, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 258, Noeud2:Noeud 108, b:0.112, h:0.75
+Object:Element, name: Poutre NE1, parent: Poutres
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre NE1-1, parent:Poutre NE1, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 224, Noeud2:Noeud 233, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre NE1-2, parent:Poutre NE1, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 233, Noeud2:Noeud 242, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre NE1-3, parent:Poutre NE1, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 242, Noeud2:Noeud 251, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre NE1-4, parent:Poutre NE1, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 251, Noeud2:Noeud 260, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre NE1-5, parent:Poutre NE1, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 260, Noeud2:Noeud 126, b:0.112, h:0.75
+Object:Element, name: Poutre NE2, parent: Poutres
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre NE2-1, parent:Poutre NE2, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 225, Noeud2:Noeud 234, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre NE2-2, parent:Poutre NE2, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 234, Noeud2:Noeud 243, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre NE2-3, parent:Poutre NE2, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 243, Noeud2:Noeud 252, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre NE2-4, parent:Poutre NE2, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 252, Noeud2:Noeud 261, b:0.112, h:0.75
+Object:Element, category: Structural Elements, type: Beam3d, name: Poutre NE2-5, parent:Poutre NE2, Fonction:Secondaire 2, Matériau:GL30h, Noeud1:Noeud 261, Noeud2:Noeud 126, b:0.112, h:0.75
+Object:Element, name: Panne longitudinale, parent: Poutres
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-1, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 10, Noeud2:Noeud 11, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-2, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 11, Noeud2:Noeud 12, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-3, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 12, Noeud2:Noeud 13, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-4, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 13, Noeud2:Noeud 14, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-5, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 14, Noeud2:Noeud 15, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-6, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 15, Noeud2:Noeud 16, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-7, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 16, Noeud2:Noeud 17, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-8, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 17, Noeud2:Noeud 18, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-9, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 19, Noeud2:Noeud 20, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-10, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 20, Noeud2:Noeud 21, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-11, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 21, Noeud2:Noeud 22, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-12, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 22, Noeud2:Noeud 23, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-13, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 23, Noeud2:Noeud 24, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-14, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 24, Noeud2:Noeud 25, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-15, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 25, Noeud2:Noeud 26, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-16, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 26, Noeud2:Noeud 27, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-17, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 28, Noeud2:Noeud 29, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-18, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 29, Noeud2:Noeud 30, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-19, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 30, Noeud2:Noeud 31, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-20, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 31, Noeud2:Noeud 32, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-21, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 32, Noeud2:Noeud 33, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-22, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 33, Noeud2:Noeud 34, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-23, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 34, Noeud2:Noeud 35, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-24, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 35, Noeud2:Noeud 36, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-25, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 37, Noeud2:Noeud 38, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-26, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 38, Noeud2:Noeud 39, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-27, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 39, Noeud2:Noeud 40, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-28, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 40, Noeud2:Noeud 41, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-29, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 41, Noeud2:Noeud 42, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-30, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 42, Noeud2:Noeud 43, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-31, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 43, Noeud2:Noeud 44, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-32, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 44, Noeud2:Noeud 45, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-33, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 55, Noeud2:Noeud 56, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-34, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 56, Noeud2:Noeud 57, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-35, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 57, Noeud2:Noeud 58, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-36, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 58, Noeud2:Noeud 59, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-37, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 59, Noeud2:Noeud 60, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-38, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 60, Noeud2:Noeud 61, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-39, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 61, Noeud2:Noeud 62, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-40, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 62, Noeud2:Noeud 63, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-41, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 64, Noeud2:Noeud 65, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-42, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 65, Noeud2:Noeud 66, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-43, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 66, Noeud2:Noeud 67, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-44, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 67, Noeud2:Noeud 68, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-45, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 68, Noeud2:Noeud 69, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-46, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 69, Noeud2:Noeud 70, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-47, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 70, Noeud2:Noeud 71, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-48, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 71, Noeud2:Noeud 72, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-49, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 73, Noeud2:Noeud 74, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-50, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 74, Noeud2:Noeud 75, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-51, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 75, Noeud2:Noeud 76, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-52, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 76, Noeud2:Noeud 77, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-53, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 77, Noeud2:Noeud 78, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-54, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 78, Noeud2:Noeud 79, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-55, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 79, Noeud2:Noeud 80, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-56, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 80, Noeud2:Noeud 81, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-57, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 82, Noeud2:Noeud 83, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-58, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 83, Noeud2:Noeud 84, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-59, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 84, Noeud2:Noeud 85, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-60, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 85, Noeud2:Noeud 86, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-61, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 86, Noeud2:Noeud 87, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-62, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 87, Noeud2:Noeud 88, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-63, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 88, Noeud2:Noeud 89, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-64, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 89, Noeud2:Noeud 90, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-65, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 91, Noeud2:Noeud 92, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-66, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 92, Noeud2:Noeud 93, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-67, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 93, Noeud2:Noeud 94, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-68, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 94, Noeud2:Noeud 95, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-69, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 95, Noeud2:Noeud 96, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-70, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 96, Noeud2:Noeud 97, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-71, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 97, Noeud2:Noeud 98, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-72, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 98, Noeud2:Noeud 99, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-73, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 100, Noeud2:Noeud 101, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-74, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 101, Noeud2:Noeud 102, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-75, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 102, Noeud2:Noeud 103, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-76, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 103, Noeud2:Noeud 104, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-77, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 104, Noeud2:Noeud 105, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-78, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 105, Noeud2:Noeud 106, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-79, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 106, Noeud2:Noeud 107, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-80, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 107, Noeud2:Noeud 108, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-81, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 109, Noeud2:Noeud 110, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-82, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 110, Noeud2:Noeud 111, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-83, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 111, Noeud2:Noeud 112, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-84, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 112, Noeud2:Noeud 113, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-85, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 113, Noeud2:Noeud 114, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-86, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 114, Noeud2:Noeud 115, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-87, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 115, Noeud2:Noeud 116, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-88, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 116, Noeud2:Noeud 117, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-89, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 127, Noeud2:Noeud 128, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-90, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 128, Noeud2:Noeud 129, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-91, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 129, Noeud2:Noeud 130, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-92, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 130, Noeud2:Noeud 131, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-93, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 131, Noeud2:Noeud 132, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-94, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 132, Noeud2:Noeud 133, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-95, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 133, Noeud2:Noeud 134, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-96, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 134, Noeud2:Noeud 135, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-97, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 136, Noeud2:Noeud 137, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-98, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 137, Noeud2:Noeud 138, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-99, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 138, Noeud2:Noeud 139, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-100, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 139, Noeud2:Noeud 140, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-101, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 140, Noeud2:Noeud 141, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-102, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 141, Noeud2:Noeud 142, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-103, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 142, Noeud2:Noeud 143, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-104, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 143, Noeud2:Noeud 144, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-105, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 145, Noeud2:Noeud 146, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-106, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 146, Noeud2:Noeud 147, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-107, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 147, Noeud2:Noeud 148, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-108, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 148, Noeud2:Noeud 149, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-109, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 149, Noeud2:Noeud 150, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-110, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 150, Noeud2:Noeud 151, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-111, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 151, Noeud2:Noeud 152, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-112, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 152, Noeud2:Noeud 153, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-113, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 154, Noeud2:Noeud 155, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-114, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 155, Noeud2:Noeud 156, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-115, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 156, Noeud2:Noeud 157, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-116, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 157, Noeud2:Noeud 158, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-117, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 158, Noeud2:Noeud 159, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-118, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 159, Noeud2:Noeud 160, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-119, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 160, Noeud2:Noeud 161, b:0.088, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne longitudinale-120, parent:Panne longitudinale, Fonction:Panne, Matériau:C24, Noeud1:Noeud 161, Noeud2:Noeud 162, b:0.088, h:0.61
+Object:Element, name: Panne Ouest, parent: Poutres
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-1, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 10, Noeud2:Noeud 181, b:0.088, h:0.391
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-2, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 181, Noeud2:Noeud 182, b:0.088, h:0.391
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-3, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 182, Noeud2:Noeud 183, b:0.088, h:0.391
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-4, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 183, Noeud2:Noeud 184, b:0.065, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-5, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 184, Noeud2:Noeud 185, b:0.065, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-6, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 185, Noeud2:Noeud 186, b:0.065, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-7, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 186, Noeud2:Noeud 187, b:0.065, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-8, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 187, Noeud2:Noeud 188, b:0.088, h:0.391
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-9, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 188, Noeud2:Noeud 189, b:0.088, h:0.391
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-10, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 189, Noeud2:Noeud 154, b:0.088, h:0.391
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-11, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 19, Noeud2:Noeud 190, b:0.088, h:0.303
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-12, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 190, Noeud2:Noeud 191, b:0.088, h:0.303
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-13, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 191, Noeud2:Noeud 192, b:0.088, h:0.303
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-14, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 192, Noeud2:Noeud 193, b:0.065, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-15, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 193, Noeud2:Noeud 194, b:0.065, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-16, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 194, Noeud2:Noeud 195, b:0.065, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-17, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 195, Noeud2:Noeud 196, b:0.065, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-18, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 196, Noeud2:Noeud 197, b:0.088, h:0.303
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-19, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 197, Noeud2:Noeud 198, b:0.088, h:0.303
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-20, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 198, Noeud2:Noeud 145, b:0.088, h:0.303
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-21, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 28, Noeud2:Noeud 199, b:0.088, h:0.303
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-22, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 199, Noeud2:Noeud 200, b:0.088, h:0.303
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-23, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 200, Noeud2:Noeud 201, b:0.088, h:0.303
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-24, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 201, Noeud2:Noeud 202, b:0.065, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-25, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 202, Noeud2:Noeud 203, b:0.065, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-26, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 203, Noeud2:Noeud 204, b:0.065, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-27, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 204, Noeud2:Noeud 205, b:0.065, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-28, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 205, Noeud2:Noeud 206, b:0.088, h:0.303
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-29, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 206, Noeud2:Noeud 207, b:0.088, h:0.303
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-30, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 207, Noeud2:Noeud 136, b:0.088, h:0.303
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-31, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 37, Noeud2:Noeud 208, b:0.088, h:0.303
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-32, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 208, Noeud2:Noeud 209, b:0.088, h:0.303
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-33, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 209, Noeud2:Noeud 210, b:0.088, h:0.303
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-34, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 210, Noeud2:Noeud 211, b:0.065, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-35, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 211, Noeud2:Noeud 212, b:0.065, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-36, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 212, Noeud2:Noeud 213, b:0.065, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-37, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 213, Noeud2:Noeud 214, b:0.065, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-38, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 214, Noeud2:Noeud 215, b:0.088, h:0.303
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-39, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 215, Noeud2:Noeud 216, b:0.088, h:0.303
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Ouest-40, parent:Panne Ouest, Fonction:Panne, Matériau:C24, Noeud1:Noeud 216, Noeud2:Noeud 127, b:0.088, h:0.303
+Object:Element, name: Panne Est, parent: Poutres
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-1, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 18, Noeud2:Noeud 226, b:0.088, h:0.391
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-2, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 226, Noeud2:Noeud 227, b:0.088, h:0.391
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-3, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 227, Noeud2:Noeud 228, b:0.088, h:0.391
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-4, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 228, Noeud2:Noeud 229, b:0.065, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-5, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 229, Noeud2:Noeud 230, b:0.065, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-6, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 230, Noeud2:Noeud 231, b:0.065, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-7, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 231, Noeud2:Noeud 232, b:0.065, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-8, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 232, Noeud2:Noeud 233, b:0.088, h:0.391
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-9, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 233, Noeud2:Noeud 234, b:0.088, h:0.391
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-10, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 234, Noeud2:Noeud 162, b:0.088, h:0.391
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-11, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 27, Noeud2:Noeud 235, b:0.088, h:0.303
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-12, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 235, Noeud2:Noeud 236, b:0.088, h:0.303
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-13, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 236, Noeud2:Noeud 237, b:0.088, h:0.303
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-14, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 237, Noeud2:Noeud 238, b:0.065, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-15, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 238, Noeud2:Noeud 239, b:0.065, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-16, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 239, Noeud2:Noeud 240, b:0.065, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-17, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 240, Noeud2:Noeud 241, b:0.065, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-18, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 241, Noeud2:Noeud 242, b:0.088, h:0.303
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-19, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 242, Noeud2:Noeud 243, b:0.088, h:0.303
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-20, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 243, Noeud2:Noeud 153, b:0.088, h:0.303
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-21, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 36, Noeud2:Noeud 244, b:0.088, h:0.303
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-22, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 244, Noeud2:Noeud 245, b:0.088, h:0.303
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-23, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 245, Noeud2:Noeud 246, b:0.088, h:0.303
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-24, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 246, Noeud2:Noeud 247, b:0.065, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-25, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 247, Noeud2:Noeud 248, b:0.065, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-26, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 248, Noeud2:Noeud 249, b:0.065, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-27, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 249, Noeud2:Noeud 250, b:0.065, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-28, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 250, Noeud2:Noeud 251, b:0.088, h:0.303
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-29, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 251, Noeud2:Noeud 252, b:0.088, h:0.303
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-30, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 252, Noeud2:Noeud 144, b:0.088, h:0.303
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-31, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 45, Noeud2:Noeud 253, b:0.088, h:0.303
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-32, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 253, Noeud2:Noeud 254, b:0.088, h:0.303
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-33, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 254, Noeud2:Noeud 255, b:0.088, h:0.303
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-34, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 255, Noeud2:Noeud 256, b:0.065, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-35, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 256, Noeud2:Noeud 257, b:0.065, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-36, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 257, Noeud2:Noeud 258, b:0.065, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-37, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 258, Noeud2:Noeud 259, b:0.065, h:0.61
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-38, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 259, Noeud2:Noeud 260, b:0.088, h:0.303
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-39, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 260, Noeud2:Noeud 261, b:0.088, h:0.303
+Object:Element, category: Structural Elements, type: Beam3d, name: Panne Est-40, parent:Panne Est, Fonction:Panne, Matériau:C24, Noeud1:Noeud 261, Noeud2:Noeud 135, b:0.088, h:0.303

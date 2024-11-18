@@ -1,0 +1,37 @@
+﻿@page "/DeleteStructure/{Id:guid}"
+@using AliantWebS.Data
+@using AliantWebS.Models
+@inject EntitiesService entitiesService
+@inject NavigationManager NavigationManager
+
+<h2>Delete Structure</h2>
+<hr />
+<h3>Are you sure want to delete this?</h3>
+
+<StructureFormComponent EditContext="@EditContext" ButtonText="Delete Structure" Structure="@structure"
+                        OnValidSubmit="@DeleteStructure" />
+
+
+
+@code {
+    [Parameter]
+    public EditContext EditContext { get; set; }
+
+    [Parameter]
+    public Guid Id { get; set; }
+    Structure structure = new Structure();
+    protected override async Task OnInitializedAsync()
+    {
+        structure = await Task.Run(() => entitiesService.GetEntityAsync<Structure>(Id));
+        EditContext = new EditContext(structure);
+    }
+    protected async void DeleteStructure()
+    {
+        await entitiesService.DeleteEntityAsync(structure);
+        NavigationManager.NavigateTo("Structures");
+    }
+    void Cancel()
+    {
+        NavigationManager.NavigateTo("Structures");
+    }
+}

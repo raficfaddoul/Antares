@@ -1,0 +1,293 @@
+﻿@implements IDisposable
+@using AliantWebS.Models
+@using AliantWebS.Data
+@inject EntitiesService entitiesService
+@inject NavigationManager navigationManager
+@inject AliantWebS.Data.AppData AppData
+@using System.Text.Json;
+@using System.Text.Json.Serialization;
+@inject IStringLocalizer<Languages> L
+
+
+@if (ElementTypesList is null)
+{
+    <p><em>@L["Loading"]... !</em></p>
+}
+else
+{
+    <EditForm EditContext="@AppData.ElementEditContext" id="ElementFormId" OnValidSubmit="@OnValidSubmit">
+        <DataAnnotationsValidator />
+        <Blazorise.Row>
+            <Column ColumnSize="ColumnSize.Is6">
+                <div class="form-group">
+                    <label>@L["Element Name"] :</label>
+                    <div>
+                        <InputText @bind-Value="@Element.Name" @oninput='(() =>areachanged("Name"))' />
+                        <ValidationMessage For="@(() => Element.Name)" />
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>@L["Short Description"] :</label>
+                    <div>
+                        <div class="form-group">
+                            <textarea @bind="@Element.Description" @oninput='(() =>areachanged("Description"))' class="form-control"></textarea>
+                        </div>
+                        <ValidationMessage For="@(() => Element.Description)" />
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="Structural" class="control-label">@L["Functionality Class"]</label>
+
+                    <InputSelect TValue="int?" @bind-Value="@Element.Structural" class="form-control">
+                        <option>-@L["Select"]...</option>
+                        <option value="1">@L["Structural"]</option>
+                        <option value="0">@L["Non Structural"]</option>
+                    </InputSelect>
+                </div>
+                    @if (!creating && Element.ElementId !=Guid.Empty)
+    {
+                <AttributesComponent Titem1="AttributeElement" Titem2="Element" Titem3="AttributeTypeElementType" CallerIdName="ElementId"
+                                     CallerTypeIdName="ElementTypeId" CallerTypeName="Element" JunctionPropName="AttributeElements"
+                                     element="Element"></AttributesComponent>
+    }
+            </Column>
+            <Column ColumnSize="ColumnSize.Is6">
+
+                <div class="form-group">
+                    <label for="Category" class="control-label">@L["Category"]</label>
+                    <Blazorise.Select TValue="Guid?" @bind-SelectedValue="BindingValue" class="form-control">
+                        <option value=Guid.Empty>@L["Select"]...</option>
+                        @foreach (var category in CategoriesList)
+                        {
+                            <option value="@category.CategoryId">@category.Name</option>
+
+                        }
+                    </Blazorise.Select>
+                </div>
+                <div class="form-group">
+                    <label for="ElementType" class="control-label">@L["Element Type"]</label>
+                    <InputSelect TValue="Guid?" class="form-control" @bind-Value="@Element.ElementTypeId">
+                        <option value="">-@L["Select"]...</option>
+                        @foreach (var elementType in ElementTypesList)
+                        {
+                            <option value="@elementType.ElementTypeId">@elementType.Name</option>
+
+                        }
+                    </InputSelect>
+                </div>
+                @if (!creating && Element.ElementId != Guid.Empty)
+                {
+                    <div style="height:auto">
+                        <MediaComponent selectedObject="Element"></MediaComponent>
+                </div>
+                }
+            </Column>
+        </Blazorise.Row>
+        <Blazorise.Row>
+
+        </Blazorise.Row>
+        <br />
+        @if (ButtonText != "Create Element")
+        {
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="form-group">
+                        @*                    <button type="submit" class="btn btn-success">
+                        @ButtonText
+                    </button>*@
+                        <button disabled="@(Element.ElementTypeId is null)" type="button" class="btn btn-success" @onclick="@InspectionButtonClick">
+                            @L["Condition State"]
+                        </button>
+                        <button disabled="@(Element.ElementTypeId is null)" type="button" class="btn btn-success" @onclick="@DefectsButtonClick">
+                            @L["Defects"]
+                        </button>
+                        @*                    <button type="button" class="btn btn-success" @onclick="@Cancel">
+                        Cancel
+                    </button>*@
+                        @if (Element.ElementTypeId != null)
+                        {
+                            <button type="button" class="btn btn-success" @onclick="@DataButtonClick">
+                                @L["Data"]
+                        </button>
+                    }
+                </div>
+            </div>
+        </div>
+        }
+
+    </EditForm>
+    <br />
+@*     @if (!creating && Element.ElementId !=Guid.Empty)
+    {
+        <Blazorise.Row>
+            <Column ColumnSize="ColumnSize.Is6">
+           
+            </Column>
+            <Column ColumnSize="ColumnSize.Is6">
+
+            </Column>
+        </Blazorise.Row>
+
+    } *@
+
+
+}
+
+@code {
+
+
+    [Parameter] public string ButtonText { get; set; } = "Save";
+
+    //[Parameter]
+    //public EditContext EditContext { get; set; }
+
+
+    [Parameter]
+    public bool creating { get; set; } = false;
+
+
+    [Parameter]
+    public Element Element { get; set; }
+
+
+    [Parameter] public EventCallback OnValidSubmit { get; set; }
+
+    List<ElementType> ElementTypesList = new List<ElementType>();
+
+    [Parameter]
+    public List<Category> CategoriesList { get; set; } = new List<Category>();
+
+
+
+    private Guid? _value;
+
+    [Parameter]
+    public Guid? BindingValue
+    {
+        get => _value;
+        set
+        {
+            if (_value == value) return;
+            _value = value;
+            CategoryChanged(value);
+        }
+    }
+
+
+
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        AppData.ButtonText = ButtonText;
+
+        AppData.FormId = "ElementFormId";
+        AppData.DisplaySubmitButton = true;
+
+        creating = true;
+        //await Task.WhenAll(entitiesService.tasksList);
+        CategoriesList = await entitiesService.GetAllEntitiesAsync<Category>();
+        BindingValue = Element.ElementType?.CategoryId;
+        //  CategorySelect.SelectedValue = Element.ElementType?.CategoryId;
+
+        //await Task.WhenAll(entitiesService.tasksList);
+        ElementTypesList = await entitiesService.GetFilteredEntitiesAsync<ElementType>(a => a.CategoryId == BindingValue);
+        creating = false;
+    }
+
+    public override async Task SetParametersAsync(ParameterView parameters)
+    {
+        await base.SetParametersAsync(parameters);
+        
+        if (AppData.ElementEditContext == null)
+        {
+            navigationManager.NavigateTo("Structures");
+            return;
+        }
+
+
+
+
+        AppData.ElementEditContext.OnFieldChanged -= FieldChanged;
+        AppData.ElementEditContext.OnFieldChanged += FieldChanged;
+        StateHasChanged();
+    }
+
+    private void areachanged(string s)
+    {
+        AppData.ElementEditContext.NotifyFieldChanged(AppData.ElementEditContext.Field(s));
+    }
+
+    private void FieldChanged(object sender, FieldChangedEventArgs arg)
+    {
+        AppData.SaveChanges = true;
+    }
+
+    async void CategoryChanged(Guid? categoryId)
+    {
+        // await Task.WhenAll(entitiesService.tasksList);
+        ElementTypesList = await entitiesService.GetFilteredEntitiesAsync<ElementType>(a => a.CategoryId == categoryId);
+
+        this.StateHasChanged();
+
+    }
+
+    protected async void CategoryClicked(ChangeEventArgs categoryEvent)
+    {
+
+        //   int categoryId = Int32.Parse(categoryEvent.Value.ToString());
+
+        //    ElementTypesList = await Task.Run(() => entitiesService.GetFilteredEntitiesAsync<ElementType>(a => a.CategoryId == categoryId));
+
+        //   this.StateHasChanged();
+    }
+
+    //void Cancel()
+    //{
+    //    navigationManager.NavigateTo("/ElementComponent/" + Element.StructureId);
+    //}
+
+    void InspectionButtonClick()
+    {
+        AppData.obj = Element;
+
+        navigationManager.NavigateTo("/ElementInspections/" + Element.ElementId);
+
+    }
+
+    void DefectsButtonClick()
+    {
+        AppData.obj = Element;
+
+        navigationManager.NavigateTo("/ElementDefects/" + Element.ElementId);
+
+    }
+
+    void DataButtonClick()
+    {
+        AppData.obj = Element;
+
+        List<Guid?> listIDs = new List<Guid?>() {Element.ElementId };
+
+        string param = JsonSerializer.Serialize(listIDs);
+
+        navigationManager.NavigateTo("/SensorData/" + param);
+
+    }
+
+
+    void IDisposable.Dispose()
+    {
+        // Unsubscribe from the event when our component is disposed
+        if (AppData.ElementEditContext != null)
+        {
+            AppData.ElementEditContext.OnFieldChanged -= FieldChanged;
+        }
+
+    }
+
+
+
+}

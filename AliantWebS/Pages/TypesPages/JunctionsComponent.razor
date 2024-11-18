@@ -1,0 +1,167 @@
+﻿@implements IDisposable
+@using AliantWebS.Data
+@using Models
+@inject AliantWebS.Data.AppData appData
+@inject EntitiesService entitiesService
+@inject IStringLocalizer<Languages> L
+
+@typeparam TItem1
+@typeparam TItem2
+@typeparam TItem3
+
+
+
+<Div Style="display: flex">
+    <h3>@Titre</h3>
+    <div style="margin-left: auto; ">
+        <Label> @L["Page Size"]: &nbsp;&nbsp;</Label>
+        <RadzenNumeric @bind-Value="PageSize" Style="width:60px"></RadzenNumeric>
+    </div>
+</Div>
+@if (InspectionResultTypeList is null)
+{
+    <p><em>@L["Loading"]... !</em></p>
+}
+else
+{
+    <EditForm Model="@InspectionResultTypeElementTypesCollection" id="JunctionFormId" OnValidSubmit="@OnValidSubmit">
+        <RadzenDataGrid class="RadzenDataGrid" AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="PageSize"
+                    Data="@InspectionResultTypeList" TItem="TItem2" ColumnWidth="150px">
+            <Columns>
+                @* <RadzenDataGridColumn TItem="TItem2" Property="@TItem2IdName" Title="@TItem2IdName"></RadzenDataGridColumn> *@
+                <RadzenDataGridColumn TItem="TItem2" Property="Name" Title="Name"></RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="TItem2" Property="Description" Title="Description"></RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="TItem2" Property="Length" Title="Action">
+                    <Template Context="inspectionResultType">
+                        <RadzenCheckBox TValue=bool Value=@GetValue(inspectionResultType) Change=@(args => OnChange(args, inspectionResultType))></RadzenCheckBox>
+
+                    </Template>
+
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+
+@*        <br />
+        <div class="row">
+            <div class="col-md-4">
+                <div class="form-group">
+                    <button type="submit" class="btn btn-success">
+                        Submit
+                    </button>
+                </div>
+            </div>
+        </div>*@
+    </EditForm>
+}
+
+@code {
+
+    [Parameter] public string ButtonText { get; set; } = "Save";
+
+    //[Parameter]
+    //public EditContext EditContext { get; set; }
+
+    int PageSize { get; set; } = 10;
+
+    [Parameter]
+    public string Titre { get; set; }
+
+    [Parameter]
+    public Guid CallerID { get; set; }
+
+    [Parameter]
+    public ICollection<TItem3> InspectionResultTypeElementTypesCollection { get; set; }
+
+    [Parameter]
+    public string TItem1IdName { get; set; }
+
+    [Parameter]
+    public string TItem2IdName { get; set; }
+
+    [Parameter] public EventCallback OnValidSubmit { get; set; }
+
+
+    TItem1 elementType;
+
+
+
+    List<TItem2> InspectionResultTypeList;
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(entitiesService.tasksList);
+        elementType = (TItem1)appData.obj;
+        //  InspectionResultTypeElementTypesList = ((ICollection<InspectionResultTypeElementType>)AppData.obj).ToList();
+        InspectionResultTypeList = await Task.Run(() => entitiesService.GetAllEntitiesAsync<TItem2>());
+
+
+        //EditContext.OnFieldChanged -= FieldChanged;
+        //EditContext.OnFieldChanged += FieldChanged;
+        appData.ButtonText = ButtonText;
+
+        appData.FormId = "JunctionFormId";
+        appData.DisplaySubmitButton = true;
+
+
+    }
+
+    //private void FieldChanged(object sender, FieldChangedEventArgs arg)
+    //{
+    //    AppData.SaveChanges = true;
+    //}
+
+    object reflexion(object ob, string IdName)
+    {
+        var v = ob.GetType().GetProperties().First(x => x.Name == IdName).GetValue(ob);
+        return v;
+    }
+
+
+    bool GetValue(TItem2 inspectionResultType)
+    {
+        if (InspectionResultTypeElementTypesCollection.Count(x => ((Guid)reflexion(x, TItem2IdName)) == ((Guid)reflexion(inspectionResultType, TItem2IdName))) > 0)
+        { return true; }
+        else
+        {
+            return false;
+        }
+    }
+
+    void OnChange(bool args, TItem2 inspectionResultType)
+    {
+        if (args && !GetValue(inspectionResultType))
+        {
+
+            TItem3 inspectionResultTypeElementType = new TItem3();
+
+            typeof(TItem3).GetProperties().First(x => x.Name == TItem2IdName).SetValue(inspectionResultTypeElementType, reflexion(inspectionResultType, TItem2IdName));
+            typeof(TItem3).GetProperties().First(x => x.Name == TItem1IdName).SetValue(inspectionResultTypeElementType, CallerID);
+
+
+            InspectionResultTypeElementTypesCollection.Add(inspectionResultTypeElementType);
+
+            //     (await entitiesService.InsertEntityAsync(elementType)
+        }
+
+        if (!args && GetValue(inspectionResultType))
+        {
+
+
+            entitiesService.DeleteEntityAsync(InspectionResultTypeElementTypesCollection.First(x => ((Guid)reflexion(x, TItem2IdName)) == ((Guid)reflexion(inspectionResultType, TItem2IdName))));
+            InspectionResultTypeElementTypesCollection.Remove(InspectionResultTypeElementTypesCollection.First(x => ((Guid)reflexion(x, TItem2IdName)) == ((Guid)reflexion(inspectionResultType, TItem2IdName))));
+
+        }
+        appData.SaveChanges = true;
+    }
+
+    void IDisposable.Dispose()
+    {
+        // Unsubscribe from the event when our component is disposed
+        //EditContext.OnFieldChanged -= FieldChanged;
+
+    }
+
+}

@@ -1,0 +1,64 @@
+﻿@page "/AddStructure"
+@page "/AddStructure/{SiteID:guid}"
+@using AliantWebS.Data
+@using AliantWebS.Models 
+@inject EntitiesService structureService
+@inject NavigationManager NavigationManager
+@inject AppData appData
+@inject IStringLocalizer<Languages> L
+
+<NavigationLock OnBeforeInternalNavigation="appData.OnBeforeInternalNavigation" ConfirmExternalNavigation="appData.SaveConfirmation&& appData.SaveChanges" />
+
+
+<StructureFormComponent ButtonText="Create" Structure="@structure"
+                        OnValidSubmit="@CreateStructure" 
+                        Title="@L["Add Structure"]"/>
+
+@code {
+    [Parameter]
+    public Guid SiteID { get; set; }
+
+    //[Parameter]
+    //public EditContext EditContext { get; set; }
+
+    Structure structure = new Structure();
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        if (SiteID != Guid.Empty)
+        {
+            structure.SiteId = SiteID;
+        }
+        appData.Structure = structure;
+    }
+
+    protected async void CreateStructure()
+    {
+        await AddAttributes(structure);
+        await structureService.InsertEntityAsync(structure);
+
+        NavigationManager.NavigateTo("Structures");
+       // structureService._appDBContext.Entry<Structure>().State != "Detached"
+    }
+
+    private async Task AddAttributes(Structure structure)
+    {
+        var structureTypeID = structure.StructureTypeId;
+
+        if (structureTypeID is null) return;
+
+        List<StructureTypeAttributeType> atet = await structureService.GetFilteredEntitiesAsync<StructureTypeAttributeType>(a => a.StructureTypeId == structure.StructureTypeId, "AttributeType");
+
+        var attributeTypesList = atet.Select(x => x.AttributeType);
+
+        foreach (var v in attributeTypesList)
+        {
+            AttributeStructure ae = new AttributeStructure();
+            ae.StructureId = structure.StructureId;
+            ae.AttributeTypeId = v.AttributeTypeId;
+            structure.AttributeStructures.Add(ae);
+        }
+    }
+ 
+}

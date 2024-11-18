@@ -1,0 +1,128 @@
+﻿@page "/AddElement/{StructureId:guid}/{ListJson}"
+@using AliantWebS.Data
+@using AliantWebS.Models
+@inject EntitiesService entitiesService
+@inject NavigationManager NavigationManager
+@using System.Text.Json;
+@inject AppData appData;
+
+@layout ElementsLayout
+
+<NavigationLock OnBeforeInternalNavigation="appData.OnBeforeInternalNavigation" ConfirmExternalNavigation="appData.SaveConfirmation&& appData.SaveChanges" />
+
+
+<h2>Add Element</h2>
+<hr />
+@if (!updating)
+{
+    <ElementFormComponent creating="true" ButtonText="Create Element" Element="@elementPrototype" OnValidSubmit="@CreateElement"></ElementFormComponent>
+}
+
+@code {
+
+    [Parameter]
+    public EditContext EditContext { get; set; }
+
+    bool updating = false;
+
+    [Parameter]
+    public Structure Structure { get; set; }
+
+    [Parameter]
+    public Guid StructureId { get; set; }
+
+    //[Parameter]
+    // public int? parentID { get; set; }
+
+    [Parameter]
+    public string ListJson { get; set; }
+
+
+    Element elementPrototype = new Element();
+    //   List<Element> elements = new List<Element>();
+    List<Guid?> parentsIDs;
+
+    public override async Task SetParametersAsync(ParameterView parameters)
+    {
+
+        await base.SetParametersAsync(parameters);
+
+
+        if (appData.obj is Structure)
+        {
+            Structure = (Structure)appData.obj;
+
+        }
+        else
+        {
+            Structure = await entitiesService.GetEntityAsync<Structure>(StructureId);
+        }
+        elementPrototype.Structure = Structure;
+        elementPrototype.StructureId = Structure.StructureId;
+        //  elementPrototype.ParentId = parentID;
+        appData.Element = elementPrototype;
+        //EditContext = new EditContext(elementPrototype);
+        parentsIDs = JsonSerializer.Deserialize<List<Guid?>>(ListJson);
+
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+
+    }
+
+
+    protected async void CreateElement()
+    {
+        updating = true;
+
+        foreach (Guid? parentID in parentsIDs)
+        {
+
+            Element element = (Element)entitiesService._appDBContext.Entry(elementPrototype).CurrentValues.ToObject();
+            element.ParentId = parentID;
+            Structure.Elements.Add(element);
+            await AddAttributes(element);
+
+        }
+
+
+
+        await entitiesService.UpdateEntityAsync(Structure);
+
+
+        // await entitiesService.InsertEntitiesAsync<Element>(elements);
+        if (parentsIDs.Contains(null))
+        {
+            appData.RootEmployeesChange();
+        }
+        appData.NSC();
+        updating = false;
+
+        NavigationManager.NavigateTo("BlankElement/");
+
+    }
+
+    private async Task AddAttributes(Element element)
+    {
+        var elementTypeID = element.ElementTypeId;
+
+        if (elementTypeID is null) return;
+
+        List<AttributeTypeElementType> atet = await entitiesService.GetFilteredEntitiesAsync<AttributeTypeElementType>(a => a.ElementTypeId == element.ElementTypeId, "AttributeType");
+
+        var attributeTypesList = atet.Select(x => x.AttributeType);
+
+    
+
+        foreach (var v in attributeTypesList)
+        {          
+                AttributeElement ae = new AttributeElement();
+                ae.ElementId = element.ElementId;
+                ae.AttributeTypeId = v.AttributeTypeId;
+                element.AttributeElements.Add(ae);      
+           
+        }    
+    }
+    //    "/AddElement/{structureID:int}/{parentID:int?}"
+}

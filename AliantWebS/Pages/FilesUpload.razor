@@ -1,0 +1,179 @@
+﻿@page "/FilesUpload/{j:int}"
+@using System
+@using System.IO
+@using Microsoft.AspNetCore.Hosting
+@using Microsoft.Extensions.Logging
+@using Models
+@using AliantWebS.Data;
+@inject ILogger<FilesUpload> Logger
+@inject IWebHostEnvironment Environment
+@inject AliantWebS.Data.AppData AppData
+
+<h3>Upload Files</h3>
+
+<p>
+    <label>
+        Max file size:
+        <input type="number" @bind="maxFileSize" />
+    </label>
+</p>
+
+<p>
+    <label>
+        Max allowed files:
+        <input type="number" @bind="maxAllowedFiles" />
+    </label>
+</p>
+
+<p>
+
+</p>
+
+@if (isLoading)
+{
+    <p>Progress: @string.Format("{0:P0}", progressPercent)</p>
+}
+else
+{
+    <ul>
+        @foreach (var file in loadedFiles)
+        {
+            <li>
+                <ul>
+                    <li>Name: @file.Name</li>
+                    <li>Last modified: @file.LastModified.ToString()</li>
+                    <li>Size (bytes): @file.Size</li>
+                    <li>Content type: @file.ContentType</li>
+                </ul>
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    private List<IBrowserFile> loadedFiles = new();
+    private long maxFileSize = 1024 * 1024 * 15;
+    private int maxAllowedFiles = 3;
+    private bool isLoading;
+    private decimal progressPercent;
+
+
+
+    [Parameter]
+    public string Folder { get; set; }
+
+    [Parameter]
+    public object obj { get; set; }
+
+    [Parameter]
+    public InputFileChangeEventArgs e { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+
+
+        await LoadFiles(e);
+
+    }
+
+
+    static public string PreparePath(string fileName, object obj, string path)
+    {
+        const int charactersFromGuid = 10; 
+
+
+        var tupleResult = FileManagementService.GetFilesLocation(obj, path);
+
+        path = tupleResult.Item1;
+        string guidElement = tupleResult.guidElement;
+        string guidDefect = tupleResult.guidDefect;
+        string guidEvent = tupleResult.guidEvent;
+
+
+        if (!Directory.Exists(path))
+        {
+            Directory.CreateDirectory(path);
+        }
+
+        string fullPath = string.Empty;
+
+        if (obj.GetType() == typeof(Event))
+        {
+            fullPath = Path.Combine(path, guidEvent.Substring(1, charactersFromGuid) + fileName);
+
+        }
+
+        else if (obj.GetType() == typeof(Element))
+        {
+            fullPath = Path.Combine(path, guidElement.Substring(1, charactersFromGuid) + fileName);
+
+        }
+        else if (obj.GetType() == typeof(Structure))
+        {
+            fullPath = Path.Combine(path, fileName);
+
+        }
+
+        else if (obj.GetType() == typeof(Defect))
+        {
+            fullPath = Path.Combine(path, guidElement.Substring(1, charactersFromGuid) + guidDefect.Substring(0, charactersFromGuid) + fileName);
+
+        }
+        else if (obj.GetType() == typeof(Site))
+        {
+            fullPath = Path.Combine(path, fileName);
+
+        }
+
+
+        return fullPath;
+    }
+
+    public async Task LoadFiles(InputFileChangeEventArgs e)
+    {
+      
+
+        isLoading = true;
+        loadedFiles.Clear();
+        progressPercent = 0;
+
+
+        foreach (var file in e.GetMultipleFiles(maxAllowedFiles))
+        {
+            try
+            {
+                string path = Path.Combine(Environment.ContentRootPath, Folder);
+
+                string fullPath = PreparePath(file.Name,obj,path);
+
+
+                await using FileStream writeStream = new(fullPath, FileMode.Create);
+                using var readStream = file.OpenReadStream(maxFileSize);
+                var bytesRead = 0;
+                var totalRead = 0;
+                var buffer = new byte[1024 * 10];
+
+                while ((bytesRead = await readStream.ReadAsync(buffer)) != 0)
+                {
+                    totalRead += bytesRead;
+
+                    await writeStream.WriteAsync(buffer, 0, bytesRead);
+
+                    progressPercent = Decimal.Divide(totalRead, file.Size);
+
+                    StateHasChanged();
+                }
+
+                loadedFiles.Add(file);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("some exeption in Files Upload");//???rafic deveopement mode
+                Logger.LogError("File: {Filename} Error: {Error}",
+                    file.Name, ex.Message);
+            }
+        }
+
+        isLoading = false;
+    }
+}

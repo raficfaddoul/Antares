@@ -1,0 +1,134 @@
+﻿@using AliantWebS.Models
+@using AliantWebS.Data
+@inject EntitiesService entitiesService
+@inject NavigationManager navigationManager
+
+@if (ElementTypesList is null)
+{
+    <p><em>Loading... !</em></p>
+}
+else
+{
+    <EditForm Model="@Element" OnValidSubmit="@OnValidSubmit">
+        <DataAnnotationsValidator />
+        <Row>
+            <Column ColumnSize="ColumnSize.Is6">
+                <div class="form-group">
+                    <label>Element Name :</label>
+                    <div>
+                        <InputText @bind-Value="@Element.Name" />
+                        <ValidationMessage For="@(() => Element.Name)" />
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Short Description :</label>
+                    <div>
+                        <InputText @bind-Value="@Element.Description" />
+                        <ValidationMessage For="@(() => Element.Description)" />
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="Structural" class="control-label"></label>
+
+                    <InputSelect TValue="int?" @bind-Value="@Element.Structural" class="form-control">
+                        <option>-Select Structural</option>
+                        <option value="0">Structural</option>
+                        <option value="1">Non Structural</option>
+                    </InputSelect>
+                </div>
+            </Column>
+            <Column ColumnSize="ColumnSize.Is6">
+
+                <div class="form-group">
+                    <label for="Category" class="control-label"></label>
+                    <select class="form-control" @onchange="@CategoryClicked">
+                        <option value="">-Select Category</option>
+                        @foreach (var category in CategoriesList)
+                        {
+                            <option value="@category.CategoryId">@category.Name</option>
+
+                        }
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="ElementType" class="control-label"></label>
+                    <InputSelect TValue="Guid?" class="form-control" @bind-Value="@Element.ElementTypeId">
+                        <option value="">-Select Element Type</option>
+                        @foreach (var elementType in ElementTypesList)
+                        {
+                            <option value="@elementType.ElementTypeId">@elementType.Name</option>
+
+                        }
+                    </InputSelect>
+                </div>
+
+            </Column>
+        </Row>
+        <Row>
+
+        </Row>
+        <br />
+        <div class="row">
+            <div class="col-md-4">
+                <div class="form-group">
+                    <button type="submit" class="btn btn-success">
+                        @ButtonText
+                    </button>
+                    <button type="button" class="btn btn-success" @onclick="@Cancel">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </EditForm>
+    <br />
+
+}
+
+@code {
+
+    [Parameter]
+    public Element Element { get; set; }
+
+    [Parameter] public EventCallback OnValidSubmit { get; set; }
+    [Parameter] public string ButtonText { get; set; } = "Save";
+
+
+    List<ElementType> ElementTypesList = new List<ElementType>();
+
+    List<Category> CategoriesList = new List<Category>();
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        CategoriesList = await Task.Run(() => entitiesService.GetAllEntitiesAsync<Category>());
+
+    }
+
+    protected async void CategoryClicked(ChangeEventArgs categoryEvent)
+    {
+
+        Guid categoryId = (Guid)categoryEvent.Value;// Int32.Parse(categoryEvent.Value.ToString());
+
+        ElementTypesList = await Task.Run(() => entitiesService.GetFilteredEntitiesAsync<ElementType>(a => a.CategoryId == categoryId));
+
+        this.StateHasChanged();
+    }
+
+    void Cancel()
+    {
+        navigationManager.NavigateTo("/ElementComponent/" + Element.StructureId);
+    }
+
+
+
+
+
+    //async Task<List<string>> GetPathForFiles()
+    //{
+    //    return await fileManagementService.GetPathForFiles(Element);
+    //}
+
+
+}

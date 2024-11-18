@@ -1,0 +1,51 @@
+﻿@page "/FlagTypeInspectionResultTypes/{CallerID:guid}"
+@using Models
+@using AliantWebS.Data
+@inject AliantWebS.Data.AppData AppData
+@inject EntitiesService entitiesService
+
+
+
+
+<AliantWebS.Pages.TypesPages.JunctionsComponent Titre=@titre
+                                                TItem1="FlagType"
+                                                TItem2="InspectionResultType"
+                                                TItem3="FlagTypeInspectionResultType"
+                                                CallerID=@CallerID
+                                                TItem1IdName="FlagTypeId"
+                                                TItem2IdName="InspectionResultTypeId"
+                                                InspectionResultTypeElementTypesCollection=@callerType.FlagTypeInspectionResultTypes
+                                                OnValidSubmit="@Update">
+
+</AliantWebS.Pages.TypesPages.JunctionsComponent>
+
+
+
+@code {
+
+    [Parameter]
+    public Guid CallerID { get; set; }
+
+    public string titre { get; set; }
+
+    FlagType callerType;
+
+    public override async Task SetParametersAsync(ParameterView parameters)
+    {
+        callerType = (FlagType)AppData.obj;
+        entitiesService.LoadCollection(callerType, "FlagTypeInspectionResultTypes");
+        await base.SetParametersAsync(parameters);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        titre = "Flag Type \"" + callerType.Name + "\" Inspection Result Types Association";
+    }
+
+    protected async void Update()
+    {
+        await entitiesService.UpdateEntityAsync(callerType);
+    }
+
+}

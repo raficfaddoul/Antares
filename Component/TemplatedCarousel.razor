@@ -1,0 +1,214 @@
+﻿@using System.Timers;
+
+@typeparam TItem;
+
+<div class="container blazor-carousel @(CssClass)">
+    @if (Items != null)
+    {
+        <div class="blazor-carousel-inner">
+            @foreach (var templatedItem in Items)
+            {
+                <div class="blazor-carousel-templated-item @GetClasses()" @onclick="() => { OnCarouselItemClicked?.Invoke(this, ActiveItemIndex); }">
+                    @ItemTemplate(templatedItem);
+                </div>
+            }
+
+            @ResetRenderCounter();
+        </div>
+
+        @if (ShowNavigation)
+        {
+            <div class="blazor-carousel-nav-container">
+                <div class="blazor-carousel-arrow-container float-left ml-2">
+                    <div class="blazor-carousel-control-nav">
+                        @if (ActiveItemIndex > 0 && Items.Count() > 1)
+                        {
+                            <a class="blazor-carousel-control-prev" @onclick="OnPreviousClicked">
+                                <span class="carousel-control-prev-icon"></span>
+                            </a>
+                        }
+                    </div>
+                </div>
+
+                <div class="blazor-carousel-indicators-container mt-2">
+                    <ol>
+                        @for (int indicatorIndex = 0; indicatorIndex < Items.Count; indicatorIndex++)
+                        {
+                            int copiedIndex = indicatorIndex;
+                            <li class="blazor-carousel-indicator @GetIndicatorState()" @onclick="() => SetActiveItemIndex(copiedIndex)" blazor-indicator-index="@_carouselRenderIndex">&nbsp;</li>
+                        }
+                    </ol>
+                </div>
+
+                <div class="blazor-carousel-arrow-container float-right mr-2">
+                    <div class="blazor-carousel-control-nav">
+                        @if (ActiveItemIndex < Items.Count() - 1 && Items.Count() > 1)
+                        {
+                            <a class="blazor-carousel-control-next" @onclick="OnNextClicked">
+                                <span class="carousel-control-next-icon"></span>
+                            </a>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            @ResetRenderCounter();
+        }
+    }
+</div>
+
+
+@code {
+
+    [Parameter]
+    public string id { get; set; }
+
+    [Parameter]
+    public RenderFragment<TItem> ItemTemplate { get; set; }
+
+    [Parameter]
+    public IReadOnlyList<TItem> Items{ get; set; }
+
+    [Parameter]
+    public string name { get; set; }
+
+    [Parameter]
+    public string CssClass { get; set; }
+
+    [Parameter]
+    public string TemplateItemClass { get; set; }
+
+    [Parameter]
+    public int? AutoScrollInterval { get; set; }
+
+    public delegate void CarouselItemClicked(object sender, int index);
+
+    [Parameter]
+    public CarouselItemClicked OnCarouselItemClicked { get; set; }
+
+    [Parameter]
+    public bool ShowNavigation { get; set; } = true;
+
+    //public int ActiveItemIndex => _activeItemIndex;
+
+    private int activeItemIndex =0;
+
+    [Parameter]
+    public int ActiveItemIndex// { get; set; } = 0;
+    {
+        get => activeItemIndex;
+        set
+    {
+            if (activeItemIndex == value) return;
+            activeItemIndex = value;
+
+            ActiveItemIndexChanged.InvokeAsync(value);
+        }
+}
+
+
+[Parameter]
+    public EventCallback<int> ActiveItemIndexChanged { get; set; }
+
+    private int _carouselRenderIndex = -1;
+   // private int _activeItemIndex = 0;
+    private Timer _scrollTimer = null;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if ((this.AutoScrollInterval ?? 0) > 0)
+        {
+
+            int scrollMilliseconds = ((int)(this.AutoScrollInterval)) * 1000;
+
+            _scrollTimer?.Stop();
+
+            if (_scrollTimer == null)
+            {
+                _scrollTimer = new Timer();
+                _scrollTimer.Elapsed += (o, e) =>
+                {
+
+                    ActiveItemIndex += 1;
+
+                    if (ActiveItemIndex > (Items?.Count - 1 ?? 0))
+                    {
+                        ActiveItemIndex = 0;
+                    }
+
+                    this.InvokeAsync(() =>
+                    {
+                        this.StateHasChanged();
+                    });
+                };
+            }
+
+            _scrollTimer.Interval = scrollMilliseconds;
+            _scrollTimer?.Start();
+        }
+        else
+        {
+            _scrollTimer?.Stop();
+        }
+    }
+
+    protected void OnNextClicked()
+    {
+        _carouselRenderIndex = -1;
+        ActiveItemIndex += 1;
+        this.StateHasChanged();
+    }
+
+    protected void OnPreviousClicked()
+    {
+        _carouselRenderIndex = -1;
+        ActiveItemIndex -= 1;
+        this.StateHasChanged();
+    }
+
+    private void SetActiveItemIndex(int newIndex)
+    {
+        _carouselRenderIndex = -1;
+        ActiveItemIndex = newIndex;
+
+        this.StateHasChanged();
+    }
+
+    private string GetClasses()
+    {
+        string imageStateClass = "hidden";
+
+        _carouselRenderIndex++;
+
+        if (_carouselRenderIndex == ActiveItemIndex)
+        {
+            imageStateClass = null;
+        }
+
+        imageStateClass += OnCarouselItemClicked != null ? " blazor-carousel-pointer" : "";
+        return imageStateClass.Trim();
+
+    }
+
+    private string GetIndicatorState()
+    {
+        string imageStateClass = "";
+
+        _carouselRenderIndex++;
+
+        if (_carouselRenderIndex == ActiveItemIndex)
+        {
+            imageStateClass = "blazor-carousel-indicator-active";
+        }
+
+        return imageStateClass;
+    }
+
+    private string ResetRenderCounter()
+    {
+
+        _carouselRenderIndex = -1;
+        return null;
+    }
+}
+

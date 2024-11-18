@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@xbim/viewer": "^2.1.0-pre202403281736"
+  }
+}

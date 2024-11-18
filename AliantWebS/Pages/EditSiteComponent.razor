@@ -1,0 +1,53 @@
+﻿@page "/EditSite/{SiteID:guid}"
+@using AliantWebS.Data
+@using AliantWebS.Models
+@inject EntitiesService entitiesService
+@inject NavigationManager navigationManager
+@inject AppData appData
+@inject IJSRuntime js
+
+
+<NavigationLock OnBeforeInternalNavigation="appData.OnBeforeInternalNavigation" ConfirmExternalNavigation="appData.SaveConfirmation&& appData.SaveChanges" />
+
+<h2>Edit Site</h2>
+<hr />
+
+<SiteFormComponent EditContext="@EditContext" ButtonText=@buttonText Site="@site"
+                        OnValidSubmit="@UpdateSite" />
+
+
+
+
+
+@code {
+    string buttonText = "Updated";
+
+    [Parameter]
+    public EditContext EditContext { get; set; }
+
+    [Parameter]
+    public Guid SiteID { get; set; }
+    Site site = new Site();
+
+    public override async Task SetParametersAsync(ParameterView parameters)
+    {
+        await base.SetParametersAsync(parameters);
+
+        await Task.WhenAll(entitiesService.tasksList);
+        site = await entitiesService.GetEntityAsync<Site>(SiteID);
+        EditContext = new EditContext(site);
+    }
+
+
+
+
+    protected async void UpdateSite()
+    {
+        await entitiesService.UpdateEntityAsync(site);
+        //navigationManager.NavigateTo("Structures");
+    }
+
+
+
+
+}

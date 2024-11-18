@@ -1,0 +1,14 @@
+﻿@using AliantWebS.Pages
+@inject IStringLocalizer<Languages> L
+<AuthorizeView>
+    <Authorized>
+        <a href="Identity/Account/Manage">Hello, @context.User.Identity.Name!</a>
+        <form method="post" action="Identity/Account/LogOut">
+            <button type="submit" class="nav-link btn btn-link">@L["Log ou0t"]</button>
+        </form>
+    </Authorized>
+    <NotAuthorized>
+        <a href="Identity/Account/Register">@L["Register"]</a>
+        <a href="Identity/Account/Login">@L["Log in"]</a>
+    </NotAuthorized>
+</AuthorizeView>

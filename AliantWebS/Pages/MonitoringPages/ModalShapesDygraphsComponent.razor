@@ -1,0 +1,180 @@
+﻿@page "/ModalShapesDygraphs/"
+@using System.Data;
+@using AliantWebS.Data
+@using Models
+@using Accord.Math;
+@using System.Globalization;
+@using Newtonsoft;
+@inject IJSRuntime js
+@inject AppData appData;
+@inject EntitiesService entitiesService
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+
+<style>
+    #darkbg .dygraph-axis-label {
+        color: white;
+    }
+
+    .dygraph-legend {
+        text-align: right;
+    }
+
+    #darkbg .dygraph-legend {
+        background-color: #101015;
+    }
+
+</style>
+
+<div id="canvas-container" style="position:relative; width:100%; height:100%;">
+    <div id="graphdiv1" style="height:300px; width:100%; display:flex"></div>
+    <div id="overlay" style="position:absolute; top:10px; left:10px;">
+        <label for="inputNumber" style="color: white;">Mode</label>
+        <InputNumber @bind-Value="Mode" type="number" id="inputNumber" style="width:50px"/>
+       
+    </div>
+</div>
+
+@code {
+    int mode;
+
+    public int Mode
+    {
+        get
+        {
+
+            return mode;
+        }
+        set
+        {
+
+            if (mode == value) return;
+            mode = value;
+            _ = SetModeAsync(mode);
+
+        }
+    }
+
+
+    Structural.Structure structuralStructure = null;
+
+
+    [Parameter]
+    public Structure structure { get; set; }
+
+    private List<string> dataPoints = new List<string>(); // Use a list to store data points
+
+    string headers = "X,Deformation";
+
+    double[] ValeursPropres = null;
+    double[,] VecteursPropres = null;
+
+    List<List<double>> lines = new List<List<double>>();
+    List<List<int>> nodes = new List<List<int>>();
+
+    protected override async Task OnInitializedAsync()
+    {
+
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+
+
+        if (firstRender)
+        {
+            if (structure == null) return;
+            try
+            {
+
+                var ss = await localStorage.GetItemAsync<string>(structure.StructureId.ToString());
+                structuralStructure = Newtonsoft.Json.JsonConvert.DeserializeObject<Structural.Structure>(ss);
+                if (structuralStructure is null)
+                {
+
+                    structuralStructure = Structural.Simulation.CreateStructure(structure, null, entitiesService);
+                    var s = Newtonsoft.Json.JsonConvert.SerializeObject(structuralStructure);
+                    await localStorage.SetItemAsync(structure.StructureId.ToString(), s);
+                }
+                
+            
+            }
+            catch (Exception ex)
+            {
+                await js.InvokeVoidAsync("alert", "Could not create structure...");
+                return;
+
+            }
+            dataPoints.Add($"{0},{0}\n");
+            await js.InvokeVoidAsync("initializeDygraph", "graphdiv1", "X", "Deformation");
+            await DoTheWork();
+        }
+    }
+
+
+
+    protected async Task DoTheWork()
+    {
+        if (structuralStructure == null) return;
+
+
+        //Structural.Structure structuralStructure = new Structural.Structure();
+        //structuralStructure.LoadStructure("Poutre_Pont", 1);
+
+
+        foreach (DataRow el in structuralStructure.element.Rows)
+        {
+            int n1 = el.Field<int>("Noeudi");
+            int n2 = el.Field<int>("Noeudj");
+            double x1 = structuralStructure.noeud[n1][0];
+            double y1 = structuralStructure.noeud[n1][1];
+
+            double x2 = structuralStructure.noeud[n2][0];
+            double y2 = structuralStructure.noeud[n2][1];
+
+
+            List<double> line = new List<double>
+            {
+                x1,y1,0,x2,y2,0
+            };
+
+            List<int> node = new List<int>
+            {
+                n1,n2
+            };
+
+            lines.Add(line);
+            nodes.Add(node);
+
+        }
+
+
+
+
+        ValeursPropres = Structural.StructuralVibration.Calcul_ValeursPropres(structuralStructure.element,
+            structuralStructure.noeud, structuralStructure.MasseNodale, structuralStructure.CL, out VecteursPropres);
+
+
+
+
+
+    }
+
+    private async Task SetModeAsync(int mode)
+    {
+        dataPoints.Clear();
+        if (VecteursPropres == null) return;
+        var v = VecteursPropres.GetColumn(mode);
+
+        int index = 0;
+        foreach (List<double> line in lines)
+        {
+            dataPoints.Add($"{line[0].ToString(CultureInfo.InvariantCulture)},{(v[nodes[index][0] * 3 + 1]).ToString(CultureInfo.InvariantCulture)}\n");
+            index++;
+        }
+        var liveData = $"{headers}\n" + string.Join("\n", dataPoints);
+
+        await js.InvokeVoidAsync("updateDygraph", "graphdiv1", liveData);
+        this.StateHasChanged();
+    }
+
+}

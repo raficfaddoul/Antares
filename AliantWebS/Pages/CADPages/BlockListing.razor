@@ -1,0 +1,126 @@
+﻿@page "/BlockListing"
+@using Microsoft.AspNetCore.Hosting
+@inject IWebHostEnvironment Env
+@inject IJSRuntime js
+
+@using netDxf
+@using netDxf.Blocks
+@using System.IO
+@using System.Text
+<input type="file" id="dxfFileInput"  />
+<div class="file-input-zone">
+    <NavLink title="BIM" class="nav-link" href="dgfrdgh" @onclick:preventDefault="true">
+        <span align="center" style="width:30px" class="fa fa-cube" aria-hidden="true"></span>
+    </NavLink>
+    <InputFile OnChange="@LoadAndListBlocks" />
+</div>
+@* <canvas @ref="_canvasElement" id="v-canvas" style="width: 100%; height: 100%;"></canvas> *@
+@* <div  style="height:100%; width:100%" id="dxf-canvas"></div> *@
+
+
+<div id="dxfContainer" style="width: 800px; height: 600px;"></div>
+
+@if (blockNames != null && blockNames.Any())
+{
+    <h3>Blocks in the DXF file:</h3>
+    <ul>
+        @foreach (var name in blockNames)
+        {
+            <li>@name</li>
+        }
+    </ul>
+}
+else if (blockNames != null)
+{
+    <p>No blocks found in the file.</p>
+}
+
+@code {
+
+    public class ViewerInstance
+    {
+        public IJSObjectReference Scene { get; set; }
+        public IJSObjectReference Camera { get; set; }
+    }
+
+    private ElementReference _canvasElement;
+
+    private List<string> blockNames;
+
+    private dynamic _viewerInstance;  // To store the viewer instance (scene, camera, etc.)
+
+    protected override async Task OnInitializedAsync()
+    {
+
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await js.InvokeVoidAsync("testdxf");
+            // await js.InvokeVoidAsync("dxfViewerInterop.initializeSettings", "fonts/helvetiker_regular.typeface.json", "dxfContainer");
+        
+        //    var DxfUrl = Path.Combine(Env.WebRootPath, "2007.dxf");
+             //  await js.InvokeVoidAsync("renderDxf", "/antares.txt");
+
+          //  await js.InvokeVoidAsync("initializeDXFViewer", "v-canvas");
+        }
+    }
+
+    // private async Task LoadDxfFile(ChangeEventArgs e)
+    // {
+    //     await js.InvokeVoidAsync("dxfViewerInterop.loadDXF", "dxfFileInput", "fonts/helvetiker_regular.typeface.json", "dxfContainer");
+    // }
+
+    private async void LoadAndListBlocks(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        // if (file != null)
+        // {
+        //     var maxChunkSize = 1048576; // Read in chunks of 1MB
+        //     using var stream = file.OpenReadStream(50000000);  // Adjust maximum read size
+        //     byte[] buffer = new byte[maxChunkSize];
+        //     int bytesRead;
+        //     var base64StringBuilder = new StringBuilder();
+
+        //     while ((bytesRead = await stream.ReadAsync(buffer)) > 0)
+        //     {
+        //         var actualBuffer = buffer.Take(bytesRead).ToArray();
+        //         var base64Chunk = Convert.ToBase64String(actualBuffer);
+        //         base64StringBuilder.Append(base64Chunk);
+        //     }
+
+        //     var base64Data = base64StringBuilder.ToString();
+        //     await js.InvokeVoidAsync("loadDXF", base64Data);
+        // }
+        
+
+        // return;
+        // var file = ((IReadOnlyList<Microsoft.AspNetCore.Components.Forms.IBrowserFile>)e.Value)[0];
+        using (var stream = file.OpenReadStream(maxAllowedSize: 152428800)) // Limit size to 50 MB
+        {
+            try
+            {
+                //stream.Position = 0;
+                var path = Path.Combine(Env.WebRootPath, "2007.dxf");
+                // this check is optional but recommended before loading a DXF file
+                netDxf.Header.DxfVersion dxfVersion = DxfDocument.CheckDxfFileVersion(path);
+                // netDxf is only compatible with AutoCad2000 and higher DXF versions
+                if (dxfVersion < netDxf.Header.DxfVersion.AutoCad2000) return;
+                // load file
+              //  DxfDocument loaded = DxfDocument.Load(file);
+
+
+                DxfDocument dxfDocument = DxfDocument.Load(path);
+                blockNames = dxfDocument.Blocks
+                                         .Select(block => block.Name)
+                                         .ToList();
+            }
+            catch(Exception ex)
+            {
+                int k = 1;
+            }
+        }
+    }
+}

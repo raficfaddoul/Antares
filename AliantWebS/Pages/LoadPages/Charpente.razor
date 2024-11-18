@@ -1,0 +1,790 @@
+﻿@page "/Charpente/{EventID:guid}"
+
+@using AliantWebS.Data
+@using Models
+@inject IStringLocalizer<Languages> L
+@inject EntitiesService entitiesService
+@inject AppData appData;
+
+@layout AntaresConceptionLayout
+
+@* Importing necessary namespaces *@
+@using System.Collections.Generic
+@using System.Reflection
+@using System.Text.RegularExpressions
+@using System.Data;
+
+<style>
+    .small-cell {
+        width: 100px !important; /* Adjust the width as needed */
+        height: 50px; /* Adjust the height as needed */
+        padding: 0; /* Remove padding to make cells smaller */
+        text-align: center; /* Center-align the text */
+    }
+
+    .small-input {
+        width: 100% !important; /* Make the input take full width of the cell */
+        height: 50%; /* Make the input take full height of the cell */
+        box-sizing: border-box; /* Include padding and border in the element's total width and height */
+        font-size: 12px; /* Adjust the font size as needed */
+        padding: 0; /* Remove padding for the input */
+    }
+
+    .fixed-table {
+        table-layout: fixed;
+        width: auto; /* Set to auto to prevent expanding to full width */
+    }
+
+    .center-text {
+        text-align: center;
+    }
+
+    /* Alternating row colors */
+    .table tbody tr:nth-child(even) {
+        background-color: #e0f7fa !important; /* Light cyan */
+    }
+
+    .table tbody tr:nth-child(odd) {
+        background-color: #ffffff !important; /* White */
+    }
+
+        /* Alternating column colors within alternating rows */
+        .table tbody tr:nth-child(even) td:nth-child(even),
+        .table tbody tr:nth-child(odd) td:nth-child(even),
+        .table tbody tr:nth-child(even) th:nth-child(even),
+        .table tbody tr:nth-child(odd) th:nth-child(even) {
+            background-color: rgba(255, 255, 153, 0.5) !important; /* Lighter yellow with transparency */
+        }
+
+        .table tbody tr:nth-child(even) td:nth-child(odd),
+        .table tbody tr:nth-child(odd) td:nth-child(odd),
+        .table tbody tr:nth-child(even) th:nth-child(odd),
+        .table tbody tr:nth-child(odd) th:nth-child(odd) {
+            background-color: inherit; /* Keep the row background color */
+        }
+
+    /* Ensure input fields inherit background color */
+    .table tbody tr td.small-cell input {
+        background-color: inherit;
+    }
+
+    .legend-box {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        margin-right: 5px;
+        vertical-align: middle;
+    }
+
+    .white-background {
+        background-color: #ffffff; /* White */
+    }
+
+    .faint-magenta-background {
+        background-color: #fde4f9; /* Faint magenta */
+    }
+
+    .legend-text {
+        vertical-align: middle;
+    }
+
+    .controls-container {
+        display: flex;
+        justify-content: start;
+        align-items: flex-start;
+    }
+
+    .buttons-container {
+        flex-grow: 1;
+    }
+
+    .legend-container {
+        margin-left: 20px; /* Adjust spacing between buttons and legend as needed */
+    }
+
+    .tooltip-container {
+        position: relative;
+        display: inline-block;
+    }
+
+    .tooltip-text {
+        visibility: hidden;
+        width: 120px;
+        background-color: #f9f9f9;
+        color: #fff;
+        text-align: center;
+        border-radius: 6px;
+        padding: 5px 0;
+        position: absolute;
+        z-index: 1;
+        bottom: 100%;
+        left: 50%;
+        margin-left: -60px;
+    }
+
+    .tooltip-container:hover .tooltip-text {
+        visibility: visible;
+    }
+
+    .tooltip-text::before {
+        display: none;   
+    }
+</style>
+
+
+
+
+<RadzenSplitter>
+    <RadzenSplitterPane>
+        <AliantWebS.Pages.CADPages.SVGComponent></AliantWebS.Pages.CADPages.SVGComponent>
+    </RadzenSplitterPane>
+    <RadzenSplitterPane>
+        <div class="form-group">
+            <div class="controls-container">
+                <!-- Buttons Container -->
+                <div class="buttons-container">
+                    <button type="button" class="btn btn-success" @onclick="Calcul">
+                        @if (isCalculating)
+                        {
+                            <i class="fas fa-spinner fa-spin"></i>
+                        }
+                        @L["Calcul Charpente"]
+                    </button>
+                    @if ((appData.GetRole().Result == "Administrator") || (appData.GetRole().Result == "Developer"))
+                    {
+                        <button type="button" class="btn btn-success" @onclick="saveLimitstodatabase" style="margin-left: 10px;">
+                            @L["Save Critical Loads"]
+                        </button>
+                    }
+                </div>
+                <!-- Legend Container -->
+                <div class="legend-container">
+                    <div>
+                        <span class="legend-box faint-magenta-background"></span>
+                        <span class="legend-text">Calculated Values</span>
+                    </div>
+                    <div>
+                        <span class="legend-box white-background"></span>
+                        <span class="legend-text">Limit values</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <table class="table table-bordered fixed-table">
+            <thead>
+                <tr>
+                    <th class="small-cell"></th>
+                    @foreach (var col in columns)
+                    {
+                        <th class="small-cell">@col</th>
+                    }
+                </tr>
+
+            </thead>
+            <tbody>
+                @for (int i = 0; i < rows.Count(); i++)
+                {
+                    var row = rows[i];
+                    <tr>
+                        <th class="small-cell">@row</th>
+                        @foreach (var col in columns)
+                        {
+                            <td class="small-cell">
+                                <div class ="tooltip-container">
+                                <span class="tooltip-text" style="@GetTooltipStyle(CalculateRatio(row, col))">@($"Taux de charge: {CalculateRatio(row, col):F2}")</span>
+                                <input type="number" class="form-control small-input center-text" value="@GetCellValue(row, col)" @onchange="e => UpdateCellValue(row, col, e)"
+                                       style="background-color: #ffffff;" />
+                                <input type="number"
+                                       class="form-control small-input center-text"
+                                       value="@GetCellValue(row, col, false)"
+                                       @onchange="e => UpdateCellValue(row, col, e, false)"
+                                       disabled="@(appData.GetRole().Result != "Administrator" && appData.GetRole().Result != "Developer")"
+                                       style="background-color: #fde4f9;" />
+                                </div>
+                            </td>
+                        }
+                    </tr>
+                }
+                <tr>
+                    <th class="small-cell">Total</th>
+                    @foreach (var col in columns)
+                    {
+                        <td class="small-cell">
+                            <input type="number" class="form-control small-input center-text" value="@GetSumValue(col)" />
+                        </td>
+                    }
+                </tr>
+            </tbody>
+        </table>
+        <Label>Charge Totale</Label>
+        <input disabled value="@GetGrandSumValue()" />
+        <div>
+            <Label>Compte Rendu</Label>
+            <InputTextArea @bind-Value=compteRendu style="width:100%"></InputTextArea>
+        </div>
+    </RadzenSplitterPane>
+</RadzenSplitter>
+
+
+
+@code {
+
+    [Parameter]
+    public Guid EventID { get; set; }
+    // Define the columns and rows
+    private readonly string[] columns = { "A", "B", "C", "D", "E", "F", "G", "H", "I", "J" };
+    private readonly string[] rows = { "1", "2", "3", "4", "5", "6", "7", "8", "9" };
+
+    // Dictionary to store cell values
+    private Dictionary<(string, string), double> tableData = new Dictionary<(string, string), double>();
+    private Dictionary<(string, string), double> ttableData = new Dictionary<(string, string), double>();
+
+    Models.Charpente charpente;
+    Models.Tcharpente tcharpente;
+
+    bool isCalculating = false;
+
+    string compteRendu = "epsom loren";
+
+    protected override async Task OnInitializedAsync()
+    {
+        charpente = await entitiesService.GetFilteredFirstEntityAsync<Models.Charpente>(x => (x.EventId == EventID));
+        if (charpente == null)
+        {
+            charpente = new Models.Charpente();
+            charpente.EventId = EventID;
+        }
+        else
+        {
+            tableData = ReadCharpenteData(charpente);
+        }
+
+        var tcharpentes = await entitiesService.GetAllEntitiesAsync<Models.Tcharpente>();
+        tcharpente = tcharpentes?.FirstOrDefault();
+        if (tcharpente == null)
+        {
+            tcharpente = new Models.Tcharpente();
+        }
+        else
+        {
+            ttableData = ReadTCharpenteData(tcharpente);
+        }
+    }
+
+    // Method to update cell values
+    private void UpdateCellValue(string row, string column, ChangeEventArgs e, bool Calculated = true)
+    {
+        if (Calculated)
+        {
+            if (int.TryParse(e.Value.ToString(), out int value))
+            {
+                tableData[(row, column)] = value;
+            }
+        }
+        else
+        {
+            if (int.TryParse(e.Value.ToString(), out int value))
+            {
+                ttableData[(row, column)] = value;
+            }
+
+        }
+    }
+
+    // Method to get cell value
+    private double GetCellValue(string row, string column, bool Calculated = true)
+    {
+        if (Calculated)
+        {
+            if (tableData.TryGetValue((row, column), out double value))
+            {
+                return value;
+            }
+        }
+        else
+        {
+            if (ttableData.TryGetValue((row, column), out double value))
+            {
+                return value;
+            }
+        }
+        return 0;
+    }
+
+
+    private double GetSumValue(string column)
+    {
+        double sum = 0;
+        foreach (var row in rows)
+        {
+            if (tableData.TryGetValue((row, column), out double value))
+            {
+                sum += value;
+            }
+        }
+
+        return sum;
+    }
+
+    private double GetGrandSumValue()
+    {
+        double sum = 0;
+        foreach (var column in columns)
+        {
+            foreach (var row in rows)
+            {
+                if (tableData.TryGetValue((row, column), out double value))
+                {
+                    sum += value;
+                }
+            }
+        }
+
+        return sum;
+    }
+
+    public static Dictionary<(string, string), double> ReadCharpenteData(Models.Charpente charpente)
+    {
+        var result = new Dictionary<(string, string), double>();
+
+        // Use reflection to get properties of Charpente
+        PropertyInfo[] properties = typeof(Models.Charpente).GetProperties();
+        foreach (PropertyInfo property in properties)
+        {
+            // Check if the property is of type double or nullable double
+            if (property.PropertyType == typeof(double) || property.PropertyType == typeof(double?))
+            {
+                // Obtain the property value
+                object valueObj = property.GetValue(charpente);
+
+                // Check if the value is not null
+                if (valueObj != null)
+                {
+                    // Safely cast the non-null value to double
+                    double value = (double)valueObj;
+
+                    // Use regex to split the property name into letter and number
+                    var match = Regex.Match(property.Name, @"([A-Z]+)(\d+)");
+                    if (match.Success)
+                    {
+                        string letter = match.Groups[1].Value;
+                        string number = match.Groups[2].Value;
+
+                        // Add the (number, letter) pair and value to the dictionary
+                        result.Add((number, letter), value);
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
+    public static Dictionary<(string, string), double> ReadTCharpenteData(Models.Tcharpente Tcharpente)
+    {
+        var result = new Dictionary<(string, string), double>();
+
+        // Use reflection to get properties of Charpente
+        PropertyInfo[] properties = typeof(Models.Tcharpente).GetProperties();
+        foreach (PropertyInfo property in properties)
+        {
+            // Check if the property is of type double or nullable double
+            if (property.PropertyType == typeof(double) || property.PropertyType == typeof(double?))
+            {
+                // Obtain the property value
+                object valueObj = property.GetValue(Tcharpente);
+
+                // Check if the value is not null
+                if (valueObj != null)
+                {
+                    // Safely cast the non-null value to double
+                    double value = (double)valueObj;
+
+                    // Use regex to split the property name into letter and number
+                    var match = Regex.Match(property.Name, @"([A-Z]+)(\d+)");
+                    if (match.Success)
+                    {
+                        string letter = match.Groups[1].Value;
+                        string number = match.Groups[2].Value;
+
+                        // Add the (number, letter) pair and value to the dictionary
+                        result.Add((number, letter), value);
+                    }
+                }
+                else
+                {
+                    // Safely cast the non-null value to double
+                    double value = 0;
+
+                    // Use regex to split the property name into letter and number
+                    var match = Regex.Match(property.Name, @"([A-Z]+)(\d+)");
+                    if (match.Success)
+                    {
+                        string letter = match.Groups[1].Value;
+                        string number = match.Groups[2].Value;
+
+                        // Add the (number, letter) pair and value to the dictionary
+                        result.Add((number, letter), value);
+                    }
+                }
+            }
+        }
+        return result;
+    }
+
+
+    public async Task saveLimitstodatabase()
+    {
+        foreach (var entry in ttableData)
+        {
+            // Create the combined key in the format "LetterNumber"
+            string ck = entry.Key.Item2 + entry.Key.Item1;
+
+            switch (ck)
+            {
+                case "A1": tcharpente.A1 = entry.Value; break;
+                case "A2": tcharpente.A2 = entry.Value; break;
+                case "A3": tcharpente.A3 = entry.Value; break;
+                case "A4": tcharpente.A4 = entry.Value; break;
+                case "A5": tcharpente.A5 = entry.Value; break;
+                case "A6": tcharpente.A6 = entry.Value; break;
+                case "A7": tcharpente.A7 = entry.Value; break;
+                case "A8": tcharpente.A8 = entry.Value; break;
+                case "A9": tcharpente.A9 = entry.Value; break;
+                case "A10": tcharpente.A10 = entry.Value; break;
+                case "B1": tcharpente.B1 = entry.Value; break;
+                case "B2": tcharpente.B2 = entry.Value; break;
+                case "B3": tcharpente.B3 = entry.Value; break;
+                case "B4": tcharpente.B4 = entry.Value; break;
+                case "B5": tcharpente.B5 = entry.Value; break;
+                case "B6": tcharpente.B6 = entry.Value; break;
+                case "B7": tcharpente.B7 = entry.Value; break;
+                case "B8": tcharpente.B8 = entry.Value; break;
+                case "B9": tcharpente.B9 = entry.Value; break;
+                case "B10": tcharpente.B10 = entry.Value; break;
+                case "C1": tcharpente.C1 = entry.Value; break;
+                case "C2": tcharpente.C2 = entry.Value; break;
+                case "C3": tcharpente.C3 = entry.Value; break;
+                case "C4": tcharpente.C4 = entry.Value; break;
+                case "C5": tcharpente.C5 = entry.Value; break;
+                case "C6": tcharpente.C6 = entry.Value; break;
+                case "C7": tcharpente.C7 = entry.Value; break;
+                case "C8": tcharpente.C8 = entry.Value; break;
+                case "C9": tcharpente.C9 = entry.Value; break;
+                case "C10": tcharpente.C10 = entry.Value; break;
+                case "D1": tcharpente.D1 = entry.Value; break;
+                case "D2": tcharpente.D2 = entry.Value; break;
+                case "D3": tcharpente.D3 = entry.Value; break;
+                case "D4": tcharpente.D4 = entry.Value; break;
+                case "D5": tcharpente.D5 = entry.Value; break;
+                case "D6": tcharpente.D6 = entry.Value; break;
+                case "D7": tcharpente.D7 = entry.Value; break;
+                case "D8": tcharpente.D8 = entry.Value; break;
+                case "D9": tcharpente.D9 = entry.Value; break;
+                case "D10": tcharpente.D10 = entry.Value; break;
+                case "E1": tcharpente.E1 = entry.Value; break;
+                case "E2": tcharpente.E2 = entry.Value; break;
+                case "E3": tcharpente.E3 = entry.Value; break;
+                case "E4": tcharpente.E4 = entry.Value; break;
+                case "E5": tcharpente.E5 = entry.Value; break;
+                case "E6": tcharpente.E6 = entry.Value; break;
+                case "E7": tcharpente.E7 = entry.Value; break;
+                case "E8": tcharpente.E8 = entry.Value; break;
+                case "E9": tcharpente.E9 = entry.Value; break;
+                case "E10": tcharpente.E10 = entry.Value; break;
+                case "F1": tcharpente.F1 = entry.Value; break;
+                case "F2": tcharpente.F2 = entry.Value; break;
+                case "F3": tcharpente.F3 = entry.Value; break;
+                case "F4": tcharpente.F4 = entry.Value; break;
+                case "F5": tcharpente.F5 = entry.Value; break;
+                case "F6": tcharpente.F6 = entry.Value; break;
+                case "F7": tcharpente.F7 = entry.Value; break;
+                case "F8": tcharpente.F8 = entry.Value; break;
+                case "F9": tcharpente.F9 = entry.Value; break;
+                case "F10": tcharpente.F10 = entry.Value; break;
+                case "G1": tcharpente.G1 = entry.Value; break;
+                case "G2": tcharpente.G2 = entry.Value; break;
+                case "G3": tcharpente.G3 = entry.Value; break;
+                case "G4": tcharpente.G4 = entry.Value; break;
+                case "G5": tcharpente.G5 = entry.Value; break;
+                case "G6": tcharpente.G6 = entry.Value; break;
+                case "G7": tcharpente.G7 = entry.Value; break;
+                case "G8": tcharpente.G8 = entry.Value; break;
+                case "G9": tcharpente.G9 = entry.Value; break;
+                case "G10": tcharpente.G10 = entry.Value; break;
+                case "H1": tcharpente.H1 = entry.Value; break;
+                case "H2": tcharpente.H2 = entry.Value; break;
+                case "H3": tcharpente.H3 = entry.Value; break;
+                case "H4": tcharpente.H4 = entry.Value; break;
+                case "H5": tcharpente.H5 = entry.Value; break;
+                case "H6": tcharpente.H6 = entry.Value; break;
+                case "H7": tcharpente.H7 = entry.Value; break;
+                case "H8": tcharpente.H8 = entry.Value; break;
+                case "H9": tcharpente.H9 = entry.Value; break;
+                case "H10": tcharpente.H10 = entry.Value; break;
+                case "I1": tcharpente.I1 = entry.Value; break;
+                case "I2": tcharpente.I2 = entry.Value; break;
+                case "I3": tcharpente.I3 = entry.Value; break;
+                case "I4": tcharpente.I4 = entry.Value; break;
+                case "I5": tcharpente.I5 = entry.Value; break;
+                case "I6": tcharpente.I6 = entry.Value; break;
+                case "I7": tcharpente.I7 = entry.Value; break;
+                case "I8": tcharpente.I8 = entry.Value; break;
+                case "I9": tcharpente.I9 = entry.Value; break;
+                case "I10": tcharpente.I10 = entry.Value; break;
+                case "J1": tcharpente.J1 = entry.Value; break;
+                case "J2": tcharpente.J2 = entry.Value; break;
+                case "J3": tcharpente.J3 = entry.Value; break;
+                case "J4": tcharpente.J4 = entry.Value; break;
+                case "J5": tcharpente.J5 = entry.Value; break;
+                case "J6": tcharpente.J6 = entry.Value; break;
+                case "J7": tcharpente.J7 = entry.Value; break;
+                case "J8": tcharpente.J8 = entry.Value; break;
+                case "J9": tcharpente.J9 = entry.Value; break;
+                case "J10": tcharpente.J10 = entry.Value; break;
+                default:
+                    Console.WriteLine("No match found for key: " + ck);
+                    break;
+            }
+        }
+
+        await entitiesService.UpdateEntityAsync(tcharpente);
+
+    }
+
+    public async Task savetodatabase()
+    {
+
+        foreach (var entry in tableData)
+        {
+            // Create the combined key in the format "LetterNumber"
+            string ck = entry.Key.Item2 + entry.Key.Item1;
+
+            switch (ck)
+            {
+                case "A1": charpente.A1 = entry.Value; break;
+                case "A2": charpente.A2 = entry.Value; break;
+                case "A3": charpente.A3 = entry.Value; break;
+                case "A4": charpente.A4 = entry.Value; break;
+                case "A5": charpente.A5 = entry.Value; break;
+                case "A6": charpente.A6 = entry.Value; break;
+                case "A7": charpente.A7 = entry.Value; break;
+                case "A8": charpente.A8 = entry.Value; break;
+                case "A9": charpente.A9 = entry.Value; break;
+                case "A10": charpente.A10 = entry.Value; break;
+                case "B1": charpente.B1 = entry.Value; break;
+                case "B2": charpente.B2 = entry.Value; break;
+                case "B3": charpente.B3 = entry.Value; break;
+                case "B4": charpente.B4 = entry.Value; break;
+                case "B5": charpente.B5 = entry.Value; break;
+                case "B6": charpente.B6 = entry.Value; break;
+                case "B7": charpente.B7 = entry.Value; break;
+                case "B8": charpente.B8 = entry.Value; break;
+                case "B9": charpente.B9 = entry.Value; break;
+                case "B10": charpente.B10 = entry.Value; break;
+                case "C1": charpente.C1 = entry.Value; break;
+                case "C2": charpente.C2 = entry.Value; break;
+                case "C3": charpente.C3 = entry.Value; break;
+                case "C4": charpente.C4 = entry.Value; break;
+                case "C5": charpente.C5 = entry.Value; break;
+                case "C6": charpente.C6 = entry.Value; break;
+                case "C7": charpente.C7 = entry.Value; break;
+                case "C8": charpente.C8 = entry.Value; break;
+                case "C9": charpente.C9 = entry.Value; break;
+                case "C10": charpente.C10 = entry.Value; break;
+                case "D1": charpente.D1 = entry.Value; break;
+                case "D2": charpente.D2 = entry.Value; break;
+                case "D3": charpente.D3 = entry.Value; break;
+                case "D4": charpente.D4 = entry.Value; break;
+                case "D5": charpente.D5 = entry.Value; break;
+                case "D6": charpente.D6 = entry.Value; break;
+                case "D7": charpente.D7 = entry.Value; break;
+                case "D8": charpente.D8 = entry.Value; break;
+                case "D9": charpente.D9 = entry.Value; break;
+                case "D10": charpente.D10 = entry.Value; break;
+                case "E1": charpente.E1 = entry.Value; break;
+                case "E2": charpente.E2 = entry.Value; break;
+                case "E3": charpente.E3 = entry.Value; break;
+                case "E4": charpente.E4 = entry.Value; break;
+                case "E5": charpente.E5 = entry.Value; break;
+                case "E6": charpente.E6 = entry.Value; break;
+                case "E7": charpente.E7 = entry.Value; break;
+                case "E8": charpente.E8 = entry.Value; break;
+                case "E9": charpente.E9 = entry.Value; break;
+                case "E10": charpente.E10 = entry.Value; break;
+                case "F1": charpente.F1 = entry.Value; break;
+                case "F2": charpente.F2 = entry.Value; break;
+                case "F3": charpente.F3 = entry.Value; break;
+                case "F4": charpente.F4 = entry.Value; break;
+                case "F5": charpente.F5 = entry.Value; break;
+                case "F6": charpente.F6 = entry.Value; break;
+                case "F7": charpente.F7 = entry.Value; break;
+                case "F8": charpente.F8 = entry.Value; break;
+                case "F9": charpente.F9 = entry.Value; break;
+                case "F10": charpente.F10 = entry.Value; break;
+                case "G1": charpente.G1 = entry.Value; break;
+                case "G2": charpente.G2 = entry.Value; break;
+                case "G3": charpente.G3 = entry.Value; break;
+                case "G4": charpente.G4 = entry.Value; break;
+                case "G5": charpente.G5 = entry.Value; break;
+                case "G6": charpente.G6 = entry.Value; break;
+                case "G7": charpente.G7 = entry.Value; break;
+                case "G8": charpente.G8 = entry.Value; break;
+                case "G9": charpente.G9 = entry.Value; break;
+                case "G10": charpente.G10 = entry.Value; break;
+                case "H1": charpente.H1 = entry.Value; break;
+                case "H2": charpente.H2 = entry.Value; break;
+                case "H3": charpente.H3 = entry.Value; break;
+                case "H4": charpente.H4 = entry.Value; break;
+                case "H5": charpente.H5 = entry.Value; break;
+                case "H6": charpente.H6 = entry.Value; break;
+                case "H7": charpente.H7 = entry.Value; break;
+                case "H8": charpente.H8 = entry.Value; break;
+                case "H9": charpente.H9 = entry.Value; break;
+                case "H10": charpente.H10 = entry.Value; break;
+                case "I1": charpente.I1 = entry.Value; break;
+                case "I2": charpente.I2 = entry.Value; break;
+                case "I3": charpente.I3 = entry.Value; break;
+                case "I4": charpente.I4 = entry.Value; break;
+                case "I5": charpente.I5 = entry.Value; break;
+                case "I6": charpente.I6 = entry.Value; break;
+                case "I7": charpente.I7 = entry.Value; break;
+                case "I8": charpente.I8 = entry.Value; break;
+                case "I9": charpente.I9 = entry.Value; break;
+                case "I10": charpente.I10 = entry.Value; break;
+                case "J1": charpente.J1 = entry.Value; break;
+                case "J2": charpente.J2 = entry.Value; break;
+                case "J3": charpente.J3 = entry.Value; break;
+                case "J4": charpente.J4 = entry.Value; break;
+                case "J5": charpente.J5 = entry.Value; break;
+                case "J6": charpente.J6 = entry.Value; break;
+                case "J7": charpente.J7 = entry.Value; break;
+                case "J8": charpente.J8 = entry.Value; break;
+                case "J9": charpente.J9 = entry.Value; break;
+                case "J10": charpente.J10 = entry.Value; break;
+                default:
+                    Console.WriteLine("No match found for key: " + ck);
+                    break;
+            }
+        }
+
+        await entitiesService.UpdateEntityAsync(charpente);
+
+
+    }
+    private string GetTooltipStyle(double ratio)
+    {
+        if (ratio > 1)
+            return "background-color: red; color: white;";
+
+        // Calculate color gradient from blue to red
+        int red = (int)(255 * ratio); // Increases as ratio approaches 1
+        int blue = 255 - red; // Decreases as ratio approaches 1
+        return $"background-color: rgb({red}, 0, {blue}); color: white;";
+    }
+
+    private double CalculateRatio(string row, string col)
+    {
+        double numerator = GetCellValue(row, col);
+        double denominator = GetCellValue(row, col, false);
+
+        if (denominator == 0) return 0; // Prevent division by zero
+
+        return numerator / denominator;
+    }
+
+    private async void Calcul()
+    {
+        isCalculating = true;
+        StateHasChanged();
+        if (appData.Structure == null)
+        {
+            Structure structure = await entitiesService.GetFilteredFirstEntityAsync<Structure>(x => x.StructureId.ToString() == "84028ce7-6e17-ef11-ab4f-3c557678c0f7");
+            appData.Structure = structure;
+        }
+
+        Structural.Structure CharpenteAntares = Structural.Simulation.CreateStructure3D(appData.Structure, null, entitiesService);
+
+        // int i = -1, j = -1;
+        // foreach (System.Data.DataRow elem in CharpenteAntares.element.Rows)
+        // {
+        //     i++;
+        //     double mat = elem.Field<double>("E");
+        //     double b = elem.Field<double>("b");
+        //     double h = elem.Field<double>("h");
+
+        //     int ni = elem.Field<int>("Noeudi");
+        //     int nj = elem.Field<int>("Noeudj");
+
+        //     j = 0;
+        // }
+
+
+
+        List<Element> elements;
+        List<Element> nodes;
+        nodes = entitiesService.GetFilteredEntitiesAsync<Element>(a => ((a.StructureId == appData.Structure.StructureId) && (a.ElementType?.Name == "Noeud3d"))).Result;
+        elements = entitiesService.GetFilteredEntitiesAsync<Element>(a => ((a.StructureId == appData.Structure.StructureId) && (a.ElementType?.Name == "Beam3d"))).Result;
+
+        // foreach (Element el in elements)
+        // {
+        //     i++;
+        //     string mat = el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name == "Matériau").Value;
+        //     double b = double.Parse(el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name == "b").Value, System.Globalization.CultureInfo.InvariantCulture);
+        //     double h = double.Parse(el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name == "h").Value, System.Globalization.CultureInfo.InvariantCulture);
+        //     string n1Name = el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name == "Noeud1").Value;
+        //     string n2Name = el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name == "Noeud2").Value;
+        //     var n1 = nodes.Find(x => x.Name == n1Name);
+        //     var n2 = nodes.Find(x => x.Name == n2Name);
+
+        //     string nom = el.Name;
+
+        //     j = 0;
+        // }
+
+
+        // // Example of load fetching
+        // double chargeA5 = charpente.A5 ?? 0;
+        // chargeA5 = 1233;
+        // int nb = CharpenteAntares.ChargesStatiquePonctuelles.Count();
+        // //        elem.Field<int>("Noeudi");   = chargeA5;
+        // int nbNoeud = -1;
+        // foreach (var node in appData.Structure.Elements)
+        // {
+        //     if (node.ElementType?.Name == "Noeud3d")
+        //     {
+        //         nbNoeud++;
+        //         CharpenteAntares.ChargesStatiquePonctuelles.Add((node.ElementId, new List<int>() { nbNoeud }, chargeA5, 0));
+        //     }
+        // }
+
+        // nb = CharpenteAntares.ChargesStatiquePonctuelles.Count();
+        double[] q = new double[6 * nodes.Count()];
+        double[] Fe = new double[6 * elements.Count()];
+
+         Structural.StructuralStatic.StructureVerification(CharpenteAntares, q, Fe);
+
+        int nbelem = -1;
+
+        double[] tauxTravail = new double[CharpenteAntares.element.Rows.Count];
+        foreach (System.Data.DataRow elem in CharpenteAntares.element.Rows)
+        {
+            nbelem++;
+            double b = elem.Field<double>("b");
+            double h = elem.Field<double>("h");
+
+            double sigma = Fe[0 + 6 * nbelem] / (b * h) + 6 * Fe[3 + 6 * nbelem] / (b * h * h) + 6 * Fe[4 + 6 * nbelem] / (h * b * b);
+            double taux = 1.5 * Fe[1 + 6 * nbelem] / (b * h) + 1.5 * Fe[2 + 6 * nbelem] / (b * h);
+
+            tauxTravail[nbelem] = Math.Max(sigma / 20, taux / 15);
+        }
+
+
+
+        await savetodatabase();
+
+        isCalculating = false;
+        StateHasChanged();
+    }
+}
+

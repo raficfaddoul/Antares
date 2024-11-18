@@ -1,0 +1,4 @@
+﻿/** For highlight when you click on a row. **/
+.rz-state-highlight td {
+    background-color: #b6ff00 !important;
+}

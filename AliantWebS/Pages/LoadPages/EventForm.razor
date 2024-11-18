@@ -1,0 +1,190 @@
+﻿@implements IDisposable
+@using AliantWebS.Models
+@using AliantWebS.Data
+@using System.Text.Json
+@inject EntitiesService entitiesService
+@inject NavigationManager navigationManager
+@inject AppData appData;
+@inject IStringLocalizer<Languages> L
+@inject IJSRuntime js
+
+@if (EditContext == null)
+{
+    <p><em>@L["Loading"]... !</em></p>
+}
+else
+{
+    @if (ButtonText != "Create")
+    {
+        <Div Style="display: flex">
+            <h2>@Title</h2>
+            <div style="margin-left: auto; ">
+                <Blazorise.Button Clicked="@OnLoadCasesButtonClicked" Color="Blazorise.Color.Primary">Edit Event Load Cases</Blazorise.Button>
+            </div>
+        </Div>
+    }
+    <hr />
+
+    <EditForm EditContext="@EditContext" id="EventFormId" OnValidSubmit="@OnValidSubmit">
+        <DataAnnotationsValidator />
+        <Blazorise.Row>
+            <Column ColumnSize="ColumnSize.Is6">
+                <div class="form-group">
+                    <label>@L["Event Name"] :</label>
+                    <div>
+                        <InputText @bind-Value="@Eventt.Name" @oninput='(() =>areachanged("Name"))' />
+                        <ValidationMessage For="@(() => Eventt.Name)" />
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div class="input-group">
+                        <div class="flex-item">
+                            <label>Date de début</label>
+                            <InputDate TValue="DateTime?" @bind-Value="@Eventt.StartDate" class="form-control"></InputDate>
+                            @* <ValidationMessage For="@(() => Structure.Geolocation)" /> *@
+                        </div>
+                        <div class="flex-item">
+                            <label>Date de fin</label>
+                            <InputDate TValue="DateTime?" @bind-Value="@Eventt.EndDate" class="form-control"></InputDate>
+                            @* <ValidationMessage For="@(() => Structure.Geolocation)" /> *@
+                        </div>
+                        <div class="flex-item button-container">
+            @*                 <Blazorise.Button Clicked="@OnLongLatButtonClicked" Color="Blazorise.Color.Primary">
+                                <i class="fas fa-map-marker-alt"></i> <!-- Replace with your actual icon class -->
+                            </Blazorise.Button> *@
+                        </div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>@L["Short Description"] :</label>
+                    <div>
+                        <textarea style="height:150px" @bind="@Eventt.Description" @oninput='(() =>areachanged("ShortDescription"))' class="form-control"></textarea>
+                        <ValidationMessage For="@(() => Eventt.Description)" />
+                    </div>
+                </div>
+                <div class="form-group">
+                    <!-- Main Label for the whole group -->
+                    <label class="form-label" style="font-weight: bold; font-size: larger;">Point 0</label>
+
+                    <div class="input-group" style="justify-content: flex-start; gap: 1em;">
+                        <div style="display: flex; align-items: center;">
+                            <label for="point0Latitude" style="margin-right: 0.5em;">X</label>
+                            <InputNumber style="width: 10em;" id="point0Latitude" TValue="double?" @bind-Value="@Eventt.Point0X" class="form-control"></InputNumber>
+                        </div>
+
+                        <div style="display: flex; align-items: center;">
+                            <label for="point0Longitude" style="margin-right: 0.5em;">Y</label>
+                            <InputNumber style="width: 10em;" id="point0Longitude" TValue="double?" @bind-Value="@Eventt.Point0Y" class="form-control"></InputNumber>
+                        </div>
+                    </div>
+                </div>
+
+
+
+
+            </Column>
+            <Column ColumnSize="ColumnSize.Is6">           
+
+
+                <MediaComponent selectedObject="Eventt"></MediaComponent>
+
+            </Column>
+        </Blazorise.Row>
+        <br />
+        <div class="row">
+            <div class="col-md-4">
+                <div class="form-group">
+                    <button type="button" class="btn btn-success" @onclick="@Cancel">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </EditForm>
+}
+
+
+@code {
+
+    [Parameter] public string ButtonText { get; set; } = "Save";
+
+    [Parameter]
+    public EditContext EditContext { get; set; }
+
+    [Parameter] public string Title { get; set; }
+
+
+    [Parameter] public EventCallback OnValidSubmit { get; set; }
+
+    [Parameter] public Event Eventt { get; set; }
+
+
+
+    public override async Task SetParametersAsync(ParameterView parameters)
+    {
+        await base.SetParametersAsync(parameters);
+        if (EditContext == null)
+        {
+            navigationManager.NavigateTo("Events");
+            return;
+        }
+
+        EditContext.OnFieldChanged -= FieldChanged;
+        EditContext.OnFieldChanged += FieldChanged;
+        
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        appData.ButtonText = ButtonText;
+
+        appData.FormId = "EventFormId";
+        appData.DisplaySubmitButton = true;
+  
+
+    }
+
+
+
+    private void areachanged(string s)
+    {
+        EditContext.NotifyFieldChanged(EditContext.Field(s));
+    }
+
+    private void FieldChanged(object sender, FieldChangedEventArgs arg)
+    {
+        appData.SaveChanges = true;
+    }
+
+
+    void OnLoadCasesButtonClicked()
+    {
+       // navigationManager.NavigateTo("LoadCases/" + Eventt.EventId);
+      //  navigationManager.NavigateTo(@"/Events/" + Eventt.StructureId);
+        appData.EventID = Eventt.EventId;
+        navigationManager.NavigateTo(@"/ChargesSceniques/" + Eventt.EventId);
+    }
+
+    void Cancel()
+    {
+        navigationManager.NavigateTo("Events");
+    }
+
+
+
+
+    void IDisposable.Dispose()
+    {
+        // Unsubscribe from the event when our component is disposed
+        if (EditContext != null)
+        {
+            EditContext.OnFieldChanged -= FieldChanged;
+        }
+
+    }
+
+
+}
+

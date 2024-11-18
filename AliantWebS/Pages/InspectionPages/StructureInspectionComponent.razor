@@ -1,0 +1,252 @@
+﻿@page "/StructureInspections/{StructureID:guid}"
+@using AliantWebS.Data
+@inject EntitiesService entitiesService
+@using Models
+@inject AliantWebS.Data.AppData AppData
+@inject IJSRuntime js
+@inject IStringLocalizer<Languages> L
+
+
+<Div Style="display: flex">
+    <h3>@title</h3>
+    <div style="margin-left: auto; ">
+        <Label> Page Size: &nbsp;&nbsp;</Label>
+        <RadzenNumeric @bind-Value="PageSize" Style="width:60px"></RadzenNumeric>
+    </div>
+</Div>
+@if (structure.StructureInspectionResults is null)
+{
+    <p><em>@L["Loading"]... !</em></p>
+}
+else if (InspectionResultTypesList.Count() == 0)
+{
+    <h1><em>@L["No Condition state types are defined for this type of structure"]...!</em></h1>
+}
+else
+{
+    <a class="nav-link" @onclick="@(args => InsertInspectionResult())" @onclick:preventDefault="true" href="">
+        <span class="oi oi-plus" aria-hidden="true">@L["Add New"]</span>
+    </a>
+
+   
+    <RadzenDataGrid @ref="inspectionResultsGrid" AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="PageSize" RowSelect=@RowSelect
+                Data="@structure.StructureInspectionResults" TItem="StructureInspectionResult" ColumnWidth="150px">
+        <Columns>
+            <RadzenDataGridColumn Width="30px" TItem="StructureInspectionResult" Property="StructureInspectionResultId" Title="Id"></RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="StructureInspectionResult" Title="@L["Inspection result Type"]">
+                <Template Context="inspectionResult">
+                    @inspectionResult?.InspectionResultType?.Name
+                </Template>
+                <EditTemplate Context="inspectionResult">
+                    <InputSelect class="form-control" @bind-Value=inspectionResult.InspectionResultTypeId>
+                        @foreach (var InspectionResultType in InspectionResultTypesList)
+                        {
+                            <option value="@InspectionResultType.InspectionResultTypeId">@InspectionResultType.Name</option>
+                        }
+                    </InputSelect>
+
+                </EditTemplate>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="StructureInspectionResult" Title="@L["Date"]">
+                <Template Context="inspectionResult">
+                    @inspectionResult?.Date
+                </Template>
+                <EditTemplate Context="inspectionResult">
+                    <InputDate @bind-Value="inspectionResult.Date"></InputDate>
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="StructureInspectionResult" Title="@L["Value"]">
+                <Template Context="inspectionResult">
+                    <Blazorise.Slider @bind-Value="inspectionResult.ResultNumeric"></Blazorise.Slider>
+                </Template>
+                <EditTemplate Context="inspectionResult">
+                    <Blazorise.Slider @bind-Value="inspectionResult.ResultNumeric"></Blazorise.Slider>
+
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+
+            <RadzenDataGridColumn Width="300px" TItem="StructureInspectionResult" Title="@L["Description"]">
+                <Template Context="inspectionResult">
+                    <EditForm Model="@inspectionResult">
+                    <InputTextArea style="width:100%; height:100px;" @bind-Value="inspectionResult.Comments"></InputTextArea>
+                    </EditForm>
+                </Template>
+                <EditTemplate Context="inspectionResult">
+                          <EditForm Model="@inspectionResult">
+                        <InputTextArea style="width:100%; height:100px;" @bind-Value="inspectionResult.Comments"></InputTextArea>
+                                </EditForm>
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+
+            <RadzenDataGridColumn TItem="StructureInspectionResult" Property="Length" Title="@L["Action"]">
+                <Template Context="data">
+                    <Div Style="display: flex">
+                        <a title="@L["Edit"]" class="nav-link" @onclick="@(args => EditRow(data))" @onclick:preventDefault="true" href="">
+                            <!--href="/patient/EditSideEffectComponent/@data.SideEffectID-->
+                            <span class="oi oi-pencil" aria-hidden="true"></span>
+                        </a>
+                        <a title="@L["End Edit"]" class="nav-link" @onclick="@(args => UpdateRow(data))" @onclick:preventDefault="true" href="">
+                            <span class="oi oi-check" aria-hidden="true"></span>
+                        </a>
+                        <a title="@L["Delete"]" class="nav-link" @onclick="@(() => DeleteRow(data))" @onclick:preventDefault="true" href="">
+                            <span class="oi oi-trash" aria-hidden="true"></span>
+                        </a>
+                    </Div>
+                </Template>
+
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+
+
+
+    @*   <Carousel @bind-SelectedSlide="@selectedSlide" ShowIndicators="true" ShowControls="true" Background="Background.Dark">
+                @foreach (string path in pathsForFiles)
+                {
+
+                    <CarouselSlide Name=@Path.GetFileNameWithoutExtension(path)>
+                        <div Style="text-align:right">
+                            <Image Source=@path Text=@Path.GetFileNameWithoutExtension(path) Display="Display.Block" Style="width: 80%; height: 30em;" />
+                        </div>
+                    </CarouselSlide>
+                }
+            </Carousel>*@
+
+}
+
+
+@code {
+    int PageSize { get; set; } = 10;
+
+    [Parameter]
+    public Guid StructureID { get; set; }
+
+    string ScrollHeight { get; set; }
+
+    RadzenDataGrid<StructureInspectionResult> inspectionResultsGrid;
+
+    Structure structure;
+
+    string title;
+
+
+
+    IEnumerable<InspectionResultType> InspectionResultTypesList;
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        ScrollHeight = "400px";
+        structure = (Structure)AppData.obj;
+
+
+        entitiesService.LoadCollection(structure, "StructureInspectionResults");
+
+
+        ///rafic te be reviewd for optimality
+        /*   foreach (var v in element.InspectionResults)
+               {
+
+               entitiesService.LoadReference(v, "InspectionResultType");
+           }*/
+
+        Guid? structureTypeID = structure.StructureTypeId;
+
+        title = "Structure " + structure.Name + " Inspections";
+
+        IEnumerable<StructureTypeInspectionResultType> ertet = await entitiesService.GetFilteredEntitiesAsync<StructureTypeInspectionResultType>(a => a.StructureTypeId == structureTypeID, "InspectionResultType");
+
+        InspectionResultTypesList = ertet.Select(x => x.InspectionResultType);
+
+        //    InspectionResultTypesList = await entitiesService.GetFilteredEntitiesAsync<InspectionResultType>(a => InspectionResultTypeIDsList.Contains(a.InspectionResultTypeId));
+
+    }
+
+
+
+    async Task DeleteRow(StructureInspectionResult structureInspectionResult)
+    {
+        if (await entitiesService.DeleteEntityAsync(structureInspectionResult))
+        {
+            //    if (inspectionResultTypeList.Remove(inspectionResultType))
+            {
+                await inspectionResultsGrid.Reload();
+
+            }
+        }
+
+
+    }
+
+    void EditRow(StructureInspectionResult structureInspectionResult)
+    {
+
+        inspectionResultsGrid.EditRow(structureInspectionResult);
+
+    }
+
+    async Task InsertInspectionResult()
+    {
+        if (structure.StructureType.StructureTypeInspectionResultTypes.Count == 0)
+        {
+
+            await js.InvokeVoidAsync("alert", $"Non Condition types are defined for this type of structure");
+            return;
+        }
+
+        StructureInspectionResult structureInspectionResult = new StructureInspectionResult();
+        structureInspectionResult.StructureId = structure.StructureId;
+        structureInspectionResult.InspectionResultTypeId = structure.StructureType.StructureTypeInspectionResultTypes.FirstOrDefault().InspectionResultTypeId;
+        structureInspectionResult.Date = DateTime.Now;
+
+        structure.StructureInspectionResults.Add(structureInspectionResult);
+        await entitiesService.UpdateEntityAsync(structure);
+
+        await inspectionResultsGrid.Reload();
+
+        /*  if (await entitiesService.InsertEntityAsync(inspectionResultType))
+          {
+              inspectionResultTypeList.Add(inspectionResultType);
+              if (!detailedMode)
+              {
+                  await inspectionResultTypesGrid.InsertRow(inspectionResultType);
+              }
+          }
+        */
+
+    }
+
+    async Task UpdateRow(StructureInspectionResult structureInspectionResult)
+    {
+
+        if (await entitiesService.UpdateEntityAsync(structureInspectionResult))
+        {
+            await inspectionResultsGrid.UpdateRow(structureInspectionResult);
+        }
+
+    }
+
+    void OnResize(RadzenSplitterResizeEventArgs args)
+    {
+        ScrollHeight = (400 * args.NewSize).ToString() + "px";
+        StateHasChanged();
+    }
+
+
+
+
+
+    StructureInspectionResult selectedInspectionResult;
+
+
+    void RowSelect(StructureInspectionResult structureInspectionResult)
+    {
+        selectedInspectionResult = structureInspectionResult;
+
+    }
+
+            }

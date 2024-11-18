@@ -1,0 +1,51 @@
+@page "/StructureTypeFlagTypes/{CallerID:guid}"
+@using Models
+@using AliantWebS.Data
+@inject AliantWebS.Data.AppData AppData
+@inject EntitiesService entitiesService
+
+
+
+
+<AliantWebS.Pages.TypesPages.JunctionsComponent Titre=@titre
+                                                TItem1="StructureType"
+                                                TItem2="FlagType"
+                                                TItem3="StructureTypeFlagType"
+                                                CallerID=@CallerID
+                                                TItem1IdName="StructureTypeId"
+                                                TItem2IdName="FlagTypeId"
+                                                InspectionResultTypeElementTypesCollection=@structureType.StructureTypeFlagTypes
+                                                OnValidSubmit="@Update">
+
+</AliantWebS.Pages.TypesPages.JunctionsComponent>
+
+
+
+@code {
+
+    [Parameter]
+    public Guid CallerID { get; set; }
+
+    public string titre { get; set; }
+
+    StructureType structureType;
+
+    public override async Task SetParametersAsync(ParameterView parameters)
+    {
+        structureType = (StructureType)AppData.obj;
+        entitiesService.LoadCollection(structureType, "StructureTypeFlagTypes");
+        await base.SetParametersAsync(parameters);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        titre = "Structure Type \"" + structureType.Name + "\" Flag Types Association";
+    }
+
+    protected async void Update()
+    {
+        await entitiesService.UpdateEntityAsync(structureType);
+    }
+
+}

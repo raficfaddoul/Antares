@@ -1,0 +1,172 @@
+﻿@using AliantWebS.Data
+@inject EntitiesService entitiesService
+@inject NavigationManager navigationManager
+@inject IJSRuntime js
+@using Models
+@inject AliantWebS.Data.AppData AppData
+@inject IStringLocalizer<Languages> L
+
+
+
+
+
+
+
+<Div Style="display: flex">
+    <h3>@L["Channel Data Types List"]</h3>
+    <div style="margin-left: auto; ">
+        <Label> @L["Page Size"]: &nbsp;&nbsp;</Label>
+        <RadzenNumeric @bind-Value="PageSize" Style="width:60px"></RadzenNumeric>
+    </div>
+</Div>
+@if (ChannelDataTypeList is null)
+{
+    <p><em>@L["Loading"]... !</em></p>
+}
+else
+{
+    <a class="nav-link" @onclick="@(args => InsertAttributeType())" @onclick:preventDefault="true" href="">
+    <span class="oi oi-plus" aria-hidden="true">@L["Add New"]</span>
+</a>
+    <EditForm Model="@ChannelDataTypeList">
+
+
+        <RadzenDataGrid class="RadzenDataGrid" @ref="channelDataTypesGrid" AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="PageSize"
+                    Data="@ChannelDataTypeList" TItem="ChannelDataType" ColumnWidth="150px" @bind-Value="@SelectedChannelDataTypes">
+            <Columns>
+
+                <RadzenDataGridColumn Width="50" TItem="ChannelDataType" Property="Name">
+                    <HeaderTemplate>
+                        <span class="gridColumndStyle">@L["Name"]</span>                    <br />
+                    </HeaderTemplate>
+                    <EditTemplate Context="channelDataType">
+                        <InputTextArea @bind-Value="channelDataType.Name" Style="width:100%" />
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn Width="50" TItem="ChannelDataType" Property="Description">
+                    <HeaderTemplate>
+                        <span class="gridColumndStyle">@L["Description"]</span>                    <br />
+                    </HeaderTemplate>
+                    <EditTemplate Context="channelDataType">
+                        <InputTextArea @bind-Value="channelDataType.Description" Style="width:100%" />
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn Width="30" TItem="ChannelDataType" Title="@L["Icon"]" Property="Icon">
+                    <Template Context="data">
+                        <IconComponent TItem1="ChannelDataType" data="data"></IconComponent>
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn Width="50" TItem="ChannelDataType" Property="PULMONARY_TOXICITY" Title="@L["Action"]" Filterable="false" Sortable="false">
+                    <Template Context="data">
+                        <Div Style="display: flex">
+                            <a title="@L["Edit"]" class="nav-link" @onclick="@(args => EditRow(data))" @onclick:preventDefault="true" href="">
+                                <!--href="/patient/EditSideEffectComponent/@data.SideEffectID-->
+                                <span class="oi oi-pencil" aria-hidden="true"></span>
+                            </a>
+                            <a title="@L["End Edit"]" class="nav-link" @onclick="@(args => UpdateRow(data))" @onclick:preventDefault="true" href="">
+                                <span class="oi oi-check" aria-hidden="true"></span>
+                            </a>
+                            <a title="@L["Delete"]" class="nav-link" @onclick="@(() => DeletechannelDataType(data))" @onclick:preventDefault="true" href="">
+                                <span class="oi oi-trash" aria-hidden="true"></span>
+                            </a>
+                        </Div>
+                        <Div Style="display: flex">
+                            <a title="@L["Element Types"]" class="nav-link" @onclick="@(args => ElementTypes(data))" @onclick:preventDefault="true" href="">
+                                <span class="fab fa-elementor" aria-hidden="true"></span>
+                            </a>
+                        </Div>
+                    </Template>
+
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+    </EditForm>
+
+}
+
+
+@code {
+
+    int PageSize { get; set; } = 10;
+
+    IList<ChannelDataType> SelectedChannelDataTypes { get; set; }
+
+    RadzenDataGrid<ChannelDataType> channelDataTypesGrid;
+
+    List<ChannelDataType> ChannelDataTypeList;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(entitiesService.tasksList);
+        ChannelDataTypeList = await entitiesService.GetAllEntitiesAsync<ChannelDataType>();
+
+
+    }
+
+
+
+    async Task DeletechannelDataType(ChannelDataType channelDataType)
+    {
+
+        if (await entitiesService.DeleteEntityAsync(channelDataType))
+        {
+            if (ChannelDataTypeList.Remove(channelDataType))
+            {
+                await channelDataTypesGrid.Reload();
+
+            }
+        }
+
+
+        //    await js.InvokeVoidAsync("alert", $"Updated Successfully!");
+        //    sideEffectsList = await httpClient.GetFromJsonAsync<SideEffect[]>($"api/sideEffect/4/{EvaluationID}");
+        // uriHelper.NavigateTo("/patient/evaluations/" + PatientID);
+
+    }
+
+    void EditRow(ChannelDataType channelDataType)
+    {
+
+
+        channelDataTypesGrid.EditRow(channelDataType);
+
+    }
+
+    async Task InsertAttributeType()
+    {
+        ChannelDataType channelDataType = new ChannelDataType();
+        channelDataType.Name = DateTime.Now.ToString();
+        if ((await entitiesService.InsertEntityAsync(channelDataType)) != null)
+        {
+            ChannelDataTypeList.Add(channelDataType);
+  
+                await channelDataTypesGrid.InsertRow(channelDataType);
+    
+        }
+        else
+        {
+            await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
+        }
+
+
+    }
+
+    async Task UpdateRow(ChannelDataType channelDataType)
+    {
+        if (await entitiesService.UpdateEntityAsync(channelDataType))
+        {
+            await channelDataTypesGrid.UpdateRow(channelDataType);
+        }
+    }
+
+    async Task ElementTypes(ChannelDataType channelDataType)
+    {
+        AppData.obj = channelDataType;
+
+        navigationManager.NavigateTo("/ChannelDataTypeElementTypes/" + channelDataType.ChannelDataTypeId);
+    }
+
+
+}

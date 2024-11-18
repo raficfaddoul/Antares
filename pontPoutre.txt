@@ -1,0 +1,30 @@
+Object:Element, name: Noeuds
+Object:Element, category: Structural Elements, type: Node,  name: Node1, parent:Noeuds, X:0, Y:0, Horizontal Constraint 1: True, Vertical Constraint:True
+Object:Element, category: Structural Elements, type: Node,  name: Node2, parent:Noeuds, X:0.25, Y:0, Horizontal Constraint 1:False, Vertical Constraint:False
+Object:Element, category: Structural Elements, type: Node,  name: Node3, parent:Noeuds, X:0.50, Y:0, Horizontal Constraint 1:False, Vertical Constraint:False
+Object:Element, category: Structural Elements, type: Node,  name: Node4, parent:Noeuds, X:0.75, Y:0, Horizontal Constraint 1:False, Vertical Constraint:False
+Object:Element, category: Structural Elements, type: Node,  name: Node5, parent:Noeuds, X:0.95, Y:0, Horizontal Constraint 1:False, Vertical Constraint:False
+Object:Element, category: Structural Elements, type: Node,  name: Node6, parent:Noeuds, X:1.15, Y:0, Horizontal Constraint 1:False, Vertical Constraint:False
+Object:Element, category: Structural Elements, type: Node,  name: Node7, parent:Noeuds, X:1.40, Y:0, Horizontal Constraint 1:False, Vertical Constraint:False
+Object:Element, category: Structural Elements, type: Node,  name: Node8, parent:Noeuds, X:1.65, Y:0, Horizontal Constraint 1:False, Vertical Constraint:False
+Object:Element, category: Structural Elements, type: Node,  name: Node9, parent:Noeuds, X:1.90, Y:0, Horizontal Constraint 1:False, Vertical Constraint:False
+
+
+Object:Element, category: sensing device, type: Accelerometer,  name: acc1, parent:Node2, channelDataType:Vertical Acceleration|Horizontal Acceleration 1|Horizontal Acceleration 2, AdressMapping:1
+Object:Element, category: sensing device, type: Accelerometer,  name: acc2, parent:Node3, channelDataType:Vertical Acceleration|Horizontal Acceleration 1|Horizontal Acceleration 2, AdressMapping:2
+Object:Element, category: sensing device, type: Accelerometer,  name: acc3, parent:Node4, channelDataType:Vertical Acceleration|Horizontal Acceleration 1|Horizontal Acceleration 2, AdressMapping:3
+Object:Element, category: sensing device, type: Accelerometer,  name: acc4, parent:Node5, channelDataType:Vertical Acceleration|Horizontal Acceleration 1|Horizontal Acceleration 2, AdressMapping:4
+Object:Element, category: sensing device, type: Accelerometer,  name: acc5, parent:Node6, channelDataType:Vertical Acceleration|Horizontal Acceleration 1|Horizontal Acceleration 2,AdressMapping:5
+Object:Element, category: sensing device, type: Accelerometer,  name: acc6, parent:Node7, channelDataType:Vertical Acceleration|Horizontal Acceleration 1|Horizontal Acceleration 2,AdressMapping:6
+Object:Element, category: sensing device, type: Accelerometer,  name: acc7, parent:Node8, channelDataType:Vertical Acceleration|Horizontal Acceleration 1|Horizontal Acceleration 2,AdressMapping:7
+
+
+Object:Element, name: Poutres
+Object:Element, category: Structural Elements, type: Beam2d,  name: p1, parent:Poutres, Noeud1:Node1, Noeud2:Node2, E:210000, S:0.0000775, I:1.61458333E-10, Rho:7850
+Object:Element, category: Structural Elements, type: Beam2d,  name: p2, parent:Poutres, Noeud1:Node2, Noeud2:Node3, E:210000, S:0.0000775, I:1.61458333E-10, Rho:7850
+Object:Element, category: Structural Elements, type: Beam2d,  name: p3, parent:Poutres, Noeud1:Node3, Noeud2:Node4, E:210000, S:0.0000775, I:1.61458333E-10, Rho:7850
+Object:Element, category: Structural Elements, type: Beam2d,  name: p4, parent:Poutres, Noeud1:Node4, Noeud2:Node5, E:210000, S:0.0000775, I:1.61458333E-10, Rho:7850
+Object:Element, category: Structural Elements, type: Beam2d,  name: p5, parent:Poutres, Noeud1:Node5, Noeud2:Node6, E:210000, S:0.0000775, I:1.61458333E-10, Rho:7850
+Object:Element, category: Structural Elements, type: Beam2d,  name: p6, parent:Poutres, Noeud1:Node6, Noeud2:Node7, E:210000, S:0.0000775, I:1.61458333E-10, Rho:7850
+Object:Element, category: Structural Elements, type: Beam2d,  name: p7, parent:Poutres, Noeud1:Node7, Noeud2:Node8, E:210000, S:0.0000775, I:1.61458333E-10, Rho:7850
+Object:Element, category: Structural Elements, type: Beam2d,  name: p8, parent:Poutres, Noeud1:Node8, Noeud2:Node9, E:210000, S:0.0000775, I:1.61458333E-10, Rho:7850

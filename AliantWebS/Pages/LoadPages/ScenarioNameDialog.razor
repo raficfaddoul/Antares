@@ -1,0 +1,17 @@
+﻿@using AliantWebS.Data
+@using Models
+
+@inject Radzen.DialogService dialogService
+
+<form id="scenarioForm">
+    <InputText @bind-Value=emp.Name id="scenarioName" name="scenarioName" placeholder="Scenario Name" required></InputText>
+    <RadzenStack Orientation="Radzen.Orientation.Horizontal" JustifyContent="Radzen.JustifyContent.End" Gap="0.5rem">
+        <RadzenButton Click="@((args) => dialogService.Close(true))" Variant="Variant.Flat" Text="Soumettre" Style="width: 120px" />
+    </RadzenStack>
+</form>
+
+@code {
+    [Parameter]
+    public EventMpscenario emp { get; set; }
+
+}

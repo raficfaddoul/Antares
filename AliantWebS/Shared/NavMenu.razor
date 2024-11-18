@@ -1,0 +1,261 @@
+﻿
+@using AliantWebS.Pages
+@using AliantWebS.Data
+@inject IStringLocalizer<Languages> L
+@inject AppData appData
+
+@*<div class="top-row pl-4 navbar navbar-dark">
+    <a class="navbar-brand" href="">AliantWebS</a>
+    <button class="navbar-toggler" @onclick="ToggleNavMenu">
+        <span class="navbar-toggler-icon"></span>
+    </button>
+</div>
+
+<div class="@NavMenuCssClass" @onclick="ToggleNavMenu">
+    <ul class="nav flex-column">
+        <li class="nav-item px-3">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <span class="oi oi-home" aria-hidden="true"></span> Home
+            </NavLink>
+        </li>
+        <li class="nav-item px-3">
+            <NavLink class="nav-link" href="counter">
+                <span class="oi oi-plus" aria-hidden="true"></span> Counter
+            </NavLink>
+        </li>
+
+        <li class="nav-item px-3">
+            <NavLink class="nav-link" @onclick="()=>expandSubNav = !expandSubNav" href="">
+                <span class="oi oi-list-rich" aria-hidden="true"></span> Types
+            </NavLink>
+            </li>
+            @if (expandSubNav)
+            {
+            <li class="nav-item px-3">
+                <NavLink class="expand-menu" href="StructuresTypes">
+                    <span class="oi oi-list-rich" aria-hidden="true" style="margin-left: 30px"></span> Structure Types
+                </NavLink>
+            </li>
+            
+                        <li class="nav-item px-3">
+                <NavLink class="expand-menu" href="categories">
+                    <span class="oi oi-list-rich" aria-hidden="true" style="margin-left: 30px"></span> Categories
+                </NavLink>
+            </li>
+            <li class="nav-item px-3">
+                <NavLink class="expand-menu" href="ElementsTypes">
+                    <span class="oi oi-list-rich" aria-hidden="true" style="margin-left: 30px"></span> Elements Types
+                </NavLink>
+            </li>
+            <li class="nav-item px-3">
+                <NavLink class="expand-menu" href="flagsTypes">
+                    <span class="oi oi-list-rich" aria-hidden="true" style="margin-left: 30px"></span> Flags Types
+                </NavLink>
+            </li>
+            <li class="nav-item px-3">
+                <NavLink class="" href="InspectionResultTypes">
+                    <span class="oi oi-list-rich" aria-hidden="true" style="margin-left: 30px"></span> Condition Types
+                </NavLink>
+            </li>
+            <li class="nav-item px-3">
+                <NavLink class="" href="defectsTypes">
+                    <span class="oi oi-list-rich" aria-hidden="true" style="margin-left: 30px"></span> Defects Types
+                </NavLink>
+            </li>
+            <li class="nav-item px-3">
+                <NavLink class="" href="attributeTypes">
+                    <span class="fa fa-tasks" aria-hidden="true" style="margin-left: 30px"></span> Attributes Types
+                </NavLink>
+            </li>
+            <li class="nav-item px-3">
+                <NavLink class="" href="channelDataTypes">
+                    <span class="oi oi-list-rich" aria-hidden="true" style="margin-left: 30px"></span> Data Channel Types
+                </NavLink>
+            </li>
+        }
+
+
+            <li class="nav-item px-3">
+                <NavLink class="nav-link" href="fetchdata">
+                    <span class="oi oi-list-rich" aria-hidden="true"></span> Fetch data
+                </NavLink>
+            </li>
+            <li class="nav-item px-3">
+                <NavLink class="nav-link" href="BIMComponent">
+                    <span class="oi oi-list-rich" aria-hidden="true"></span> BIM
+                </NavLink>
+            </li>
+            <li class="nav-item px-3">
+                <NavLink class="nav-link" href="Structures">
+                    <span class="oi oi-list-rich" aria-hidden="true"></span> Structures
+                </NavLink>
+            </li>
+        </ul>
+</div>
+
+@code {
+    private bool expandSubNav;
+
+    private bool collapseNavMenu = true;
+
+    private string NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+
+    private void ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+    }
+}*@
+
+<nav class="navbar navbar-expand-md navbar-dark bg-dark mb-4">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">Aliant</a>
+        <button class="navbar-toggler @NavButtonCssClass" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse"
+                aria-controls="navbarCollapse" aria-label="Toggle navigation" @onclick="ToggleNavMenu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse @NavBarCssClass" id="navbarCollapse" @onclick="ToggleNavMenu">
+            <ul class="navbar-nav me-auto mb-2 mb-md-0">
+                <li class="nav-item px-3">
+                    <NavLink class="nav-link" href="/AntaresHome" >
+                        <span class="oi oi-home" aria-hidden="true"></span> @L["Home"]
+                    </NavLink>
+                </li>
+@*                 <li class="nav-item px-3">
+                    <NavLink class="nav-link" href="counter">
+                        <span class="oi oi-plus" aria-hidden="true"></span> Counter
+                    </NavLink>
+                </li> *@
+
+                @if ((appData.GetRole().Result == "Administrator") || (appData.GetRole().Result == "Developer"))
+                { 
+                <li class="nav-item px-3 dropdown" style="z-index:2">
+                    <NavLink class="nav-link" @onclick="()=>expandSubNav = !expandSubNav" href="#">
+                        <span class="oi oi-list-rich" aria-hidden="true"></span> @L["Types"]
+                    </NavLink>
+               
+                @if (expandSubNav)
+                {
+                    <div class="dropdown-content" style="z-index:1000">
+                    <li class="nav-item px-3" >
+                        <NavLink  href="StructuresTypes" >
+                            <span class="oi oi-list-rich" aria-hidden="true" ></span> @L["Structure Types"]
+                        </NavLink>
+                    </li>
+
+                    <li class="nav-item px-3 ">
+                        <NavLink  href="categories">
+                            <span class="oi oi-list-rich" aria-hidden="true" ></span> @L["Categories"]
+                        </NavLink>
+                    </li>
+                    <li class="nav-item px-3 ">
+                        <NavLink  href="ElementsTypes">
+                            <span class="oi oi-list-rich" aria-hidden="true" ></span> @L["Element Types"]
+                        </NavLink>
+                    </li>
+                    <li class="nav-item px-3 ">
+                        <NavLink  href="flagsTypes">
+                            <span class="oi oi-list-rich" aria-hidden="true" ></span> @L["Flag Types"]
+                        </NavLink>
+                    </li>
+                    <li class="nav-item px-3 ">
+                        <NavLink  href="InspectionResultTypes">
+                            <span class="oi oi-list-rich" aria-hidden="true" ></span> @L["Condition Types"]
+                        </NavLink>
+                    </li>
+                    <li class="nav-item px-3 ">
+                        <NavLink  href="defectsTypes">
+                            <span class="oi oi-list-rich" aria-hidden="true" ></span> @L["Defect Types"]
+                        </NavLink>
+                    </li>
+                    <li class="nav-item px-3 ">
+                        <NavLink  href="attributeTypes">
+                            <span class="fa fa-tasks" aria-hidden="true" ></span> @L["Attributes Types"]
+                        </NavLink>
+                    </li>
+                    <li class="nav-item px-3 ">
+                        <NavLink href="channelDataTypes">
+                            <span class="oi oi-list-rich" aria-hidden="true"></span> @L["Data Channel Types"]
+                        </NavLink>
+                    </li>
+                    <li class="nav-item px-3 ">
+                        <NavLink  href="LoadCategories">
+                            <span class="oi oi-list-rich" aria-hidden="true" ></span> @L["Load Categories"]
+                        </NavLink>
+                    </li>
+                    <li class="nav-item px-3 ">
+                        <NavLink href="LoadsTypes">
+                            <span class="oi oi-list-rich" aria-hidden="true"></span> @L["Loads Types"]
+                        </NavLink>
+                    </li>
+                                  
+                    <li class="nav-item px-3 ">
+                        <NavLink href="EquipementTypes">
+                            <span class="oi oi-list-rich" aria-hidden="true"></span> @L["Equipement Types"]
+                        </NavLink>
+                    </li>
+                    
+                    </Div>
+                }
+                 </li>
+                 }
+
+@*                <li class="nav-item px-3">
+                    <NavLink class="nav-link" href="fetchdata">
+                        <span class="oi oi-list-rich" aria-hidden="true"></span> Fetch data
+                    </NavLink>
+                </li>*@
+                <li class="nav-item px-3">
+                    <NavLink class="nav-link" href="Sites">
+                        <span class="oi oi-list-rich" aria-hidden="true"></span> @L["Sites"]
+                    </NavLink>
+                </li>
+@*                 <li class="nav-item px-3">
+                    <NavLink class="nav-link" href="Events">
+                        <span class="oi oi-list-rich" aria-hidden="true"></span> @L["Events"]
+                    </NavLink>
+                </li> 
+                <li class="nav-item px-3">
+                    <NavLink class="nav-link" href="Equipements">
+                        <span class="oi oi-list-rich" aria-hidden="true"></span> @L["Equipements"]
+                    </NavLink>
+                </li>*@
+                <li class="nav-item px-3">
+                    <NavLink class="nav-link" href="Structures">
+                        <span class="oi oi-list-rich" aria-hidden="true"></span> @L["Structures"]
+                    </NavLink>
+                </li>
+                @if ((appData.GetRole().Result == "Administrator") || (appData.GetRole().Result == "Developer"))
+                {
+@*                                 <li class="nav-item px-3">
+                    <NavLink class="nav-link" href="BIMComponent">
+                        <span class="oi oi-list-rich" aria-hidden="true"></span> @L["BIM"]
+                    </NavLink>
+                </li> *@
+                <li class="nav-item px-3">
+                    <NavLink class="nav-link" href="settings">
+                        <span class="oi oi-list-rich" aria-hidden="true"></span> @L["Settings"]
+                    </NavLink>
+                </li>
+                }
+            </ul>
+        </div>
+    </div>
+</nav>
+
+@code {
+    private bool expandSubNav;
+    private bool collapseNavMenu = true;
+    private string? NavBarCssClass => collapseNavMenu ? null : "show";
+    private string? NavButtonCssClass => collapseNavMenu ? "collapsed" : null;
+
+    protected override async Task OnInitializedAsync()
+    {
+       
+    }
+
+    private void ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+    }
+}
+
