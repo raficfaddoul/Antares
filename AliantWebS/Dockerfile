@@ -12,10 +12,10 @@ EXPOSE 443
     #&& curl -sSL https://aka.ms/getvsdbgsh | bash /dev/stdin -v latest -l /root/.vsdbg
 
     # Add Node.js installation if needed
-RUN apt-get update && apt-get install -y curl && \
-    curl -fsSL https://deb.nodesource.com/setup_16.x | bash - && \
-    apt-get install -y nodejs && \
-    npm install -g npm
+#RUN apt-get update && apt-get install -y curl && \
+    #curl -fsSL https://deb.nodesource.com/setup_16.x | bash - && \
+    #apt-get install -y nodejs && \
+    #npm install -g npm
 
 # This stage is used to build the service project
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
