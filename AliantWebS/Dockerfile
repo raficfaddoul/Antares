@@ -6,7 +6,7 @@ WORKDIR /app
 EXPOSE 80
 EXPOSE 443
 
-# Add debugging tools
+# Add debugging toolsr
 #RUN apt-get update \
     #&& apt-get install -y --no-install-recommends unzip curl \
     #&& curl -sSL https://aka.ms/getvsdbgsh | bash /dev/stdin -v latest -l /root/.vsdbg
