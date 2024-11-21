@@ -33,6 +33,8 @@ services:
       #- "9229:9229" # Add for debugger
     volumes:
       - ../data/images:/app/Images
+      - /usr/bin/node:/usr/bin/node
+      - /usr/bin/npm:/usr/bin/npm
      # - ./AliantWebS:/app
      # - ~/.vsdbg:/root/.vsdbg:rw
 
