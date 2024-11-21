@@ -191,9 +191,9 @@
 
 
 
-  <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
+  <!--<Target Name="PreBuild" BeforeTargets="PreBuildEvent">
     <Exec Command="npm install" WorkingDirectory="NpmJS" />
     <Exec Command="npm run build" WorkingDirectory="NpmJS" />
-  </Target>
+  </Target>-->
 
 </Project>
