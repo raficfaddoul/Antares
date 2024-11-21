@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net7.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
@@ -14,8 +14,8 @@
     <PackageReference Include="Accord.Math" Version="3.8.0" />
     <PackageReference Include="HDF5-CSharp" Version="1.15.4.1" />
     <PackageReference Include="MathNet.Numerics" Version="5.0.0" />
-    <PackageReference Include="Microsoft.AspNetCore.Components" Version="7.0.2" />
-    <PackageReference Include="runtime.win-x64.Microsoft.NETCore.ILDAsm" Version="7.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Components" Version="8.0.0" />
+    <PackageReference Include="runtime.win-x64.Microsoft.NETCore.ILDAsm" Version="8.0.0" />
     <PackageReference Include="TorchSharp" Version="0.99.2" />
     <PackageReference Include="TorchSharp-cpu" Version="0.99.2" />
   </ItemGroup>
