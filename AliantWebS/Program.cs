@@ -22,7 +22,12 @@ namespace AliantWebS
                 {
                    // webBuilder.UseUrls("http://localhost:5002");
                     webBuilder.UseStartup<Startup>();
-         
+
+                  //  if (Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true")
+                    {
+                        webBuilder.UseUrls("http://+:80"); // Bind to HTTP port 80
+                    }
+
                 });
     }
     /*
