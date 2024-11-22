@@ -3,7 +3,7 @@
 
 FROM mcr.microsoft.com/mssql/server:2022-latest
 
-#USER root
+USER root
 
 # Install sqlcmd and dependencies
 #RUN apt-get update && \
