@@ -16,17 +16,17 @@ FROM mcr.microsoft.com/mssql/server:2022-latest
 # Add sqlcmd to PATH
 #RUN echo 'export PATH="$PATH:/opt/mssql-tools18/bin"' >> ~/.bashrc
 
-#USER mssql
+USER mssql
 
 
 # Copy the SQL script
-#COPY attach-db.sql /var/opt/mssql/scripts/attach-db.sql
+COPY attach-db.sql /var/opt/mssql/scripts/attach-db.sql
 
 # Copy the shell script
-#COPY --chmod=+x attach-db.sh /var/opt/mssql/scripts/attach-db.sh
+COPY --chmod=+x attach-db.sh /var/opt/mssql/scripts/attach-db.sh
 
 # Run the shell script to attach the database at container startup
-#CMD /bin/bash /var/opt/mssql/scripts/attach-db.sh & /opt/mssql/bin/sqlservr
+CMD /bin/bash /var/opt/mssql/scripts/attach-db.sh & /opt/mssql/bin/sqlservr
 
 # Copy the SQL script
 #COPY ./list-databases.sql /var/opt/mssql/data/list-databases.sql
