@@ -133,7 +133,6 @@
   <ItemGroup>
     <ProjectReference Include="..\AI\AI.csproj" />
     <ProjectReference Include="..\Component\Components.csproj" />
-    <ProjectReference Include="..\Reporting\Reporting.csproj" />
     <ProjectReference Include="..\Shared\Shared.csproj" />
     <ProjectReference Include="..\Structural\Structural.csproj" />
   </ItemGroup>

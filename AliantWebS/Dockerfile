@@ -29,7 +29,7 @@ COPY ["AI/AI.csproj", "AI/"]
 COPY ["Structural/Structural.csproj", "Structural/"]
 COPY ["Shared/Shared.csproj", "Shared/"]
 COPY ["Component/Components.csproj", "Component/"]
-COPY ["Reporting/Reporting.csproj", "Reporting/"]
+#COPY ["Reporting/Reporting.csproj", "Reporting/"]
 RUN dotnet restore "./AliantWebS/AliantWebS.csproj"
 COPY . .
 WORKDIR "/src/AliantWebS"
