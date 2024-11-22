@@ -42,6 +42,7 @@ services:
       - AliantDb
 
     environment:
+      - ASPNETCORE_URLS=http://+:80
       - DB_HOST=AliantDb
       - DB_NAME=AliantWeb
       - DB_SA_PASSWORD=password@12345#
