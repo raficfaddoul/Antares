@@ -23,7 +23,10 @@ USER mssql
 COPY attach-db.sql /var/opt/mssql/scripts/attach-db.sql
 
 # Copy the shell script
-COPY --chmod=+x attach-db.sh /var/opt/mssql/scripts/attach-db.sh
+#COPY --chmod=+x attach-db.sh /var/opt/mssql/scripts/attach-db.sh
+COPY attach-db.sh /var/opt/mssql/scripts/attach-db.sh
+RUN chmod +x /var/opt/mssql/scripts/attach-db.sh
+
 
 # Run the shell script to attach the database at container startup
 CMD /bin/bash /var/opt/mssql/scripts/attach-db.sh & /opt/mssql/bin/sqlservr
