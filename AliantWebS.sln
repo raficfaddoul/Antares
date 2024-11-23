@@ -17,6 +17,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Reporting", "Reporting\Repo
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{D6E172B2-1D9A-4D47-91F6-2C02C83A3D6D}"
 	ProjectSection(SolutionItems) = preProject
+		data\sql\Aliant\AliantWeb.mdf = data\sql\Aliant\AliantWeb.mdf
+		data\sql\Aliant\AliantWeb_log.ldf = data\sql\Aliant\AliantWeb_log.ldf
 		sqlserver\attach-db.sh = sqlserver\attach-db.sh
 		sqlserver\attach-db.sql = sqlserver\attach-db.sql
 		sqlserver\Dockerfilesqlserver = sqlserver\Dockerfilesqlserver
@@ -24,7 +26,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		sqlserver\run-sql.sh = sqlserver\run-sql.sh
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AliantDesktop", "AliantDesktop\AliantDesktop.csproj", "{89B870C7-DBAF-49BD-AC09-2723D53E6ED4}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AliantDesktop", "AliantDesktop\AliantDesktop.csproj", "{89B870C7-DBAF-49BD-AC09-2723D53E6ED4}"
 EndProject
 Project("{E53339B2-1760-4266-BCC7-CA923CBCF16C}") = "docker-compose", "docker-compose.dcproj", "{1E845D0F-40B7-4A20-8C7F-BC9861EB98B1}"
 EndProject
