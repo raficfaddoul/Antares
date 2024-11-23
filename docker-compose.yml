@@ -12,7 +12,7 @@ services:
     ports:
       - 8005:1433
     volumes:
-      - data/sql/Aliant:/var/opt/mssql/data
+      - ../data/sql/Aliant:/var/opt/mssql/data
  
     environment:
       - ACCEPT_EULA=Y
