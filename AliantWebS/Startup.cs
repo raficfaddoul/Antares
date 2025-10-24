@@ -133,6 +133,15 @@ namespace AliantWebS
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
+            var basePath = Environment.GetEnvironmentVariable("BasePath")
+               ?? Configuration["BasePath"];
+            if (!string.IsNullOrWhiteSpace(basePath))
+            {
+                if (!basePath.StartsWith("/")) basePath = "/" + basePath;
+                app.UsePathBase(basePath);
+                // Optional: rewrite redirects/links if needed
+            }
+
             app.UseStaticFiles();
 
             var provider = new FileExtensionContentTypeProvider();
@@ -186,8 +195,8 @@ namespace AliantWebS
             app.UseRequestLocalization(options);
             // End I18N configuration
 
-            //app.UseHttpsRedirection();  // Disabled for Docker deployment - HTTPS handled by Nginx
-            app.UseStaticFiles();
+            //app.UseHttpsRedirection();
+           // app.UseStaticFiles();
 
             app.UseRouting();
 
