@@ -21,13 +21,13 @@
     <TypeScriptCompile Remove="NpmJS\node_modules\**" />
   </ItemGroup>
 
-  <ItemGroup>
+  <!--<ItemGroup>
     <Content Remove="wwwroot\img\20210622_101236resized.jpg" />
     <Content Remove="wwwroot\Resources\StructuresComponent.Designer.cs" />
     <Content Remove="wwwroot\Resources\StructuresComponent.en.resx" />
     <Content Remove="wwwroot\Resources\StructuresComponent.fr.resx" />
     <Content Remove="wwwroot\Resources\StructuresComponent.resx" />
-  </ItemGroup>
+  </ItemGroup>-->
 
   <ItemGroup>
     <None Remove="BIM\AC20-FZK-Haus.wexBIM" />
