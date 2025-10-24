@@ -65,8 +65,7 @@ services:
     build:
       context: .
       dockerfile: AliantWebS/Dockerfile
-    ports:
-      - "8004:80"
+    ports: []
     volumes:
       - ../data/images:/app/Images
     depends_on:
@@ -103,6 +102,19 @@ services:
     volumes:
       - ../data/influx:/var/lib/influxdb2
       - ../data/influx:/etc/influxdb2
+    networks:
+      - AliantNetwork
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - aliantwebs
     networks:
       - AliantNetwork
 

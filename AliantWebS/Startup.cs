@@ -205,4 +205,6 @@ namespace AliantWebS
         }
     }
 }
+
+// git clone https://github.com/raficfaddoul/AliantWebS
 //docker exec -it AliantDbContainer /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'password@12345#'
