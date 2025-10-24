@@ -23,7 +23,11 @@ namespace AliantWebS
                  
                     webBuilder.UseStartup<Startup>();
 
-
+                    // Force HTTP-only inside the container; HTTPS is terminated by nginx
+                    webBuilder.ConfigureKestrel(options =>
+                    {
+                        options.ListenAnyIP(80); // no HTTPS listener
+                    });
 
                 });
     }
