@@ -151,7 +151,7 @@
     bool isImporting = false;
 
     bool copyAttributes;
-    bool settingEditElementOnSelect;
+    bool? settingEditElementOnSelect;
 
     bool updating = false;
     RadzenTree tree;
@@ -261,7 +261,7 @@
         if (firstRender)
         {
             copyAttributes = await localStorage.GetItemAsync<bool>("copyAttributes");
-            settingEditElementOnSelect = await localStorage.GetItemAsync<bool>("settingEditElementOnSelect");
+            settingEditElementOnSelect = await localStorage.GetItemAsync<bool?>("settingEditElementOnSelect");
 
         }
 
@@ -382,7 +382,7 @@
         navigationManager.NavigateTo("BlankElement/");
         List<Element> elementsToBeDeleted = new List<Element>();
 
-        AI.Helpers.GetTheChildren(appData.CheckedNodeObjects, elementsToBeDeleted);
+        Helpers.Helpers.GetTheChildren(appData.CheckedNodeObjects, elementsToBeDeleted);
 
 
 
@@ -469,8 +469,8 @@
     {
         if (el.ElementId == element.ElementId) return maximum;
 
-        var v1 = AI.Helpers.SplitStringInStringAndNum(el.Name);
-        var v2 = AI.Helpers.SplitStringInStringAndNum(element.Name);
+        var v1 = Helpers.Helpers.SplitStringInStringAndNum(el.Name);
+        var v2 = Helpers.Helpers.SplitStringInStringAndNum(element.Name);
 
         if (v1.Item1 == v2.Item1)
         {
@@ -515,7 +515,7 @@
         if (maximum != -4589)
         {
 
-            proposedName = AI.Helpers.SplitStringInStringAndNum(element.Name).Item1 + (maximum + 1).ToString();
+            proposedName = Helpers.Helpers.SplitStringInStringAndNum(element.Name).Item1 + (maximum + 1).ToString();
         }
         else
         {
@@ -730,7 +730,7 @@
         {
 
 
-            listIDs = AI.Helpers.GetTheChildren(appData.CheckedNodeObjects);
+            listIDs = Helpers.Helpers.GetTheChildren(appData.CheckedNodeObjects);
         }
 
 
@@ -754,7 +754,7 @@
         }
         else
         {
-            listIDs = AI.Helpers.GetTheChildren(appData.CheckedNodeObjects);
+            listIDs = Helpers.Helpers.GetTheChildren(appData.CheckedNodeObjects);
         }
 
 
@@ -953,7 +953,7 @@
                     }///
                     ///////////////////////////
 
-                    var v = await AI.Helpers.CreateElementType(entitiesService, category, dict, elementsTypesWanted,
+                    var v = await Helpers.Helpers.CreateElementType(entitiesService, category, dict, elementsTypesWanted,
                         elementsTypesExcluded, JsRuntime);
 
                     var elementType = v.elementType;
@@ -1102,14 +1102,14 @@
 
     async void OnChange(TreeEventArgs args)
     {
-        if (AI.Helpers.IsCurrentPage(navigationManager, "LoadCases"))
+        if (Helpers.Helpers.IsCurrentPage(navigationManager, "LoadCases"))
         {
 
         }
         else
         {
 
-            if ((settingEditElementOnSelect == null) || settingEditElementOnSelect)
+            if ((settingEditElementOnSelect == null) || (bool)settingEditElementOnSelect)
             {
                 Element elem = (Element)args.Value;
                 navigationManager.NavigateTo("/EditElement/" + elem.ElementId);

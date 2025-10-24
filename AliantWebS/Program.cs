@@ -25,7 +25,7 @@ namespace AliantWebS
 
                   //  if (Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true")
                     {
-                        webBuilder.UseUrls("http://+:80"); // Bind to HTTP port 80
+                   //     webBuilder.UseUrls("http://+:80"); // Bind to HTTP port 80
                     }
 
                 });

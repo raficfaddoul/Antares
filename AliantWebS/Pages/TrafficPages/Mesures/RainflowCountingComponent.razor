@@ -1,0 +1,658 @@
+﻿@using AliantWebS.Models
+@using System.Text.Json
+@using Helpers
+@inject IJSRuntime JSRuntime
+@inject IStringLocalizer<Languages> L
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+
+<style>
+    @@keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    .rainflow-container {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        height: 100%;
+        overflow: hidden;
+    }
+
+    .controls-section {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 15px;
+        display: flex;
+        gap: 15px;
+        align-items: center;
+        flex-wrap: wrap;
+        animation: fadeIn 0.5s ease-out;
+        flex-shrink: 0;
+    }
+
+    .charts-accordion {
+        flex: 1;
+        overflow: hidden;
+        animation: fadeIn 0.8s ease-out;
+    }
+
+    .accordion-item-content {
+        height: 400px;
+        padding: 15px;
+        background-color: white;
+        overflow: hidden;
+    }
+
+    .chart-content {
+        height: 100%;
+        width: 100%;
+    }
+
+    .parameter-group {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .parameter-label {
+        font-size: 0.9em;
+        font-weight: 500;
+        color: #495057;
+    }
+
+    .date-picker-group {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .date-picker-label {
+        font-size: 0.9em;
+        font-weight: 500;
+        color: #495057;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-top: 15px;
+        flex-shrink: 0;
+    }
+
+    .stat-card {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 12px;
+        text-align: center;
+    }
+
+    .stat-value {
+        font-size: 1.5em;
+        font-weight: bold;
+        color: #007bff;
+    }
+
+    .stat-label {
+        font-size: 0.9em;
+        color: #6c757d;
+        margin-top: 5px;
+    }
+</style>
+
+<div class="rainflow-container">
+    <!-- Section des contrôles -->
+    <div class="controls-section">
+        <div class="date-picker-group">
+            <label class="date-picker-label">@L["Date début"]</label>
+            <RadzenDatePicker @bind-Value="@startDate"
+                              DateFormat="dd/MM/yyyy"
+                              Style="width: 150px;"
+                              Change="@OnDateChanged" />
+        </div>
+
+        <div class="date-picker-group">
+            <label class="date-picker-label">@L["Date fin"]</label>
+            <RadzenDatePicker @bind-Value="@endDate"
+                              DateFormat="dd/MM/yyyy"
+                              Style="width: 150px;"
+                              Change="@OnDateChanged" />
+        </div>
+
+        <div class="parameter-group">
+            <label class="parameter-label">@L["Indicateur"]</label>
+            <RadzenDropDown @bind-Value="@selectedIndicatorId"
+                            Data="@availableIndicators"
+                            TextProperty="DisplayName"
+                            ValueProperty="Id"
+                            Placeholder="Sélectionner un indicateur..."
+                            AllowClear="true"
+                            Style="width: 180px;"
+                            Change="@OnIndicatorChanged" />
+        </div>
+
+        <div class="parameter-group">
+            <label class="parameter-label">@L["Type d'algorithme"]</label>
+            <RadzenDropDown @bind-Value="@algorithmType" 
+                            Data="@algorithmTypes" 
+                            Style="width: 150px;" 
+                            Change="@OnAlgorithmTypeChanged" />
+        </div>
+
+        <div class="parameter-group">
+            <label class="parameter-label">@L["Nombre de classes"]</label>
+            <RadzenNumeric @bind-Value="@binCount" 
+                           Min="10" 
+                           Max="100" 
+                           Step="5" 
+                           Style="width: 100px;"
+                           Change="@((int value) => OnBinCountChanged(value))" />
+        </div>
+
+        <div class="parameter-group">
+            <label class="parameter-label">@L["Seuil"]</label>
+            <RadzenNumeric @bind-Value="@threshold" 
+               Min="0.001m" 
+               Max="1.0m" 
+               Step="0.001m" 
+               Format="0.000"
+               Style="width: 100px;"
+               Change="@((decimal value) => OnThresholdChanged((double)value))" />
+        </div>
+
+        <RadzenButton Text="@L["Analyser"]" 
+                      Icon="analytics" 
+                      ButtonStyle="ButtonStyle.Primary" 
+                      Click="@RunRainflowAnalysis" 
+                      IsBusy="@IsLoading" 
+                      Style="margin-left: auto;" />
+    </div>
+
+    <!-- Accordéon des graphiques -->
+    <div class="charts-accordion">
+        <RadzenAccordion Multiple="true">
+            <Items>
+                <RadzenAccordionItem Text="@L["Inversions de charge"]" Icon="show_chart" >
+                    <div class="accordion-item-content">
+                        <div class="chart-content">
+                            <div id="loadReversalsChart" style="height: 100%; width: 100%;"></div>
+                        </div>
+                    </div>
+                </RadzenAccordionItem>
+
+                <RadzenAccordionItem Text="@L["Histogramme Matrice Rainflow"]" Icon="grid_view" >
+                    <div class="accordion-item-content">
+                        <div class="chart-content">
+                            <div id="rainflowMatrixChart" style="height: 100%; width: 100%;"></div>
+                        </div>
+                    </div>
+                </RadzenAccordionItem>
+
+                <RadzenAccordionItem Text="@L["Matrice de dispersion Rainflow"]" Icon="scatter_plot">
+                    <div class="accordion-item-content">
+                        <div class="chart-content">
+                            <div id="rainflowScatterChart" style="height: 100%; width: 100%;"></div>
+                        </div>
+                    </div>
+                </RadzenAccordionItem>
+            </Items>
+        </RadzenAccordion>
+    </div>
+
+    <!-- Statistiques -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value">@totalCycles</div>
+            <div class="stat-label">@L["Cycles totaux"]</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">@maxAmplitude.ToString("F2")</div>
+            <div class="stat-label">@L["Amplitude max"]</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">@avgAmplitude.ToString("F2")</div>
+            <div class="stat-label">@L["Amplitude moyenne"]</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">@damageIndex.ToString("F4")</div>
+            <div class="stat-label">@L["Indice de dommage"]</div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public bool IsLoading { get; set; }
+    [Parameter] public EventCallback OnDataLoaded { get; set; }
+    [Parameter] public EventCallback<DateTime> OnStartDateChanged { get; set; }
+    [Parameter] public EventCallback<DateTime> OnEndDateChanged { get; set; }
+
+    private DateTime startDate = DateTime.Today.AddDays(-7);
+    private DateTime endDate = DateTime.Today;
+    private string algorithmType = "RFC";
+    private List<string> algorithmTypes = new List<string> { "RFC", "ASTM", "RFC Modifié" };
+    private int binCount = 30;
+    private decimal threshold = 0.01m;
+
+    // Indicateurs
+    private List<IndicatorDisplayInfo> availableIndicators = new();
+    private Guid? selectedIndicatorId;
+
+    // Résultats
+    private int totalCycles = 0;
+    private double maxAmplitude = 0.0;
+    private double avgAmplitude = 0.0;
+    private double damageIndex = 0.0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAvailableIndicators();
+        if (startDate == default)
+            startDate = DateTime.Today.AddDays(-7);
+        if (endDate == default)
+            endDate = DateTime.Today;
+    }
+
+    private async Task LoadAvailableIndicators()
+    {
+        try
+        {
+            var localStorageIndicators = await localStorage.GetItemAsync<List<CustomIndicator>>("customIndicators") ?? new List<CustomIndicator>();
+            availableIndicators = localStorageIndicators.Select(indicator => new IndicatorDisplayInfo
+            {
+                Id = indicator.Id,
+                Name = indicator.Name,
+                Type = indicator.Type,
+                Unit = indicator.Unit,
+                Description = indicator.Description,
+                DisplayName = $"{indicator.Name} ({indicator.Unit})"
+            }).ToList();
+
+            // Sélectionner le premier indicateur par défaut si disponible
+            if (availableIndicators.Any())
+                selectedIndicatorId = availableIndicators.First().Id;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur lors du chargement des indicateurs : {ex.Message}");
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await InitializeCharts();
+            await GenerateSampleData();
+        }
+    }
+
+    private async Task InitializeCharts()
+    {
+        await JSRuntime.InvokeVoidAsync("initializePlotlyChart", "loadReversalsChart");
+        await JSRuntime.InvokeVoidAsync("initializePlotlyChart", "rainflowMatrixChart");
+        await JSRuntime.InvokeVoidAsync("initializePlotlyChart", "rainflowScatterChart");
+    }
+
+    private async Task OnDateChanged(DateTime? newDate)
+    {
+        if (newDate.HasValue)
+        {
+            if (newDate == startDate)
+                await OnStartDateChanged.InvokeAsync(startDate);
+            else if (newDate == endDate)
+                await OnEndDateChanged.InvokeAsync(endDate);
+
+            await RunRainflowAnalysis();
+        }
+    }
+
+    private async Task OnIndicatorChanged(object value)
+    {
+        selectedIndicatorId = value as Guid?;
+        await RunRainflowAnalysis();
+    }
+
+    private async Task OnAlgorithmTypeChanged(object value)
+    {
+        await RunRainflowAnalysis();
+    }
+
+    private async Task OnBinCountChanged(int value)
+    {
+        await RunRainflowAnalysis();
+    }
+
+    private async Task OnThresholdChanged(double value)
+    {
+        await RunRainflowAnalysis();
+    }
+
+    private async Task RunRainflowAnalysis()
+    {
+        try
+        {
+            IsLoading = true;
+            StateHasChanged();
+
+            await Task.Delay(500);
+            await GenerateSampleData();
+            await OnDataLoaded.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur dans l'analyse rainflow : {ex.Message}");
+        }
+        finally
+        {
+            IsLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task GenerateSampleData()
+    {
+        var selectedIndicator = availableIndicators.FirstOrDefault(i => i.Id == selectedIndicatorId);
+
+        var loadReversalsData = GenerateLoadReversalsData(selectedIndicator);
+        await JSRuntime.InvokeVoidAsync("updateLoadReversalsChart", "loadReversalsChart", loadReversalsData);
+
+        var rainflowMatrixData = GenerateRainflowMatrixData(selectedIndicator);
+        await JSRuntime.InvokeVoidAsync("updateRainflowMatrixChart", "rainflowMatrixChart", rainflowMatrixData);
+
+        var rainflowScatterData = GenerateRainflowScatterData(selectedIndicator);
+        await JSRuntime.InvokeVoidAsync("updateRainflowScatterChart", "rainflowScatterChart", rainflowScatterData);
+
+        UpdateStatistics();
+    }
+
+    private object GenerateLoadReversalsData(IndicatorDisplayInfo? indicator)
+    {
+        Random rand = new Random();
+        var timePoints = new List<double>();
+        var amplitudes = new List<double>();
+
+        var totalDays = (endDate - startDate).TotalDays;
+        var timeStep = totalDays * 24 * 3600 / 1000;
+
+        for (int i = 0; i < 1000; i++)
+        {
+            timePoints.Add(i * timeStep);
+            double signal = 2 * Math.Sin(0.1 * i) + 0.5 * Math.Sin(0.5 * i) + rand.NextGaussian() * 0.2;
+            // Si un indicateur est sélectionné, modifiez le signal selon ses propriétés (exemple simple)
+            if (indicator != null)
+                signal += indicator.Id.GetHashCode() % 5 * 0.1;
+            amplitudes.Add(signal);
+        }
+
+        return new
+        {
+            x = timePoints,
+            y = amplitudes,
+            type = "scatter",
+            mode = "lines",
+            name = indicator?.DisplayName ?? "Inversions de charge",
+            line = new { color = "#1f77b4", width = 1 }
+        };
+    }
+
+    private object GenerateRainflowMatrixData(IndicatorDisplayInfo? indicator)
+    {
+        Random rand = new Random();
+
+        var allCounts = new List<double>();
+        var barData = new List<(double avgCenter, double rangeCenter, double count)>();
+
+        double avgStep = 4.0 / binCount;
+        double rangeStep = 6.0 / binCount;
+
+        for (int i = 0; i < binCount; i++)
+        {
+            for (int j = 0; j < binCount; j++)
+            {
+                double avgCenter = -2.0 + (i * avgStep) + (avgStep / 2);
+                double rangeCenter = 0.0 + (j * rangeStep) + (rangeStep / 2);
+
+                double distance = Math.Sqrt(Math.Pow(avgCenter, 2) + Math.Pow(rangeCenter - 2, 2));
+                double count = Math.Max(0, 25 * Math.Exp(-distance / 1.5) + rand.NextGaussian() * 2);
+
+                // Si un indicateur est sélectionné, modifiez le count selon ses propriétés (exemple simple)
+                if (indicator != null)
+                    count += indicator.Id.GetHashCode() % 3 * 0.2;
+
+                if (count > 0.5)
+                {
+                    allCounts.Add(count);
+                    barData.Add((avgCenter, rangeCenter, count));
+                }
+            }
+        }
+
+        double minCount = allCounts.Min();
+        double maxCount = allCounts.Max();
+
+        var allX = new List<double>();
+        var allY = new List<double>();
+        var allZ = new List<double>();
+        var allI = new List<int>();
+        var allJ = new List<int>();
+        var allK = new List<int>();
+        var allIntensity = new List<double>();
+
+        int vertexOffset = 0;
+
+        foreach (var bar in barData)
+        {
+            var barWidth = avgStep * 0.8;
+            var barDepth = rangeStep * 0.8;
+
+            var x = new double[] {
+            bar.avgCenter - barWidth/2, bar.avgCenter + barWidth/2, bar.avgCenter + barWidth/2, bar.avgCenter - barWidth/2,
+            bar.avgCenter - barWidth/2, bar.avgCenter + barWidth/2, bar.avgCenter + barWidth/2, bar.avgCenter - barWidth/2
+        };
+            var y = new double[] {
+            bar.rangeCenter - barDepth/2, bar.rangeCenter - barDepth/2, bar.rangeCenter + barDepth/2, bar.rangeCenter + barDepth/2,
+            bar.rangeCenter - barDepth/2, bar.rangeCenter - barDepth/2, bar.rangeCenter + barDepth/2, bar.rangeCenter + barDepth/2
+        };
+            var z = new double[] {
+            0, 0, 0, 0,
+            bar.count, bar.count, bar.count, bar.count
+        };
+
+            allX.AddRange(x);
+            allY.AddRange(y);
+            allZ.AddRange(z);
+
+            var i = new int[] { 7, 0, 0, 0, 4, 4, 6, 6, 4, 0, 3, 2 };
+            var j = new int[] { 3, 4, 1, 2, 5, 6, 5, 2, 0, 1, 6, 3 };
+            var k = new int[] { 0, 7, 2, 3, 6, 7, 1, 1, 5, 5, 7, 6 };
+
+            allI.AddRange(i.Select(idx => idx + vertexOffset));
+            allJ.AddRange(j.Select(idx => idx + vertexOffset));
+            allK.AddRange(k.Select(idx => idx + vertexOffset));
+
+            double normalizedIntensity = (bar.count - minCount) / (maxCount - minCount);
+            allIntensity.AddRange(Enumerable.Repeat(normalizedIntensity, 8));
+
+            vertexOffset += 8;
+        }
+
+        return new
+        {
+            type = "mesh3d",
+            x = allX.ToArray(),
+            y = allY.ToArray(),
+            z = allZ.ToArray(),
+            i = allI.ToArray(),
+            j = allJ.ToArray(),
+            k = allK.ToArray(),
+            intensity = allIntensity.ToArray(),
+            colorscale = "Viridis",
+            showscale = true,
+            opacity = 0.9,
+            name = indicator?.DisplayName ?? "Matrice Rainflow"
+        };
+    }
+
+    // Ajout de la méthode pour générer les données du scatter/damage matrix
+    private object GenerateRainflowScatterData(IndicatorDisplayInfo? indicator)
+    {
+        Random rand = new Random();
+        var x = new List<double>();
+        var y = new List<double>();
+        var damage = new List<double>();
+
+        for (int i = 0; i < 500; i++)
+        {
+            double xVal = rand.NextDouble() * 100 - 50;
+            double yVal = rand.NextDouble() * 100 - 50;
+            x.Add(xVal);
+            y.Add(yVal);
+
+            // Simulate damage/cycle count (replace with your real calculation)
+            double d = Math.Abs(xVal - yVal) + rand.NextDouble() * 10;
+            damage.Add(d);
+        }
+
+        return new[]
+        {
+            new {
+                x = x,
+                y = y,
+                mode = "markers",
+                type = "scatter",
+                marker = new {
+                    color = damage,
+                    colorscale = "Jet", // or "Viridis", "Rainbow", etc.
+                    colorbar = new {
+                        title = "Cycles/Dommage",
+                        titleside = "right"
+                    },
+                    size = 6,
+                    opacity = 0.7
+                },
+                name = indicator?.DisplayName ?? "Dispersion Rainflow"
+            }
+        };
+    }
+
+    private void UpdateStatistics()
+    {
+        Random rand = new Random();
+        
+        totalCycles = rand.Next(500, 2000);
+        maxAmplitude = 2.0 + rand.NextDouble() * 2.0;
+        avgAmplitude = 0.5 + rand.NextDouble() * 1.0;
+        damageIndex = rand.NextDouble() * 0.01;
+    }
+
+    // Classe d'affichage des indicateurs
+    public class IndicatorDisplayInfo
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
+        public string Unit { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string DisplayName { get; set; } = string.Empty;
+    }
+}
+
+<script>
+    window.initializePlotlyChart = function(elementId) {
+        var layout = {
+            margin: { l: 50, r: 50, t: 30, b: 50 },
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            autosize: true
+        };
+        var config = {
+            responsive: true,
+            displayModeBar: true
+        };
+        Plotly.newPlot(elementId, [], layout, config);
+    };
+
+    window.updateLoadReversalsChart = function(elementId, data) {
+        var layout = {
+            title: '',
+            xaxis: { title: 'Temps (sec)' },
+            yaxis: { title: 'Amplitude' },
+            margin: { l: 50, r: 50, t: 30, b: 50 },
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            autosize: true
+        };
+        var config = {
+            responsive: true,
+            displayModeBar: true
+        };
+        Plotly.newPlot(elementId, [data], layout, config);
+    };
+
+    window.updateRainflowMatrixChart = function(elementId, data) {
+        var container = document.getElementById(elementId);
+        if (!container) return;
+        var containerRect = container.getBoundingClientRect();
+        var chartHeight = Math.max(containerRect.height, 350);
+        var chartWidth = Math.max(containerRect.width, 500);
+        var layout = {
+            title: '',
+            scene: {
+                xaxis: { 
+                    title: 'Moyenne du cycle',
+                    gridcolor: '#ddd',
+                    showbackground: true,
+                    backgroundcolor: 'rgba(230, 230, 230, 0.5)'
+                },
+                yaxis: { 
+                    title: 'Plage du cycle',
+                    gridcolor: '#ddd',
+                    showbackground: true,
+                    backgroundcolor: 'rgba(230, 230, 230, 0.5)'
+                },
+                zaxis: { 
+                    title: 'Nombre de cycles',
+                    gridcolor: '#ddd',
+                    showbackground: true,
+                    backgroundcolor: 'rgba(230, 230, 230, 0.5)'
+                },
+                camera: {
+                    eye: { x: 1.5, y: 1.5, z: 1.5 }
+                },
+                aspectmode: 'cube'
+            },
+            width: chartWidth,
+            height: chartHeight,
+            margin: { l: 0, r: 0, t: 30, b: 0 },
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            showlegend: false,
+            autosize: false
+        };
+        var config = {
+            responsive: false,
+            displayModeBar: true
+        };
+        Plotly.newPlot(elementId, [data], layout, config);
+    };
+
+    window.updateRainflowScatterChart = function(elementId, data) {
+        var layout = {
+            title: 'Matrice de dispersion Rainflow',
+            xaxis: { title: 'Axe X', gridcolor: '#e0e0e0' },
+            yaxis: { title: 'Axe Y', gridcolor: '#e0e0e0' },
+            margin: { l: 50, r: 50, t: 50, b: 50 },
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'white',
+            autosize: true,
+            showlegend: true
+        };
+        var config = {
+            responsive: true,
+            displayModeBar: true
+        };
+        Plotly.newPlot(elementId, data, layout, config);
+    };
+</script>

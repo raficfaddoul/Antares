@@ -1,10 +1,10 @@
 ﻿@using System.Threading
 @using AliantWebS.Data
 @using System.Globalization;
+@using System.Text
 @inject NavigationManager navigationManager
 @inject IJSRuntime JSRuntime
 @inject DataUpdateService DataUpdateService
-
 
 <style>
     #darkbg .dygraph-axis-label {
@@ -19,20 +19,28 @@
         background-color: #101015;
     }
 
+    /* Assurer que le conteneur a une hauteur appropriée pour le zoom slider */
+    .chart-container-with-zoom {
+        height: 100%;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        min-height: 350px; /* Espace supplémentaire pour le slider */
+    }
 </style>
-<Div Style="height: 100%; width:100%; display:flex">
-    <div id="@GraphId" style="height:300px; width:100%; display:flex"></div>
-</Div>
+
+<div class="chart-container-with-zoom">
+    <div id="@GraphId" style="height: 100%; width: 100%; min-height: 350px;"></div>
+</div>
 
 @code {
     [Parameter]
     public string GraphId { get; set; }
 
     [Parameter]
-    public List<Dictionary<DateTime, double>> Indices { get; set; }
+    public List<Dictionary<object, double>> Indices { get; set; }
 
-
-    private List<string> dataPoints = new List<string>(); // Use a list to store data points
+    private List<string> dataPoints = new List<string>();
 
     [Parameter]
     public List<string> Headers { get; set; } 
@@ -41,75 +49,104 @@
     {
         if (firstRender)
         {
-
-            //  dataPoints.Add($"{DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff")},{0},{0},{0},\n");
-            await JSRuntime.InvokeVoidAsync("initializeDygraph", GraphId, "Date", "Score");
-
-            await DisplayData(Indices);
+            await JSRuntime.InvokeVoidAsync("initializeDygraph", GraphId, "Date", "");
+            await DisplayData(Indices, Headers);
         }
     }
 
-    public async Task DisplayData(List<Dictionary<DateTime, double>> Indices)
+    public async Task DisplayData(List<Dictionary<object, double>> Indices, List<string> Headers, DateTime? startDate = null)
     {
-        dataPoints.Clear();
-        try{
-            string coco = ",";
-            string coci = string.Empty;
-            for(int i=1; i<Indices.Count; i++)
+        try
+        {
+            // Si il n'y a pas de données, envoyer CSV minimal
+            bool noData = (Indices == null || Indices.Count == 0)
+                          || Indices.All(d => d == null || d.Count == 0);
+
+            if (noData)
             {
-                coci += ",";
+                string emptyCsv = string.Join(",", Headers) + "\n";
+                await JSRuntime.InvokeVoidAsync("updateDygraph", GraphId, emptyCsv);
+                StateHasChanged();
+                return;
             }
 
-            //  string coci = ",,";
-            foreach(var dic in Indices)
+            // Traitement normal des données
+            var firstNonEmpty = Indices.First(d => d.Count > 0);
+            object sampleKey = firstNonEmpty.Keys.First();
+            bool isDateTimeKey = sampleKey is DateTime;
+
+            var allKeys = new List<object>();
+            foreach (var dic in Indices)
             {
-             
-                foreach (var i in dic)
+                foreach (var key in dic.Keys)
                 {
-                    string newData = $"{i.Key.ToString("yyyy-MM-dd HH:mm:ss.fff")}{coco}{i.Value.ToString(CultureInfo.InvariantCulture)}{coci}\n";
-                    dataPoints.Add(newData);
-                 
-                 
+                    allKeys.Add(key);
                 }
-                coco += ",";
-                if (coci.Count() != 0) coci = coci.Remove(coci.Count() - 1);
             }
 
-            // for (int i=0; i<dataPoints.Count; i++)
-            // {
-            //     dataPoints[i] = dataPoints[i].Trim('\n');
-            //     dataPoints[i] = dataPoints[i].Trim(',');
-            //     dataPoints[i] = dataPoints[i].Trim(',');
-            //     dataPoints[i] = dataPoints[i] + "\n";
-            // }
+            List<object> sortedKeys;
+            if (isDateTimeKey)
+            {
+                sortedKeys = allKeys.Cast<DateTime>().OrderBy(dt => dt).Cast<object>().ToList();
+            }
+            else
+            {
+                sortedKeys = allKeys
+                    .Select(o => new
+                    {
+                        Original = o,
+                        Num = Convert.ToDouble(o, CultureInfo.InvariantCulture)
+                    })
+                    .OrderBy(p => p.Num)
+                    .Select(p => p.Original)
+                    .ToList();
+            }
 
-            // foreach (var i in Indice2)
-            // {
-            //     string newData = $"{i.Key.ToString("yyyy-MM-dd HH:mm:ss.fff")},,{i.Value},\n";
-            //     dataPoints.Add(newData);
-            // }
-            // foreach (var i in Indice3)
-            // {
-            //     string newData = $"{i.Key.ToString("yyyy-MM-dd HH:mm:ss.fff")},,,{i.Value}\n";
-            //     dataPoints.Add(newData);
-            // }
+            var sb = new StringBuilder();
+            sb.AppendLine(string.Join(",", Headers));
 
-            string headers = String.Join(",", Headers);
-            var liveData = $"{headers}\n" + string.Join("\n", dataPoints);
+            foreach (var key in sortedKeys)
+            {
+                var rowCells = new List<string>();
 
+                if (isDateTimeKey)
+                {
+                    var dt = (DateTime)key;
+                    rowCells.Add(dt.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture));
+                }
+                else
+                {
+                    double val = Convert.ToDouble(key, CultureInfo.InvariantCulture);
+                    rowCells.Add(val.ToString(CultureInfo.InvariantCulture));
+                }
 
-            await JSRuntime.InvokeVoidAsync("updateDygraph", "graphdiv2", liveData);      
-            StateHasChanged();
+                foreach (var dic in Indices)
+                {
+                    if (dic.TryGetValue(key, out double yVal))
+                    {
+                        rowCells.Add(yVal.ToString(CultureInfo.InvariantCulture));
+                    }
+                    else
+                    {
+                        rowCells.Add("");
+                    }
+                }
+
+                sb.AppendLine(string.Join(",", rowCells));
+            }
+
+            string csvData = sb.ToString();
+            await JSRuntime.InvokeVoidAsync("updateDygraph", GraphId, csvData, startDate?.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture));
+            await InvokeAsync(StateHasChanged);
         }
         catch (Exception ex)
         {
-            int k = 1;
+            Console.Error.WriteLine($"Error while building CSV for Dygraph: {ex.Message}");
         }
     }
 
- 
-
- 
-
-
+    public async Task RemoveFromJavascript()
+    { 
+        await JSRuntime.InvokeVoidAsync("removeDygraph", GraphId); 
+    }
 }

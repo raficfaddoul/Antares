@@ -77,6 +77,12 @@
     <None Include="wwwroot\css\open-iconic\ICON-LICENSE" />
     <None Include="wwwroot\css\open-iconic\README.md" />
     <None Include="wwwroot\css\site.css~RF1fed2ddc.TMP" />
+    <None Include="wwwroot\images\Camions\truck1.png" />
+    <None Include="wwwroot\images\Camions\truck2.png" />
+    <None Include="wwwroot\images\Camions\truck3.png" />
+    <None Include="wwwroot\images\Camions\truck4.png" />
+    <None Include="wwwroot\images\Camions\truck5.png" />
+    <None Include="wwwroot\images\Camions\truck6.png" />
     <None Include="wwwroot\img\20210622_101236resized.jpg" />
     <None Include="wwwroot\model.xkt" />
     <None Include="wwwroot\rac_sample_project.xkt" />
@@ -92,7 +98,7 @@
     <PackageReference Include="Blazorise.Icons.FontAwesome" Version="0.9.4.4" />
     <PackageReference Include="BlazorSvgEditor" Version="1.6.2" />
     <PackageReference Include="DiffSharp.Data" Version="1.0.7" />
-    <PackageReference Include="EntityFramework" Version="6.4.4" />
+    <PackageReference Include="DocumentFormat.OpenXml" Version="3.3.0" />
     <PackageReference Include="ExifLibNet" Version="2.1.4" />
     <PackageReference Include="HDF5-CSharp" Version="1.15.4.1" />
     <PackageReference Include="InfluxDB.Client" Version="4.12.0" />
@@ -118,9 +124,11 @@
     <PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="8.0.0" />
     <PackageReference Include="netDxf" Version="2022.11.2" />
     <PackageReference Include="NetTopologySuite" Version="2.5.0" />
+    <PackageReference Include="OpenAI" Version="2.1.0" />
     <PackageReference Include="Plotly.Blazor" Version="2.25.1" />
-    <PackageReference Include="Radzen.Blazor" Version="4.15.5" />
+    <PackageReference Include="Radzen.Blazor" Version="7.0.8" />
     <PackageReference Include="System.IO.Ports" Version="8.0.0" />
+    <PackageReference Include="System.Linq.Dynamic.Core" Version="1.6.5" />
     <PackageReference Include="TorchSharp" Version="0.99.2" />
     <PackageReference Include="TorchSharp-cpu" Version="0.99.2" />
     <PackageReference Include="Xbim.Common" Version="6.0.445" />
@@ -133,6 +141,7 @@
   <ItemGroup>
     <ProjectReference Include="..\AI\AI.csproj" />
     <ProjectReference Include="..\Component\Components.csproj" />
+    <ProjectReference Include="..\OperationalModalAnalysis\OperationalModalAnalysis.csproj" />
     <ProjectReference Include="..\Shared\Shared.csproj" />
     <ProjectReference Include="..\Structural\Structural.csproj" />
   </ItemGroup>

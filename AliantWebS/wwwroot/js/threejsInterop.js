@@ -2,6 +2,13 @@
 let lines = [];
 let vlines = [];
 let linesOrg = [];
+let smooth = false;      // toggle this on/off
+let smoothLines = [];
+
+// smoother, more rounded tube:
+const subdivisions = 60;
+const tension = 0.3;
+const radialSegs = 12;
 
 
 let nodes = [];
@@ -20,6 +27,14 @@ function initThreeJsCanvas(canvas) {
     let width = canvas.clientWidth;
     let height = canvas.clientHeight;
     scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xEEEEEE);
+
+    const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+    scene.add(ambient);
+
+    const axes = new THREE.AxesHelper(2);   // length of each axis line
+    scene.add(axes);
+
     camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
     renderer = new THREE.WebGLRenderer({ canvas: canvas });
     renderer.setSize(width, height);
@@ -232,8 +247,45 @@ function drawLineo(x1, y1, z1, x2, y2, z2) {
     return beam;
 }
 
-function addLinesToScene(linesList, nodesList, VecteursPropresJagged) {
+function createSmoothEntry(coords, nodePair, subdivisions = 20, radius = 0.02) {
+    // center & scale endpoints exactly as your other drawLine* funcs do
+    let [x1, y1, z1, x2, y2, z2] = coords.map((v, i) =>
+        (v - [centerX, centerY, centerZ][i % 3]) * scaleFactor
+    );
+    const A = new THREE.Vector3(x1, y1, z1);
+    const B = new THREE.Vector3(x2, y2, z2);
+    const mid = new THREE.Vector3().addVectors(A, B).multiplyScalar(0.5);
 
+   // const curve = new THREE.CatmullRomCurve3([A, mid, B], false, 'catmullrom', 0.5);
+    const curve = new THREE.CatmullRomCurve3([A, mid, B], false, 'catmullrom', tension);
+
+
+    let mesh;
+    if (radius > 0) {
+
+        const geom = new THREE.TubeGeometry(
+            curve,
+            subdivisions,    // more subdivisions = smoother path
+            0.02,            // beam radius
+            radialSegs,      // more radial segments = smoother circumference
+            false
+        );
+        const mat = new THREE.MeshBasicMaterial({ color: 0x0000ff });
+        mesh = new THREE.Mesh(geom, mat);
+
+
+
+    } else {
+        const pts = curve.getPoints(subdivisions);
+        const geom = new THREE.BufferGeometry().setFromPoints(pts);
+        mesh = new THREE.Line(geom, new THREE.LineBasicMaterial({ color: 0x0000ff }));
+    }
+
+    return { mesh, curve, subdivisions, radius, coords, nodePair };
+}
+
+function addLinesToScene(linesList, nodesList, VecteursPropresJagged, doSmooth = false) {
+    smooth = doSmooth;
     let minX = Infinity, minY = Infinity, minZ = Infinity;
     let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
 
@@ -249,79 +301,142 @@ function addLinesToScene(linesList, nodesList, VecteursPropresJagged) {
         }
     }
 
-    centerX = (minX + maxX) / 2;
-    centerY = (minY + maxY) / 2;
-    centerZ = (minZ + maxZ) / 2;
+    centerX = 0;// (minX + maxX) / 2;
+    centerY = 0;// (minY + maxY) / 2;
+    centerZ = 0;// (minZ + maxZ) / 2;
 
     let rangeX = maxX - minX;
     let rangeY = maxY - minY;
     let rangeZ = maxZ - minZ;
 
-    scaleFactor = 2 / Math.max(rangeX, rangeY, rangeZ);  // Assuming you want your objects to occupy a range of 2 units (for example)
+    scaleFactor = 1; // 2 / Math.max(rangeX, rangeY, rangeZ);  // Assuming you want your objects to occupy a range of 2 units (for example)
 
 
     VecteursPropres = VecteursPropresJagged;
     nodes = nodesList;
 
-    for (let lineCoords of linesList) {
-        const line = drawLineold(...lineCoords);
-        lines.push(line);
+    for (let idx = 0; idx < linesList.length; idx++) {
+        const coords = linesList[idx];
+        const nodePair = nodesList[idx];
 
-        const b = drawLineo(...lineCoords);
-        scene.add(b)
+        if (smooth) {
+            // build & stash a dynamic spline entry
+            const entry = createSmoothEntry(coords, nodePair);
+            smoothLines.push(entry);
+            scene.add(entry.mesh);
 
-        const lineOrg = drawLineold(...lineCoords);
-        linesOrg.push(lineOrg);
+            const b = drawLineo(...coords);
+            scene.add(b);
 
+            const lineOrg = drawLineold(...coords);
+            linesOrg.push(lineOrg);
 
-        const linev = drawLineold(lineCoords[0], lineCoords[1], lineCoords[2], lineCoords[0], lineCoords[1] + 1, lineCoords[2]);
-        vlines.push(linev);
-        scene.add(linev);
+            const linev = drawLineold(
+                coords[0], coords[1], coords[2],
+                coords[0], coords[1] + 1, coords[2]
+            );
+            vlines.push(linev);
+            scene.add(linev);
 
-        scene.add(line);
+        } else {
+            // your original straight‐line + beam + vertical‐line code:
+            const line = drawLineold(...coords);
+            lines.push(line);
+            scene.add(line);
+
+            const b = drawLineo(...coords);
+            scene.add(b);
+
+            const lineOrg = drawLineold(...coords);
+            linesOrg.push(lineOrg);
+
+            const linev = drawLineold(
+                coords[0], coords[1], coords[2],
+                coords[0], coords[1] + 1, coords[2]
+            );
+            vlines.push(linev);
+            scene.add(linev);
+        }
     }
 }
 
 function animate() {
+    // 1) schedule next frame
     requestAnimationFrame(animate);
 
-    controls.update(); // only required if controls.enableDamping = true, or if controls.autoRotate = true
-    index = 0;
-    t +=0.01
+    // 2) update controls (for damping/auto-rotate)
+    controls.update();
 
-    let scaleFactor1 = 5 * Math.sin(t);
+    // 3) update our time & compute deformation scale
+    t += 0.01;
+    const scaleAnim = 200 * Math.sin(t);
 
-   // VecteursPropres = VecteursPropres.map(subArray => subArray.map(value => value * scaleFactor1));
+    if (smooth) {
+        // --- Dynamic smoothing path ---
+        for (let entry of smoothLines) {
+            // a) recompute endpoints with modal deformation
+            let [x1, y1, z1, x2, y2, z2] = entry.coords.map((v, i) =>
+                (v - [centerX, centerY, centerZ][i % 3]) * scaleFactor
+            );
 
+            // apply modal offsets in X/Y
+            const n0 = entry.nodePair[0] * 3;
+            const n1 = entry.nodePair[1] * 3;
+            //x1 += VecteursPropres[n0 + 0][mode] * scaleAnim;
+            y1 += VecteursPropres[n0 + 1][mode] * scaleAnim;
+            //x2 += VecteursPropres[n1 + 0][mode] * scaleAnim;
+            y2 += VecteursPropres[n1 + 1][mode] * scaleAnim;
+            // (keep z at 0 if your deformation is planar)
 
-    for (let line of lines) {
-        let vertices = line.geometry.attributes.position.array;
+            const A = new THREE.Vector3(x1, y1, 0);
+            const B = new THREE.Vector3(x2, y2, 0);
+            const mid = new THREE.Vector3().addVectors(A, B).multiplyScalar(0.5);
 
-        let verticesOrg = linesOrg[index].geometry.attributes.position.array;
+            // b) update control points on the curve
+            entry.curve.points = [A, mid, B];
 
-        // Assuming a simple line with just two endpoints:
-        // Move first endpoint (x, y, z)
-        vertices[0] = verticesOrg[0] + VecteursPropres[nodes[index][0] * 3][mode] * scaleFactor1; // Move in x direction
-        vertices[1] = verticesOrg[1] + VecteursPropres[nodes[index][0] * 3 + 1][mode] * scaleFactor1; // Move in y direction
-        vertices[2] = 0; // Move in z direction
+            // c) resample or rebuild geometry
+            if (entry.radius > 0) {
+                // tube: dispose old and recreate
+                entry.mesh.geometry.dispose();
+                entry.mesh.geometry = new THREE.TubeGeometry(
+                    entry.curve,
+                    entry.subdivisions,
+                    entry.radius,
+                    8,
+                    false
+                );
+            } else {
+                // thin line: update positions buffer
+                const pts = entry.curve.getPoints(entry.subdivisions);
+                entry.mesh.geometry.setFromPoints(pts);
+                entry.mesh.geometry.attributes.position.needsUpdate = true;
+            }
+        }
 
-        // Move second endpoint (x, y, z)
-        vertices[3] = verticesOrg[3] + VecteursPropres[nodes[index][1] * 3][mode] * scaleFactor1; // Move in x direction
-        vertices[4] = verticesOrg[4] + VecteursPropres[nodes[index][1] * 3 + 1][mode] * scaleFactor1; // Move in y direction
-        vertices[5] = 0; // Move in z direction
+    } else {
+        // --- Original jagged‐line path ---
+        let idx = 0;
+        for (let line of lines) {
+            const vertices = line.geometry.attributes.position.array;
+            const verticesOrg = linesOrg[idx].geometry.attributes.position.array;
 
-        // Notify Three.js that the vertices need updating
-        line.geometry.attributes.position.needsUpdate = true;
+            // endpoint A
+            vertices[0] = verticesOrg[0] + VecteursPropres[nodes[idx][0] * 3 + 0][mode] * scaleAnim;
+            vertices[1] = verticesOrg[1] + VecteursPropres[nodes[idx][0] * 3 + 1][mode] * scaleAnim;
+            vertices[2] = 0;
 
-        index++;
+            // endpoint B
+            vertices[3] = verticesOrg[3] + VecteursPropres[nodes[idx][1] * 3 + 0][mode] * scaleAnim;
+            vertices[4] = verticesOrg[4] + VecteursPropres[nodes[idx][1] * 3 + 1][mode] * scaleAnim;
+            vertices[5] = 0;
+
+            line.geometry.attributes.position.needsUpdate = true;
+            idx++;
+        }
     }
 
-
-    //for (let line of lines) {
-
-    //    line.rotation.x += 0.01;
-    //    line.rotation.y += 0.01;
-    //}
+    // 4) finally, render!
     renderer.render(scene, camera);
 }
 

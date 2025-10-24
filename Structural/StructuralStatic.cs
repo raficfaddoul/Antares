@@ -17,7 +17,7 @@ namespace Structural
         static public void StructureVerification(Structural.Structure structure, double[] q, double[] FeMax)
         {
             List<double[]> Fe = new List<double[]>();
-            StaticAnalysis(structure, q, Fe);
+            StaticAnalysis(structure, out q, out Fe);
 
             int nbelem = -1;
             foreach (double[] Fei in Fe)
@@ -34,8 +34,11 @@ namespace Structural
             // 6 solicitations par elements
             // 6 ddl par noeuds
         }
-        static public void StaticAnalysis(Structural.Structure structure, double[] q, List<double[]> Fe)
+        static public void StaticAnalysis(Structural.Structure structure, out double[] q, out List<double[]> Fe)
         {
+            q = new double[structure.nddl];
+            Fe = new List<double[]>();
+
             double[,] K = StructuralProcedures.Calcul_K_3D(structure.element, structure.noeud);
             double[] F = StructuralProcedures.Calcul_F_3D(structure.element, structure.noeud,structure.ChargesStatiquePonctuelles);
 

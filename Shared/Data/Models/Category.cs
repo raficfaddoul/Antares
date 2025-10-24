@@ -21,5 +21,5 @@ public partial class Category
     public bool? Structural { get; set; }
 
     [InverseProperty("Category")]
-    public virtual ICollection<ElementType> ElementTypes { get; } = new List<ElementType>();
+    public virtual ICollection<ElementType> ElementTypes { get; set; } = new List<ElementType>();
 }

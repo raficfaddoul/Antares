@@ -87,11 +87,16 @@
             {
 
                 var ss = await localStorage.GetItemAsync<string>(structure.StructureId.ToString());
-                structuralStructure = Newtonsoft.Json.JsonConvert.DeserializeObject<Structural.Structure>(ss);
+
+                if (ss != null)
+                {
+                    structuralStructure = Newtonsoft.Json.JsonConvert.DeserializeObject<Structural.Structure>(ss);
+                }
+
                 if (structuralStructure is null)
                 {
 
-                    structuralStructure = Structural.Simulation.CreateStructure(structure, null, entitiesService);
+                    structuralStructure = await Structural.Simulation.CreateStructure(structure, null, entitiesService);
                     var s = Newtonsoft.Json.JsonConvert.SerializeObject(structuralStructure);
                     await localStorage.SetItemAsync(structure.StructureId.ToString(), s);
                 }

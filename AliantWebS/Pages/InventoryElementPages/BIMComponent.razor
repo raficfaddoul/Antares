@@ -582,7 +582,7 @@ else
     private async Task gogo()
     {
         if (Structure == null) return;
-        List<string> paths = await FileManagementService.GetPathForFilesAsync(Structure, false, @"wwwroot\data");
+        List<string> paths = await FileManagementService.GetPathForFilesAsync(Structure, false, @"wwwroot/data");
         string path = paths.Find(x => x.ToLower().Contains(".wexbim"));
         // path = null;
         if (path == null)

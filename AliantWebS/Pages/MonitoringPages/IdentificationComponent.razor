@@ -28,7 +28,7 @@
 
 @if (somethingToPresent)
 {
-    <h2>@title</h2>
+
 
 
     <div class="page" Style="display: flex">
@@ -56,16 +56,16 @@
                         <RadzenDataGrid AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="10"
                                         Data="@channelDataTypeList" TItem="ChannelDataType" ColumnWidth="150px">
                             <Columns>
-                                <RadzenDataGridColumn TItem="ChannelDataType" Property="Name" Title="@L["Channel"]"></RadzenDataGridColumn>
-                                <RadzenDataGridColumn TItem="ChannelDataType" Property="Description" Title="@L["Action"]" Width="30px">
+                                     <RadzenDataGridColumn TItem="ChannelDataType" Property="Name" Title="@L["Channel"]"></RadzenDataGridColumn>
+                                                               <RadzenDataGridColumn TItem="ChannelDataType" Property="Description" Title="@L["Action"]" Width="30px">
                                     <Template Context="channelDataType">
                                         <Div Style="display: flex">
-                                            <RadzenCheckBox TValue=bool Change=@(args => OnChangeSelectedChannelDataTypes(args,channelDataType))></RadzenCheckBox>
-                                        </Div>
+                                             <RadzenCheckBox TValue=bool Change=@(args => OnChangeSelectedChannelDataTypes(args,channelDataType))></RadzenCheckBox>
+                                         </Div>
                                     </Template>
-                                </RadzenDataGridColumn>
+                                </RadzenDataGridColumn>  
                             </Columns>
-                        </RadzenDataGrid>
+                        </RadzenDataGrid> 
 
 
                         <div style="display:flex">
@@ -221,10 +221,6 @@
     [Parameter] public EventCallback OnValidSubmit { get; set; }
 
 
-
-    string title;
-
-
   //  private const string ServerHost = "localhost";
   //  private const int ServerPort = 8000;
 
@@ -281,7 +277,7 @@
 
             channelDataTypeElementTypeList = await entitiesService.GetFilteredEntitiesAsync<ChannelDataTypeElementType>(a => elementTypesIDs.Contains(a.ElementTypeId), "ChannelDataType");
 
-            channelDataTypeList = channelDataTypeElementTypeList.Select(x => x.ChannelDataType).ToList();
+            channelDataTypeList = channelDataTypeElementTypeList.Select(x => x.ChannelDataType).Distinct().ToList();
 
             if (channelDataTypeList.Count() > 0)
             {

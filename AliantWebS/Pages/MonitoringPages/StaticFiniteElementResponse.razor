@@ -1,0 +1,292 @@
+﻿@page "/StaticFiniteElementResponse"
+@using AliantWebS.Data
+@inject EntitiesService entitiesService
+@using Models
+@using System.Data;
+@*@inject FileManagementService fileManagementService*@
+@inject NavigationManager navigationManager
+@inject AppData appData;
+@inject IJSRuntime js
+@inject IStringLocalizer<Languages> L
+
+<Div Style="display: flex">
+    <h3>@L["Static Analysis Results"]</h3>
+    <div style="margin-left: auto; ">
+        <Label> Page Size: &nbsp;&nbsp;</Label>
+        <RadzenNumeric @bind-Value="PageSize" Style="width:60px"></RadzenNumeric>
+    </div>
+</Div>
+
+<!-- NEW: export buttons -->
+<div style="margin-bottom:1rem">
+    <RadzenButton Icon="download" Style="margin-right:10px"
+                  Text="CSV ­- Déplacements"
+                  Click="@DownloadDisplacementsCsv" />
+    <RadzenButton Icon="download"
+                  Text="CSV ­- Forces"
+                  Click="@DownloadForcesCsv" />
+</div>
+
+@if (DeplacementRows is null)
+{
+    <p><em>@L["Loading"]... !</em></p>
+}
+else
+{
+    <RadzenAccordion Multiple="true">
+        <Items>
+            <RadzenAccordionItem Text="Déplacements" Icon="group_work" Selected=true>
+
+
+                <RadzenDataGrid @ref="elementsGrid"
+                                Data="@DeplacementRows"
+                                TItem="ElementDeplacement"
+                                AllowFiltering="true"
+                                AllowPaging="true"
+                                AllowSorting="true"
+                                PageSize="PageSize">
+
+                    <Columns>
+
+                        <RadzenDataGridColumn TItem="ElementDeplacement" Property="Element.Name" Title="@L["Name"]" />
+
+                        <RadzenDataGridColumn TItem="ElementDeplacement" Property="Q1" Title="Q1" FormatString="{0:E3}" />
+                        <RadzenDataGridColumn TItem="ElementDeplacement" Property="Q2" Title="Q2" FormatString="{0:E3}" />
+                        <RadzenDataGridColumn TItem="ElementDeplacement" Property="Q3" Title="Q3" FormatString="{0:E3}" />
+                        <RadzenDataGridColumn TItem="ElementDeplacement" Property="Q4" Title="Q4" FormatString="{0:E3}" />
+                        <RadzenDataGridColumn TItem="ElementDeplacement" Property="Q5" Title="Q5" FormatString="{0:E3}" />
+                        <RadzenDataGridColumn TItem="ElementDeplacement" Property="Q6" Title="Q6" FormatString="{0:E3}" />
+
+                    </Columns>
+                </RadzenDataGrid>
+            </RadzenAccordionItem>
+            <RadzenAccordionItem Text="Forces" Icon="group_work" Selected=true>
+                <RadzenDataGrid Data="@ElementForces"
+                                TItem="ElementForce"
+                                AllowFiltering="true"
+                                AllowPaging="true"
+                                AllowSorting="true"
+                                PageSize="PageSize">
+
+                    <Columns>
+
+                        <RadzenDataGridColumn TItem="ElementForce" Property="Element.Name" Title="@L["Name"]" />
+
+                        <RadzenDataGridColumn TItem="ElementForce" Property="F1x" Title="F1x" FormatString="{0:E3}" />
+                        <RadzenDataGridColumn TItem="ElementForce" Property="F1y" Title="F1y" FormatString="{0:E3}" />
+                        <RadzenDataGridColumn TItem="ElementForce" Property="F1z" Title="F1z" FormatString="{0:E3}" />
+                        <RadzenDataGridColumn TItem="ElementForce" Property="M1x" Title="M1x" FormatString="{0:E3}" />
+                        <RadzenDataGridColumn TItem="ElementForce" Property="M1y" Title="M1y" FormatString="{0:E3}" />
+                        <RadzenDataGridColumn TItem="ElementForce" Property="M1z" Title="M1z" FormatString="{0:E3}" />
+
+                        <RadzenDataGridColumn TItem="ElementForce" Property="F2x" Title="F2x" FormatString="{0:E3}" />
+                        <RadzenDataGridColumn TItem="ElementForce" Property="F2y" Title="F2y" FormatString="{0:E3}" />
+                        <RadzenDataGridColumn TItem="ElementForce" Property="F2z" Title="F2z" FormatString="{0:E3}" />
+                        <RadzenDataGridColumn TItem="ElementForce" Property="M2x" Title="M2x" FormatString="{0:E3}" />
+                        <RadzenDataGridColumn TItem="ElementForce" Property="M2y" Title="M2y" FormatString="{0:E3}" />
+                        <RadzenDataGridColumn TItem="ElementForce" Property="M2z" Title="M2z" FormatString="{0:E3}" />
+
+                    </Columns>
+                </RadzenDataGrid>
+            </RadzenAccordionItem>
+        </Items>
+    </RadzenAccordion>
+}
+
+
+@code {
+
+    public double[] q { get; set; }
+
+
+    public List<double[]> Fe { get; set; }
+
+    Structure structure;
+
+    Structural.Structure structura;
+
+
+    int PageSize { get; set; } = 10;
+
+    RadzenDataGrid<ElementDeplacement> elementsGrid;
+
+
+    Element selectedElement;
+
+    List<ElementDeplacement> DeplacementRows;
+
+    public class ElementDeplacement
+    {
+        public Element Element { get; init; }
+        public double Q1 { get; init; }
+        public double Q2 { get; init; }
+        public double Q3 { get; init; }
+        public double Q4 { get; init; }
+        public double Q5 { get; init; }
+        public double Q6 { get; init; }
+    }
+
+    List<ElementForce> ElementForces;
+
+    public class ElementForce
+    {
+        public Element Element { get; init; }
+        public double F1x { get; init; }
+        public double F1y { get; init; }
+        public double F1z { get; init; }
+        public double M1x { get; init; }
+        public double M1y { get; init; }
+        public double M1z { get; init; }
+        public double F2x { get; init; }
+        public double F2y { get; init; }
+        public double F2z { get; init; }
+        public double M2x { get; init; }
+        public double M2y { get; init; }
+        public double M2z { get; init; }
+    }
+
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        //elementsGrid
+        q = (double[])appData.obj1;
+        Fe = (List<double[]>)appData.obj2;
+        structura = (Structural.Structure)appData.obj3;
+        structure = appData.Structure;
+        if ((q == null) || (Fe == null) || (structure == null) || (structura == null))
+        {
+            navigationManager.NavigateTo("Structures");
+        }
+
+
+        // 1️⃣ Build a quick lookup from Id → Element
+        var elementById = structure.Elements
+            .ToDictionary(e => e.ElementId);
+
+        // 2️⃣ Force the list to follow the order of guidsNoeuds
+        var noeuds = structura.guidsNoeuds
+            .Where(id => elementById.ContainsKey(id))  // safety check
+            .Select(id => elementById[id])             // now in the same order
+            .ToList();
+
+        // 3️⃣ Now the index from .Select((el, idx) …) is exactly the index in guidsNoeuds
+        DeplacementRows = noeuds.Select((el, idx) => new ElementDeplacement
+            {
+                Element = el,
+                Q1 = q[idx * 6 + 0],
+                Q2 = q[idx * 6 + 1],
+                Q3 = q[idx * 6 + 2],
+                Q4 = q[idx * 6 + 3],
+                Q5 = q[idx * 6 + 4],
+                Q6 = q[idx * 6 + 5],
+            })
+            .ToList();
+
+
+
+        var elements = structura.element.AsEnumerable().Select(row => row.Field<Guid>("Guid"))
+    .Where(id => elementById.ContainsKey(id))  // safety check
+    .Select(id => elementById[id])             // now in the same order
+    .ToList();
+
+
+        ElementForces = elements.Select((el, idx) => new ElementForce
+            {
+                Element = el,
+                F1x = Fe[idx][0],
+                F1y = Fe[idx][1],
+                F1z = Fe[idx][2],
+                M1x = Fe[idx][3],
+                M1y = Fe[idx][4],
+                M1z = Fe[idx][5],
+                F2x = Fe[idx][0],
+                F2y = Fe[idx][1],
+                F2z = Fe[idx][2],
+                M2x = Fe[idx][3],
+                M2y = Fe[idx][4],
+                M2z = Fe[idx][5],
+            })
+      .ToList();
+
+
+
+    }
+
+
+    void RowSelect(Element element)
+    {
+        //   navigationManager.NavigateTo(@"/defects");
+        selectedElement = element;
+        //   StateHasChanged();
+    }
+
+    // ↓ already injected earlier
+    // @inject IJSRuntime js
+
+    async Task DownloadDisplacementsCsv()
+    {
+        var csv = BuildDisplacementsCsv();
+        await SaveCsvAsync("displacements.csv", csv);
+    }
+
+    async Task DownloadForcesCsv()
+    {
+        var csv = BuildForcesCsv();
+        await SaveCsvAsync("forces.csv", csv);
+    }
+
+    string BuildDisplacementsCsv()
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("Name,Q1,Q2,Q3,Q4,Q5,Q6");
+        foreach (var r in DeplacementRows)
+        {
+            sb.AppendLine(string.Join(",", new[]
+            {
+            Csv(r.Element.Name),
+            r.Q1.ToString("E3"), r.Q2.ToString("E3"), r.Q3.ToString("E3"),
+            r.Q4.ToString("E3"), r.Q5.ToString("E3"), r.Q6.ToString("E3")
+        }));
+        }
+        return sb.ToString();
+    }
+
+    string BuildForcesCsv()
+    {
+        var sb = new StringBuilder();
+        @using System.Text
+        sb.AppendLine("Name,F1x,F1y,F1z,M1x,M1y,M1z,F2x,F2y,F2z,M2x,M2y,M2z");
+        foreach (var r in ElementForces)
+        {
+            sb.AppendLine(string.Join(",", new[]
+            {
+            Csv(r.Element.Name),
+            r.F1x.ToString("E3"), r.F1y.ToString("E3"), r.F1z.ToString("E3"),
+            r.M1x.ToString("E3"), r.M1y.ToString("E3"), r.M1z.ToString("E3"),
+            r.F2x.ToString("E3"), r.F2y.ToString("E3"), r.F2z.ToString("E3"),
+            r.M2x.ToString("E3"), r.M2y.ToString("E3"), r.M2z.ToString("E3")
+        }));
+        }
+        return sb.ToString();
+    }
+
+    // Wrap quotes if a value itself contains a comma or quote
+      static string Csv(string s)
+      {
+          if (s == null) return "";
+          if (s.Contains('"') || s.Contains(','))
+              return "\"" + s.Replace("\"", "\"\"") + "\"";
+          return s;
+      }
+
+    async Task SaveCsvAsync(string fileName, string csvText)
+    {
+        // send the bytes to JS and trigger a download
+        await js.InvokeVoidAsync("downloadCsvFile",
+            fileName, Convert.ToBase64String(Encoding.UTF8.GetBytes(csvText)));
+    }
+
+
+}

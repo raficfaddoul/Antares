@@ -60,7 +60,7 @@ else
     {
 
 
-        elementType = (ElementType)AppData.obj;
+        elementType = (ElementType)AppData.obj1;
         //  InspectionResultTypeElementTypesList = ((ICollection<InspectionResultTypeElementType>)AppData.obj).ToList();
         InspectionResultTypeList = await Task.Run(() => entitiesService.GetAllEntitiesAsync<InspectionResultType>());
     }

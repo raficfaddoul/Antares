@@ -28,8 +28,11 @@ public partial class DynamicLoad
 
     public double? EndValue { get; set; }
 
+    [Column("DOF")]
+    public int? Dof { get; set; }
+
     [InverseProperty("DynamicLoad")]
-    public virtual ICollection<DynamicLoadElement> DynamicLoadElements { get; } = new List<DynamicLoadElement>();
+    public virtual ICollection<DynamicLoadElement> DynamicLoadElements { get; set; } = new List<DynamicLoadElement>();
 
     [ForeignKey("LoadCaseId")]
     [InverseProperty("DynamicLoads")]

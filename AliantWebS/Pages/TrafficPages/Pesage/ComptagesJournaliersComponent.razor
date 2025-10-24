@@ -1,0 +1,333 @@
+﻿@using System.Collections.Generic
+@using AliantWebS.Models
+@inject IStringLocalizer<Languages> L
+
+<style>
+    .comptages-container {
+        padding: 0;
+    }
+    
+    .sens-section {
+        margin-bottom: 30px;
+        border: 2px solid #ddd;
+        border-radius: 8px;
+        padding: 15px;
+    }
+    
+    .sens-header {
+        text-align: center;
+        font-weight: bold;
+        font-size: 1.2em;
+        margin-bottom: 15px;
+        padding: 8px;
+        background-color: #f5f5f5;
+        border: 1px solid #ccc;
+    }
+    
+    .chart-container {
+        height: 300px;
+        width: 100%;
+    }
+</style>
+
+<div class="comptages-container">
+    @if (shouldRenderCharts && VehicleCategories?.Any() == true)
+    {
+        <!-- Sens 1 -->
+        <div class="sens-section">
+            <div class="sens-header">Sens 1</div>
+            <div class="chart-container">
+                @if (comptagesSens1?.Any() == true)
+                {
+                    <RadzenChart>
+                        @foreach (var category in VehicleCategories.Where(c => c.IsSelected))
+                        {
+                            <RadzenColumnSeries Data="@comptagesSens1" 
+                                                CategoryProperty="Date" 
+                                                ValueProperty="@category.PropertyName" 
+                                                Title="@category.Label" 
+                                                Fill="@category.Color" />
+                        }
+                        
+                        <RadzenCategoryAxis>
+                            <RadzenGridLines Visible="true" />
+                            <RadzenAxisTitle Text="Date" />
+                        </RadzenCategoryAxis>
+                        
+                        <RadzenValueAxis>
+                            <RadzenGridLines Visible="true" />
+                            <RadzenAxisTitle Text="Nombre de véhicules" />
+                        </RadzenValueAxis>
+                        
+                        <RadzenLegend Position="LegendPosition.Right" />
+                        <RadzenColumnOptions Margin="2" />
+                    </RadzenChart>
+                }
+                else
+                {
+                    <div style="text-align: center; padding: 50px; color: #666;">
+                        Aucune donnée disponible pour cette période
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Sens 2 -->
+        <div class="sens-section">
+            <div class="sens-header">Sens 2</div>
+            <div class="chart-container">
+                @if (comptagesSens2?.Any() == true)
+                {
+                    <RadzenChart>
+                        @foreach (var category in VehicleCategories.Where(c => c.IsSelected))
+                        {
+                            <RadzenColumnSeries Data="@comptagesSens2" 
+                                                CategoryProperty="Date" 
+                                                ValueProperty="@category.PropertyName" 
+                                                Title="@category.Label" 
+                                                Fill="@category.Color" />
+                        }
+                        
+                        <RadzenCategoryAxis>
+                            <RadzenGridLines Visible="true" />
+                            <RadzenAxisTitle Text="Date" />
+                        </RadzenCategoryAxis>
+                        
+                        <RadzenValueAxis>
+                            <RadzenGridLines Visible="true" />
+                            <RadzenAxisTitle Text="Nombre de véhicules" />
+                        </RadzenValueAxis>
+                        
+                        <RadzenLegend Position="LegendPosition.Right" />
+                        <RadzenColumnOptions Margin="2" />
+                    </RadzenChart>
+                }
+                else
+                {
+                    <div style="text-align: center; padding: 50px; color: #666;">
+                        Aucune donnée disponible pour cette période
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Total -->
+        <div class="sens-section">
+            <div class="sens-header">Total</div>
+            <div class="chart-container">
+                @if (comptagesTotal?.Any() == true)
+                {
+                    <RadzenChart>
+                        @foreach (var category in VehicleCategories.Where(c => c.IsSelected))
+                        {
+                            <RadzenColumnSeries Data="@comptagesTotal" 
+                                                CategoryProperty="Date" 
+                                                ValueProperty="@category.PropertyName" 
+                                                Title="@category.Label" 
+                                                Fill="@category.Color" />
+                        }
+                        
+                        <RadzenCategoryAxis>
+                            <RadzenGridLines Visible="true" />
+                            <RadzenAxisTitle Text="Date" />
+                        </RadzenCategoryAxis>
+                        
+                        <RadzenValueAxis>
+                            <RadzenGridLines Visible="true" />
+                            <RadzenAxisTitle Text="Nombre de véhicules" />
+                        </RadzenValueAxis>
+                        
+                        <RadzenLegend Position="LegendPosition.Right" />
+                        <RadzenColumnOptions Margin="2" />
+                    </RadzenChart>
+                }
+                else
+                {
+                    <div style="text-align: center; padding: 50px; color: #666;">
+                        Aucune donnée disponible pour cette période
+                    </div>
+                }
+            </div>
+        </div>
+    }
+    else
+    {
+        <div style="text-align: center; padding: 50px; color: #666;">
+            <p>Chargement en cours...</p>
+        </div>
+    }
+</div>
+
+@code {
+    private List<ComptageData> comptagesSens1 = new();
+    private List<ComptageData> comptagesSens2 = new();
+    private List<ComptageData> comptagesTotal = new();
+
+    private bool shouldRenderCharts = false;
+    private bool isInitialized = false;
+    private bool hasDataLoaded = false; // Pour éviter les appels multiples
+    
+    // Clés uniques pour chaque graphique
+    // private string chartKey1 = Guid.NewGuid().ToString();
+    // private string chartKey2 = Guid.NewGuid().ToString();
+    // private string chartKey3 = Guid.NewGuid().ToString();
+
+    // Variables pour détecter les changements de paramètres
+    private DateTime lastStartDate = default(DateTime);
+    private DateTime lastEndDate = default(DateTime);
+    private int lastCategoriesHash = 0;
+
+    // Paramètres reçus du parent
+    [Parameter] public DateTime StartDate { get; set; }
+    [Parameter] public DateTime EndDate { get; set; }
+    [Parameter] public List<VehicleCategory> VehicleCategories { get; set; } = new();
+    [Parameter] public bool IsLoading { get; set; }
+    [Parameter] public EventCallback OnDataLoaded { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        isInitialized = true;
+        await Task.CompletedTask;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Calculer le hash des catégories sélectionnées pour détecter les changements
+        var currentCategoriesHash = VehicleCategories?.Where(c => c.IsSelected).Select(c => c.PropertyName).GetHashCode() ?? 0;
+        
+        // Vérifier si les paramètres ont vraiment changé
+        bool parametersChanged = lastStartDate != StartDate || 
+                                lastEndDate != EndDate || 
+                                lastCategoriesHash != currentCategoriesHash;
+
+        // Charger les données seulement si les paramètres sont valides ET ont changé
+        if (isInitialized && 
+            parametersChanged &&
+            VehicleCategories?.Any() == true && 
+            StartDate != default(DateTime) && 
+            EndDate != default(DateTime) && 
+            StartDate <= EndDate)
+        {
+            // Mettre à jour les dernières valeurs
+            lastStartDate = StartDate;
+            lastEndDate = EndDate;
+            lastCategoriesHash = currentCategoriesHash;
+            
+            await LoadDataSafely();
+        }
+    }
+
+    private async Task LoadDataSafely()
+    {
+        shouldRenderCharts = false;
+        hasDataLoaded = false;
+        StateHasChanged();
+
+        try
+        {
+            await Task.Delay(50);
+            
+            GenerateSampleDataForPeriod(StartDate, EndDate);
+            
+              
+            shouldRenderCharts = true;
+            hasDataLoaded = true;
+            
+            // Notifier le parent UNE SEULE FOIS que le chargement est terminé
+            if (OnDataLoaded.HasDelegate && !hasDataLoaded)
+            {
+                await OnDataLoaded.InvokeAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur lors du chargement des données: {ex.Message}");
+        }
+        finally
+        {
+            StateHasChanged();
+        }
+    }
+
+    private void GenerateSampleDataForPeriod(DateTime start, DateTime end)
+    {
+        try
+        {
+            comptagesSens1.Clear();
+            comptagesSens2.Clear();
+
+            if (start == default(DateTime) || end == default(DateTime) || start > end)
+            {
+                return;
+            }
+
+            var random = new Random(DateTime.Now.Millisecond + (int)(start - DateTime.MinValue).TotalDays);
+            var currentDate = start;
+
+            while (currentDate <= end)
+            {
+                comptagesSens1.Add(new ComptageData 
+                { 
+                    Date = currentDate.ToString("dd MMM"), 
+                    ST3T = 100 + random.Next(0, 50), 
+                    ST3T12T = 90 + random.Next(0, 40), 
+                    T12TP40T = 80 + random.Next(0, 40), 
+                    GT40T = 70 + random.Next(0, 40), 
+                    Motos = 60 + random.Next(0, 30), 
+                    Velo = 50 + random.Next(0, 30), 
+                    Pietons = 40 + random.Next(0, 30), 
+                    Autres = 30 + random.Next(0, 30) 
+                });
+
+                comptagesSens2.Add(new ComptageData 
+                { 
+                    Date = currentDate.ToString("dd MMM"), 
+                    ST3T = 95 + random.Next(0, 45), 
+                    ST3T12T = 85 + random.Next(0, 35), 
+                    T12TP40T = 75 + random.Next(0, 35), 
+                    GT40T = 65 + random.Next(0, 35), 
+                    Motos = 55 + random.Next(0, 25), 
+                    Velo = 45 + random.Next(0, 25), 
+                    Pietons = 35 + random.Next(0, 25), 
+                    Autres = 25 + random.Next(0, 25) 
+                });
+
+                currentDate = currentDate.AddDays(1);
+            }
+
+            CalculateTotal();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur lors de la génération des données: {ex.Message}");
+        }
+    }
+
+    private void CalculateTotal()
+    {
+        try
+        {
+            comptagesTotal.Clear();
+            
+            for (int i = 0; i < Math.Min(comptagesSens1.Count, comptagesSens2.Count); i++)
+            {
+                comptagesTotal.Add(new ComptageData
+                {
+                    Date = comptagesSens1[i].Date,
+                    ST3T = comptagesSens1[i].ST3T + comptagesSens2[i].ST3T,
+                    ST3T12T = comptagesSens1[i].ST3T12T + comptagesSens2[i].ST3T12T,
+                    T12TP40T = comptagesSens1[i].T12TP40T + comptagesSens2[i].T12TP40T,
+                    GT40T = comptagesSens1[i].GT40T + comptagesSens2[i].GT40T,
+                    Motos = comptagesSens1[i].Motos + comptagesSens2[i].Motos,
+                    Velo = comptagesSens1[i].Velo + comptagesSens2[i].Velo,
+                    Pietons = comptagesSens1[i].Pietons + comptagesSens2[i].Pietons,
+                    Autres = comptagesSens1[i].Autres + comptagesSens2[i].Autres
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur lors du calcul des totaux: {ex.Message}");
+        }
+    }
+}

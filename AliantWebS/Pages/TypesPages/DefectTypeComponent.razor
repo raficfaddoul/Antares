@@ -171,21 +171,21 @@ else
 
     async Task FlagTypes(DefectType defectType)
     {
-        AppData.obj = defectType;
+        AppData.obj1 = defectType;
 
         navigationManager.NavigateTo("/DefectTypeFlagTypes/" + defectType.DefectTypeId);
     }
 
     async Task ElementTypes(DefectType defectType)
     {
-        AppData.obj = defectType;
+        AppData.obj1 = defectType;
 
         navigationManager.NavigateTo("/DefectTypeElementTypes/" + defectType.DefectTypeId);
     }
 
     async Task AttributesTypes(DefectType defectType)
     {
-        AppData.obj = defectType;
+        AppData.obj1 = defectType;
 
         navigationManager.NavigateTo("/DefectTypeAttributeTypes/" + defectType.DefectTypeId);
     }

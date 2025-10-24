@@ -19,10 +19,10 @@ namespace Structural
         static public double[,] Calcul_Dynamique(int duree, int nbReponse, int nbIntegration,
              int nddl, List<double[]> noeud,  DataTable element, List<string[]> CL,
         DataTable MasseNodale,
-                       List<(Guid id, List<int> noeudInd, double value, double position)> ChargesStatiquePonctuelles,
-                       List<(Guid id, List<int> noeudInd, double startValue, double endValue)> ChargesStatiqueReparties,
-                       List<(Guid id, List<int> noeudInd, double value, double position, Dictionary<double, double> tempFunc)> ChargesDynamiquePonctuelles,
-                       List<(Guid id, List<int> noeudInd, double startValue, double endValue, Dictionary<double, double> tempFunc)> ChargesDynamiqueReparties,
+                       List<(Guid id, List<int> noeudInd,int dof, double value, double position)> ChargesStatiquePonctuelles,
+                       List<(Guid id, List<int> noeudInd, int dof, double startValue, double endValue)> ChargesStatiqueReparties,
+                       List<(Guid id, List<int> noeudInd, int dof, double value, double position, Dictionary<double, double> tempFunc)> ChargesDynamiquePonctuelles,
+                       List<(Guid id, List<int> noeudInd, int dof, double startValue, double endValue, Dictionary<double, double> tempFunc)> ChargesDynamiqueReparties,
                        List<(Guid id, List<int> noeudInd, double ValueVL, double ValuePL, double ValueConvoi, double SpeedVL,
             double SpeedPL, double AverageHourlyTraffic, double PercentagePL, double LoadUncertainty, double SpeedUncertainty)> ChargesMobiles )
         {

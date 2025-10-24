@@ -21,65 +21,84 @@
                 <RadzenNumeric @bind-Value="PageSize" Style="width:60px"></RadzenNumeric>
             </div>
         </Div>
-        <a class="nav-link" @onclick="@(args => InsertLoadCase())" @onclick:preventDefault="true" href="">
+        <a class="nav-link" @onclick="@(InsertLoadCase)" @onclick:preventDefault="true" href="">
             <span class="oi oi-plus" aria-hidden="true">@L["Add New"]</span>
         </a>
-        <RadzenDataGrid class="RadzenDataGrid" @ref="loadCasesGrid" AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="PageSize"
-                        Data="@loadCases" TItem="LoadCase" ColumnWidth="150px" @bind-Value="@SelectedLoadCases" RowSelect=@RowSelect>
-            <Columns>
-                <RadzenDataGridColumn Width="50" TItem="LoadCase" Property="Name">
-                    <HeaderTemplate>
-                        <span class="gridColumndStyle">@L["Name"]</span>                    <br />
-                    </HeaderTemplate>
-                    <EditTemplate Context="loadCase">
-                        <InputTextArea @bind-Value="loadCase.Name" Style="width:100%" />
-                    </EditTemplate>
-                </RadzenDataGridColumn>
-                <RadzenDataGridColumn Width="50" TItem="LoadCase" Property="Description">
-                    <HeaderTemplate>
-                        <span class="gridColumndStyle">@L["Description"]</span>                    <br />
-                    </HeaderTemplate>
-                    <EditTemplate Context="loadCase">
-                        <InputTextArea @bind-Value="loadCase.Description" Style="width:100%" />
-                    </EditTemplate>
-                </RadzenDataGridColumn>
+
+            <RadzenDataGrid class="RadzenDataGrid" @ref="loadCasesGrid" AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="PageSize"
+            Data="@loadCases" TItem="LoadCase" ColumnWidth="150px" @bind-Value="@SelectedLoadCases" RowSelect=@RowSelect>
+                <Columns>
+                    <RadzenDataGridColumn Width="50" TItem="LoadCase" Property="Name">
+                        <HeaderTemplate>
+                            <span class="gridColumndStyle">@L["Name"]</span>                    <br />
+                        </HeaderTemplate>
+                        <EditTemplate Context="loadCase">
+                            <InputTextArea @bind-Value="loadCase.Name" Style="width:100%" />
+                        </EditTemplate>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn Width="50" TItem="LoadCase" Property="Description">
+                        <HeaderTemplate>
+                            <span class="gridColumndStyle">@L["Description"]</span>                    <br />
+                        </HeaderTemplate>
+                        <EditTemplate Context="loadCase">
+                            <InputTextArea @bind-Value="loadCase.Description" Style="width:100%" />
+                        </EditTemplate>
+                    </RadzenDataGridColumn>
+
+                    <RadzenDataGridColumn Width="50" TItem="LoadCase">
+                        <HeaderTemplate>
+                            <span class="gridColumndStyle">@L["Exclusive"]</span>
+                        </HeaderTemplate>
+                        <Template Context="loadCase">
+                            <!-- Read-only mode -->
+                            <RadzenCheckBox Value="@(loadCase.StructureId != null)" Disabled="true" />
+                        </Template>
+                        <EditTemplate Context="loadCase">
+                            <!-- Editable mode -->
+                            <RadzenCheckBox TValue="bool"
+                                            Value="@(loadCase.StructureId != null)"
+                                            ValueChanged="@(value => OnCheckboxChanged(value, loadCase))" />
+                        </EditTemplate>
+                    </RadzenDataGridColumn>
 
 
-                <RadzenDataGridColumn Width="50" TItem="LoadCase">
-                    <HeaderTemplate>
-                        <span class="gridColumndStyle">@L["Exclusive"]</span>                    <br />
-                    </HeaderTemplate>
-                    <Template Context="loadCase">
-                        <InputCheckbox Value ="@(loadCase.StructureId != null)" ValueExpression="@( () => coco )"></InputCheckbox>
-                    </Template>
-                    <EditTemplate Context="loadCase">
-                        <InputCheckbox Value="@(loadCase.StructureId != null)" 
-                                       ValueChanged="@(value => OnCheckboxChanged(value, loadCase))"
-                                       ValueExpression="@( () => coco )"></InputCheckbox>
 
-                    </EditTemplate>
-                </RadzenDataGridColumn>
+@*                     <RadzenDataGridColumn Width="50" TItem="LoadCase">
+                        <HeaderTemplate>
+                            <span class="gridColumndStyle">@L["Exclusive"]</span>                    <br />
+                        </HeaderTemplate>
+                        <Template Context="loadCase">
+                            <InputCheckbox Value ="@(loadCase.StructureId != null)" ValueExpression="@( () => coco )"></InputCheckbox>
+                        </Template>
+                        <EditTemplate Context="loadCase">
+                            <InputCheckbox Value="@(loadCase.StructureId != null)" 
+                            ValueChanged="@(value => OnCheckboxChanged(value, loadCase))"
+                            ValueExpression="@( () => coco )"></InputCheckbox>
+
+                        </EditTemplate>
+                    </RadzenDataGridColumn> *@
 
 
-                <RadzenDataGridColumn Width="50" TItem="LoadCase" Title="Action" Filterable="false" Sortable="false">
-                    <Template Context="data">
-                        <div style="display:flex">
-                            <a title="@L["Edit"]" class="nav-link" @onclick="@(args => EditRow(data))" @onclick:preventDefault="true" href="">
-                                <span class="oi oi-pencil" aria-hidden="true"></span>
-                            </a>
-                            <a title="@L["End Edit"]" class="nav-link" @onclick="@(args => UpdateRow(data))" @onclick:preventDefault="true" href="">
-                                <span class="oi oi-check" aria-hidden="true"></span>
-                            </a>
-                            <a title="@L["Delete"]" class="nav-link" @onclick="@(() => DeleteLoadCase(data))" @onclick:preventDefault="true" href="">
-                                <span class="oi oi-trash" aria-hidden="true"></span>
-                            </a>
+                    <RadzenDataGridColumn Width="50" TItem="LoadCase" Title="Action" Filterable="false" Sortable="false">
+                        <Template Context="data">
+                            <div style="display:flex">
+                                <a title="@L["Edit"]" class="nav-link" @onclick="@(args => EditRow(data))" @onclick:preventDefault="true" href="">
+                                    <span class="oi oi-pencil" aria-hidden="true"></span>
+                                </a>
+                                <a title="@L["End Edit"]" class="nav-link" @onclick="@(args => UpdateRow(data))" @onclick:preventDefault="true" href="">
+                                    <span class="oi oi-check" aria-hidden="true"></span>
+                                </a>
+                                <a title="@L["Delete"]" class="nav-link" @onclick="@(() => DeleteLoadCase(data))" @onclick:preventDefault="true" href="">
+                                    <span class="oi oi-trash" aria-hidden="true"></span>
+                                </a>
 
-                        </div>
-                    </Template>
+                            </div>
+                        </Template>
 
-                </RadzenDataGridColumn>
-            </Columns>
-        </RadzenDataGrid>
+                    </RadzenDataGridColumn>
+                </Columns>
+            </RadzenDataGrid>
+        
     </RadzenSplitterPane>
     <RadzenSplitterPane Size="50%">
         @if (selectedLoadCase != null)
@@ -92,7 +111,7 @@
                             <span class="oi oi-plus" aria-hidden="true">@L["Add New"]</span>
                         </a>
                         <RadzenDataGrid class="RadzenDataGrid" @ref="staticLoadsGrid" AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="PageSize"
-                                        Data="@selectedLoadCase.StaticLoads" TItem="StaticLoad" RowSelect=@StaticLoadRowSelect ColumnWidth="150px">
+                        Data="@selectedLoadCase.StaticLoads" TItem="StaticLoad" RowSelect=@StaticLoadRowSelect ColumnWidth="150px">
                             <Columns>
                                 <RadzenDataGridColumn Width="50" TItem="StaticLoad" Property="Name">
                                     <HeaderTemplate>
@@ -100,6 +119,16 @@
                                     </HeaderTemplate>
                                     <EditTemplate Context="staticLoad">
                                         <InputTextArea @bind-Value="staticLoad.Name" Style="width:100%" />
+                                    </EditTemplate>
+                                </RadzenDataGridColumn>
+
+                                <RadzenDataGridColumn Width="50" TItem="StaticLoad" Property="Dof">
+                                    <HeaderTemplate>
+                                        <span class="gridColumndStyle">@L["DOF"]</span>                    <br />
+                                    </HeaderTemplate>
+                                    <EditTemplate Context="staticLoad">
+                                        <RadzenNumeric @bind-Value="staticLoad.Dof" Style="width:100%" Name="Dof" />
+                                        <RadzenRequiredValidator Text="DOF is required" Component="Dof" Popup="true" />
                                     </EditTemplate>
                                 </RadzenDataGridColumn>
 
@@ -153,7 +182,7 @@
                             <span class="oi oi-plus" aria-hidden="true">@L["Add New"]</span>
                         </a>
                         <RadzenDataGrid class="RadzenDataGrid" @ref="staticPointLoadsGrid" AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="PageSize"
-                                        Data="@selectedLoadCase.StaticPointLoads" TItem="StaticPointLoad" RowSelect=@StaticPointLoadRowSelect ColumnWidth="150px">
+                        Data="@selectedLoadCase.StaticPointLoads" TItem="StaticPointLoad" RowSelect=@StaticPointLoadRowSelect ColumnWidth="150px">
                             <Columns>
                                 <RadzenDataGridColumn Width="50" TItem="StaticPointLoad" Property="Name">
                                     <HeaderTemplate>
@@ -161,6 +190,16 @@
                                     </HeaderTemplate>
                                     <EditTemplate Context="staticPointLoad">
                                         <InputTextArea @bind-Value="staticPointLoad.Name" Style="width:100%" />
+                                    </EditTemplate>
+                                </RadzenDataGridColumn>
+
+                                <RadzenDataGridColumn Width="50" TItem="StaticPointLoad" Property="Dof">
+                                    <HeaderTemplate>
+                                        <span class="gridColumndStyle">@L["DOF"]</span>                    <br />
+                                    </HeaderTemplate>
+                                    <EditTemplate Context="staticLoad">
+                                        <RadzenNumeric @bind-Value="staticLoad.Dof" Style="width:100%" Name="Dof" />
+                                        <RadzenRequiredValidator Text="DOF is required" Component="Dof" Popup="true" />
                                     </EditTemplate>
                                 </RadzenDataGridColumn>
 
@@ -217,7 +256,7 @@
                             <span class="oi oi-plus" aria-hidden="true">@L["Add New"]</span>
                         </a>
                         <RadzenDataGrid class="RadzenDataGrid" @ref="dynamicLoadsGrid" AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="PageSize"
-                                        Data="@selectedLoadCase.DynamicLoads" TItem="DynamicLoad" RowSelect=@DynamicLoadRowSelect ColumnWidth="150px">
+                        Data="@selectedLoadCase.DynamicLoads" TItem="DynamicLoad" RowSelect=@DynamicLoadRowSelect ColumnWidth="150px">
                             <Columns>
                                 <RadzenDataGridColumn Width="50" TItem="DynamicLoad" Property="Name">
                                     <HeaderTemplate>
@@ -225,6 +264,16 @@
                                     </HeaderTemplate>
                                     <EditTemplate Context="dynamicLoad">
                                         <InputTextArea @bind-Value="dynamicLoad.Name" Style="width:100%" />
+                                    </EditTemplate>
+                                </RadzenDataGridColumn>
+
+                                <RadzenDataGridColumn Width="100px" TItem="DynamicLoad" Property="Dof">
+                                    <HeaderTemplate>
+                                        <span class="gridColumndStyle">@L["DOF"]</span>                    <br />
+                                    </HeaderTemplate>
+                                    <EditTemplate Context="dynamicLoad">
+                                        <RadzenNumeric @bind-Value="dynamicLoad.Dof" Style="width:100%" Name="Dof" />
+                                        <RadzenRequiredValidator Text="DOF is required" Component="Dof" Popup="true" />
                                     </EditTemplate>
                                 </RadzenDataGridColumn>
 
@@ -255,12 +304,12 @@
                                     <Template Context="dynamicLoad">
                                         <textArea disabled style="width:100%">
                                             @Converter.DisplayDictionary(Converter.ConvertFromXml(dynamicLoad.TemporalFunc))
-                                                    </textArea>
+                                        </textArea>
                                     </Template>
                                     <EditTemplate Context="dynamicLoad">
                                         <RadzenTextArea Value="@Converter.DisplayDictionary(Converter.ConvertFromXml(dynamicLoad.TemporalFunc))"
-                                                       @oninput="@(e => dynamicLoad.TemporalFunc = Converter.ConvertToXml(dynamicLoad.TemporalFunc,Converter.ParseToDictionary(e.Value.ToString())))"
-                                                        ValueExpression="@( () => dynamicLoad.TemporalFunc )" Name="TemporalFunc" Style="width:100%" />
+                                        @oninput="@(e => dynamicLoad.TemporalFunc = Converter.ConvertToXml(dynamicLoad.TemporalFunc,Converter.ParseToDictionary(e.Value.ToString())))"
+                                        ValueExpression="@( () => dynamicLoad.TemporalFunc )" Name="TemporalFunc" Style="width:100%" />
                                         <RadzenRequiredValidator Text="Temporal function is required" Component="TemporalFunc" Popup="true" />
 
                                     </EditTemplate>
@@ -295,7 +344,7 @@
                             <span class="oi oi-plus" aria-hidden="true">@L["Add New"]</span>
                         </a>
                         <RadzenDataGrid class="RadzenDataGrid" @ref="dynamicPointLoadsGrid" AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="PageSize"
-                                        Data="@selectedLoadCase.DynamicPointLoads" TItem="DynamicPointLoad" RowSelect=@DynamicPointLoadRowSelect ColumnWidth="150px" Style="overflow:auto">
+                        Data="@selectedLoadCase.DynamicPointLoads" TItem="DynamicPointLoad" RowSelect=@DynamicPointLoadRowSelect ColumnWidth="150px" Style="overflow:auto">
                             <Columns>
                                 <RadzenDataGridColumn Width="50" TItem="DynamicPointLoad" Property="Name">
                                     <HeaderTemplate>
@@ -305,6 +354,17 @@
                                         <InputTextArea @bind-Value="dynamicPointLoad.Name" Style="width:100%" />
                                     </EditTemplate>
                                 </RadzenDataGridColumn>
+
+                                <RadzenDataGridColumn Width="100px" TItem="DynamicPointLoad" Property="Dof">
+                                    <HeaderTemplate>
+                                        <span class="gridColumndStyle">@L["DOF"]</span>                    <br />
+                                    </HeaderTemplate>
+                                    <EditTemplate Context="dynamicPointLoad">
+                                        <RadzenNumeric @bind-Value="dynamicPointLoad.Dof" Style="width:100%" Name="Dof" />
+                                        <RadzenRequiredValidator Text="DOF is required" Component="Dof" Popup="true" />
+                                    </EditTemplate>
+                                </RadzenDataGridColumn>
+
 
                                 <RadzenDataGridColumn Width="100px" TItem="DynamicPointLoad" Property="Value">
                                     <HeaderTemplate>
@@ -334,12 +394,12 @@
                                     <Template Context="dynamicPointLoad">
                                         <textArea disabled style="width:100%">
                                             @Converter.DisplayDictionary(Converter.ConvertFromXml(dynamicPointLoad.TemporalFunc))
-                                                </textArea>
+                                        </textArea>
                                     </Template>
                                     <EditTemplate Context="dynamicPointLoad">
                                         <RadzenTextArea Value="@Converter.DisplayDictionary(Converter.ConvertFromXml(dynamicPointLoad.TemporalFunc))"
-                                                       @oninput="@(e => dynamicPointLoad.TemporalFunc = Converter.ConvertToXml(dynamicPointLoad.TemporalFunc,Converter.ParseToDictionary(e.Value.ToString())))"
-                                                        ValueExpression="@( () => dynamicPointLoad.TemporalFunc )" Name="TemporalFunc" Style="width:100%"/>
+                                        @oninput="@(e => dynamicPointLoad.TemporalFunc = Converter.ConvertToXml(dynamicPointLoad.TemporalFunc,Converter.ParseToDictionary(e.Value.ToString())))"
+                                        ValueExpression="@( () => dynamicPointLoad.TemporalFunc )" Name="TemporalFunc" Style="width:100%"/>
                                         <RadzenRequiredValidator Text="Temporal function is required" Component="TemporalFunc" Popup="true" />
 
                                     </EditTemplate>
@@ -373,7 +433,7 @@
                             <span class="oi oi-plus" aria-hidden="true">@L["Add New"]</span>
                         </a>
                         <RadzenDataGrid class="RadzenDataGrid" @ref="mobileLoadsGrid" AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="PageSize"
-                                        Data="@selectedLoadCase.MobileLoads" TItem="MobileLoad" ColumnWidth="150px">
+                        Data="@selectedLoadCase.MobileLoads" TItem="MobileLoad" ColumnWidth="150px">
                             <Columns>
                                 <RadzenDataGridColumn Width="50" TItem="MobileLoad" Property="Name">
                                     <HeaderTemplate>
@@ -505,6 +565,7 @@
     int PageSize { get; set; } = 10;
 
     bool coco;
+
 
     Structure structure;
 
@@ -759,6 +820,7 @@
 
         loadCasesGrid.EditRow(loadCase);
 
+
     }
 
     void EditStaticRow(StaticLoad loadCase)
@@ -798,23 +860,39 @@
 
     async Task InsertLoadCase()
     {
+   
         LoadCase loadCase = new LoadCase();
         loadCase.StructureId = structure.StructureId;
+
         if ((await entitiesService.InsertEntityAsync(loadCase)) != null)
         {
             loadCases.Add(loadCase);
+   
             await loadCasesGrid.InsertRow(loadCase);
+         
         }
         else
         {
             await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
         }
+ 
     }
 
     async Task InsertStaticLoad()
     {
         StaticLoad staticLoad = new StaticLoad();
         staticLoad.LoadCaseId = selectedLoadCase.LoadCaseId;
+
+        var elements = appData.CheckedNodeObjects.Select(x => (AliantWebS.Models.Element)x).ToList();        
+        foreach (Element el in elements)
+        {
+            StaticLoadElement elc = new StaticLoadElement();
+            elc.ElementId = el.ElementId;
+            elc.StaticLoadId = staticLoad.StaticLoadId;         
+            staticLoad.StaticLoadElements.Add(elc);  
+        }
+
+
         if ((await entitiesService.InsertEntityAsync(staticLoad)) != null)
         {
             // selectedLoadCase.StaticLoads.Add(staticLoad);
@@ -830,6 +908,16 @@
     {
         StaticPointLoad staticPointLoad = new StaticPointLoad();
         staticPointLoad.LoadCaseId = selectedLoadCase.LoadCaseId;
+
+        var elements = appData.CheckedNodeObjects.Select(x => (AliantWebS.Models.Element)x).ToList();
+        foreach (Element el in elements)
+        {
+            StaticPointLoadElement elc = new StaticPointLoadElement();
+            elc.ElementId = el.ElementId;
+            elc.StaticPointLoadId = staticPointLoad.StaticPointLoadId;
+            staticPointLoad.StaticPointLoadElements.Add(elc);
+        }
+
         if ((await entitiesService.InsertEntityAsync(staticPointLoad)) != null)
         {
             // selectedLoadCase.StaticLoads.Add(staticLoad);
@@ -845,6 +933,16 @@
     {
         DynamicLoad dynamicLoad = new DynamicLoad();
         dynamicLoad.LoadCaseId = selectedLoadCase.LoadCaseId;
+
+        var elements = appData.CheckedNodeObjects.Select(x => (AliantWebS.Models.Element)x).ToList();
+        foreach (Element el in elements)
+        {
+            DynamicLoadElement elc = new DynamicLoadElement();
+            elc.ElementId = el.ElementId;
+            elc.DynamicLoadId = dynamicLoad.DynamicLoadId;
+            dynamicLoad.DynamicLoadElements.Add(elc);
+        }
+
         if ((await entitiesService.InsertEntityAsync(dynamicLoad)) != null)
         {
             // selectedLoadCase.DynamicLoads.Add(dynamicLoad);
@@ -860,6 +958,17 @@
     {
         DynamicPointLoad dynamicPointLoad = new DynamicPointLoad();
         dynamicPointLoad.LoadCaseId = selectedLoadCase.LoadCaseId;
+
+        var elements = appData.CheckedNodeObjects.Select(x => (AliantWebS.Models.Element)x).ToList();
+        foreach (Element el in elements)
+        {
+            DynamicPointLoadElement elc = new DynamicPointLoadElement();
+            elc.ElementId = el.ElementId;
+            elc.DynamicPointLoadId = dynamicPointLoad.DynamicPointLoadId;
+            dynamicPointLoad.DynamicPointLoadElements.Add(elc);
+        }
+
+
         if ((await entitiesService.InsertEntityAsync(dynamicPointLoad)) != null)
         {
             // selectedLoadCase.DynamicLoads.Add(dynamicLoad);
@@ -959,7 +1068,7 @@
         {
             entitiesService.LoadCollection(selectedLoadCase, "MobileLoads");
         }
-        // if (selectedLoadCase.ElementLoadCases.Count == 0)
+         //if (selectedLoadCase.ElementLoadCases.Count == 0)
         // {
         //     entitiesService.LoadCollection(selectedLoadCase, "ElementLoadCases");
         // }
@@ -971,24 +1080,40 @@
 
     void StaticLoadRowSelect(StaticLoad staticLoad)
     {
+        if (staticLoad.StaticLoadElements.Count == 0)
+        {
+            entitiesService.LoadCollection(staticLoad, "StaticLoadElements");
+        }
         appData.CheckedNodeObjects = staticLoad.StaticLoadElements.Select(x => x.Element).Where(x => appData.Structure.Elements.Contains(x));
         StateHasChanged();
     }
 
     void StaticPointLoadRowSelect(StaticPointLoad staticPointLoad)
     {
+        if (staticPointLoad.StaticPointLoadElements.Count == 0)
+        {
+            entitiesService.LoadCollection(staticPointLoad, "StaticPointLoadElements");
+        }
         appData.CheckedNodeObjects = staticPointLoad.StaticPointLoadElements.Select(x => x.Element).Where(x => appData.Structure.Elements.Contains(x));
         StateHasChanged();        
     }
 
     void DynamicLoadRowSelect(DynamicLoad dynamicLoad)
     {
+        if (dynamicLoad.DynamicLoadElements.Count == 0)
+        {
+            entitiesService.LoadCollection(dynamicLoad, "DynamicLoadElements");
+        }
         appData.CheckedNodeObjects = dynamicLoad.DynamicLoadElements.Select(x => x.Element).Where(x => appData.Structure.Elements.Contains(x));
         StateHasChanged();
     }
 
     void DynamicPointLoadRowSelect(DynamicPointLoad dynamicPointLoad)
     {
+        if (dynamicPointLoad.DynamicPointLoadElements.Count == 0)
+        {
+            entitiesService.LoadCollection(dynamicPointLoad, "DynamicPointLoadElements");
+        }
         appData.CheckedNodeObjects = dynamicPointLoad.DynamicPointLoadElements.Select(x => x.Element).Where(x => appData.Structure.Elements.Contains(x));
         StateHasChanged();
     }

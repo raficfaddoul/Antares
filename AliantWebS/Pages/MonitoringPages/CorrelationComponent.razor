@@ -197,7 +197,7 @@ else
 
 
 
-            var correlationCalculator = new AI.CorrelationCalculator();
+            var correlationCalculator = new CorrelationCalculator.CorrelationCalculator();
             correlationMatrix = correlationCalculator.CalculateCorrelationMatrix(indices);
 
             StateHasChanged();
@@ -209,7 +209,7 @@ else
             headers.Remove(sensor.Name + "|" + channelDataType.Name);
             var d = indices.Find(x => x.Item1 == sensor.ElementId.ToString() + "|" + channelDataType.ChannelDataTypeId.ToString());
             indices.Remove(d);
-            var correlationCalculator = new AI.CorrelationCalculator();
+            var correlationCalculator = new CorrelationCalculator.CorrelationCalculator();
             correlationMatrix = correlationCalculator.CalculateCorrelationMatrix(indices);
 
             StateHasChanged();

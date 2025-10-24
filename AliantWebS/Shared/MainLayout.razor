@@ -45,7 +45,7 @@
                 @StructureName
             </a>
 
-            @if ((AI.Helpers.IsCurrentPage(navigationManager, "SHM", "BlankElement", "SensorData", "Statistics", "EditElement", "SP", "Identification", "StructuralResponse")))
+            @if ((Helpers.Helpers.IsCurrentPage(navigationManager, "SHM", "BlankElement", "SensorData", "Statistics", "EditElement", "SP", "Identification", "StructuralResponse")))
             {           
 
                 <RadzenMenu >
@@ -307,7 +307,7 @@
           //  string param = JsonSerializer.Serialize(listIDs);
 
 
-            navigationManager.NavigateTo("/SP");
+            navigationManager.NavigateTo("/SP2");
 
 
             // JsRuntime.InvokeVoidAsync("alert", "Please check one or more elements...");
@@ -316,11 +316,11 @@
         }
         else
         {
-            listIDs = AI.Helpers.GetTheChildren(appData.CheckedNodeObjects);
+            listIDs = Helpers.Helpers.GetTheChildren(appData.CheckedNodeObjects);
             string param = JsonSerializer.Serialize(listIDs);
 
 
-            navigationManager.NavigateTo("/SP/" + param);
+            navigationManager.NavigateTo("/SP2/" + param);
         }
 
 

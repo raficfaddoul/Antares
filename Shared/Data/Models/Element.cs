@@ -33,45 +33,45 @@ public partial class Element
     public string? Description { get; set; }
 
     [InverseProperty("Element")]
-    public virtual ICollection<AttributeElement> AttributeElements { get; } = new List<AttributeElement>();
+    public virtual ICollection<AttributeElement> AttributeElements { get; set; } = new List<AttributeElement>();
 
     [InverseProperty("Element")]
-    public virtual ICollection<Defect> Defects { get; } = new List<Defect>();
+    public virtual ICollection<Defect> Defects { get; set; } = new List<Defect>();
 
     [InverseProperty("Element")]
-    public virtual ICollection<DynamicLoadElement> DynamicLoadElements { get; } = new List<DynamicLoadElement>();
+    public virtual ICollection<DynamicLoadElement> DynamicLoadElements { get; set; } = new List<DynamicLoadElement>();
 
     [InverseProperty("Element")]
-    public virtual ICollection<DynamicPointLoadElement> DynamicPointLoadElements { get; } = new List<DynamicPointLoadElement>();
+    public virtual ICollection<DynamicPointLoadElement> DynamicPointLoadElements { get; set; } = new List<DynamicPointLoadElement>();
 
     [ForeignKey("ElementTypeId")]
     [InverseProperty("Elements")]
     public virtual ElementType? ElementType { get; set; }
 
     [InverseProperty("Element")]
-    public virtual ICollection<Equipement> Equipements { get; } = new List<Equipement>();
+    public virtual ICollection<Equipement> Equipements { get; set; } = new List<Equipement>();
 
     [InverseProperty("Element")]
-    public virtual ICollection<FlagElement> FlagElements { get; } = new List<FlagElement>();
+    public virtual ICollection<FlagElement> FlagElements { get; set; } = new List<FlagElement>();
 
     [InverseProperty("Element")]
-    public virtual ICollection<InspectionResult> InspectionResults { get; } = new List<InspectionResult>();
+    public virtual ICollection<InspectionResult> InspectionResults { get; set; } = new List<InspectionResult>();
 
     [InverseProperty("Parent")]
-    public virtual ICollection<Element> InverseParent { get; } = new List<Element>();
+    public virtual ICollection<Element> InverseParent { get; set; } = new List<Element>();
 
     [InverseProperty("Element")]
-    public virtual ICollection<MobileLoadElement> MobileLoadElements { get; } = new List<MobileLoadElement>();
+    public virtual ICollection<MobileLoadElement> MobileLoadElements { get; set; } = new List<MobileLoadElement>();
 
     [ForeignKey("ParentId")]
     [InverseProperty("InverseParent")]
     public virtual Element? Parent { get; set; }
 
     [InverseProperty("Element")]
-    public virtual ICollection<StaticLoadElement> StaticLoadElements { get; } = new List<StaticLoadElement>();
+    public virtual ICollection<StaticLoadElement> StaticLoadElements { get; set; } = new List<StaticLoadElement>();
 
     [InverseProperty("Element")]
-    public virtual ICollection<StaticPointLoadElement> StaticPointLoadElements { get; } = new List<StaticPointLoadElement>();
+    public virtual ICollection<StaticPointLoadElement> StaticPointLoadElements { get; set; } = new List<StaticPointLoadElement>();
 
     [ForeignKey("StructureId")]
     [InverseProperty("Elements")]

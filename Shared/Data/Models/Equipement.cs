@@ -36,7 +36,7 @@ public partial class Equipement
     public double? ProjectionParameter { get; set; }
 
     [InverseProperty("Equipement")]
-    public virtual ICollection<AttributeEquipement> AttributeEquipements { get; } = new List<AttributeEquipement>();
+    public virtual ICollection<AttributeEquipement> AttributeEquipements { get; set; } = new List<AttributeEquipement>();
 
     [ForeignKey("ElementId")]
     [InverseProperty("Equipements")]

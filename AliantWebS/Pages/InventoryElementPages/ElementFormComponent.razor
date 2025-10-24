@@ -251,7 +251,7 @@ else
 
     void InspectionButtonClick()
     {
-        AppData.obj = Element;
+        AppData.obj1 = Element;
 
         navigationManager.NavigateTo("/ElementInspections/" + Element.ElementId);
 
@@ -259,7 +259,7 @@ else
 
     void DefectsButtonClick()
     {
-        AppData.obj = Element;
+        AppData.obj1 = Element;
 
         navigationManager.NavigateTo("/ElementDefects/" + Element.ElementId);
 
@@ -267,7 +267,7 @@ else
 
     void DataButtonClick()
     {
-        AppData.obj = Element;
+        AppData.obj1 = Element;
 
         List<Guid?> listIDs = new List<Guid?>() {Element.ElementId };
 

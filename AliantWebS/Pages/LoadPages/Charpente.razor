@@ -16,118 +16,118 @@
 
 <style>
     .small-cell {
-        width: 100px !important; /* Adjust the width as needed */
-        height: 50px; /* Adjust the height as needed */
-        padding: 0; /* Remove padding to make cells smaller */
-        text-align: center; /* Center-align the text */
+    width: 100px !important; /* Adjust the width as needed */
+    height: 50px; /* Adjust the height as needed */
+    padding: 0; /* Remove padding to make cells smaller */
+    text-align: center; /* Center-align the text */
     }
 
     .small-input {
-        width: 100% !important; /* Make the input take full width of the cell */
-        height: 50%; /* Make the input take full height of the cell */
-        box-sizing: border-box; /* Include padding and border in the element's total width and height */
-        font-size: 12px; /* Adjust the font size as needed */
-        padding: 0; /* Remove padding for the input */
+    width: 100% !important; /* Make the input take full width of the cell */
+    height: 50%; /* Make the input take full height of the cell */
+    box-sizing: border-box; /* Include padding and border in the element's total width and height */
+    font-size: 12px; /* Adjust the font size as needed */
+    padding: 0; /* Remove padding for the input */
     }
 
     .fixed-table {
-        table-layout: fixed;
-        width: auto; /* Set to auto to prevent expanding to full width */
+    table-layout: fixed;
+    width: auto; /* Set to auto to prevent expanding to full width */
     }
 
     .center-text {
-        text-align: center;
+    text-align: center;
     }
 
     /* Alternating row colors */
     .table tbody tr:nth-child(even) {
-        background-color: #e0f7fa !important; /* Light cyan */
+    background-color: #e0f7fa !important; /* Light cyan */
     }
 
     .table tbody tr:nth-child(odd) {
-        background-color: #ffffff !important; /* White */
+    background-color: #ffffff !important; /* White */
     }
 
-        /* Alternating column colors within alternating rows */
-        .table tbody tr:nth-child(even) td:nth-child(even),
-        .table tbody tr:nth-child(odd) td:nth-child(even),
-        .table tbody tr:nth-child(even) th:nth-child(even),
-        .table tbody tr:nth-child(odd) th:nth-child(even) {
-            background-color: rgba(255, 255, 153, 0.5) !important; /* Lighter yellow with transparency */
-        }
+    /* Alternating column colors within alternating rows */
+    .table tbody tr:nth-child(even) td:nth-child(even),
+    .table tbody tr:nth-child(odd) td:nth-child(even),
+    .table tbody tr:nth-child(even) th:nth-child(even),
+    .table tbody tr:nth-child(odd) th:nth-child(even) {
+    background-color: rgba(255, 255, 153, 0.5) !important; /* Lighter yellow with transparency */
+    }
 
-        .table tbody tr:nth-child(even) td:nth-child(odd),
-        .table tbody tr:nth-child(odd) td:nth-child(odd),
-        .table tbody tr:nth-child(even) th:nth-child(odd),
-        .table tbody tr:nth-child(odd) th:nth-child(odd) {
-            background-color: inherit; /* Keep the row background color */
-        }
+    .table tbody tr:nth-child(even) td:nth-child(odd),
+    .table tbody tr:nth-child(odd) td:nth-child(odd),
+    .table tbody tr:nth-child(even) th:nth-child(odd),
+    .table tbody tr:nth-child(odd) th:nth-child(odd) {
+    background-color: inherit; /* Keep the row background color */
+    }
 
     /* Ensure input fields inherit background color */
     .table tbody tr td.small-cell input {
-        background-color: inherit;
+    background-color: inherit;
     }
 
     .legend-box {
-        display: inline-block;
-        width: 20px;
-        height: 20px;
-        margin-right: 5px;
-        vertical-align: middle;
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    margin-right: 5px;
+    vertical-align: middle;
     }
 
     .white-background {
-        background-color: #ffffff; /* White */
+    background-color: #ffffff; /* White */
     }
 
     .faint-magenta-background {
-        background-color: #fde4f9; /* Faint magenta */
+    background-color: #fde4f9; /* Faint magenta */
     }
 
     .legend-text {
-        vertical-align: middle;
+    vertical-align: middle;
     }
 
     .controls-container {
-        display: flex;
-        justify-content: start;
-        align-items: flex-start;
+    display: flex;
+    justify-content: start;
+    align-items: flex-start;
     }
 
     .buttons-container {
-        flex-grow: 1;
+    flex-grow: 1;
     }
 
     .legend-container {
-        margin-left: 20px; /* Adjust spacing between buttons and legend as needed */
+    margin-left: 20px; /* Adjust spacing between buttons and legend as needed */
     }
 
     .tooltip-container {
-        position: relative;
-        display: inline-block;
+    position: relative;
+    display: inline-block;
     }
 
     .tooltip-text {
-        visibility: hidden;
-        width: 120px;
-        background-color: #f9f9f9;
-        color: #fff;
-        text-align: center;
-        border-radius: 6px;
-        padding: 5px 0;
-        position: absolute;
-        z-index: 1;
-        bottom: 100%;
-        left: 50%;
-        margin-left: -60px;
+    visibility: hidden;
+    width: 120px;
+    background-color: #f9f9f9;
+    color: #fff;
+    text-align: center;
+    border-radius: 6px;
+    padding: 5px 0;
+    position: absolute;
+    z-index: 1;
+    bottom: 100%;
+    left: 50%;
+    margin-left: -60px;
     }
 
     .tooltip-container:hover .tooltip-text {
-        visibility: visible;
+    visibility: visible;
     }
 
     .tooltip-text::before {
-        display: none;   
+    display: none;   
     }
 </style>
 
@@ -192,15 +192,15 @@
                         {
                             <td class="small-cell">
                                 <div class ="tooltip-container">
-                                <span class="tooltip-text" style="@GetTooltipStyle(CalculateRatio(row, col))">@($"Taux de charge: {CalculateRatio(row, col):F2}")</span>
-                                <input type="number" class="form-control small-input center-text" value="@GetCellValue(row, col)" @onchange="e => UpdateCellValue(row, col, e)"
-                                       style="background-color: #ffffff;" />
-                                <input type="number"
-                                       class="form-control small-input center-text"
-                                       value="@GetCellValue(row, col, false)"
-                                       @onchange="e => UpdateCellValue(row, col, e, false)"
-                                       disabled="@(appData.GetRole().Result != "Administrator" && appData.GetRole().Result != "Developer")"
-                                       style="background-color: #fde4f9;" />
+                                    <span class="tooltip-text" style="@GetTooltipStyle(CalculateRatio(row, col))">@($"Taux de charge: {CalculateRatio(row, col):F2}")</span>
+                                    <input type="number" class="form-control small-input center-text" value="@GetCellValue(row, col)" @onchange="e => UpdateCellValue(row, col, e)"
+                                    style="background-color: #ffffff;" />
+                                    <input type="number"
+                                    class="form-control small-input center-text"
+                                    value="@GetCellValue(row, col, false)"
+                                    @onchange="e => UpdateCellValue(row, col, e, false)"
+                                    disabled="@(appData.GetRole().Result != "Administrator" && appData.GetRole().Result != "Developer")"
+                                    style="background-color: #fde4f9;" />
                                 </div>
                             </td>
                         }
@@ -703,7 +703,13 @@
             appData.Structure = structure;
         }
 
-        Structural.Structure CharpenteAntares = Structural.Simulation.CreateStructure3D(appData.Structure, null, entitiesService);
+        Dictionary<LoadCase, double> selectedLoadCases = new Dictionary<LoadCase, double>();
+
+        List<LoadCase> loadCases = await entitiesService.GetFilteredEntitiesAsync<LoadCase>(x => x.StructureId == appData.Structure.StructureId);
+
+        selectedLoadCases = loadCases.ToDictionary(lc => lc, lc => 1.0); // Assuming all load cases are selected with a factor of 1.0
+        
+        Structural.Structure CharpenteAntares = Structural.Simulation.CreateStructure3D(appData.Structure, selectedLoadCases, null, entitiesService);
 
         // int i = -1, j = -1;
         // foreach (System.Data.DataRow elem in CharpenteAntares.element.Rows)

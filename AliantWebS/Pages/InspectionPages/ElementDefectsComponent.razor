@@ -129,7 +129,7 @@ else
     protected override async Task OnInitializedAsync()
     {
         ScrollHeight = "400px";
-        element = (Element)appData.obj;
+        element = (Element)appData.obj1;
 
 
 
@@ -206,7 +206,7 @@ else
         defect.ElementId = element.ElementId;
 
         defect.DefectTypeId = element.ElementType.ElementTypeDefectTypes.FirstOrDefault().DefectTypeId;
-        defect.Date = DateTime.Now;
+        defect.Date = DateOnly.FromDateTime(DateTime.Now);
         await AddAttributes(defect);
         element.Defects.Add(defect);        
         await entitiesService.UpdateEntityAsync(element);

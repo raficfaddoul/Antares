@@ -19,8 +19,7 @@ public partial class FlagStructure
     [Column("FlagTypeID")]
     public Guid FlagTypeId { get; set; }
 
-    [Column(TypeName = "date")]
-    public DateTime? Date { get; set; }
+    public DateOnly? Date { get; set; }
 
     [ForeignKey("FlagTypeId")]
     [InverseProperty("FlagStructures")]

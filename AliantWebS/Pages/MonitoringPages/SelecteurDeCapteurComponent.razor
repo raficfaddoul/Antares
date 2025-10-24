@@ -13,18 +13,18 @@
     </div>
 </Div>
     <RadzenDataGrid class="RadzenDataGrid" @ref="eventsGrid" AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="PageSize" RowSelect=@RowSelect
-                    Data="@sensors" @bind-Value=@selectedSensors SelectionMode="DataGridSelectionMode.Multiple" TItem="Element" ColumnWidth="150px">
+                    Data="@sensors" @bind-Value=@selectedSensors SelectionMode="DataGridSelectionMode.Multiple" TItem="Element" AllowColumnResize="true" >
         <Columns>
             <RadzenDataGridColumn TItem="Element" Property="Name" Title="@L["Name"]"></RadzenDataGridColumn>
             <RadzenDataGridColumn TItem="Element" Property="Description" Title="@L["Description"]"></RadzenDataGridColumn>
 
-            <RadzenDataGridColumn TItem="Element" Title="@L["Action"]" Width="90px" Sortable=false Filterable=false>
+            <RadzenDataGridColumn TItem="Element" Title="@L["Action"]" Sortable=false Filterable=false>
 
                 <Template Context="element">
                     <Div Style="display: flex">
                         @foreach (ChannelDataType cdt in element.ElementType.ChannelDataTypeElementTypes.Select(x => x.ChannelDataType))
                         {
-                            <img title="@cdt.Name" src="@AI.Helpers.GetSource(cdt.Icon)" alt="@cdt.Name" />
+                        <img title="@cdt.Name" src="@Helpers.Helpers.GetSource(cdt.Icon)" alt="@cdt.Name" />
                             <RadzenCheckBox TValue=bool Change=@(args =>plot(args,element,cdt))></RadzenCheckBox>
                         }
                     </Div>
@@ -65,7 +65,7 @@
 
     private IList<Element> selectedSensors { get; set; }
 
-    DateTime startDate { get; set; } = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+    DateTime startDate { get; set; } = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
     DateTime endDate { get; set; } = DateTime.UtcNow;
 
     [Parameter]

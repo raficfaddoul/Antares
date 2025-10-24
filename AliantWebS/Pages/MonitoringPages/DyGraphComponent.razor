@@ -8,22 +8,22 @@
 
 <style>
     #darkbg .dygraph-axis-label {
-        color: white;
+    color: white;
     }
 
     .dygraph-legend {
-        text-align: right;
+    text-align: right;
     }
 
     #darkbg .dygraph-legend {
-        background-color: #101015;
+    background-color: #101015;
     }
 
 </style>
 <Div Style="height: 100%; width:100%; display:flex">
 
-<button class="btn btn-primary" @onclick="Stop">Stop/Restart Stream</button>
-<div id="graphdiv1" style="height:300px; width:100%; display:flex"></div>
+    <button class="btn btn-primary" @onclick="Stop">Stop/Restart Stream</button>
+    <div id="graphdiv1" style="height:300px; width:100%; display:flex"></div>
 </Div>
 
 @code {
@@ -44,7 +44,8 @@
 
     protected override async Task OnInitializedAsync()
     {
-        DataUpdateService.OnDataUpdated += UpdateUI;
+        //DataUpdateService.OnDataUpdated += UpdateUI;
+        ReportsService.OnReportsReceived += UpdateUI;
     }
 
     string headers = "Date,Acceleration";
@@ -151,16 +152,17 @@
         //  navigationManager.NavigateTo("/Python");
     }
 
-    private async void UpdateUI(string chartType, string name)
+    private async Task UpdateUI(List<Report> l)
     {
-        await FetchLiveData();
+        //await FetchLiveData();
     }
 
     public void Dispose()
     {
         _cts.Cancel();
         _cts.Dispose();
-        DataUpdateService.OnDataUpdated -= UpdateUI;
+        //DataUpdateService.OnDataUpdated -= UpdateUI;
+        ReportsService.OnReportsReceived -= UpdateUI;
     }
 }
 

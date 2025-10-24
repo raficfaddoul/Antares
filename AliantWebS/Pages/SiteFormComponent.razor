@@ -168,6 +168,12 @@ else
         appData.DisplaySubmitButton = true;
         objRef = DotNetObjectReference.Create(this);
         structureList = await entitiesService.GetFilteredEntitiesAsync<Structure>(x => x.SiteId == Site.SiteId);
+        if (Site.Geolocation == null)
+        {
+            Site.Geolocation = NetTopologySuite.Geometries.Geometry.DefaultFactory.CreatePoint(new NetTopologySuite.Geometries.Coordinate(0, 0));
+            Site.Geolocation.SRID = 4326;
+        }
+
 
         coordinates = new List<(string id, string Type, string Name, double X, double Y, double C)?>()
         {

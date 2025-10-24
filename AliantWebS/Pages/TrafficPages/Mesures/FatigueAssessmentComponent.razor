@@ -1,0 +1,686 @@
+@using AliantWebS.Models
+@using System.Text.Json
+@using Helpers
+@inject IJSRuntime JSRuntime
+@inject IStringLocalizer<Languages> L
+
+<style>
+    @@keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    .fatigue-container {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        height: 100%;
+        overflow: hidden;
+    }
+
+    .controls-section {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 15px;
+        display: flex;
+        gap: 15px;
+        align-items: center;
+        flex-wrap: wrap;
+        animation: fadeIn 0.5s ease-out;
+        flex-shrink: 0;
+    }
+
+    .parameter-group {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .parameter-label {
+        font-size: 0.9em;
+        font-weight: 500;
+        color: #495057;
+    }
+
+    .date-picker-group {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .date-picker-label {
+        font-size: 0.9em;
+        font-weight: 500;
+        color: #495057;
+    }
+
+    .chart-container {
+        flex: 1;
+        overflow: hidden;
+        animation: fadeIn 0.8s ease-out;
+        display: flex;
+        gap: 15px;
+    }
+
+    .fatigue-diagram {
+        flex: 1;
+        background-color: white;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 15px;
+        overflow: hidden;
+    }
+
+    .legend-panel {
+        width: 200px;
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 15px;
+        flex-shrink: 0;
+    }
+
+    .legend-title {
+        font-weight: bold;
+        margin-bottom: 10px;
+        text-align: center;
+        color: #495057;
+    }
+
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+        font-size: 0.85em;
+    }
+
+    .legend-color {
+        width: 20px;
+        height: 15px;
+        border: 1px solid #ccc;
+        border-radius: 2px;
+    }
+
+    .damage-zones {
+        margin-top: 20px;
+        padding-top: 15px;
+        border-top: 1px solid #dee2e6;
+    }
+
+    .damage-zone {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+        font-size: 0.85em;
+        font-weight: 500;
+    }
+
+    .zone-marker {
+        width: 20px;
+        height: 15px;
+        border: 2px solid;
+        border-radius: 2px;
+        background-color: transparent;
+    }
+
+    .high-damage {
+        border-color: #dc3545;
+        color: #dc3545;
+    }
+
+    .low-damage {
+        border-color: #28a745;
+        color: #28a745;
+    }
+
+    .stats-summary {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px;
+        margin-top: 15px;
+        flex-shrink: 0;
+    }
+
+    .stat-item {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 10px;
+        text-align: center;
+    }
+
+    .stat-value {
+        font-size: 1.2em;
+        font-weight: bold;
+        color: #007bff;
+    }
+
+    .stat-label {
+        font-size: 0.8em;
+        color: #6c757d;
+        margin-top: 3px;
+    }
+</style>
+
+<div class="fatigue-container">
+    <!-- Controls Section -->
+    <div class="controls-section">
+        <div class="date-picker-group">
+            <label class="date-picker-label">@L["Date début"]</label>
+            <RadzenDatePicker @bind-Value="@startDate"
+                              DateFormat="dd/MM/yyyy"
+                              Style="width: 150px;"
+                              Change="@OnDateChanged" />
+        </div>
+
+        <div class="date-picker-group">
+            <label class="date-picker-label">@L["Date fin"]</label>
+            <RadzenDatePicker @bind-Value="@endDate"
+                              DateFormat="dd/MM/yyyy"
+                              Style="width: 150px;"
+                              Change="@OnDateChanged" />
+        </div>
+
+        <div class="parameter-group">
+            <label class="parameter-label">@L["Material"]</label>
+            <RadzenDropDown @bind-Value="@selectedMaterial" 
+                            Data="@materials" 
+                            TextProperty="Name"
+                            ValueProperty="Name"
+                            Style="width: 150px;" 
+                            Change="@OnParameterChanged" />
+        </div>
+
+        <div class="parameter-group">
+            <label class="parameter-label">@L["Safety Factor"]</label>
+            <RadzenNumeric @bind-Value="@safetyFactor" 
+                           Min="1.0m" 
+                           Max="5.0m" 
+                           Step="0.1m" 
+                           Format="0.0"
+                           Style="width: 120px;"
+                           Change="@((decimal value) => OnParameterChanged())" />
+        </div>
+
+        <div class="parameter-group">
+            <label class="parameter-label">@L["Cycle Count"]</label>
+            <RadzenNumeric @bind-Value="@cycleCount" 
+                           Min="100" 
+                           Max="100000" 
+                           Step="100" 
+                           Style="width: 120px;"
+                           Change="@((int value) => OnParameterChanged())" />
+        </div>
+
+        <RadzenButton Text="@L["Analyze Fatigue"]" 
+                      Icon="assessment" 
+                      ButtonStyle="ButtonStyle.Primary" 
+                      Click="@AnalyzeFatigue" 
+                      IsBusy="@IsLoading" 
+                      Style="margin-left: auto;" />
+    </div>
+
+    <!-- Chart and Legend Container -->
+    <div class="chart-container">
+        <div class="fatigue-diagram">
+            <div id="fatigueChart" style="height: 100%; width: 100%;"></div>
+        </div>
+
+        <div class="legend-panel">
+            <div class="legend-title">Cycles</div>
+            @foreach (var legendItem in cycleLegend)
+            {
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: @legendItem.Color;"></div>
+                    <span>@legendItem.Label</span>
+                </div>
+            }
+
+            <div class="damage-zones">
+                <div class="legend-title">Zones de Dommage</div>
+                <div class="damage-zone high-damage">
+                    <div class="zone-marker high-damage"></div>
+                    <span>High Damage</span>
+                </div>
+                <div class="damage-zone low-damage">
+                    <div class="zone-marker low-damage"></div>
+                    <span>Low Damage</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics Summary -->
+    <div class="stats-summary">
+        <div class="stat-item">
+            <div class="stat-value">@totalCycles</div>
+            <div class="stat-label">@L["Total Cycles"]</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value">@highDamageCycles</div>
+            <div class="stat-label">@L["High Damage Cycles"]</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value">@lowDamageCycles</div>
+            <div class="stat-label">@L["Low Damage Cycles"]</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value">@fatigueLife.ToString("F0")</div>
+            <div class="stat-label">@L["Estimated Life (years)"]</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value">@damageRatio.ToString("F4")</div>
+            <div class="stat-label">@L["Damage Ratio"]</div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public bool IsLoading { get; set; }
+    [Parameter] public EventCallback OnDataLoaded { get; set; }
+    [Parameter] public EventCallback<DateTime> OnStartDateChanged { get; set; }
+    [Parameter] public EventCallback<DateTime> OnEndDateChanged { get; set; }
+
+    private DateTime startDate = DateTime.Today.AddDays(-7);
+    private DateTime endDate = DateTime.Today;
+    private string selectedMaterial = "Steel";
+    private decimal safetyFactor = 2.0m;
+    private int cycleCount = 5000;
+
+    // Material properties
+    private List<MaterialInfo> materials = new();
+
+    // Legend data
+    private List<LegendItem> cycleLegend = new();
+
+    // Fatigue data
+    private List<FatigueCycle> fatigueCycles = new();
+    
+    // Statistics
+    private int totalCycles = 0;
+    private int highDamageCycles = 0;
+    private int lowDamageCycles = 0;
+    private double fatigueLife = 0.0;
+    private double damageRatio = 0.0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        InitializeMaterials();
+        InitializeLegend();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await InitializeChart();
+            await AnalyzeFatigue();
+        }
+    }
+
+    private void InitializeMaterials()
+    {
+        materials = new List<MaterialInfo>
+        {
+            new MaterialInfo { Name = "Steel", UltimateStrength = 400, YieldStrength = 250, EnduranceLimit = 200 },
+            new MaterialInfo { Name = "Aluminum", UltimateStrength = 280, YieldStrength = 180, EnduranceLimit = 140 },
+            new MaterialInfo { Name = "Concrete", UltimateStrength = 30, YieldStrength = 25, EnduranceLimit = 15 },
+            new MaterialInfo { Name = "Carbon Fiber", UltimateStrength = 600, YieldStrength = 550, EnduranceLimit = 400 }
+        };
+    }
+
+    private void InitializeLegend()
+    {
+        cycleLegend = new List<LegendItem>
+        {
+            new LegendItem { Label = "<= 0", Color = "#ffffff" },
+            new LegendItem { Label = "<= 1", Color = "#ff00ff" },
+            new LegendItem { Label = "<= 3", Color = "#000080" },
+            new LegendItem { Label = "<= 6", Color = "#0000ff" },
+            new LegendItem { Label = "<= 13", Color = "#00ffff" },
+            new LegendItem { Label = "<= 25", Color = "#00ff00" },
+            new LegendItem { Label = "<= 48", Color = "#ffff00" },
+            new LegendItem { Label = "<= 93", Color = "#ffa500" },
+            new LegendItem { Label = "> 93", Color = "#ff0000" }
+        };
+    }
+
+    private async Task InitializeChart()
+    {
+        await JSRuntime.InvokeVoidAsync("initializeFatigueChart", "fatigueChart");
+    }
+
+    private async Task OnDateChanged(DateTime? newDate)
+    {
+        if (newDate.HasValue)
+        {
+            if (newDate == startDate)
+                await OnStartDateChanged.InvokeAsync(startDate);
+            else if (newDate == endDate)
+                await OnEndDateChanged.InvokeAsync(endDate);
+
+            await AnalyzeFatigue();
+        }
+    }
+
+    private async Task OnParameterChanged()
+    {
+        await AnalyzeFatigue();
+    }
+
+    private async Task AnalyzeFatigue()
+    {
+        try
+        {
+            IsLoading = true;
+            StateHasChanged();
+
+            await Task.Delay(500); // Simulate processing time
+
+            // Generate fatigue cycle data
+            GenerateFatigueData();
+            await UpdateChart();
+            CalculateStatistics();
+            await OnDataLoaded.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error in fatigue analysis: {ex.Message}");
+        }
+        finally
+        {
+            IsLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void GenerateFatigueData()
+    {
+        fatigueCycles.Clear();
+        Random rand = new Random();
+        var material = materials.FirstOrDefault(m => m.Name == selectedMaterial);
+        
+        if (material == null) return;
+
+        for (int i = 0; i < cycleCount; i++)
+        {
+            // Generate mean stress and amplitude values
+            double meanStress = (rand.NextDouble() - 0.5) * 100; // -50 to 50 MPa
+            double amplitude = rand.NextDouble() * 60; // 0 to 60 MPa
+            
+            // Determine cycle count based on stress levels and position
+            int cycles = DetermineCycleCount(meanStress, amplitude, material, rand);
+            
+            fatigueCycles.Add(new FatigueCycle
+            {
+                MeanStress = meanStress,
+                Amplitude = amplitude,
+                CycleCount = cycles,
+                IsHighDamage = IsInHighDamageZone(meanStress, amplitude, material)
+            });
+        }
+    }
+
+    private int DetermineCycleCount(double meanStress, double amplitude, MaterialInfo material, Random rand)
+    {
+        // Create clusters based on stress characteristics
+        double totalStress = Math.Abs(meanStress) + amplitude;
+        double normalizedStress = totalStress / material.UltimateStrength;
+        
+        // Higher stress = more cycles (damage accumulation)
+        if (normalizedStress > 0.8)
+            return GetRandomCycleCountInRange(48, 93, rand);
+        else if (normalizedStress > 0.6)
+            return GetRandomCycleCountInRange(25, 48, rand);
+        else if (normalizedStress > 0.4)
+            return GetRandomCycleCountInRange(13, 25, rand);
+        else if (normalizedStress > 0.3)
+            return GetRandomCycleCountInRange(6, 13, rand);
+        else if (normalizedStress > 0.2)
+            return GetRandomCycleCountInRange(3, 6, rand);
+        else if (normalizedStress > 0.1)
+            return GetRandomCycleCountInRange(1, 3, rand);
+        else
+            return 0;
+    }
+
+    private int GetRandomCycleCountInRange(int min, int max, Random rand)
+    {
+        return rand.Next(min, max + 1);
+    }
+
+    private bool IsInHighDamageZone(double meanStress, double amplitude, MaterialInfo material)
+    {
+        // Define high damage zones based on stress limits
+        double totalStress = Math.Abs(meanStress) + amplitude;
+        return totalStress > material.EnduranceLimit * 0.8;
+    }
+
+    private string GetCycleColor(int cycleCount)
+    {
+        return cycleCount switch
+        {
+            0 => "#ffffff",
+            <= 1 => "#ff00ff",
+            <= 3 => "#000080",
+            <= 6 => "#0000ff",
+            <= 13 => "#00ffff",
+            <= 25 => "#00ff00",
+            <= 48 => "#ffff00",
+            <= 93 => "#ffa500",
+            _ => "#ff0000"
+        };
+    }
+
+    private async Task UpdateChart()
+    {
+        var scatterData = fatigueCycles.Select(cycle => new
+        {
+            x = cycle.MeanStress,
+            y = cycle.Amplitude,
+            color = GetCycleColor(cycle.CycleCount),
+            cycleCount = cycle.CycleCount
+        }).ToList();
+
+        var material = materials.FirstOrDefault(m => m.Name == selectedMaterial);
+        
+        await JSRuntime.InvokeVoidAsync("updateFatigueChart", "fatigueChart", 
+            scatterData, material?.EnduranceLimit ?? 200, (double)safetyFactor);
+    }
+
+    private void CalculateStatistics()
+    {
+        totalCycles = fatigueCycles.Count;
+        highDamageCycles = fatigueCycles.Count(c => c.IsHighDamage);
+        lowDamageCycles = totalCycles - highDamageCycles;
+        
+        // Calculate damage ratio using Palmgren-Miner rule
+        damageRatio = fatigueCycles.Sum(c => c.CycleCount / 1000000.0); // Simplified calculation
+        
+        // Estimate fatigue life
+        fatigueLife = damageRatio > 0 ? 50 / damageRatio : 100; // Simplified years estimation
+    }
+
+    // Helper classes
+    public class MaterialInfo
+    {
+        public string Name { get; set; } = string.Empty;
+        public double UltimateStrength { get; set; }
+        public double YieldStrength { get; set; }
+        public double EnduranceLimit { get; set; }
+    }
+
+    public class LegendItem
+    {
+        public string Label { get; set; } = string.Empty;
+        public string Color { get; set; } = string.Empty;
+    }
+
+    public class FatigueCycle
+    {
+        public double MeanStress { get; set; }
+        public double Amplitude { get; set; }
+        public int CycleCount { get; set; }
+        public bool IsHighDamage { get; set; }
+    }
+}
+
+<script>
+    window.initializeFatigueChart = function(elementId) {
+        var layout = {
+            title: 'Analyse de Fatigue - Cycles vs Contrainte',
+            xaxis: { 
+                title: 'Contrainte Moyenne (MPa)',
+                gridcolor: '#e0e0e0',
+                zeroline: true,
+                zerolinecolor: '#666'
+            },
+            yaxis: { 
+                title: 'Amplitude de Contrainte (MPa)',
+                gridcolor: '#e0e0e0'
+            },
+            margin: { l: 60, r: 50, t: 50, b: 60 },
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'white',
+            autosize: true,
+            showlegend: false
+        };
+        
+        var config = {
+            responsive: true,
+            displayModeBar: true
+        };
+        
+        Plotly.newPlot(elementId, [], layout, config);
+    };
+
+    window.updateFatigueChart = function(elementId, scatterData, enduranceLimit, safetyFactor) {
+        // Create scatter plot data grouped by cycle count/color
+        var traces = [];
+        var colorGroups = {};
+        
+        // Group points by color
+        scatterData.forEach(point => {
+            if (!colorGroups[point.color]) {
+                colorGroups[point.color] = {
+                    x: [],
+                    y: [],
+                    cycleCount: point.cycleCount
+                };
+            }
+            colorGroups[point.color].x.push(point.x);
+            colorGroups[point.color].y.push(point.y);
+        });
+        
+        // Create traces for each color group
+        Object.keys(colorGroups).forEach(color => {
+            var group = colorGroups[color];
+            traces.push({
+                x: group.x,
+                y: group.y,
+                mode: 'markers',
+                type: 'scatter',
+                marker: {
+                    color: color,
+                    size: 6,
+                    opacity: 0.7
+                },
+                name: 'Cycles: ' + group.cycleCount,
+                showlegend: false
+            });
+        });
+        
+        // Add high damage zone (red diamond)
+        traces.push({
+            x: [20, 40, 20, 0, 20],
+            y: [20, 40, 60, 40, 20],
+            mode: 'lines',
+            type: 'scatter',
+            line: {
+                color: 'red',
+                width: 3
+            },
+            fill: 'none',
+            name: 'High Damage Zone',
+            showlegend: false
+        });
+        
+        // Add low damage zone (green diamond)
+        traces.push({
+            x: [-40, -20, -40, -60, -40],
+            y: [40, 20, 0, 20, 40],
+            mode: 'lines',
+            type: 'scatter',
+            line: {
+                color: 'green',
+                width: 3
+            },
+            fill: 'none',
+            name: 'Low Damage Zone',
+            showlegend: false
+        });
+        
+        // Add endurance limit lines
+        var limitValue = enduranceLimit / safetyFactor;
+        traces.push({
+            x: [-80, 80],
+            y: [limitValue, limitValue],
+            mode: 'lines',
+            type: 'scatter',
+            line: {
+                color: 'black',
+                width: 2,
+                dash: 'dash'
+            },
+            name: 'Endurance Limit',
+            showlegend: false
+        });
+        
+        var layout = {
+            title: 'Analyse de Fatigue - Distribution des Cycles',
+            xaxis: { 
+                title: 'Contrainte Moyenne (MPa)',
+                range: [-80, 80],
+                gridcolor: '#e0e0e0',
+                zeroline: true,
+                zerolinecolor: '#666'
+            },
+            yaxis: { 
+                title: 'Amplitude de Contrainte (MPa)',
+                range: [0, 80],
+                gridcolor: '#e0e0e0'
+            },
+            margin: { l: 60, r: 50, t: 50, b: 60 },
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'white',
+            autosize: true,
+            showlegend: false,
+            annotations: [
+                {
+                    x: 25,
+                    y: 70,
+                    text: 'High<br>Damage',
+                    showarrow: false,
+                    font: { color: 'red', size: 14, family: 'Arial Black' }
+                },
+                {
+                    x: -45,
+                    y: 15,
+                    text: 'Low<br>Damage',
+                    showarrow: false,
+                    font: { color: 'green', size: 14, family: 'Arial Black' }
+                }
+            ]
+        };
+        
+        var config = {
+            responsive: true,
+            displayModeBar: true
+        };
+        
+        Plotly.newPlot(elementId, traces, layout, config);
+    };
+</script>

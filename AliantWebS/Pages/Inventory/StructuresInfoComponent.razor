@@ -1,0 +1,530 @@
+﻿@page "/StructuresInfo"
+@page "/StructuresInfo/{SiteID:guid}"
+@page "/StructuresInfo/Sites/{SiteIDsParam}"
+
+@using AliantWebS.Data
+@inject EntitiesService entitiesService
+@using Microsoft.EntityFrameworkCore
+@using Models
+@using System.Data;
+@using OpenAI.Chat;
+@using System.Text.Json
+@using System.Text.Json.Serialization
+
+@*@inject FileManagementService fileManagementService*@
+@inject NavigationManager navigationManager
+@inject AppData appData;
+@inject IJSRuntime js
+@inject IStringLocalizer<Languages> L
+
+<style>
+
+    #threejsCanvas {
+        width: 100%;
+        height: 100vh;
+        display: block;
+    }
+</style>
+
+<Div Style="display: flex">
+    <h3>@L["Structure Info"]</h3>
+    <div style="margin-left: auto; ">
+        <Label> Page Size: &nbsp;&nbsp;</Label>
+        <RadzenNumeric @bind-Value="PageSize" Style="width:60px"></RadzenNumeric>
+    </div>
+</Div>
+@if (structuresList is null)
+{
+    <p><em>@L["Loading"]... !</em></p>
+}
+else
+{
+    <RadzenSplitter Orientation="Radzen.Orientation.Vertical" style="height: 100%; border: 1px solid rgba(0,0,0,.08);">
+        <RadzenSplitterPane Size="auto">
+
+
+            <RadzenDataGrid class="RadzenDataGrid" @ref="structuresGrid" AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="PageSize" RowSelect=@RowSelect
+                            Data="@structuresList" TItem="Structure" ColumnWidth="150px">
+                <Columns>
+                    @*                    <RadzenDataGridColumn TItem="Structure" Property="StructureId" Title="Structure Id"></RadzenDataGridColumn>*@
+                    <RadzenDataGridColumn TItem="Structure" Property="Name" Title="@L["Name"]"></RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="Structure" Property="ShortDescription" Title="@L["Short Description"]"></RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="Structure" Property="YearBuilt" Title="@L["Year Built"]"></RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="Structure" Title="@L["Site"]" Type="typeof(string)" FilterProperty="Site.Name" Property="Site.Name">
+                        <Template Context="context">
+                            @context.Site?.Name
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    @foreach (var attributeName in selectedAttributeNames)
+                    {
+                        <RadzenDataGridColumn TItem="Structure" Title="@attributeName" Filterable="true" Sortable="false">
+                            <Template Context="structure">
+                                @GetAttributeValue(structure, attributeName)
+                            </Template>
+                        </RadzenDataGridColumn>
+                    }
+
+
+                    <RadzenDataGridColumn TItem="Structure" Property="Length" Title="@L["Action"]" Filterable="false" Sortable="false" Width="200px">
+                        <Template Context="data">
+                            <Div Style="display: flex">
+                                <a title="@L["Taffic"]" class="nav-link" href="EditStructure/@data.StructureId">
+                                    <span class="oi oi-pencil" aria-hidden="true"></span>
+                                </a>
+                                <a title="@L["Edit"]" class="nav-link" href="EditStructure/@data.StructureId">
+                                    <span class="oi oi-pencil" aria-hidden="true"></span>
+                                </a>                       
+                                <a title="@L["Reporting"]" class="nav-link" @onclick="@(args => Report(data))" @onclick:preventDefault="true" href="">
+                                    <span class="oi oi-document" aria-hidden="true"></span>
+                                </a>
+                                <a title="@L["Identification"]" class="nav-link" @onclick="@(args => Identification(data))" @onclick:preventDefault="true" href="">
+                                    <span class="oi oi-dashboard" aria-hidden="true"></span>
+                                </a>
+                                <a title="@L["Dashboard"]" class="nav-link" @onclick="@(args => Dashboard(data))" @onclick:preventDefault="true" href="">
+                                    <RadzenIcon Icon="dashboard"></RadzenIcon>
+                                </a>
+
+
+
+                            </Div>
+                        </Template>
+
+                    </RadzenDataGridColumn>
+                </Columns>
+            </RadzenDataGrid>
+
+        </RadzenSplitterPane>
+        <RadzenSplitterPane>
+            @if ((selectedStructure != null) && (updating == false) && (structuresList.Count != 0))
+            {
+                <RadzenSplitter Orientation="Radzen.Orientation.Horizontal" Style="height: auto; border: 1px solid rgba(0,0,0,.08);">
+                    <RadzenSplitterPane>
+                        <AttributesComponent Titem1="AttributeStructure" Titem2="Structure" Titem3="StructureTypeAttributeType" CallerIdName="StructureId"
+                                             CallerTypeIdName="StructureTypeId" CallerTypeName="Structure" JunctionPropName="AttributeStructures"
+                                             element="selectedStructure"></AttributesComponent>
+                    </RadzenSplitterPane>
+                    <RadzenSplitterPane Style="height:auto">
+
+                        <div>
+                            <MediaComponent selectedObject="selectedStructure"></MediaComponent>
+                        </div>
+
+                    </RadzenSplitterPane>
+                </RadzenSplitter>
+            }
+
+
+        </RadzenSplitterPane>
+
+    </RadzenSplitter>
+
+
+
+
+}
+
+
+@code {
+
+
+
+    RadzenDataGrid<Structure> structuresGrid;
+
+    [Parameter]
+    public Guid SiteID { get; set; }
+
+    [Parameter]
+    public List<Guid> SiteIDs { get; set; }
+    [Parameter]
+    public string? SiteIDsParam { get; set; }
+
+    public List<Structure> structuresList;
+
+    Dictionary<Guid, List<(string Name, string Description, string Value)>> structureInfo = new();
+
+    // NEW: Store selected attributes for dynamic columns
+    List<string> selectedAttributeNames = new();
+    Dictionary<Guid, Dictionary<string, string>> structureAttributeValues = new();
+
+
+
+    Structure selectedStructure;
+
+    int PageSize { get; set; } = 10;
+
+    bool updating = false;
+
+    @* NEW: Track previous SiteID to detect changes *@
+    private Guid _previousSiteID = Guid.Empty;
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        appData.Structure = null;
+        await Task.WhenAll(entitiesService.tasksList);
+
+        if (!string.IsNullOrEmpty(SiteIDsParam))
+        {
+            ParseSiteIDsFromUrl();
+        }
+
+        @* NEW: Load data in separate method *@
+        await LoadStructuresData();
+
+        //await jj(structuresList); 
+        await GetAttributesNames(structuresList);
+    
+        // Load attribute values for all structures
+        await LoadAttributeValuesForStructures();
+    }
+
+    @* NEW: Handle parameter changes *@
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!string.IsNullOrEmpty(SiteIDsParam))
+        {
+            ParseSiteIDsFromUrl();
+        }
+
+        @* Only reload if SiteID actually changed *@
+        if (_previousSiteID != SiteID)
+        {
+            _previousSiteID = SiteID;
+            selectedStructure = null; // Clear selected structure when site changes
+            await LoadStructuresData();
+            StateHasChanged(); // Force UI update
+        }
+    }
+
+    private void ParseSiteIDsFromUrl()
+    {
+        try
+        {
+            if (!string.IsNullOrEmpty(SiteIDsParam))
+            {
+                SiteIDs = SiteIDsParam
+                    .Split(',')
+                    .Where(s => Guid.TryParse(s.Trim(), out _))
+                    .Select(s => Guid.Parse(s.Trim()))
+                    .ToList();
+            }
+        }
+        catch
+        {
+            SiteIDs = new List<Guid>();
+        }
+    }
+
+    @* NEW: Separate method to load structures data *@
+    private async Task LoadStructuresData()
+    {
+        @* NEW: Handle multiple site IDs *@
+        if (SiteIDs?.Any() == true)
+        {
+            structuresList = await entitiesService.GetFilteredEntitiesAsync<Structure>(
+                a => SiteIDs.Contains(a.SiteId ?? Guid.Empty), "Site");
+
+        }
+        else if (SiteID != Guid.Empty)
+        {
+            structuresList = await entitiesService.GetFilteredEntitiesAsync<Structure>(
+                a => a.SiteId == SiteID, "Site");
+
+        }
+        else
+        {
+            structuresList = await entitiesService.GetAllEntitiesAsync<Structure>("Site");
+
+        }
+    }
+
+
+
+
+
+
+    void RowSelect(Structure structure)
+    {
+        //   navigationManager.NavigateTo(@"/defects");
+        selectedStructure = structure;
+
+        //   StateHasChanged();
+    }
+
+
+
+    async Task Report(Structure structure)
+    {
+
+        //    Reporting.Reporting rep = new Reporting.Reporting(structure, entitiesService);
+
+    }
+
+    async Task Dashboard(Structure structure)
+    {
+        appData.Structure = structure;
+        if (structure.Name.Trim() == "Antares")
+        {
+            navigationManager.NavigateTo("DashBoard2");
+        }
+        else
+        {
+            navigationManager.NavigateTo("DashBoard");
+        }
+
+
+    }
+
+    async Task Identification(Structure structure)
+    {
+        appData.Structure = structure;
+        navigationManager.NavigateTo("Identification");
+
+    }
+
+
+
+    public async Task GetAttributesNames(List<Structure> structures)
+    {
+        ChatClient client = new(model: "gpt-4o", apiKey: "***REMOVED***");
+
+
+        var allStructureAttributes = new HashSet<(string Name, string Description)>();
+
+        foreach (var structure in structures)
+        {
+            var attributes = await AttributeExtractor.ExtractInfoAsync(entitiesService, structure);
+            foreach (var (name, description, value1) in attributes)
+            {
+                allStructureAttributes.Add((name, description));
+            }
+        }
+
+        var predefinedAttributes = allStructureAttributes.Select(x => x.Name).ToArray();
+
+
+        var schemaJson = Helpers.JsonSchemaBuilder
+            .Create("AttributeSelection")
+            .ArrayOfEnumProperty("SelectedAttributes", predefinedAttributes,
+                description: "List of attributes related to the structure")
+            .Build();
+
+        string InputText = "je veux afficher inertie par rapport a x est 323";
+
+        ChatCompletionOptions options = new()
+        {
+            ResponseFormat = ChatResponseFormat.CreateJsonSchemaFormat(
+                    jsonSchemaFormatName: "schemaJson",
+                jsonSchema: BinaryData.FromString(schemaJson),
+                jsonSchemaIsStrict: true),
+        };
+
+        var messages = new List<ChatMessage>
+        {
+            new SystemChatMessage(@"
+                Tu es un asssistant pour extraire les attributs d'interets pour etre affiche dans un tableau de bord.
+                - Ne crée aucune donnée qui n'existe pas explicitement dans le texte fourni.
+                - Si une information n'est pas présente, renvoie une chaîne vide pour ce champ.                
+                - Contenu uniquement – aucun commentaire ou interprétation.
+                Réponds exclusivement au format JSON conforme au schéma."),
+            new UserChatMessage(InputText)
+        };
+
+        ChatCompletion completion = await client.CompleteChatAsync(messages, options);
+        string json = completion.Content[0].Text;
+
+        var jsonOptions = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            PropertyNameCaseInsensitive = true
+        };
+          
+
+        var result = JsonSerializer.Deserialize<AttributeSelectionResult>(json, jsonOptions)!;
+
+        selectedAttributeNames = result.SelectedAttributes;
+    }
+
+    private async Task LoadAttributeValuesForStructures()
+    {
+        structureAttributeValues.Clear();
+
+        foreach (var structure in structuresList)
+        {
+            var attributes = await AttributeExtractor.ExtractInfoAsync(entitiesService, structure);
+            var attributeDict = attributes.ToDictionary(x => x.Name, x => x.Value);
+            structureAttributeValues[structure.StructureId] = attributeDict;
+        }
+
+        // Force UI update after loading data
+        StateHasChanged();
+    }
+
+    private string GetAttributeValue(Structure structure, string attributeName)
+    {
+        if (structureAttributeValues.TryGetValue(structure.StructureId, out var attributes))
+        {
+            return attributes.TryGetValue(attributeName, out var value) ? value : "";
+        }
+        return "";
+    }
+
+    public class AttributeSelectionResult
+    {
+        public List<string> SelectedAttributes { get; set; } = new();
+    }
+
+    private async Task jj(List<Structure> structures)
+    {
+        var sitesList = await entitiesService.GetAllEntitiesAsync<Site>();
+        var structureTypesList = await Task.Run(() => entitiesService.GetAllEntitiesAsync<StructureType>());
+
+        ChatClient client = new(model: "gpt-4o", apiKey: "***REMOVED***");
+
+        var structureTypes = structureTypesList.Select(x => x.Name);
+        var sites = sitesList.Select(x => x.Name);
+
+        var elementTypes = await entitiesService.GetAllEntitiesAsync<ElementType>();
+        var elementTypesNames = elementTypes.Select(d => d.Name);
+
+        // NEW: Extract attributes from a representative structure or all structures
+       var allStructureAttributes = new HashSet<(string Name, string Description)>();
+        
+        //Option 1: Get attributes from all structures (comprehensive but slower)
+        foreach (var structure in structures)
+        {
+            var attributes = await AttributeExtractor.ExtractInfoAsync(entitiesService, structure);
+            foreach (var (name, description, value1) in attributes)
+            {
+                allStructureAttributes.Add((name, description));
+            }
+        }
+
+
+
+        // Build the schema with dynamic attributes
+        var schemaBuilder = Helpers.JsonSchemaBuilder
+            .Create("Structure")
+            .Property("Name", "string")
+            .Property("ShortDescription", "string")
+            .Property("Length", "number")
+            .PropertyWithPattern("YearBuilt", "string", @"^\d{4}-\d{2}-\d{2}$")
+            .Property("DesignLoad", "number")
+            .Property("Latitude", "number")
+            .Property("Longitude", "number")
+            .EnumProperty("StructureType", structureTypes)
+            .EnumProperty("Site", sites);
+
+        // NEW: Add dynamic attribute properties
+        foreach (var (name, description) in allStructureAttributes)
+        {
+            // Sanitize property name for JSON schema (remove spaces, special chars)
+            var propertyName = SanitizePropertyName(name);
+            
+            // Add property with description as title/description
+            schemaBuilder.Property(propertyName, "string", description: description);
+        }
+
+        // Continue with Elements array
+        schemaBuilder.ArrayProperty("Elements", item => item
+            .Property("Name", "string")
+            .Property("ShortDescription", "string")
+            .EnumProperty("ElementType", elementTypesNames)
+        );
+
+        string schemaJson = schemaBuilder.Build();
+
+        // Rest of your existing code...
+        var structureTypesDict = structureTypesList.ToDictionary(x => x.Name, x => x.StructureTypeId);
+        var sitesDict = sitesList.ToDictionary(x => x.Name, x => x.SiteId);
+        var elementTypesDict = elementTypes.ToDictionary(x => x.Name, x => x.ElementTypeId);
+
+        string InputText = "Le pont lolita est en beton au dessus de la rivière. il a été construit en 1995. Il mesure 150 mètres de long et est situé à Paris. Sa charge de conception est de 500 tonnes. Le pont est un élément clé de l'infrastructure locale. il est compose de deux elements. un noeud 3d and un beam 3d. son inertie par rapport a x est 323";
+        
+        ChatCompletionOptions options = new()
+        {
+            ResponseFormat = ChatResponseFormat.CreateJsonSchemaFormat(
+                    jsonSchemaFormatName: "schemaJson",
+                jsonSchema: BinaryData.FromString(schemaJson),
+                jsonSchemaIsStrict: true),
+        };
+
+        var messages = new List<ChatMessage>
+        {
+            new SystemChatMessage(@"
+                Tu es un moteur d'extraction d'informations d'infrastructure.
+                - Ne crée aucune donnée qui n'existe pas explicitement dans le texte fourni.
+                - Si une information n'est pas présente, renvoie une chaîne vide pour ce champ.
+                - Extrait toutes les informations pertinentes sur la structure, y compris ses attributs techniques.
+                - Contenu uniquement – aucun commentaire ou interprétation.
+                Réponds exclusivement au format JSON conforme au schéma."),
+            new UserChatMessage(InputText)
+        };
+
+        ChatCompletion completion = await client.CompleteChatAsync(messages, options);
+        string json = completion.Content[0].Text;
+
+        var jsonOptions = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            PropertyNameCaseInsensitive = true
+        };
+
+        var combinedMap = structureTypesDict
+            .Concat(sitesDict)
+            .Concat(elementTypesDict)
+            .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+
+        jsonOptions.Converters.Add(new Helpers.StringToGuidConverter(combinedMap));
+
+        var value = JsonSerializer.Deserialize<StructureWithAttributes>(json, jsonOptions)!;
+    }
+
+    // Helper method to sanitize property names for JSON schema
+    private string SanitizePropertyName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return "Unknown";
+            
+        // Remove special characters and spaces, convert to PascalCase
+        var sanitized = System.Text.RegularExpressions.Regex.Replace(name, @"[^a-zA-Z0-9]", "");
+        
+        // Ensure it starts with a letter
+        if (char.IsDigit(sanitized[0]))
+            sanitized = "Attr" + sanitized;
+            
+        return sanitized;
+    }
+
+    // Updated DTO class to include dynamic attributes
+    public class StructureWithAttributes
+    {
+        public string Name { get; set; } = string.Empty;
+        public string ShortDescription { get; set; } = string.Empty;
+        public double Length { get; set; }
+        public DateTime YearBuilt { get; set; }
+        public double DesignLoad { get; set; }
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+        public Guid StructureType { get; set; }
+        public Guid Site { get; set; }
+        public List<Elemente> Elements { get; set; } = new();
+        
+        // Dynamic attributes will be deserialized as additional properties
+        // You can use JsonExtensionData to capture them
+        [JsonExtensionData]
+        public Dictionary<string, object> AdditionalAttributes { get; set; } = new();
+    }
+
+    public class Elemente
+    {
+        public string Name { get; set; } = string.Empty;
+        public string ShortDescription { get; set; } = string.Empty;
+        public Guid ElementType { get; set; }
+    }
+
+
+
+}

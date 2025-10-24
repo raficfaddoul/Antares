@@ -22,14 +22,14 @@ public partial class DefectType
     public byte[]? Icon { get; set; }
 
     [InverseProperty("DefectType")]
-    public virtual ICollection<AttributeTypeDefectType> AttributeTypeDefectTypes { get; } = new List<AttributeTypeDefectType>();
+    public virtual ICollection<AttributeTypeDefectType> AttributeTypeDefectTypes { get; set; } = new List<AttributeTypeDefectType>();
 
     [InverseProperty("DefectType")]
-    public virtual ICollection<Defect> Defects { get; } = new List<Defect>();
+    public virtual ICollection<Defect> Defects { get; set; } = new List<Defect>();
 
     [InverseProperty("DefectType")]
-    public virtual ICollection<ElementTypeDefectType> ElementTypeDefectTypes { get; } = new List<ElementTypeDefectType>();
+    public virtual ICollection<ElementTypeDefectType> ElementTypeDefectTypes { get; set; } = new List<ElementTypeDefectType>();
 
     [InverseProperty("DefectType")]
-    public virtual ICollection<FlagTypeDefectType> FlagTypeDefectTypes { get; } = new List<FlagTypeDefectType>();
+    public virtual ICollection<FlagTypeDefectType> FlagTypeDefectTypes { get; set; } = new List<FlagTypeDefectType>();
 }

@@ -13,6 +13,8 @@
     [Parameter]
     public List<(string id,string Type, string Name, double X,double Y, double C)?> Coordinates { get; set; }
 
+    List<(string id, string Type, string Name, double X, double Y, double C)?> _previousCoordinates { get; set; }
+
 
     [Parameter]
     public int Scale { get; set; }
@@ -24,6 +26,8 @@
 
     private Structural.IdentificationResult ir;
 
+
+
     protected override async Task OnInitializedAsync()
     {
         objRef = DotNetObjectReference.Create(this);
@@ -31,8 +35,13 @@
 
     }
 
+
+
     public override async Task SetParametersAsync(ParameterView parameters)
     {
+        var previousCoordinates = _previousCoordinates;
+
+
         await base.SetParametersAsync(parameters);
 
         idArray = Coordinates.Where(c => c.HasValue).Select(c => c.Value.id).ToArray();
@@ -68,6 +77,41 @@
             }
 
         }
+
+
+        // _previousCoordinates = Coordinates?.ToList();
+
+        // // If coordinates changed and component is already rendered, update markers
+        // if (previousCoordinates != null && !CoordinatesEqual(previousCoordinates, Coordinates))
+        // {
+        //     await UpdateMarkers();
+        // }
+
+
+
+    }
+
+    private async Task UpdateMarkers()
+    {
+        if (idArray?.Length > 0)
+        {
+            await js.InvokeVoidAsync("ClearMarkers");
+            await js.InvokeVoidAsync("AddMarker", idArray, typeArray, nameArray, xArray, yArray, cArray);
+        }
+    }
+
+    private bool CoordinatesEqual(List<(string id, string Type, string Name, double X, double Y, double C)?> coords1,
+                                 List<(string id, string Type, string Name, double X, double Y, double C)?> coords2)
+    {
+        if (coords1 == null && coords2 == null) return true;
+        if (coords1 == null || coords2 == null) return false;
+        if (coords1.Count != coords2.Count) return false;
+
+        for (int i = 0; i < coords1.Count; i++)
+        {
+            if (coords1[i] != coords2[i]) return false;
+        }
+        return true;
     }
 
 

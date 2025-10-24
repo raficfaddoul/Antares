@@ -156,7 +156,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        structure = (Structure)appData.obj;
+        structure = appData.Structure;
 
         if (structure == null)
         {
@@ -189,7 +189,7 @@
     {
         try
         {
-            structuralStructure = Structural.Simulation.CreateStructure(structure,null, entitiesService);
+            structuralStructure = await Structural.Simulation.CreateStructure(structure,null, entitiesService);
         }
         catch (Exception ex)
         {

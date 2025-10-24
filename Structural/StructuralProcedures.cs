@@ -304,7 +304,7 @@ namespace Structural
             return M;
         }
         static public double[] Calcul_F_3D
-            (DataTable element, List<double[]> noeud, List<(Guid id, List<int> noeudInd, double value, double position)> ChargesStatiquePonctuelles)
+            (DataTable element, List<double[]> noeud, List<(Guid id, List<int> noeudInd, int dof, double value, double position)> ChargesStatiquePonctuelles)
         {
             double[] F = new double[6 * noeud.Count()];
 

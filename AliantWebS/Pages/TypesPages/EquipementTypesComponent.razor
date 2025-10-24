@@ -173,14 +173,14 @@ else
 
     async Task FlagsTypes(EquipementType equipementType)
     {
-        AppData.obj = equipementType;
+        AppData.obj1 = equipementType;
 
         navigationManager.NavigateTo("/StructureTypeFlagTypes/" + equipementType.EquipementTypeId);
     }
 
     async Task AttributesTypes(EquipementType equipementType)
     {
-        AppData.obj = equipementType;
+        AppData.obj1 = equipementType;
 
         navigationManager.NavigateTo("/EquipementTypeAttributeTypes/" + equipementType.EquipementTypeId);
     }

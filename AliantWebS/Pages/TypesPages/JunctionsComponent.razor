@@ -93,7 +93,7 @@ else
     protected override async Task OnInitializedAsync()
     {
         await Task.WhenAll(entitiesService.tasksList);
-        elementType = (TItem1)appData.obj;
+        elementType = (TItem1)appData.obj1;
         //  InspectionResultTypeElementTypesList = ((ICollection<InspectionResultTypeElementType>)AppData.obj).ToList();
         InspectionResultTypeList = await Task.Run(() => entitiesService.GetAllEntitiesAsync<TItem2>());
 

@@ -20,12 +20,12 @@ public partial class AspNetRole
     public string? ConcurrencyStamp { get; set; }
 
     [InverseProperty("Role")]
-    public virtual ICollection<AspNetRoleClaim> AspNetRoleClaims { get; } = new List<AspNetRoleClaim>();
+    public virtual ICollection<AspNetRoleClaim> AspNetRoleClaims { get; set; } = new List<AspNetRoleClaim>();
 
     [InverseProperty("AspNetRoles")]
-    public virtual ICollection<TokenAspNetRole> TokenAspNetRoles { get; } = new List<TokenAspNetRole>();
+    public virtual ICollection<TokenAspNetRole> TokenAspNetRoles { get; set; } = new List<TokenAspNetRole>();
 
     [ForeignKey("RoleId")]
     [InverseProperty("Roles")]
-    public virtual ICollection<AspNetUser> Users { get; } = new List<AspNetUser>();
+    public virtual ICollection<AspNetUser> Users { get; set; } = new List<AspNetUser>();
 }

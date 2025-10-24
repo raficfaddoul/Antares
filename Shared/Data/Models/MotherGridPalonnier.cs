@@ -38,7 +38,7 @@ public partial class MotherGridPalonnier
     public double? Y2 { get; set; }
 
     [InverseProperty("MotherGridPalonnier")]
-    public virtual ICollection<ChargeMp> ChargeMps { get; } = new List<ChargeMp>();
+    public virtual ICollection<ChargeMp> ChargeMps { get; set; } = new List<ChargeMp>();
 
     [ForeignKey("ElementTypeId")]
     [InverseProperty("MotherGridPalonniers")]

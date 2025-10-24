@@ -4,6 +4,14 @@
 @inject IStringLocalizer<Languages> L
 @inject AppData appData
 
+@implements IDisposable
+
+<style>
+    .alarm-active {
+    background-color: red;
+    }
+</style>
+
 @*<div class="top-row pl-4 navbar navbar-dark">
     <a class="navbar-brand" href="">AliantWebS</a>
     <button class="navbar-toggler" @onclick="ToggleNavMenu">
@@ -36,7 +44,7 @@
                     <span class="oi oi-list-rich" aria-hidden="true" style="margin-left: 30px"></span> Structure Types
                 </NavLink>
             </li>
-            
+
                         <li class="nav-item px-3">
                 <NavLink class="expand-menu" href="categories">
                     <span class="oi oi-list-rich" aria-hidden="true" style="margin-left: 30px"></span> Categories
@@ -106,11 +114,11 @@
     }
 }*@
 
-<nav class="navbar navbar-expand-md navbar-dark bg-dark mb-4">
+<nav class="navbar navbar-expand-md navbar-dark bg-dark mb-4 @(AppData.IsAlarmActive ? "alarm-active" : "")">
     <div class="container-fluid">
-        <a class="navbar-brand" href="">Aliant</a>
+        <a class="navbar-brand @(AppData.IsAlarmActive ? "alarm-active" : "")" href="">Aliant</a>
         <button class="navbar-toggler @NavButtonCssClass" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse"
-                aria-controls="navbarCollapse" aria-label="Toggle navigation" @onclick="ToggleNavMenu">
+        aria-controls="navbarCollapse" aria-label="Toggle navigation" @onclick="ToggleNavMenu">
             <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse @NavBarCssClass" id="navbarCollapse" @onclick="ToggleNavMenu">
@@ -120,7 +128,7 @@
                         <span class="oi oi-home" aria-hidden="true"></span> @L["Home"]
                     </NavLink>
                 </li>
-@*                 <li class="nav-item px-3">
+                @*                 <li class="nav-item px-3">
                     <NavLink class="nav-link" href="counter">
                         <span class="oi oi-plus" aria-hidden="true"></span> Counter
                     </NavLink>
@@ -128,78 +136,78 @@
 
                 @if ((appData.GetRole().Result == "Administrator") || (appData.GetRole().Result == "Developer"))
                 { 
-                <li class="nav-item px-3 dropdown" style="z-index:2">
-                    <NavLink class="nav-link" @onclick="()=>expandSubNav = !expandSubNav" href="#">
-                        <span class="oi oi-list-rich" aria-hidden="true"></span> @L["Types"]
-                    </NavLink>
-               
-                @if (expandSubNav)
-                {
-                    <div class="dropdown-content" style="z-index:1000">
-                    <li class="nav-item px-3" >
-                        <NavLink  href="StructuresTypes" >
-                            <span class="oi oi-list-rich" aria-hidden="true" ></span> @L["Structure Types"]
+                    <li class="nav-item px-3 dropdown" style="z-index:2">
+                        <NavLink class="nav-link" @onclick="()=>expandSubNav = !expandSubNav" href="#">
+                            <span class="oi oi-list-rich" aria-hidden="true"></span> @L["Types"]
                         </NavLink>
-                    </li>
 
-                    <li class="nav-item px-3 ">
-                        <NavLink  href="categories">
-                            <span class="oi oi-list-rich" aria-hidden="true" ></span> @L["Categories"]
-                        </NavLink>
+                        @if (expandSubNav)
+                        {
+                            <div class="dropdown-content" style="z-index:1000">
+                                <li class="nav-item px-3" >
+                                    <NavLink  href="StructuresTypes" >
+                                        <span class="oi oi-list-rich" aria-hidden="true" ></span> @L["Structure Types"]
+                                    </NavLink>
+                                </li>
+
+                                <li class="nav-item px-3 ">
+                                    <NavLink  href="categories">
+                                        <span class="oi oi-list-rich" aria-hidden="true" ></span> @L["Categories"]
+                                    </NavLink>
+                                </li>
+                                <li class="nav-item px-3 ">
+                                    <NavLink  href="ElementsTypes">
+                                        <span class="oi oi-list-rich" aria-hidden="true" ></span> @L["Element Types"]
+                                    </NavLink>
+                                </li>
+                                <li class="nav-item px-3 ">
+                                    <NavLink  href="flagsTypes">
+                                        <span class="oi oi-list-rich" aria-hidden="true" ></span> @L["Flag Types"]
+                                    </NavLink>
+                                </li>
+                                <li class="nav-item px-3 ">
+                                    <NavLink  href="InspectionResultTypes">
+                                        <span class="oi oi-list-rich" aria-hidden="true" ></span> @L["Condition Types"]
+                                    </NavLink>
+                                </li>
+                                <li class="nav-item px-3 ">
+                                    <NavLink  href="defectsTypes">
+                                        <span class="oi oi-list-rich" aria-hidden="true" ></span> @L["Defect Types"]
+                                    </NavLink>
+                                </li>
+                                <li class="nav-item px-3 ">
+                                    <NavLink  href="attributeTypes">
+                                        <span class="fa fa-tasks" aria-hidden="true" ></span> @L["Attributes Types"]
+                                    </NavLink>
+                                </li>
+                                <li class="nav-item px-3 ">
+                                    <NavLink href="channelDataTypes">
+                                        <span class="oi oi-list-rich" aria-hidden="true"></span> @L["Data Channel Types"]
+                                    </NavLink>
+                                </li>
+                                <li class="nav-item px-3 ">
+                                    <NavLink  href="LoadCategories">
+                                        <span class="oi oi-list-rich" aria-hidden="true" ></span> @L["Load Categories"]
+                                    </NavLink>
+                                </li>
+                                <li class="nav-item px-3 ">
+                                    <NavLink href="LoadsTypes">
+                                        <span class="oi oi-list-rich" aria-hidden="true"></span> @L["Loads Types"]
+                                    </NavLink>
+                                </li>
+
+                                <li class="nav-item px-3 ">
+                                    <NavLink href="EquipementTypes">
+                                        <span class="oi oi-list-rich" aria-hidden="true"></span> @L["Equipement Types"]
+                                    </NavLink>
+                                </li>
+
+                            </Div>
+                        }
                     </li>
-                    <li class="nav-item px-3 ">
-                        <NavLink  href="ElementsTypes">
-                            <span class="oi oi-list-rich" aria-hidden="true" ></span> @L["Element Types"]
-                        </NavLink>
-                    </li>
-                    <li class="nav-item px-3 ">
-                        <NavLink  href="flagsTypes">
-                            <span class="oi oi-list-rich" aria-hidden="true" ></span> @L["Flag Types"]
-                        </NavLink>
-                    </li>
-                    <li class="nav-item px-3 ">
-                        <NavLink  href="InspectionResultTypes">
-                            <span class="oi oi-list-rich" aria-hidden="true" ></span> @L["Condition Types"]
-                        </NavLink>
-                    </li>
-                    <li class="nav-item px-3 ">
-                        <NavLink  href="defectsTypes">
-                            <span class="oi oi-list-rich" aria-hidden="true" ></span> @L["Defect Types"]
-                        </NavLink>
-                    </li>
-                    <li class="nav-item px-3 ">
-                        <NavLink  href="attributeTypes">
-                            <span class="fa fa-tasks" aria-hidden="true" ></span> @L["Attributes Types"]
-                        </NavLink>
-                    </li>
-                    <li class="nav-item px-3 ">
-                        <NavLink href="channelDataTypes">
-                            <span class="oi oi-list-rich" aria-hidden="true"></span> @L["Data Channel Types"]
-                        </NavLink>
-                    </li>
-                    <li class="nav-item px-3 ">
-                        <NavLink  href="LoadCategories">
-                            <span class="oi oi-list-rich" aria-hidden="true" ></span> @L["Load Categories"]
-                        </NavLink>
-                    </li>
-                    <li class="nav-item px-3 ">
-                        <NavLink href="LoadsTypes">
-                            <span class="oi oi-list-rich" aria-hidden="true"></span> @L["Loads Types"]
-                        </NavLink>
-                    </li>
-                                  
-                    <li class="nav-item px-3 ">
-                        <NavLink href="EquipementTypes">
-                            <span class="oi oi-list-rich" aria-hidden="true"></span> @L["Equipement Types"]
-                        </NavLink>
-                    </li>
-                    
-                    </Div>
                 }
-                 </li>
-                 }
 
-@*                <li class="nav-item px-3">
+                @*                <li class="nav-item px-3">
                     <NavLink class="nav-link" href="fetchdata">
                         <span class="oi oi-list-rich" aria-hidden="true"></span> Fetch data
                     </NavLink>
@@ -209,7 +217,7 @@
                         <span class="oi oi-list-rich" aria-hidden="true"></span> @L["Sites"]
                     </NavLink>
                 </li>
-@*                 <li class="nav-item px-3">
+                @*                 <li class="nav-item px-3">
                     <NavLink class="nav-link" href="Events">
                         <span class="oi oi-list-rich" aria-hidden="true"></span> @L["Events"]
                     </NavLink>
@@ -224,18 +232,23 @@
                         <span class="oi oi-list-rich" aria-hidden="true"></span> @L["Structures"]
                     </NavLink>
                 </li>
+                                <li class="nav-item px-3">
+                    <NavLink class="nav-link" href="TrafficHome">
+                        <span class="oi oi-list-rich" aria-hidden="true"></span> @L["Trafic"]
+                    </NavLink>
+                </li>
                 @if ((appData.GetRole().Result == "Administrator") || (appData.GetRole().Result == "Developer"))
                 {
-@*                                 <li class="nav-item px-3">
+                    @*                                 <li class="nav-item px-3">
                     <NavLink class="nav-link" href="BIMComponent">
                         <span class="oi oi-list-rich" aria-hidden="true"></span> @L["BIM"]
                     </NavLink>
                 </li> *@
-                <li class="nav-item px-3">
-                    <NavLink class="nav-link" href="settings">
-                        <span class="oi oi-list-rich" aria-hidden="true"></span> @L["Settings"]
-                    </NavLink>
-                </li>
+                    <li class="nav-item px-3">
+                        <NavLink class="nav-link" href="settings">
+                            <span class="oi oi-list-rich" aria-hidden="true"></span> @L["Settings"]
+                        </NavLink>
+                    </li>
                 }
             </ul>
         </div>
@@ -250,12 +263,27 @@
 
     protected override async Task OnInitializedAsync()
     {
-       
+        AppData.OnAlarmStateChanged += UpdateScreen;
     }
 
     private void ToggleNavMenu()
     {
         collapseNavMenu = !collapseNavMenu;
+    }
+
+    private void UpdateScreen()
+    {
+        InvokeAsync(() =>
+        {
+            StateHasChanged();
+            var v = AppData.IsAlarmActive;
+            Console.WriteLine($"IsAlarmActive: {v}");
+        });
+    }
+
+        public void Dispose()
+    {
+        AppData.OnAlarmStateChanged -= UpdateScreen;
     }
 }
 

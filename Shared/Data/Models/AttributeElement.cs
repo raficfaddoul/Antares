@@ -19,8 +19,7 @@ public partial class AttributeElement
     [Column("ElementID")]
     public Guid ElementId { get; set; }
 
-    [Column(TypeName = "date")]
-    public DateTime? Date { get; set; }
+    public DateOnly? Date { get; set; }
 
     [StringLength(50)]
     public string? Value { get; set; }

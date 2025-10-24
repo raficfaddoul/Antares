@@ -32,7 +32,7 @@
 
     public override async Task SetParametersAsync(ParameterView parameters)
     {
-        structureType = (StructureType)AppData.obj;
+        structureType = (StructureType)AppData.obj1;
         entitiesService.LoadCollection(structureType, "StructureTypeFlagTypes");
         await base.SetParametersAsync(parameters);
     }

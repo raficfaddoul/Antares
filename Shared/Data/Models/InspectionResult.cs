@@ -29,8 +29,7 @@ public partial class InspectionResult
 
     public string? Comments { get; set; }
 
-    [Column(TypeName = "date")]
-    public DateTime? Date { get; set; }
+    public DateOnly? Date { get; set; }
 
     [ForeignKey("ElementId")]
     [InverseProperty("InspectionResults")]

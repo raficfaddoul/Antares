@@ -208,9 +208,20 @@ namespace Structural
         }
 
 
-        static public Structure CreateStructure3D(AliantWebS.Models.Structure structure, Dictionary<Guid, double> ChargeNodale, EntitiesService entitiesService)
+        static public Structure CreateStructure3D(AliantWebS.Models.Structure structure, Dictionary<LoadCase, double> selectedLoadCases, Dictionary<Guid, (int dof,double value)> ChargeNodale, EntitiesService entitiesService)
         {
-            List<(Guid id, List<int> noeudElementInd, double value, double position)> ChargesStatiquePonctuelles = new List<(Guid id, List<int> noeudInd, double value, double position)>();
+            //List<(Guid id, List<int> noeudElementInd,int dof, double value, double position)> ChargesStatiquePonctuelles = new List<(Guid id, List<int> noeudInd,int dof, double value, double position)>();
+
+            List<(Guid id, List<int> elInd, int dof, double startValue, double endValue)> ChargesStatiqueReparties = new List<(Guid id, List<int> noeudInd, int dof, double startValue, double endValue)>();
+            List<(Guid id, List<int> elInd, int dof, double value, double position)> ChargesStatiquePonctuelles = new List<(Guid id, List<int> noeudInd, int dof, double value, double position)>();
+            List<(Guid id, List<int> elInd, int dof, double startValue, double endValue, Dictionary<double, double> tempFunc)> ChargesDynamiqueReparties = new List<(Guid id, List<int> noeudInd, int dof, double startValue, double endValue, Dictionary<double, double> tempFunc)>();
+            List<(Guid id, List<int> elInd, int dof, double value, double position, Dictionary<double, double> tempFunc)> ChargesDynamiquePonctuelles = new List<(Guid id, List<int> noeudInd, int dof, double value, double position, Dictionary<double, double> tempFunc)>();
+            List<(Guid id, List<int> elInd, double ValueVL, double ValuePL, double ValueConvoi, double SpeedVL,
+                double SpeedPL, double AverageHourlyTraffic, double PercentagePL, double LoadUncertainty, double SpeedUncertainty)> ChargesMobiles = new List<(Guid id, List<int> noeudInd, double ValueVL, double ValuePL, double ValueConvoi, double SpeedVL, double SpeedPL, double AverageHourlyTraffic, double PercentagePL, double LoadUncertainty, double SpeedUncertainty)>();
+
+
+
+
 
             List<Element> elements;
             List<Element> nodes;
@@ -325,13 +336,20 @@ namespace Structural
 
                 if ((ChargeNodale != null) && (ChargeNodale.Keys.Contains(node.ElementId)))
                 {
-                    ChargesStatiquePonctuelles.Add((node.ElementId, new List<int>() { index }, ChargeNodale[node.ElementId], 0));
+                    ChargesStatiquePonctuelles.Add((node.ElementId, new List<int>() { index }, ChargeNodale[node.ElementId].dof, ChargeNodale[node.ElementId].value, 0));
+                }
+
+                if (selectedLoadCases != null)
+                {
+                    AddCharge(node, index, selectedLoadCases, ChargesStatiqueReparties, ChargesStatiquePonctuelles,
+    ChargesDynamiqueReparties, ChargesDynamiquePonctuelles, ChargesMobiles);
                 }
 
                 index++;
             }
 
             structura.noeud = noeuds;
+            structura.guidsNoeuds = guidsNoeuds;
             structura.CL = CL;
 
             DataTable element;
@@ -346,8 +364,8 @@ namespace Structural
 
                 double e = double.TryParse(el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name.Trim() == "E")?.Value, NumberStyles.Any, CultureInfo.InvariantCulture, out double tempE) ? 1E6 * tempE : 0;
                 double s = double.TryParse(el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name.Trim() == "S")?.Value, NumberStyles.Any, CultureInfo.InvariantCulture, out double tempS) ? tempS : 0;
-                double iy = double.TryParse(el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name.Trim() == "Ix")?.Value, NumberStyles.Any, CultureInfo.InvariantCulture, out double tempIx) ? tempIx : 0;
-                double iz = double.TryParse(el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name.Trim() == "Iy")?.Value, NumberStyles.Any, CultureInfo.InvariantCulture, out double tempIy) ? tempIy : 0;
+                double iy = double.TryParse(el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name.Trim() == "Iy")?.Value, NumberStyles.Any, CultureInfo.InvariantCulture, out double tempIy) ? tempIy : 0;
+                double iz = double.TryParse(el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name.Trim() == "Iz")?.Value, NumberStyles.Any, CultureInfo.InvariantCulture, out double tempIz) ? tempIz : 0;
                 double G = double.TryParse(el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name.Trim() == "G")?.Value, NumberStyles.Any, CultureInfo.InvariantCulture, out double tempG) ? tempG : 0;
 
 
@@ -383,9 +401,13 @@ namespace Structural
 
                 foreach (var eq in el.Equipements)
                 {
-                    ChargesStatiquePonctuelles.Add((eq.EquipementId, new List<int>() { index }, (eq.EquipementType.Weight ?? 0), eq.ProjectionParameter ?? 0));
+                    ChargesStatiquePonctuelles.Add((eq.EquipementId, new List<int>() { index },1, (eq.EquipementType.Weight ?? 0), eq.ProjectionParameter ?? 0));
                 }
-
+                if (selectedLoadCases != null)
+                {
+                    AddCharge(el, index, selectedLoadCases, ChargesStatiqueReparties, ChargesStatiquePonctuelles,
+ ChargesDynamiqueReparties, ChargesDynamiquePonctuelles, ChargesMobiles);
+                }
 
                 index++;
 
@@ -405,25 +427,25 @@ namespace Structural
 
         }
 
-        static public Structure CreateStructure(AliantWebS.Models.Structure structure, Dictionary<LoadCase, double> selectedLoadCases, EntitiesService entitiesService)
+        static public async Task<Structure> CreateStructure(AliantWebS.Models.Structure structure, Dictionary<LoadCase, double> selectedLoadCases, EntitiesService entitiesService)
         {
             List<Element> elements = new List<Element>();
             List<Element> nodes = new List<Element>();
 
-            nodes = entitiesService.GetFilteredEntitiesAsync<Element>(a => ((a.StructureId == structure.StructureId) && (a.ElementType?.Name == "Node")),
+            nodes = await entitiesService.GetFilteredEntitiesAsync<Element>(a => ((a.StructureId == structure.StructureId) && (a.ElementType?.Name == "Node")),
     "StaticLoadElements.StaticLoad",
     "StaticPointLoadElements.StaticPointLoad",
     "DynamicLoadElements.DynamicLoad",
     "DynamicPointLoadElements.DynamicPointLoad",
     "MobileLoadElements.MobileLoad",
-    "ElementType", "AttributeElements.AttributeType").Result;
-            elements = entitiesService.GetFilteredEntitiesAsync<Element>(a => ((a.StructureId == structure.StructureId) && ((a.ElementType?.Name == "Beam2d"))),
+    "ElementType", "AttributeElements.AttributeType");
+            elements = await entitiesService.GetFilteredEntitiesAsync<Element>(a => ((a.StructureId == structure.StructureId) && ((a.ElementType?.Name == "Beam2d"))),
                 "StaticLoadElements.StaticLoad",
                 "StaticPointLoadElements.StaticPointLoad",
                 "DynamicLoadElements.DynamicLoad",
                 "DynamicPointLoadElements.DynamicPointLoad",
                 "MobileLoadElements.MobileLoad",
-                "ElementType", "AttributeElements.AttributeType").Result;
+                "ElementType", "AttributeElements.AttributeType");
 
             return CreateStructure1(structure, selectedLoadCases, elements, nodes);
         }
@@ -442,10 +464,10 @@ namespace Structural
 
         static public Structure CreateStructure1(AliantWebS.Models.Structure structure, Dictionary<LoadCase, double> selectedLoadCases, List<Element> elements, List<Element> nodes)
         {
-            List<(Guid id, List<int> noeudInd, double startValue, double endValue)> ChargesStatiqueReparties = new List<(Guid id, List<int> noeudInd, double startValue, double endValue)>();
-            List<(Guid id, List<int> noeudInd, double value, double position)> ChargesStatiquePonctuelles = new List<(Guid id, List<int> noeudInd, double value, double position)>();
-            List<(Guid id, List<int> noeudInd, double startValue, double endValue, Dictionary<double, double> tempFunc)> ChargesDynamiqueReparties = new List<(Guid id, List<int> noeudInd, double startValue, double endValue, Dictionary<double, double> tempFunc)>();
-            List<(Guid id, List<int> noeudInd, double value, double position, Dictionary<double, double> tempFunc)> ChargesDynamiquePonctuelles = new List<(Guid id, List<int> noeudInd, double value, double position, Dictionary<double, double> tempFunc)>();
+            List<(Guid id, List<int> noeudInd, int dof, double startValue, double endValue)> ChargesStatiqueReparties = new List<(Guid id, List<int> noeudInd, int dof, double startValue, double endValue)>();
+            List<(Guid id, List<int> noeudInd, int dof, double value, double position)> ChargesStatiquePonctuelles = new List<(Guid id, List<int> noeudInd, int dof, double value, double position)>();
+            List<(Guid id, List<int> noeudInd, int dof, double startValue, double endValue, Dictionary<double, double> tempFunc)> ChargesDynamiqueReparties = new List<(Guid id, List<int> noeudInd, int dof, double startValue, double endValue, Dictionary<double, double> tempFunc)>();
+            List<(Guid id, List<int> noeudInd, int dof, double value, double position, Dictionary<double, double> tempFunc)> ChargesDynamiquePonctuelles = new List<(Guid id, List<int> noeudInd, int dof, double value, double position, Dictionary<double, double> tempFunc)>();
             List<(Guid id, List<int> noeudInd, double ValueVL, double ValuePL, double ValueConvoi, double SpeedVL,
                 double SpeedPL, double AverageHourlyTraffic, double PercentagePL, double LoadUncertainty, double SpeedUncertainty)> ChargesMobiles = new List<(Guid id, List<int> noeudInd, double ValueVL, double ValuePL, double ValueConvoi, double SpeedVL, double SpeedPL, double AverageHourlyTraffic, double PercentagePL, double LoadUncertainty, double SpeedUncertainty)>();
 
@@ -474,6 +496,7 @@ namespace Structural
 
             List<double[]> noeuds = new List<double[]>();
             List<string[]> CL = new List<string[]>();
+            List<Guid> guidsNoeuds = new List<Guid>();
 
             int index = 0;
             foreach (Element node in nodes)
@@ -481,6 +504,7 @@ namespace Structural
                 double x = double.Parse(node.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name == "X").Value, CultureInfo.InvariantCulture);
                 double y = double.Parse(node.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name == "Y").Value, CultureInfo.InvariantCulture);
                 noeuds.Add(new double[] { x, y });
+                guidsNoeuds.Add(node.ElementId);
 
                 bool success = bool.TryParse(node.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name == "Horizontal Constraint 1")?.Value, out bool u);
                 if (!success)
@@ -520,6 +544,7 @@ namespace Structural
             }
 
             structura.noeud = noeuds;
+            structura.guidsNoeuds = guidsNoeuds;
             structura.CL = CL;
 
             DataTable element;
@@ -534,13 +559,16 @@ namespace Structural
 
                 double e = 1E6 * double.Parse(el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name.Trim() == "E").Value, CultureInfo.InvariantCulture);
                 double s = double.Parse(el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name.Trim() == "S").Value, CultureInfo.InvariantCulture);
-                double i = double.Parse(el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name.Trim() == "I").Value, CultureInfo.InvariantCulture);
-                double rho = double.Parse(el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name.Trim() == "Rho").Value, CultureInfo.InvariantCulture);
+                double i = double.TryParse(el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name.Trim() == "I")?.Value, NumberStyles.Any, CultureInfo.InvariantCulture, out double tempI) ? tempI : 0;
+
+                //double i = double.Parse(el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name.Trim() == "Iy").Value, CultureInfo.InvariantCulture);
+                //double rho = double.Parse(el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name.Trim() == "Rho").Value, CultureInfo.InvariantCulture);
+                double rho = double.TryParse(el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name.Trim() == "Rho")?.Value, NumberStyles.Any, CultureInfo.InvariantCulture, out double tempRho) ? tempRho : 1;
 
                 int indexnoeud1 = nodes.FindIndex(x => x.Name == noeud1);
                 int indexnoeud2 = nodes.FindIndex(x => x.Name == noeud2);
-                element.Rows.Add(indexnoeud1, indexnoeud2, e, s, i, rho);
-
+                element.Rows.Add(indexnoeud1, indexnoeud2, e, 0, s, i, 0, rho, 0, 0, el.ElementId);
+                //element.Rows.Add(indexnoeud1, indexnoeud2, e, G, s, iy, iz, rho, b, h, el.ElementId);
                 if (selectedLoadCases != null)
                 {
                     AddCharge(el, index, selectedLoadCases, ChargesStatiqueReparties, ChargesStatiquePonctuelles,
@@ -570,10 +598,10 @@ namespace Structural
 
 
         static private void AddCharge(Element el, int elementIndex, Dictionary<LoadCase, double> selectedLoadCases,
-            List<(Guid id, List<int> noeudInd, double startValue, double endValue)> ChargesStatiqueReparties,
-        List<(Guid id, List<int> noeudInd, double value, double position)> ChargesStatiquePonctuelles,
-        List<(Guid id, List<int> noeudInd, double startValue, double endValue, Dictionary<double, double> tempFunc)> ChargesDynamiqueReparties,
-        List<(Guid id, List<int> noeudInd, double value, double position, Dictionary<double, double> tempFunc)> ChargesDynamiquePonctuelles,
+            List<(Guid id, List<int> noeudInd, int dof, double startValue, double endValue)> ChargesStatiqueReparties,
+        List<(Guid id, List<int> noeudInd, int dof, double value, double position)> ChargesStatiquePonctuelles,
+        List<(Guid id, List<int> noeudInd, int dof, double startValue, double endValue, Dictionary<double, double> tempFunc)> ChargesDynamiqueReparties,
+        List<(Guid id, List<int> noeudInd, int dof, double value, double position, Dictionary<double, double> tempFunc)> ChargesDynamiquePonctuelles,
         List<(Guid id, List<int> noeudInd, double ValueVL, double ValuePL, double ValueConvoi, double SpeedVL,
             double SpeedPL, double AverageHourlyTraffic, double PercentagePL, double LoadUncertainty, double SpeedUncertainty)> ChargesMobiles
 )
@@ -608,7 +636,7 @@ ToDictionary(x => x.MobileLoad, x => x.Item2);
                 int ind = ChargesStatiqueReparties.FindIndex(x => x.id == sl.StaticLoadId);
                 if (ind == -1)
                 {
-                    ChargesStatiqueReparties.Add((sl.StaticLoadId, new List<int>() { elementIndex }, (sl.StartValue ?? 0) * (staticLoads?[sl] ?? 1), (sl.EndValue ?? 0) * (staticLoads?[sl] ?? 1)));
+                    ChargesStatiqueReparties.Add((sl.StaticLoadId, new List<int>() { elementIndex }, (int)sl.Dof, (sl.StartValue ?? 0) * (staticLoads?[sl] ?? 1), (sl.EndValue ?? 0) * (staticLoads?[sl] ?? 1)));
                 }
                 else
                 {
@@ -622,7 +650,7 @@ ToDictionary(x => x.MobileLoad, x => x.Item2);
                 int ind = ChargesStatiquePonctuelles.FindIndex(x => x.id == sl.StaticPointLoadId);
                 if (ind == -1)
                 {
-                    ChargesStatiquePonctuelles.Add((sl.StaticPointLoadId, new List<int>() { elementIndex }, (sl.Value ?? 0) * (staticPointLoads?[sl] ?? 1), sl.ApplicationPointDistance ?? 0));
+                    ChargesStatiquePonctuelles.Add((sl.StaticPointLoadId, new List<int>() { elementIndex }, (int)sl.Dof, (sl.Value ?? 0) * (staticPointLoads?[sl] ?? 1), sl.ApplicationPointDistance ?? 0));
                 }
                 else
                 {
@@ -638,7 +666,7 @@ ToDictionary(x => x.MobileLoad, x => x.Item2);
                     Dictionary<double, double> dic = new Dictionary<double, double>();
                     if (sl.TemporalFunc != null)
                         dic = Converter.ConvertFromXml(sl.TemporalFunc);
-                    ChargesDynamiqueReparties.Add((sl.DynamicLoadId, new List<int>() { elementIndex }, (sl.StartValue ?? 0) * (dynamicLoads?[sl] ?? 1), (sl.EndValue ?? 0) * (dynamicLoads?[sl] ?? 1), dic));
+                    ChargesDynamiqueReparties.Add((sl.DynamicLoadId, new List<int>() { elementIndex }, (int)sl.Dof, (sl.StartValue ?? 0) * (dynamicLoads?[sl] ?? 1), (sl.EndValue ?? 0) * (dynamicLoads?[sl] ?? 1), dic));
                 }
                 else
                 {
@@ -654,7 +682,7 @@ ToDictionary(x => x.MobileLoad, x => x.Item2);
                     Dictionary<double, double> dic = new Dictionary<double, double>();
                     if (sl.TemporalFunc != null)
                         dic = Converter.ConvertFromXml(sl.TemporalFunc);
-                    ChargesDynamiquePonctuelles.Add((sl.DynamicPointLoadId, new List<int>() { elementIndex }, (sl.Value ?? 0) * (dynamicPointLoads?[sl] ?? 1), sl.ApplicationPointDistance ?? 0, dic));
+                    ChargesDynamiquePonctuelles.Add((sl.DynamicPointLoadId, new List<int>() { elementIndex }, (int)sl.Dof, (sl.Value ?? 0) * (dynamicPointLoads?[sl] ?? 1), sl.ApplicationPointDistance ?? 0, dic));
                 }
                 else
                 {

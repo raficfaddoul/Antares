@@ -11,16 +11,16 @@ namespace Structural
 
         public DataTable element { get; set; }
         public DataTable MasseNodale { get; set; }
-        public List<double[]> noeud { get; set; }
 
+        public List<double[]> noeud { get; set; }
         public List<Guid> guidsNoeuds { get; set; }
 
         public List<string[]> CL { get; set; }
-        public List<(Guid id, List<int> noeudInd,  double startValue, double endValue)> ChargesStatiqueReparties { get; set; }
-        public List<(Guid id, List<int> elementInd, double value, double position)> ChargesStatiquePonctuelles { get; set; }
-        public List<(Guid id, List<int> noeudInd, double startValue, double endValue, Dictionary<double,double> tempFunc)> ChargesDynamiqueReparties { get; set; }
-        public List<(Guid id, List<int> noeudInd, double value, double position, Dictionary<double, double> tempFunc)> ChargesDynamiquePonctuelles { get; set; }
-        public List<(Guid id, List<int> noeudInd, double ValueVL, double ValuePL, double ValueConvoi, double SpeedVL, 
+        public List<(Guid id, List<int> obInd, int dof, double startValue, double endValue)> ChargesStatiqueReparties { get; set; }
+        public List<(Guid id, List<int> obInd, int dof, double value, double position)> ChargesStatiquePonctuelles { get; set; }
+        public List<(Guid id, List<int> obInd, int dof, double startValue, double endValue, Dictionary<double,double> tempFunc)> ChargesDynamiqueReparties { get; set; }
+        public List<(Guid id, List<int> obInd, int dof, double value, double position, Dictionary<double, double> tempFunc)> ChargesDynamiquePonctuelles { get; set; }
+        public List<(Guid id, List<int> obInd, double ValueVL, double ValuePL, double ValueConvoi, double SpeedVL, 
             double SpeedPL, double AverageHourlyTraffic, double PercentagePL, double LoadUncertainty, double SpeedUncertainty)> ChargesMobiles { get; set; }
         
         public int nddl { get; set; }

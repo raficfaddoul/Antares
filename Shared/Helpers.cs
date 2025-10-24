@@ -16,9 +16,22 @@ using AliantWebS.Data;
 using Accord.Math.Distances;
 using Microsoft.JSInterop;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Forms;
 
-namespace AI
+namespace Helpers
 {
+    public static class RandomExtensions
+    {
+        public static double NextGaussian(this Random random, double mean = 0, double stdDev = 1)
+        {
+            // Box-Muller transform to generate Gaussian random numbers
+            double u1 = 1.0 - random.NextDouble();
+            double u2 = 1.0 - random.NextDouble();
+            double randStdNormal = Math.Sqrt(-2.0 * Math.Log(u1)) * Math.Sin(2.0 * Math.PI * u2);
+            return mean + stdDev * randStdNormal;
+        }
+    }
+
     public static class Helpers
     {
         public static double?[,] ConvertToDoubleArray(object[,] inputArray)
@@ -219,6 +232,40 @@ namespace AI
             return result;
         }
 
+        public static Dictionary<string, object> ProcessLine(string line)
+        {
+            //string pattern = @"(\w+):\s*(\w+),?";
+            string pattern = @"([^:]+):\s*([^,]+),?";
+            var matches = Regex.Matches(line, pattern);
+
+            Dictionary<string, object> dict = new Dictionary<string, object>();
+
+            foreach (System.Text.RegularExpressions.Match match in matches)
+            {
+                string key = match.Groups[1].Value.Trim();
+                string value = match.Groups[2].Value.Trim();
+                bool booleanValue;
+                int intValue;
+
+                if (int.TryParse(value, out intValue))
+                {
+                    dict.Add(key, intValue);
+                }
+                else if (bool.TryParse(value, out booleanValue))
+                {
+                    dict.Add(key, booleanValue);
+                }
+                else
+                {
+                    dict.Add(key, value);
+                }
+            }
+
+            return dict;
+        }
+
+       
+
 
         public async static Task<(ElementType? elementType, string? typeName)> CreateElementType(EntitiesService entitiesService,
             Category category,
@@ -379,7 +426,6 @@ namespace AI
         {
             Dictionary<int, Dictionary<long, List<double>>> data = new Dictionary<int, Dictionary<long, List<double>>>();
 
-          //  string json = File.ReadAllText(jsonPath);
             JsonElement root = JsonSerializer.Deserialize<JsonElement>(json);
 
             foreach (var item in root.EnumerateArray())
@@ -389,26 +435,6 @@ namespace AI
                 JsonElement values = samples.GetProperty("values");
 
                 DateTime dt = item.GetProperty("software").GetProperty("datetime_utc").GetDateTime();
-
-
-
-                //string sampingString = item.GetProperty("accelerometer").GetProperty("output_data_rate").GetString();
-
-                //string pattern = @"\d+"; // Matches one or more digits
-
-                //Match match = Regex.Match(input: sampingString, pattern);
-
-                //double samplingRate;
-
-                //if (match.Success)
-                //{
-                //    samplingRate = int.Parse(match.Value);
-                //}
-                //else
-                //{
-                //    throw new Exception("Could not parse sampling rate");
-                //}
-
 
                 foreach (var value in values.EnumerateArray())
                 {
@@ -436,7 +462,6 @@ namespace AI
                 }
 
             }
-
 
 
             return data;

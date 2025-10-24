@@ -10,31 +10,31 @@
 
 <style>
     .chart-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-        gap: 10px;
-        padding: 10px;
-        width: 100%;
-        height: auto;
-        overflow: auto;
-        max-height: 600px;
-        min-width: 100%;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 10px;
+    padding: 10px;
+    width: 100%;
+    height: auto;
+    overflow: auto;
+    max-height: 600px;
+    min-width: 100%;
     }
 
 
 
     .radzen-chart {
-        height: 300px; /* Fixed height for each chart */
-        width: 100%; /* Chart width is responsive to the grid column width */
+    height: 300px; /* Fixed height for each chart */
+    width: 100%; /* Chart width is responsive to the grid column width */
     }
 
     .chart-container {
-        text-align: center; /* Centers the label and chart within the container */
-        margin: 10px; /* Optional: Adds some space around each chart container */
+    text-align: center; /* Centers the label and chart within the container */
+    margin: 10px; /* Optional: Adds some space around each chart container */
     }
 
     .chart-label {
-        margin-bottom: 5px; /* Spacing between the label and the chart */
+    margin-bottom: 5px; /* Spacing between the label and the chart */
     }
 
 </style>
@@ -145,7 +145,7 @@
 
 
 
-    List<Dictionary<DateTime, double>> indices = new List<Dictionary<DateTime, double>>();
+    List<Dictionary<object, double>> indices = new List<Dictionary<object, double>>();
 
 
     //string jsonlistIDs;
@@ -196,10 +196,19 @@
             navigationManager.NavigateTo(@"/Structures");
         }
 
-      
+
         try
         {
             ir = await ir.Load(appData.Structure);
+
+            if (ir != null)
+            {
+                value1 = (int)(ir.TauxMoyen * 100);
+                value2 = (int)(ir.TauxMaximal * 100 * 0.93);
+                value3 = (int)(ir.Ptaux75_100 * 100);
+
+                //    rigidities = ir.TauxDetravail;
+            }
         }
         catch (Exception ex)
         {
@@ -207,11 +216,7 @@
             return;
         }
 
-        value1 = (int)(ir.TauxMoyen * 100);
-        value2 = (int)(ir.TauxMaximal* 100*0.93);
-        value3 = (int)(ir.Ptaux75_100 * 100);
 
-    //    rigidities = ir.TauxDetravail;
 
 
 
@@ -227,7 +232,7 @@
         {
             entitiesService.LoadCollection(appData.Structure, "Events");
         }
-        Dictionary<DateTime, double> tauxDic = new Dictionary<DateTime, double>();
+        Dictionary<object, double> tauxDic = new Dictionary<object, double>();
         foreach(var ev in appData.Structure.Events)
         {
             if ((ev.StartDate != null) && (ev.TauxMoyen != null))
@@ -235,7 +240,7 @@
                 tauxDic.Add((DateTime)ev.StartDate, (double)ev.TauxMoyen);
             }
         }
-   
+
 
 
         headers.Add("Date");
@@ -248,26 +253,29 @@
         await GetElementsPercentages();// not awaited on purpose so it dosnnt block BIM display
 
 
-      
+
     }
 
 
     private async Task GetElementsPercentages()
     {
-          
-   
-            DataItem[] dataItem = new DataItem[4];
-            
-        dataItem[0] = new DataItem() { Quarter = "0-25%", Revenue = (int)(ir.Ptaux0_25 * 100) };
-        dataItem[1] = new DataItem() { Quarter = "25-50%", Revenue = (int)(ir.Ptaux25_50 * 100) };
-        dataItem[2] = new DataItem() { Quarter = "50-75%", Revenue = (int)(ir.Ptaux50_75 * 100) };
-        dataItem[3] = new DataItem() { Quarter = "75-100%", Revenue = (int)(ir.Ptaux75_100 * 100) };
+
+
+        DataItem[] dataItem = new DataItem[4];
+
+        if (ir != null)
+        {
+
+            dataItem[0] = new DataItem() { Quarter = "0-25%", Revenue = (int)(ir.Ptaux0_25 * 100) };
+            dataItem[1] = new DataItem() { Quarter = "25-50%", Revenue = (int)(ir.Ptaux25_50 * 100) };
+            dataItem[2] = new DataItem() { Quarter = "50-75%", Revenue = (int)(ir.Ptaux50_75 * 100) };
+            dataItem[3] = new DataItem() { Quarter = "75-100%", Revenue = (int)(ir.Ptaux75_100 * 100) };
 
             string title = "Taux de travail";
             dataItemsLists.Add(title, dataItem);
 
+        }
 
-       
 
         StateHasChanged();
 
@@ -287,17 +295,20 @@
 
             var colors = AliantWebS.Pages.InventoryElementPages.BIMComponent.GenerateBlueToRedColors(101);
 
-            int i = 0;
-            foreach (var inst in instanceIdsList)
-            //for (int i =0; i<l.Count; i++)
+            if (ir != null)
             {
-                if (!ir.TauxDetravail.Keys.Contains(inst.Value)) continue;
-                var tt = (int)ir.TauxDetravail[inst.Value] * 100;
+                int i = 0;
+                foreach (var inst in instanceIdsList)
+                //for (int i =0; i<l.Count; i++)
+                {
+                    if (!ir.TauxDetravail.Keys.Contains(inst.Value)) continue;
+                    var tt = (int)ir.TauxDetravail[inst.Value] * 100;
 
-                List<long> ins = new List<long>() { inst.Key };
+                    List<long> ins = new List<long>() { inst.Key };
 
-                await js.InvokeVoidAsync("ColorElement", tt, ins.ToArray(), colors[tt].r, colors[tt].g, colors[tt].b);
-                i++;
+                    await js.InvokeVoidAsync("ColorElement", tt, ins.ToArray(), colors[tt].r, colors[tt].g, colors[tt].b);
+                    i++;
+                }
             }
             this.StateHasChanged();
         }

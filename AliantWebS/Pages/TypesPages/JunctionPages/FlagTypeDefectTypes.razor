@@ -32,7 +32,7 @@
 
     public override async Task SetParametersAsync(ParameterView parameters)
     {
-        flagType = (FlagType)AppData.obj;
+        flagType = (FlagType)AppData.obj1;
         entitiesService.LoadCollection(flagType, "FlagTypeDefectTypes");
         await base.SetParametersAsync(parameters);
     }

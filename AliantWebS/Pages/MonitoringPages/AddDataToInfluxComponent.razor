@@ -1,8 +1,10 @@
 ﻿@page "/AddDataToInflux/{ListJson}"
+@page "/AddDataToInflux"
 @using AliantWebS.Data
 @using AliantWebS.Models
 @using Microsoft.Extensions.Logging
 @using System.Net.Sockets
+@using Microsoft.EntityFrameworkCore
 
 @inject EntitiesService entitiesService
 @inject IJSRuntime JsRuntime
@@ -45,29 +47,47 @@
                         <Column>
 
                             <RadzenDataGrid AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="10"
-                                    Data="@sensors" TItem="Element" ColumnWidth="150px">
+                            Data="@sensors" TItem="Element" ColumnWidth="150px" RowSelect="SensorRowSelect">
                                 <Columns>
                                     <RadzenDataGridColumn TItem="Element" Property="Name" Title="@L["Sensing Device"]" Width="60px"></RadzenDataGridColumn>
-                                    <RadzenDataGridColumn TItem="Element" Property="Description" Title="@L["Action"]" Width="30px">
+
+                                    <RadzenDataGridColumn TItem="Element" Title="Select All" Filterable="false" Sortable="false" TextAlign="TextAlign.Center" Width="50px">
+
+                                        <!-- HeaderTemplate: The checkbox in the column header -->
+                                        <HeaderTemplate>
+                                            <RadzenCheckBox TValue="bool"
+                                            @bind-Value="isSelectAll"
+                                            Change="@OnSelectAllChecked" />
+                                        </HeaderTemplate>
+
+                                        <!-- Template: The checkbox for each row/sensor -->
+                                        <Template Context="element">
+                                            <RadzenCheckBox TValue="bool"
+                                            Value="selectedElements.Contains(element)"
+                                            Change="@((args) => OnChangeSelectedElements(args, element))" />
+                                        </Template>
+                                    </RadzenDataGridColumn>
+
+                                    @*                                     <RadzenDataGridColumn TItem="Element" Property="Description" Title="@L["Action"]" Width="30px">
                                         <Template Context="element">
                                             <Div Style="display: flex">
                                                 <RadzenCheckBox TValue=bool Value="selectedElements.Contains(element)" Change=@(args => OnChangeSelectedElements(args,element))></RadzenCheckBox>
                                             </Div>
                                         </Template>
-                                    </RadzenDataGridColumn>
+                                    </RadzenDataGridColumn> *@
 
                                 </Columns>
                             </RadzenDataGrid>
 
                             <RadzenDataGrid AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="10"
-                                    Data="@channelDataTypeList" TItem="ChannelDataType" ColumnWidth="150px">
+                            Data="@channelDataTypeList" TItem="ChannelDataType" ColumnWidth="150px">
                                 <Columns>
                                     <RadzenDataGridColumn TItem="ChannelDataType" Property="Name" Title="@L["Channel"]"></RadzenDataGridColumn>
                                     <RadzenDataGridColumn TItem="ChannelDataType" Property="Description" Title="@L["Action"]" Width="30px">
                                         <Template Context="channelDataType">
-                                            <Div Style="display: flex">
+                                            <div style="display: flex; background-color:@(color(channelDataType))">
                                                 <RadzenCheckBox TValue=bool Change=@(args => OnChangeSelectedChannelDataTypes(args,channelDataType.ChannelDataTypeId))></RadzenCheckBox>
-                                            </Div>
+                                            </div>
                                         </Template>
                                     </RadzenDataGridColumn>
                                 </Columns>
@@ -110,7 +130,7 @@
                                     <InputFile OnChange="@AddData" />
                                 </div>
 
-@*                                <div class="file-input-zone">
+                                @*                                <div class="file-input-zone">
 
                                     <a class="nav-link" @onclick="@(args => QueryData())" href="dgfrdgh" @onclick:preventDefault="true">
                                         <span align="center" style="width:30px" class="fas fa-stream" aria-hidden="true"></span>
@@ -118,15 +138,19 @@
                                 </div>*@
 
                                 <div class="file-input-zone">
-                                    <a class="nav-link" @onclick="@(args => DeleteData())" href="dgfrdgh" @onclick:preventDefault="true">
+                                    <a class="nav-link" title="Delete Data for the selected sensor" @onclick="@(args => DeleteData())" href="dgfrdgh" @onclick:preventDefault="true">
                                         <span align="center" style="width:30px" class="oi oi-trash" aria-hidden="true"></span>
                                     </a>
                                 </div>
                                 <div class="file-input-zone">
                                     <a class="nav-link" title="Delete All Data" @onclick="@(args => DeleteAllData())" href="dgfrdgh" @onclick:preventDefault="true">
                                         <span align="center" style="width:30px" class="oi oi-trash" aria-hidden="true"></span>
+                                        <span class="oi oi-hard-drive"></span>
                                     </a>
                                 </div>
+                                <Div>
+                                    <p>Total records in the database: @TotalRecords</p>
+                                </Div>
                             </Div>
 
                         </Column>
@@ -172,7 +196,7 @@
 
     [Parameter] public EventCallback OnValidSubmit { get; set; }
 
-
+    Element hightlightedSensor;
 
     string title;
 
@@ -192,11 +216,32 @@
     List<ChannelDataType> channelDataTypeList;
     List<Guid> selectedChannelDataTypes { get; set; } = new List<Guid>();
 
+    int TotalRecords = 0;
+
+
+    bool isSelectAll; // Binds to the "select all" checkbox in the header
+
+    void OnSelectAllChecked(bool value)
+    {
+        isSelectAll = value;
+        if (isSelectAll)
+        {
+            // Add ALL sensors to the selected list
+            selectedElements = sensors.ToList();
+        }
+        else
+        {
+            // Clear the selected list
+            selectedElements.Clear();
+        }
+    }
+
 
     protected override async Task OnInitializedAsync()
     {
         cts = new CancellationTokenSource();
         ct = cts.Token;
+        TotalRecords = await AliantWebS.Data.InfluxService.CountRecords();
 
     }
 
@@ -207,16 +252,33 @@
         var elligibleElementTypes = await entitiesService.GetFilteredEntitiesAsync<ElementType>(a => ((a.ChannelDataTypeElementTypes?.Count ?? 0) > 0), "ChannelDataTypeElementTypes");
         var elligibleElementTypesID = elligibleElementTypes.Select(x => x.ElementTypeId).ToList();
 
-
-        sensorsIDs = JsonSerializer.Deserialize<List<Guid?>>(ListJson);
-
-        sensors = await entitiesService.GetFilteredEntitiesAsync<Element>(a => (sensorsIDs.Contains(a.ElementId)
-                    && (elligibleElementTypesID.Contains(a.ElementTypeId ?? new Guid()))));
-        foreach (var s in sensors)
+        if (string.IsNullOrEmpty(ListJson?.Trim()))
         {
-            entitiesService.LoadCollection("ElementType.ChannelDataTypeElementTypes");
-            entitiesService.LoadCollection("AttributeElements.AttributeType");
+            sensorsIDs = null;
         }
+        else
+        {
+            sensorsIDs = JsonSerializer.Deserialize<List<Guid?>>(ListJson);
+        }
+
+
+
+        sensors = await entitiesService._appDBContext.Elements
+            .Include(e => e.AttributeElements)
+                .ThenInclude(ae => ae.AttributeType)
+            .Include(e => e.ElementType) // Include ElementType
+                .ThenInclude(et => et.ChannelDataTypeElementTypes) // Include ChannelDataTypeElementTypes within ElementType
+            .Where(e => ((sensorsIDs == null) || sensorsIDs.Contains(e.ElementId)) && (elligibleElementTypesID.Contains(e.ElementTypeId ?? new Guid())) && (e.StructureId == appData.Structure.StructureId)).ToListAsync();
+
+
+
+        // sensors = await entitiesService.GetFilteredEntitiesAsync<Element>(a => (sensorsIDs.Contains(a.ElementId)
+        //             && (elligibleElementTypesID.Contains(a.ElementTypeId ?? new Guid()))));
+        // foreach (var s in sensors)
+        // {
+        //     entitiesService.LoadCollection(s,"ElementType.ChannelDataTypeElementTypes");
+        //     entitiesService.LoadCollection(s,"AttributeElements.AttributeType");
+        // }
         foreach (Element sensor in sensors)
         {
 
@@ -263,6 +325,8 @@
             selectedElements.Remove(element);
 
         }
+
+        isSelectAll = (selectedElements.Count == sensors.Count);
     }
 
     void OnChangeSelectedChannelDataTypes(bool args, Guid channelDataTypeID)
@@ -280,6 +344,11 @@
         }
     }
 
+    public async Task AddDataFromServer()
+    {
+
+    }
+
 
 
     private async Task AddData(InputFileChangeEventArgs e)
@@ -294,7 +363,7 @@
                     if ((Path.GetExtension(file.Name) == ".csv"))
                     {
 
-                        var data = await AI.Helpers.GetDataFromCSV2(file.OpenReadStream(file.Size));
+                        var data = await Helpers.Helpers.GetDataFromCSV2(file.OpenReadStream(file.Size));
 
                         var lines = new List<string>();
                         int count = 0;
@@ -309,7 +378,7 @@
                             var dictionary = intersect.ToDictionary(x => x.ChannelDataTypeId.ToString(), x => x.Name);
 
 
-                            
+
                             foreach (var record in data)
                             {
                                 string line = "SHM,";
@@ -366,7 +435,7 @@
                     if ((Path.GetExtension(file.Name) == ".txt") || (Path.GetExtension(file.Name) == ""))
                     {
 
-                        using var reader = new StreamReader(file.OpenReadStream());
+                        using var reader = new StreamReader(file.OpenReadStream(file.Size));
 
                         var lines = new List<string>();
 
@@ -390,7 +459,7 @@
 
 
 
-                        Dictionary<int, Dictionary<long, List<double>>> data = AI.Helpers.GetDataFromJson(content);
+                        Dictionary<int, Dictionary<long, List<double>>> data = Helpers.Helpers.GetDataFromJson(content);
                         var lines = new List<string>();
                         foreach (Element el in selectedElements)
                         {
@@ -420,9 +489,24 @@
                                     line += "sensor=" + el.ElementId.ToString() + " ";
 
 
-                                    line += ls[("Horizontal Acceleration 1").ToLower()] + "=" + v.Value[0].ToString() + ",";
-                                    line += ls[("Vertical Acceleration").ToLower()] + "=" + v.Value[1].ToString() + ",";
-                                    line += ls[("Horizontal Acceleration 2").ToLower()] + "=" + v.Value[2].ToString() + " ";
+                                    string s1 = ls.Keys.Contains("Horizontal Acceleration 1".ToLower())
+                                                                                  ? ls["Horizontal Acceleration 1".ToLower()]
+                                                                                  : "NA";
+                                    string s2 = ls.Keys.Contains("Vertical Acceleration".ToLower())
+                                                   ? ls["Vertical Acceleration".ToLower()]
+                                                  : "NA";
+                                    string s3 = ls.Keys.Contains("Horizontal Acceleration 2".ToLower())
+                                            ? ls["Horizontal Acceleration 2".ToLower()]
+                                            : "NA";
+
+                                    if (s1 == "NA" && s2 == "NA" && s3 == "NA")
+                                    {
+                                        continue;
+                                    }
+
+                                    line += s1 + "=" + v.Value[0].ToString() + ",";
+                                    line += s2 + "=" + v.Value[1].ToString() + ",";
+                                    line += s3 + "=" + v.Value[2].ToString() + " ";
                                     line += v.Key;
 
                                     lines.Add(line);
@@ -431,7 +515,7 @@
                         }
 
                         var linesArray = lines.ToArray();
-
+                        await JsRuntime.InvokeVoidAsync("alert", linesArray.Count().ToString() + "... to be written to Influx");
                         await InfluxService.WriteData(linesArray);
 
                     }
@@ -444,10 +528,12 @@
                 isAdding = false;
                 await JsRuntime.InvokeVoidAsync("alert", "No data written..." + ex.Message);
                 throw new Exception("some exeption in Files Upload");//???rafic deveopement mode
-                                                                     //Logger.LogError("File: {Filename} Error: {Error}",
-                                                                     //    file.Name, ex.Message);
+                //Logger.LogError("File: {Filename} Error: {Error}",
+                //    file.Name, ex.Message);
             }
         }
+
+        TotalRecords = await AliantWebS.Data.InfluxService.CountRecords();
 
     }
 
@@ -460,7 +546,7 @@
         }
 
 
-        if (await JsRuntime.InvokeAsync<bool>("confirm", $"Data will be deleted. Are you sure you want to continue?"))
+        if (await JsRuntime.InvokeAsync<bool>("confirm", $"Data will be deleted for the selected sensor. Are you sure you want to continue?"))
         {
             if(await InfluxService.DeleteData(startDate, endDate, selectedElements.Select(x => x.ElementId.ToString()).ToList()))
             {
@@ -470,6 +556,8 @@
             {
                 await JsRuntime.InvokeVoidAsync("alert", "No Data deleted...");
             }
+            TotalRecords = await AliantWebS.Data.InfluxService.CountRecords();
+            StateHasChanged();
         }
     }
 
@@ -486,8 +574,29 @@
             {
                 await JsRuntime.InvokeVoidAsync("alert", "No Data deleted...");
             }
+            TotalRecords = await AliantWebS.Data.InfluxService.CountRecords();
+            StateHasChanged();
         }
     }
+
+    private void SensorRowSelect(Element element)
+    {
+        hightlightedSensor = element;
+    }
+
+    private string color(ChannelDataType channelDataType)
+    {
+        if (hightlightedSensor != null && hightlightedSensor.ElementType.ChannelDataTypeElementTypes.Select(x => x.ChannelDataTypeId).Contains(channelDataType.ChannelDataTypeId))
+        {
+            return "blue";
+        }
+        else
+        {
+            return "white";
+            
+        }
+    }
+
 
 
 

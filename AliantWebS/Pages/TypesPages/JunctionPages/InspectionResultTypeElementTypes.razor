@@ -32,7 +32,7 @@
 
     public override async Task SetParametersAsync(ParameterView parameters)
     {
-        inspectionResultType = (InspectionResultType)AppData.obj;
+        inspectionResultType = (InspectionResultType)AppData.obj1;
         entitiesService.LoadCollection(inspectionResultType, "InspectionResultTypeElementTypes");
         await base.SetParametersAsync(parameters);
     }

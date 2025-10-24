@@ -1,0 +1,622 @@
+﻿@page "/Sites"
+@using AliantWebS.Data
+@inject EntitiesService entitiesService
+@using Models
+@using AliantWebS.Pages.Inventory
+
+@inject NavigationManager navigationManager
+@inject AppData appData;
+@inject IJSRuntime js
+@inject IStringLocalizer<Languages> L
+
+<style>
+  .page-head {
+    display:flex; align-items:center; gap:1rem; margin-bottom:.5rem;
+  }
+  .page-head h3 { margin:0; }
+  .head-spacer { margin-left:auto; display:flex; align-items:center; gap:.75rem; }
+  .view-toggle {
+    display:flex; align-items:center; gap:.5rem;
+    padding:.25rem .6rem; border:1px solid rgba(0,0,0,.08);
+    border-radius:999px; background:#fafafa;
+  }
+  .soft-card {
+    border:1px solid rgba(0,0,0,.08);
+    border-radius:14px; padding:12px; background:#fff;
+  }
+  .dropdown-row { display:flex; align-items:center; gap:.75rem; flex-wrap:wrap; }
+  
+  /* NEW: Styles for structures section */
+  .structures-section {
+    padding: 8px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin: 4px;
+  }
+  .structures-header {
+    display: flex; 
+    align-items: center; 
+    gap: 1rem; 
+    margin-bottom: 0.5rem;
+    padding: 8px 12px;
+    background: white;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    flex-wrap: wrap;
+  }
+  .structures-header h4 { margin: 0; color: #495057; }
+  .site-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  .site-tag {
+    background: #007bff;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.8em;
+    white-space: nowrap;
+  }
+  .all-sites-tag {
+    background: #6c757d;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.8em;
+  }
+</style>
+
+<Div class="page-head">
+  <h3>Sites Info</h3>
+
+  <div class="head-spacer">
+    <div class="view-toggle" title="@L["Toggle view"]">
+      <span class="oi oi-list" aria-hidden="true"></span>
+      <RadzenSwitch @bind-Value="useDropdown" Style="transform:scale(.9)" />
+      <span class="oi oi-caret-bottom" aria-hidden="true"></span>
+    </div>
+
+    <Label> @L["Page Size"]: </Label>
+    <RadzenNumeric @bind-Value="PageSize" Style="width:60px"></RadzenNumeric>
+  </div>
+</Div>
+
+@if (sitesList is null)
+{
+    <p><em>@L["Loading"]... !</em></p>
+}
+else
+{
+    <Div Style="display:flex; gap:.5rem; align-items:center;">
+      <NavLink class="nav-link" href="AddSite">
+        <span class="oi oi-plus" aria-hidden="true">@L["Add New"]</span>
+      </NavLink>
+
+      <a title="@L["Reporting"]" class="nav-link" @onclick="@(args => Report())" @onclick:preventDefault="true" href="">
+        <span class="oi oi-document" aria-hidden="true"></span>
+      </a>
+    </Div>
+
+    @* NEW: Outer vertical splitter to accommodate structures at bottom *@
+    <RadzenSplitter Orientation="Radzen.Orientation.Vertical" style="height: 100%; border: 1px solid rgba(0,0,0,.08);">
+      
+      @* Top section: Existing Sites layout *@
+      <RadzenSplitterPane Size="60%">
+        <RadzenSplitter Orientation="Radzen.Orientation.Horizontal" style="height: 100%; border: 1px solid rgba(0,0,0,.08);">
+          <RadzenSplitterPane Size="50%">
+
+            <RadzenSplitter Orientation="Radzen.Orientation.Vertical" style="height: 100%; border: 1px solid rgba(0,0,0,.08);">
+              <RadzenSplitterPane Size="auto">
+
+                @* --- TOGGLEABLE AREA START --- *@
+                @if (!useDropdown)
+                {
+                    <RadzenDataGrid class="RadzenDataGrid soft-card" @ref="sitesGrid" AllowFiltering="true" AllowPaging="true" AllowSorting="true"
+                                    PageSize="PageSize" Data="@sitesList" TItem="Site" ColumnWidth="150px"
+                                    SelectionMode="DataGridSelectionMode.Multiple" @bind-Value="@SelectedSites">
+                        <Columns>
+                            <RadzenDataGridColumn TItem="Site" Property="Name" Title="@L["Name"]"></RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="Site" Property="ShortDescription" Title="@L["Short Description"]"></RadzenDataGridColumn>
+
+                            <RadzenDataGridColumn TItem="Site" Property="Name" Title="@L["Action"]" Filterable="false" Sortable="false">
+                                <Template Context="data">
+                                    <Div Style="display:flex; gap:.25rem;">
+                                        <a title="@L["Edit"]" class="nav-link" href="EditSite/@data.SiteId">
+                                            <span class="oi oi-pencil" aria-hidden="true"></span>
+                                        </a>
+                                        <a title="@L["Delete"]" @onclick="@(() => DeleteSite(data))" @onclick:preventDefault="true" href="">
+                                            <span class="oi oi-trash" aria-hidden="true"></span>
+                                        </a>
+                                        <a title="@L["Reporting"]" class="nav-link" @onclick="@(args => Report(data))" @onclick:preventDefault="true" href="">
+                                            <span class="oi oi-document" aria-hidden="true"></span>
+                                        </a>
+                                    </Div>
+                                </Template>
+                            </RadzenDataGridColumn>
+                        </Columns>
+                    </RadzenDataGrid>
+                }
+                else
+                {
+                    <div class="soft-card">
+                      <div class="dropdown-row">
+                        <Label style="min-width:110px;">@L["Choose sites"]:</Label>
+                                        <RadzenDropDown Data="@sitesList"
+                                                        TItem="Site"
+                                                        TValue="IList<Site>"
+                                                        TextProperty="Name"
+                                                        @bind-Value="SelectedSites"                                                    
+                                                        Multiple="true"
+                                                        AllowClear="true"
+                                                        AllowSelectAll="true"
+                                                        Chips="true"
+                                                        FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                                        Style="min-width:360px"
+                                                        Placeholder="@L["Search or pick multiple sites..."]" />
+
+                        <RadzenButton ButtonStyle="ButtonStyle.Primary" 
+                                      Size="ButtonSize.Small" 
+                                      Text="@L["Open Selected"]"
+                                      Disabled="@(!SelectedSites?.Any() ?? true)"
+                                      Click="@HandleOpenSelected" />
+                      </div>
+                    </div>
+                }
+                @* --- TOGGLEABLE AREA END --- *@
+
+              </RadzenSplitterPane>
+
+              @if (useDropdown)
+              {
+                  <RadzenSplitterPane>
+                               @* NEW: Add Radzen Tabs for AI Prompt and Attribute Selection *@
+                      <RadzenTabs Style="height: 100%;">
+                        <Tabs>
+                          @* Tab 1: AI Prompt *@
+                          <RadzenTabsItem Text="@L["AI Prompt"]" Icon="chat">
+                            <div style="padding: 16px; height: 100%; display: flex; flex-direction: column; gap: 12px;">
+                              <div style="flex-grow: 1;">
+                                <RadzenLabel Text="@L["Enter your prompt to customize structure display:"]" Style="font-weight: 500; margin-bottom: 8px; display: block;" />
+                                <RadzenTextArea @bind-Value="aiPromptText" 
+                                                Placeholder="@L["Example: I want to display inertia with respect to x axis and material properties..."]"
+                                                Style="width: 100%; min-height: 120px; resize: vertical;" 
+                                                Rows="5" />
+                              </div>
+                              <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                                <RadzenButton ButtonStyle="ButtonStyle.Primary" 
+                                              Text="@L["Apply AI Prompt"]" 
+                                              Icon="send" 
+                                              Click="@ApplyAIPrompt" 
+                                              Disabled="@(string.IsNullOrWhiteSpace(aiPromptText) || isProcessingAI)" />
+                                <RadzenButton ButtonStyle="ButtonStyle.Light" 
+                                              Text="@L["Clear"]" 
+                                              Icon="clear" 
+                                              Click="@ClearAIPrompt" />
+                                @if (isProcessingAI)
+                                {
+                                    <RadzenProgressBarCircular ShowValue="false" Size="ProgressBarCircularSize.Small" />
+                                    <RadzenLabel Text="@L["Processing..."]" Style="font-size: 0.9em; color: #666;" />
+                                }
+                              </div>
+                            </div>
+                          </RadzenTabsItem>
+
+                          @* Tab 2: Attribute Checkboxes *@
+                          <RadzenTabsItem Text="@L["Select Attributes"]" Icon="check_box">
+                            <div style="padding: 16px; height: 100%; overflow-y: auto;">
+                              <RadzenLabel Text="@L["Choose attributes to display in structure grid:"]" Style="font-weight: 500; margin-bottom: 12px; display: block;" />
+                              
+                              @if (availableAttributes?.Any() == true)
+                              {
+                                  <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 8px;">
+                                    @foreach (var attribute in availableAttributes)
+                                    {
+                                        <div style="display: flex; align-items: center; gap: 8px;">
+                                            <RadzenCheckBox @bind-Value="@selectedAttributesDict[attribute.Name]" 
+                                                            Name="@($"attr_{attribute.Name}")" 
+                                                 Change="@((bool value) => OnAttributeSelectionChanged(value))" />
+
+                                                    <RadzenLabel Text=@(attribute.Name)
+                                                         Component="@($"attr_{attribute.Name}")" 
+                                                         Style="cursor: pointer; font-size: 0.9em;" 
+                                                          />
+
+                                         
+                                        </div>
+                                    }
+                                  </div>
+                                  
+                                  <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid #eee;">
+                                    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                                      <RadzenButton ButtonStyle="ButtonStyle.Success" 
+                                                    Text="@L["Apply Selection"]" 
+                                                    Icon="done" 
+                                                    Click="@ApplyAttributeSelection" 
+                                                    Size="ButtonSize.Small"
+                                                    Disabled="@(!selectedAttributesDict.Values.Any(v => v))" />
+                                      <RadzenButton ButtonStyle="ButtonStyle.Light" 
+                                                    Text="@L["Select All"]" 
+                                                    Icon="select_all" 
+                                                    Click="@SelectAllAttributes" 
+                                                    Size="ButtonSize.Small" />
+                                      <RadzenButton ButtonStyle="ButtonStyle.Light" 
+                                                    Text="@L["Clear All"]" 
+                                                    Icon="clear_all" 
+                                                    Click="@ClearAllAttributes" 
+                                                    Size="ButtonSize.Small" />
+                                      <span style="margin-left: auto; font-size: 0.9em; color: #666;">
+                                        @L["Selected"]: @selectedAttributesDict.Values.Count(v => v) / @availableAttributes.Count()
+                                      </span>
+                                    </div>
+                                  </div>
+                              }
+                              else
+                              {
+                                  <div style="text-align: center; color: #666; padding: 40px;">
+                                    <RadzenIcon Icon="hourglass_empty" Style="font-size: 2em; margin-bottom: 12px; display: block; opacity: 0.3;" />
+                                    <p>@L["Loading available attributes..."]</p>
+                                  </div>
+                              }
+                            </div>
+                          </RadzenTabsItem>
+                        </Tabs>
+                      </RadzenTabs>
+                  </RadzenSplitterPane>
+              }
+            </RadzenSplitter>
+
+          </RadzenSplitterPane>
+
+          <RadzenSplitterPane>
+            @* Tabbed interface for Map and Media *@
+            <RadzenTabs Style="height: 100%;">
+              <Tabs>
+                        <RadzenTabsItem Text="@L["Map"]" Icon="map">
+                  @if (coordinates != null)
+                  {
+                      <AliantWebS.Pages.SharedComponents.MapComponent Coordinates="coordinates" Scale="9"></AliantWebS.Pages.SharedComponents.MapComponent>
+                  }
+                  else
+                  {
+                      <div style="padding: 20px; text-align: center; color: #666;">
+                        <p>@L["Loading map data"]...</p>
+                      </div>
+                  }
+                </RadzenTabsItem>
+                
+                <RadzenTabsItem Text="@L["Media"]" Icon="photo">
+                  @if (SelectedSites?.Any() == true)
+                  {
+                      <div style="padding: 12px; height: 100%; overflow-y: auto;">
+                                        @foreach (var site in SelectedSites)
+                        {
+                            <div style="margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+                                <div style="display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 12px;">
+                                    <h5 style="margin: 0; color: #333;">@site.Name</h5>
+                                    @if (!string.IsNullOrEmpty(site.ShortDescription))
+                                    {
+                                        <span style="color: #999; font-size: 0.9em;">•</span>
+                                        <p style="margin: 0; color: #666; font-size: 0.9em; font-style: italic;">@site.ShortDescription</p>
+                                    }
+                                </div>
+                                <MediaComponent selectedObject="site"></MediaComponent>
+                            </div>
+                        }
+                      </div>
+                  }
+                  else
+                  {
+                      <div style="padding: 20px; text-align: center; color: #666;">
+                        <span class="oi oi-camera-slr" style="font-size: 2em; margin-bottom: 10px; display: block; opacity: 0.3;"></span>
+                        <p>@L["Select sites to view media"]</p>
+                      </div>
+                  }
+                </RadzenTabsItem>
+              </Tabs>
+            </RadzenTabs>
+          </RadzenSplitterPane>
+        </RadzenSplitter>
+      </RadzenSplitterPane>
+
+      @* NEW: Bottom section for StructuresComponent *@
+      <RadzenSplitterPane Size="40%">
+        <div class="structures-section">
+          <div class="structures-header">
+            <h4>@L["Structures"]</h4>
+                    @if (SelectedSites?.Any() == true)
+            {
+                <div class="site-tags">
+                            @foreach (var site in SelectedSites.Take(3))
+                    {
+                        <span class="site-tag">@site.Name</span>
+                    }
+                            @if (SelectedSites.Count() > 3)
+                    {
+                                <span class="site-tag">+@(SelectedSites.Count() - 3) more</span>
+                    }
+                </div>
+            }
+            else
+            {
+                <span class="all-sites-tag">@L["All Sites"]</span>
+            }
+          </div>
+
+          @* NEW: Reuse StructuresComponent *@
+                <StructuresInfoComponent @ref=structuresInfoComponent SiteID="@CurrentSiteId" />
+        </div>
+      </RadzenSplitterPane>
+    </RadzenSplitter>
+}
+
+@code {
+    StructuresInfoComponent structuresInfoComponent;
+
+    List<Site> sitesList;
+    List<Structure> structureList;
+
+    Site selectedSite;
+
+    int PageSize { get; set; } = 10;
+
+    RadzenDataGrid<Site> sitesGrid;
+
+    // view toggle + dropdown selection
+    bool useDropdown { get; set; } = false;
+
+
+    // Multiple selection support   
+    IList<Site> selectedSites = new List<Site>();
+    IList<Site> SelectedSites {
+        get { return selectedSites; } 
+        set {
+            if (selectedSites == value) return;
+            selectedSites = value;
+            coordinates.Clear();
+            coordinates = selectedSites.Select(a => a.Geolocation != null ? (a.SiteId.ToString(), "Site", a.Name, a.Geolocation.Coordinate.X, a.Geolocation.Coordinate.Y, 100) : ((string, string, string, double, double, double)?)null).ToList();
+
+            _ = Task.Run(async () => await UpdateStructureListBasedOnSelection(SelectedSites.Select(x => x.SiteId).ToList()));
+
+        } 
+    }
+
+
+        // NEW: AI Prompt and Attribute Selection variables
+    string aiPromptText = "";
+    bool isProcessingAI = false;
+    List<(string Name, string Description)> availableAttributes = new();
+    Dictionary<string, bool> selectedAttributesDict = new();
+
+
+    @* NEW: Computed property for passing to StructuresComponent *@
+    Guid CurrentSiteId
+    {
+        get
+        {
+            if (useDropdown)
+            {
+                return SelectedSites?.FirstOrDefault()?.SiteId ?? Guid.Empty;
+            }
+            else
+            {
+                return SelectedSites?.FirstOrDefault()?.SiteId ?? Guid.Empty;
+            }
+        }
+    }
+
+    public List<(string id, string Type, string Name, double X, double Y, double C)?> coordinates { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        appData.Structure = null;
+        sitesList = await entitiesService.GetAllEntitiesAsync<Site>();
+        structureList = await entitiesService.GetAllEntitiesAsync<Structure>();
+
+        coordinates = sitesList.Select(a => a.Geolocation != null ? (a.SiteId.ToString(),"Site", a.Name, a.Geolocation.Coordinate.X, a.Geolocation.Coordinate.Y, 100) : ((string,string, string,double, double,double)?)null).ToList();
+        coordinates.AddRange(structureList.Select(a => a.Geolocation != null ? (a.StructureId.ToString(), "Structure", a.Name, a.Geolocation.Coordinate.X, a.Geolocation.Coordinate.Y, 100) : ((string, string, string, double, double, double)?)null).ToList());
+
+        await LoadAvailableAttributes();  
+    }
+
+    private async Task UpdateStructureListBasedOnSelection(List<Guid> SelectedSiteIDs)
+    {
+        var allStructures = await entitiesService.GetAllEntitiesAsync<Structure>();
+
+
+        if (SelectedSiteIDs.Any())
+        {
+            structureList = allStructures.Where(s => SelectedSiteIDs.Contains(s.SiteId ?? Guid.Empty)).ToList();
+        }
+        else
+        {
+            // If no sites selected, show all structures
+            structureList = allStructures;
+        }
+        coordinates.AddRange(structureList.Select(a => a.Geolocation != null ? (a.StructureId.ToString(), "Structure", a.Name, a.Geolocation.Coordinate.X, a.Geolocation.Coordinate.Y, 100) : ((string, string, string, double, double, double)?)null).ToList());
+
+        // Reload attributes for the updated structure list
+        await LoadAvailableAttributes();
+        StateHasChanged();
+    }
+
+    private async Task LoadAvailableAttributes()
+    {
+        try
+        {
+            if (structureList == null || !structureList.Any())
+            {
+                availableAttributes = new List<(string Name, string Description)>();
+                selectedAttributesDict = new Dictionary<string, bool>();
+                return;
+            }
+
+            List<(string Name, string Description, string Value)> allAttributes = new List<(string Name, string Description, string Value)>();
+
+            // Use the current structureList directly
+            foreach (Structure structure in structureList)
+            {
+                var attributes = await AttributeExtractor.ExtractInfoAsync(entitiesService, structure);
+                allAttributes.AddRange(attributes);
+            }
+
+            availableAttributes = allAttributes
+                .GroupBy(t => t.Name)
+                .Select(g => (g.Key, g.First().Description))
+                .OrderBy(t => t.Key)
+                .ToList();
+
+            // Initialize selection dictionary
+            selectedAttributesDict = availableAttributes.ToDictionary(x => x.Name, x => false);
+
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            availableAttributes = new List<(string Name, string Description)>();
+            selectedAttributesDict = new Dictionary<string, bool>();
+        }
+    }
+
+    // NEW: AI Prompt Methods
+    private async Task ApplyAIPrompt()
+    {
+        if (string.IsNullOrWhiteSpace(aiPromptText) || structuresInfoComponent == null)
+            return;
+
+        isProcessingAI = true;
+        StateHasChanged();
+
+        try
+        {
+            
+        }
+        catch (Exception ex)
+        {
+            await js.InvokeVoidAsync("alert", $"Error processing AI prompt: {ex.Message}");
+        }
+        finally
+        {
+            isProcessingAI = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ClearAIPrompt()
+    {
+        aiPromptText = "";
+        StateHasChanged();
+    }
+
+    // NEW: Attribute Selection Methods
+    private void OnAttributeSelectionChanged(bool b)
+    {
+        StateHasChanged();
+    }
+
+    private async Task ApplyAttributeSelection()
+    {
+        if (structuresInfoComponent == null)
+            return;
+
+        var selectedAttributes = selectedAttributesDict
+            .Where(kvp => kvp.Value)
+            .Select(kvp => kvp.Key)
+            .ToList();
+
+        try
+        {
+            // Apply selected attributes - you'll need to add this method to StructuresInfoComponent
+         
+        }
+        catch (Exception ex)
+        {
+            await js.InvokeVoidAsync("alert", $"Error applying attribute selection: {ex.Message}");
+        }
+    }
+
+    private void SelectAllAttributes()
+    {
+        foreach (var key in selectedAttributesDict.Keys.ToList())
+        {
+            selectedAttributesDict[key] = true;
+        }
+        StateHasChanged();
+    }
+
+    private void ClearAllAttributes()
+    {
+        foreach (var key in selectedAttributesDict.Keys.ToList())
+        {
+            selectedAttributesDict[key] = false;
+        }
+        StateHasChanged();
+    }
+
+    // void RowSelect(Site site)
+    // {
+    //     // selectedSite = site;
+    //     // // Update selected sites for consistency
+    //     // if (!SelectedSites.Contains(site))
+    //     // {
+    //     //     SelectedSites.Add(site);
+    //     // }
+
+
+    // }
+
+
+
+    void HandleOpenSelected()
+    {
+        if (SelectedSites?.Any() == true)
+        {
+            // Navigate to first selected site or handle multiple selection as needed
+            var firstSiteId = SelectedSites.First().SiteId;
+            navigationManager.NavigateTo($"EditSite/{firstSiteId}");
+        }
+    }
+
+    async Task DeleteSite(Site site)
+    {
+        var isConfirmed = await js.InvokeAsync<bool>("confirm", $"Are you sure you want to delete this site?");
+        if (isConfirmed)
+        {
+            try
+            {
+                if (await entitiesService.DeleteEntityAsync(site))
+                {
+                    if (sitesList.Remove(site))
+                    {
+                        await sitesGrid?.Reload();
+                        
+                        // Remove from selections
+                        if (SelectedSites.Contains(site))
+                        {
+                            SelectedSites.Remove(site);
+                        }
+                        if (selectedSite?.SiteId == site.SiteId) 
+                        { 
+                            selectedSite = null; 
+                        }
+                    }
+                }
+            }
+            catch(Exception ex)
+            {
+                await js.InvokeVoidAsync("alert", "Error: " + ex.Message);
+            }
+        }
+    }
+
+    void Report(Site site)
+    {
+        // Reporting.Reporting rep = new Reporting.Reporting(site, entitiesService);
+    }
+
+    void Report()
+    {
+        // Reporting.Reporting rep = new Reporting.Reporting(sitesList, entitiesService);
+    }
+}

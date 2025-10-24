@@ -163,7 +163,7 @@ namespace AliantDesktop
 
 
 
-            object[,] la = AI.Helpers.ConvertTo2DArray(await InfluxService.GetDataByTag(sensors.Select(e => e.ElementId.ToString()).ToList(), channelDataTypeList.Select(x => x.ChannelDataTypeId.ToString()).ToList(), startDate1, endDate1));
+            object[,] la = Helpers.Helpers.ConvertTo2DArray(await InfluxService.GetDataByTag(sensors.Select(e => e.ElementId.ToString()).ToList(), channelDataTypeList.Select(x => x.ChannelDataTypeId.ToString()).ToList(), startDate1, endDate1));
 
             if (la.Length == 0)
             {
@@ -219,16 +219,16 @@ namespace AliantDesktop
 
 
 
-            var qtime = AI.Helpers.ConvertToDoubleArray(pivotedTable);
+            var qtime = Helpers.Helpers.ConvertToDoubleArray(pivotedTable);
 
             int numColumns = pivotedTable.GetLength(1);
 
             for (int i = 0; i < numColumns; i++)
             {
-                AI.Helpers.InterpolateColumn(qtime, i);
+                Helpers.Helpers.InterpolateColumn(qtime, i);
             }
 
-            var result = Structural.SP.GetSubsequences(AI.Helpers.ConvertToDoubleMatrix(qtime), sequenceLength: 1000, thresholdPercentage: 0.4, refSensor: 1);
+            var result = Structural.SP.GetSubsequences(Helpers.Helpers.ConvertToDoubleMatrix(qtime), sequenceLength: 1000, thresholdPercentage: 0.4, refSensor: 1);
 
             List<int> trigerPoints = result.TriggerPoints;
             List<double[,]> subsequences = result.Subsequences;

@@ -1,0 +1,11 @@
+Object:Element, name: NodeForSensors
+Object:Element, category: sensing device, type: inclinometer,  name: I1, parent:NodeForSensors, channelDataType:temperature|x_axis|y_axis
+Object:Element, category: sensing device, type: potentiometer,  name: E1, parent:NodeForSensors, channelDataType:temperature|extension
+Object:Element, category: sensing device, type: potentiometer,  name: F1, parent:NodeForSensors, channelDataType:temperature|extension
+Object:Element, category: sensing device, type: hygrometer,  name: H1, parent:NodeForSensors, channelDataType:external_temperature|internal_temperature|humidity
+Object:Element, category: sensing device, type: weight_scale,  name: M1, parent:NodeForSensors, channelDataType:temperature|weight
+Object:Element, category: sensing device, type: strain_gauge,  name: J1, parent:NodeForSensors, channelDataType:temperature|strain
+Object:Element, category: sensing device, type: wind_station,  name: WIND, parent:NodeForSensors, channelDataType:speed|direction
+Object:Element, category: sensing device, type: snow_scale,  name: SNOW, parent:NodeForSensors, channelDataType:temperature|weight
+
+

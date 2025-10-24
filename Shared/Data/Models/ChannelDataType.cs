@@ -31,5 +31,5 @@ public partial class ChannelDataType
     public byte[]? Icon { get; set; }
 
     [InverseProperty("ChannelDataType")]
-    public virtual ICollection<ChannelDataTypeElementType> ChannelDataTypeElementTypes { get; } = new List<ChannelDataTypeElementType>();
+    public virtual ICollection<ChannelDataTypeElementType> ChannelDataTypeElementTypes { get; set; } = new List<ChannelDataTypeElementType>();
 }

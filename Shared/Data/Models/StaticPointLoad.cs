@@ -25,10 +25,13 @@ public partial class StaticPointLoad
 
     public double? ApplicationPointDistance { get; set; }
 
+    [Column("DOF")]
+    public int? Dof { get; set; }
+
     [ForeignKey("LoadCaseId")]
     [InverseProperty("StaticPointLoads")]
     public virtual LoadCase LoadCase { get; set; } = null!;
 
     [InverseProperty("StaticPointLoad")]
-    public virtual ICollection<StaticPointLoadElement> StaticPointLoadElements { get; } = new List<StaticPointLoadElement>();
+    public virtual ICollection<StaticPointLoadElement> StaticPointLoadElements { get; set; } = new List<StaticPointLoadElement>();
 }

@@ -130,7 +130,7 @@ namespace Structural
             double yj = noeud[elem.Field<int>("Noeudj")][1];
             double E = elem.Field<double>("E");
             double S = elem.Field<double>("S");
-            double I = elem.Field<double>("I");
+            double I = elem.Field<double>("Iy");
 
             double L = Math.Sqrt(Math.Pow(xj - xi, 2) + Math.Pow(yj - yi, 2));
             double L2 = L * L;

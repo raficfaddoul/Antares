@@ -191,7 +191,7 @@
                 SelectedDefect.ElementId = SelectedDescendantID;
                 SelectedDefect.DefectTypeId = SelectedDefectTypeID;
                 SelectedDefect.DefectType = DefectTypesList.Find(x => x.DefectTypeId == SelectedDefectTypeID);
-                SelectedDefect.Date = DateTime.Now;
+                SelectedDefect.Date = DateOnly.FromDateTime(DateTime.Now);
                 SelectedDefect.DefectId = Guid.Parse("7c9e6679-7425-40de-944b-e07fc1f90ae7");
 
 
@@ -212,7 +212,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        element = (Element)AppData.obj;
+        element = (Element)AppData.obj1;
 
         if (element == null) navigationManager.NavigateTo("/Structures");
 

@@ -5,6 +5,14 @@
 @using System.Text.Json;
 ﻿@using Plotly.Blazor.LayoutLib
 @using Plotly.Blazor.Traces.ScatterLib
+@using Microsoft.EntityFrameworkCore
+@using OperationalModalAnalysis
+@using Accord.Math
+@using MathNet.Numerics.LinearAlgebra
+@using System.Globalization
+@using System.Text;
+@using LDM = OperationalModalAnalysis.LocalisationDetectionMethod
+
 @inject IStringLocalizer<Languages> L
 @inject IJSRuntime JsRuntime
 @inject EntitiesService entitiesService
@@ -19,28 +27,37 @@
                 <Column ColumnSize="ColumnSize.Is6">
                     <div class="form-group ">
                         <div>
-                            <label>@L["Number of time steps"] :</label>
+                            <label>@L["threshold"] :</label>
                             <div>
-                                <InputNumber @bind-Value="@nbTimeSteps" />
-                                <ValidationMessage For="@(() => nbTimeSteps)" />
+                                <InputNumber @bind-Value="@threshold" />
+                                <ValidationMessage For="@(() => threshold)" />
                             </div>
                         </div>
                     </div>
                     <div class="form-group ">
                         <div>
-                            <label>@L["Time step"] :</label>
+                            <label>@L["Frequency"] :</label>
                             <div>
-                                <InputNumber @bind-Value="@timeStep" />
-                                <ValidationMessage For="@(() => timeStep)" />
+                                <InputNumber @bind-Value="@hertz" />
+                                <ValidationMessage For="@(() => hertz)" />
                             </div>
                         </div>
                     </div>
                     <div class="form-group ">
                         <div>
-                            <label>@L["Number of modes"] :</label>
+                            <label>@L["nt"] :</label>
                             <div>
-                                <InputNumber @bind-Value="@nbModes" />
-                                <ValidationMessage For="@(() => nbModes)" />
+                                <InputNumber @bind-Value="@nt" />
+                                <ValidationMessage For="@(() => nt)" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group ">
+                        <div>
+                            <label>@L["overlapping"] :</label>
+                            <div>
+                                <InputCheckbox @bind-Value="@overlapping" />
+                                <ValidationMessage For="@(() => overlapping)" />
                             </div>
                         </div>
                     </div>
@@ -51,41 +68,61 @@
                 <Column ColumnSize="ColumnSize.Is6">
                     <div class="form-group ">
                         <div>
-                            <label>@L["Time step"] :</label>
+                            <label>@L["Min Mode"] :</label>
                             <div>
-                                <InputNumber @bind-Value="@timeStep" />
-                                <ValidationMessage For="@(() => timeStep)" />
+                                <InputNumber @bind-Value="@minMode" />
+                                <ValidationMessage For="@(() => minMode)" />
                             </div>
                         </div>
                     </div>
 
                     <div class="form-group ">
                         <div>
-                            <label>@L["Nb Analysis Steps"] :</label>
+                            <label>@L["Max Mode"] :</label>
                             <div>
-                                <InputNumber @bind-Value="@nbAnalysisSteps" />
-                                <ValidationMessage For="@(() => nbAnalysisSteps)" />
+                                <InputNumber @bind-Value="@maxMode" />
+                                <ValidationMessage For="@(() => maxMode)" />
                             </div>
                         </div>
                     </div>
 
                     <div class="form-group ">
                         <div>
-                            <label>@L["Nb Series Averaging"] :</label>
+                            <label>@L["sampleToSave"] :</label>
                             <div>
-                                <InputNumber @bind-Value="@nbSeriesAveraging" />
-                                <ValidationMessage For="@(() => nbSeriesAveraging)" />
+                                <InputNumber @bind-Value="@sampleToSave" />
+                                <ValidationMessage For="@(() => sampleToSave)" />
                             </div>
                         </div>
                     </div>
-                    <div class="form-group">
+
+                    <div class="form-group ">
+                        <div>
+                            <label>@L["savePath 1"] :</label>
+                            <div>
+                                <InputTextArea @bind-Value="@savePath1" />
+                                <ValidationMessage For="@(() => savePath1)" />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group ">
+                        <div>
+                            <label>@L["savePath 2"] :</label>
+                            <div>
+                                <InputTextArea @bind-Value="@savePath2" />
+                                <ValidationMessage For="@(() => savePath2)" />
+                            </div>
+                        </div>
+                    </div>
+
+                    @*                     <div class="form-group">
                         <label for="Category" class="control-label">@L["Shift Type"]</label>
                         <InputSelect TValue="string" class="form-control" @bind-Value="@shiftType">
                             <option value="Automatic">@L["Automatic"]...</option>
                             <option value="Constant">@L["Constant"]...</option>
                             <option value="Adaptif">@L["Adaptif"]...</option>
                         </InputSelect>
-                    </div>
+                    </div> *@
 
 
                 </Column>
@@ -93,21 +130,32 @@
             <Blazorise.Row>
                 <Column>
                     <div style="display:flex">
-                    <button type="button" class="btn btn-success" @onclick="@Calcul">
-                        @L["Calcul"]
-                    </button>
-                    <InputNumber @bind-Value=@vp1></InputNumber>
+                        <button type="button" class="btn btn-success" @onclick="HandleCalculate">
+                            @L["Calcul"]
+                        </button>
+                        <button type="button" class="btn btn-success" @onclick="Compare">
+                            @L["Compare"]
+                        </button>
+                        <button type="button" class="btn btn-success" @onclick="Compare">
+                            @L["Survey"]
+                        </button>
+                        <InputNumber @bind-Value=@vp1></InputNumber>
                         <InputNumber @bind-Value=@vp2></InputNumber>
                     </div>
- 
+
                 </Column>
             </Blazorise.Row>
         </EditForm>
 
     </RadzenSplitterPane>
     <RadzenSplitterPane>
-        <PlotlyChart style="height:100%;width:100%" @bind-Config="@chartBundles["modalDeformation"].Config" @bind-Layout="@chartBundles["modalDeformation"].Layout" @bind-Data="@chartBundles["modalDeformation"].Data" @ref=@chartBundles["modalDeformation"].Chart />
 
+        @if (VecteursPropres != null)
+        {
+            <ModalShapesComponent structure="appData.Structure" SensorsIDs="SensorsIDs" VecteursPropres="VecteursPropres"></ModalShapesComponent>
+        }
+        @*         <PlotlyChart style="height:100%;width:100%" @bind-Config="@chartBundles["modalDeformation"].Config" @bind-Layout="@chartBundles["modalDeformation"].Layout" @bind-Data="@chartBundles["modalDeformation"].Data" @ref=@chartBundles["modalDeformation"].Chart />
+ *@
 
 
     </RadzenSplitterPane>
@@ -159,9 +207,9 @@
 
             Layout = new Plotly.Blazor.Layout()
                 {
-                    //Title = new Title { Text = "Time Series Plot" },
+                //Title = new Title { Text = "Time Series Plot" },
                     XAxis = new[]
-                                                        {
+                                                            {
                 new XAxis
                 {
                     Title = new Plotly.Blazor.LayoutLib.XAxisLib.Title
@@ -185,19 +233,37 @@
 
     Structural.Structure structuralStructure;
 
+
+    double threshold = 0.1;
+    double hertz = 250;
+    int nt = 500;
+    double minMode = 0.0;
+    double maxMode = 0.1;
+    int sampleToSave = 1000;
+    int hackelBlock = 10;
+    bool overlapping = true;
+    string savePath1 = string.Empty;
+    string savePath2 = string.Empty;
+
+
+    List<Guid> SensorsIDs { get; set; }
+    double[,] VecteursPropres { get; set; }
+
+
+
     protected override async Task OnInitializedAsync()
     {
-        PlotlyChartBundle modalDeformation1ChartBundle = new PlotlyChartBundle();
-   
+        //PlotlyChartBundle modalDeformation1ChartBundle = new PlotlyChartBundle();
 
-        chartBundles.Add("modalDeformation", modalDeformation1ChartBundle);
- 
+
+        // chartBundles.Add("modalDeformation", modalDeformation1ChartBundle);
+
     }
 
-    private void gg()
+    private async Task gg()
     {
         chartBundles["modalDeformation"].Data.Clear();
-        structuralStructure = Structural.Simulation.CreateStructure(appData.Structure,null, entitiesService);
+        structuralStructure = await Structural.Simulation.CreateStructure(appData.Structure, null, entitiesService);
 
         double[] ValeursPropres = null;
         double[,] VecteursPropres = null;
@@ -310,7 +376,7 @@
 
 
 
-        object[,] la = AI.Helpers.ConvertTo2DArray(await InfluxService.GetDataByTag(sensors.Select(e => e.ElementId.ToString()).ToList(), channelDataTypeList.Select(x => x.ChannelDataTypeId.ToString()).ToList(), startDate1, endDate1));
+        object[,] la = Helpers.Helpers.ConvertTo2DArray(await InfluxService.GetDataByTag(sensors.Select(e => e.ElementId.ToString()).ToList(), channelDataTypeList.Select(x => x.ChannelDataTypeId.ToString()).ToList(), startDate1, endDate1));
 
         if (la.Length == 0)
         {
@@ -366,16 +432,16 @@
 
 
 
-        var qtime = AI.Helpers.ConvertToDoubleArray(pivotedTable);
+        var qtime = Helpers.Helpers.ConvertToDoubleArray(pivotedTable);
 
         int numColumns = pivotedTable.GetLength(1);
 
         for (int i = 0; i < numColumns; i++)
         {
-            AI.Helpers.InterpolateColumn(qtime, i);
+            Helpers.Helpers.InterpolateColumn(qtime, i);
         }
 
-        var result = Structural.SP.GetSubsequences(AI.Helpers.ConvertToDoubleMatrix(qtime), sequenceLength: 1000, thresholdPercentage: 0.4, refSensor: 1);
+        var result = Structural.SP.GetSubsequences(Helpers.Helpers.ConvertToDoubleMatrix(qtime), sequenceLength: 1000, thresholdPercentage: 0.4, refSensor: 1);
 
         List<int> trigerPoints = result.TriggerPoints;
         List<double[,]> subsequences = result.Subsequences;
@@ -399,15 +465,195 @@
         // ir.Rigidités = new List<double>() { 1.0075, 0.9982, 0.9747, 0.9801, 1.0098, 1.0015, 0.9829, 0.9749, 0.9731, 0.9753, 0.9907, 0.9983, 1.014, 0.9677, 0.9569, 1.013, 0.9965, 1, 1.0004, 0.9945, 0.989, 0.9908, 0.9991, 0.9966, 0.9873, 0.991, 1.0008, 0.9973 };
 
         // await ir.Save(appData.Structure);
-  
+
 
         // //// exemple de load
         // Structural.IdentificationResult ir1 = new Structural.IdentificationResult();
         // ir1 = await ir1.Load(appData.Structure);
 
-   
+    }
 
 
+
+    private async void HandleCalculate()
+    {
+        var res = await Calculate(startDate1, endDate1);
+        SensorsIDs = res.Value.sensorsIDs;
+        VecteursPropres = res.Value.modesArray;
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// /////////////////////////////////////////////////////////////////////////////////////
+    /// </summary>
+    ///
+
+    async Task<(Vector<double> frequencies, Vector<double> damping, Matrix<double> modes, double[,] modesArray, List<Guid> sensorsIDs)?> Calculate(DateTime startDate, DateTime endDate)
+    {
+
+
+        DateTime start = startDate;// DateTime.Parse(Environment.GetEnvironmentVariable("START") ?? string.Empty); // nedd to be in local time
+        DateTime end = endDate;
+
+        AliantWebContext dbContext = entitiesService._appDBContext;
+
+        List<Guid?> elementsIDs = JsonSerializer.Deserialize<List<Guid?>>(ListJson);
+
+        List<Guid?> ChannelsDataTypeIDs = JsonSerializer.Deserialize<List<Guid?>>(ListJson1);
+
+        List<Element> sensors = await entitiesService.GetFilteredEntitiesAsync<Element>(a => (elementsIDs.Contains(a.ElementId) && (a.ElementType.ChannelDataTypeElementTypes.Count > 0)), "ElementType.ChannelDataTypeElementTypes");
+        IEnumerable<Guid?> elementTypesIDs = sensors.Select(x => x.ElementTypeId);
+
+
+        List<ChannelDataType> channelDataTypeList = await entitiesService.GetFilteredEntitiesAsync<ChannelDataType>(a => (ChannelsDataTypeIDs.Contains(a.ChannelDataTypeId)));
+
+        if (sensors.Count == 0)
+        {
+            await JsRuntime.InvokeVoidAsync("alert", "No sensors found.\n");
+            Console.WriteLine("No sensors found.\n");
+            return null;
+        }
+
+
+        // DateTime.Parse(Environment.GetEnvironmentVariable("END") ?? string.Empty);
+        // threshold = double.Parse(Environment.GetEnvironmentVariable("THRESHOLD") ?? "0.1", CultureInfo.InvariantCulture);
+        //ertz = double.Parse(Environment.GetEnvironmentVariable("HERTZ") ?? "250");
+        //nt = int.Parse(Environment.GetEnvironmentVariable("NT") ?? "500");
+        // minMode = double.Parse(Environment.GetEnvironmentVariable("MIN_MODE") ?? "0.0", CultureInfo.InvariantCulture);
+        // maxMode = double.Parse(Environment.GetEnvironmentVariable("MAX_MODE") ?? "0.1", CultureInfo.InvariantCulture);
+        //sampleToSave = int.Parse(Environment.GetEnvironmentVariable("SAMPLE_TO_SAVE") ?? "1000");
+        //int hackelBlock = int.Parse(Environment.GetEnvironmentVariable("HACKEL_BLOCK") ?? "10");
+        //bool overlapping = bool.Parse(Environment.GetEnvironmentVariable("OVERLAPPING") ?? "true");
+        // string savePath = forceSavePath is not null ? forceSavePath : Environment.GetEnvironmentVariable("SAVE_PATH") ?? $"{Environment.GetEnvironmentVariable("tmp")}/test.aliant" ?? SelectExistingPath("Enter the file to save result", false);
+
+        static bool triggerRandomdecrement(double previous, double data, double threshold) { return previous < data && data > threshold; }
+
+        List<object[]>? data = await InfluxService.GetData(sensors.Select(s => s.ElementId.ToString()).ToList(), channelDataTypeList.Select(c => c.ChannelDataTypeId.ToString()).ToList(), start, end);
+        if (data is null || data.Count == 0)
+        {
+            await JsRuntime.InvokeVoidAsync("alert", "No data found.\n");
+            Console.WriteLine("No data found.");
+            return null;
+        }
+
+        double[,] matrix = new double[sensors.Count, data.Count / sensors.Count];
+        //List<DateTime> times = [];
+        List<Guid> sensorIds = new List<Guid>();
+
+        for (int i = 0; i < sensors.Count; ++i)
+        {
+            Guid guid = sensors[i].ElementId;//   .Select(s => s.ElementId.ToString()).ToList()[i];
+
+            try
+            {
+                var dataCpt = data.Where(d => d[1].ToString() == guid.ToString()).ToList();
+                sensorIds.Add(guid);
+
+                for (int j = 0; j < dataCpt.Count; ++j)
+            {
+                var d = data[(i + 1) * j];
+               // times.Add(DateTime.Parse(d[0].ToString() ?? throw new Exception("No DateTime in influx data")));
+                matrix[i, j] = double.Parse(d[2].ToString() ?? throw new Exception("No data in influx"));
+            }
+            }
+            catch (Exception e)
+            {
+                int k = 1;
+            }
+        }
+
+        int directiveCaptor = 0;
+        double dt = 1 / hertz;
+
+        Ibrahim ibrahim = new(matrix, dt, directiveCaptor, sampleToSave, triggerRandomdecrement, nt, hackelBlock, overlapping);
+
+        IEnumerable<int> indices = ibrahim.GetIndices();
+        await ibrahim.SetIndices(indices);
+
+        Matrix<System.Numerics.Complex> vp = await ibrahim.GetVp();
+        Vector<System.Numerics.Complex> fp = await ibrahim.GetFp();
+        Vector<double> freq = await ibrahim.GetFrequency();
+        Vector<double> damping = await ibrahim.GetDamping();
+        Matrix<double> modes = await ibrahim.GetModes();
+        Console.WriteLine("");
+
+        // var sb = new StringBuilder();
+
+        // for (int i = 0; i < freq.Count; i++)
+        // {
+        //     sb.Append(freq[i].ToString(CultureInfo.InvariantCulture));
+        //     if (i < freq.Count - 1) sb.Append(' ');
+        // }
+        // sb.AppendLine();
+
+        // for (int i = 0; i < damping.Count; i++)
+        // {
+        //     sb.Append(damping[i].ToString(CultureInfo.InvariantCulture));
+        //     if (i < damping.Count - 1) sb.Append(' ');
+        // }
+        // sb.AppendLine();
+
+        // foreach (var mode in modes.EnumerateRows())
+        // {
+        //     for (int i = 0; i < mode.Count; i++)
+        //     {
+        //         sb.Append(mode[i].ToString(CultureInfo.InvariantCulture));
+        //         if (i < mode.Count - 1) sb.Append(' ');
+        //     }
+        //     sb.AppendLine();
+        // }
+
+        double[,] modesArray = modes.ToArray();
+
+
+        return (freq, damping, modes, modesArray, sensorIds);
+
+        // await JsRuntime.InvokeVoidAsync("downloadCsvFile",savePath1, Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(sb.ToString())));
+        //return sb.ToString();
+    }
+
+    async Task Compare()
+    {
+
+        double frenquenciesErrorRate = double.Parse(Environment.GetEnvironmentVariable("FREQUENCIES_ERROR_RATE") ?? "0.05", CultureInfo.InvariantCulture);
+        double rejectLevelMac = double.Parse(Environment.GetEnvironmentVariable("REJECT_LEVEL_MAC") ?? "0.8", CultureInfo.InvariantCulture);
+
+
+        var res1 = await Calculate(startDate1,endDate1);
+        var res2 = await Calculate(startDate2,endDate2);
+
+
+        List<FileResults> filesResult = [];
+        filesResult.Add(new FileResults(res1.Value.frequencies, res1.Value.damping, res1.Value.modes));
+        filesResult.Add(new FileResults(res2.Value.frequencies, res2.Value.damping, res2.Value.modes));
+
+
+        List<FileResults> ModeMatched = LDM.MatchModes(filesResult[0], filesResult[1]).ToList();
+
+        for (int i = 0; i < ModeMatched[0].Frequencies.Count; ++i)
+        {
+            Console.WriteLine($"Frequencies {i} ({ModeMatched[0].Frequencies[i]} != {ModeMatched[1].Frequencies[i]})");
+            if (!LDM.IsSameFrequences(ModeMatched[0].Frequencies[i], ModeMatched[1].Frequencies[i], frenquenciesErrorRate))
+            {
+                Console.WriteLine($"Freq are not the same");
+            }
+            var mac = LDM.Mac(Matrix<double>.Build.DenseOfColumnVectors(ModeMatched[0].Modes.Column(i)), Matrix<double>.Build.DenseOfColumnVectors(ModeMatched[1].Modes.Column(i)));
+            if (mac < rejectLevelMac)
+            {
+                Console.WriteLine("Issue on the struture");
+            }
+            Console.WriteLine($"Mac: {mac}\n");
+        }
+
+        for (int i = 0; i < ModeMatched[0].Modes.ColumnCount; ++i)
+        {
+            Console.WriteLine($"\nJ = {i}");
+            Console.WriteLine($"COMAC: {LDM.Comac(ModeMatched[0].Modes, ModeMatched[1].Modes, i)}");
+            Console.WriteLine($"ECOMAC: {LDM.Ecomac(ModeMatched[0].Modes, ModeMatched[1].Modes, ModeMatched[0].Modes.RowCount, i)}");
+        }
+
+        Console.WriteLine("Gamma flexibility: ");
+        Console.WriteLine(LDM.GammaFlexibilityMatrix(ModeMatched[0].Modes, ModeMatched[0].Damping, ModeMatched[1].Modes, ModeMatched[1].Damping));
     }
 
 }

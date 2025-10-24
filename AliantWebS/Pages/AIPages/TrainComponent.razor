@@ -316,7 +316,7 @@
                 {
                     elementsToTrain = null;
                 }
-                elementsToTrain = Helpers.ListFromString<int>(elementToTrain).ToList();
+                elementsToTrain = Helpers.Helpers.ListFromString<int>(elementToTrain).ToList();
 
             }
         }
@@ -336,7 +336,7 @@
             {
                 if (epochsNumber == value) return;
                 epochsNumber = value;
-                epochsNumbers = Helpers.ListFromString<int>(epochsNumber).ToList();
+                epochsNumbers = Helpers.Helpers.ListFromString<int>(epochsNumber).ToList();
 
             }
         }
@@ -354,7 +354,7 @@
             {
                 if (batchSize == value) return;
                 batchSize = value;
-                batchSizes = Helpers.ListFromString<int>(batchSize).ToList();
+                batchSizes = Helpers.Helpers.ListFromString<int>(batchSize).ToList();
 
             }
         }
@@ -372,7 +372,7 @@
             {
                 if (learningRate == value) return;
                 learningRate = value;
-                learningRates = Helpers.ListFromString<double>(learningRate).ToList();
+                learningRates = Helpers.Helpers.ListFromString<double>(learningRate).ToList();
             }
         }
 
@@ -387,7 +387,7 @@
             {
                 if (testSetPercentage == value) return;
                 testSetPercentage = value;
-                testSetPercentages = Helpers.ListFromString<double>(testSetPercentage).ToList();
+                testSetPercentages = Helpers.Helpers.ListFromString<double>(testSetPercentage).ToList();
             }
         }
 
@@ -405,7 +405,7 @@
             {
                 if (dropoutRate == value) return;
                 dropoutRate = value;
-                dropoutRates = Helpers.ListFromString<double>(dropoutRate).ToList();
+                dropoutRates = Helpers.Helpers.ListFromString<double>(dropoutRate).ToList();
             }
         }
 
@@ -546,14 +546,14 @@
 
     protected override async Task OnInitializedAsync()
     {
-        structure = (Structure)appData.obj;
+        structure = appData.Structure;
 
         if (structure == null)
         {
             navigationManager.NavigateTo("Structures");
         }
 
-        PredictW.structuralStructure = Structural.Simulation.CreateStructure(structure,null, entitiesService);
+        PredictW.structuralStructure = await Structural.Simulation.CreateStructure(structure,null, entitiesService);
 
 
         var pff = await FileManagementService.GetPathForFilesAsync(structure,false, @"TrainingSets\");

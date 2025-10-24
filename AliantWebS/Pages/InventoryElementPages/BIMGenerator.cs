@@ -128,7 +128,7 @@ namespace AliantWebS.Pages.InventoryElementPages
                             Directory.CreateDirectory(structurePath);
                         }
 
-                        List<string> paths = await FileManagementService.GetPathForFilesAsync(appData.Structure, false, @"wwwroot\data");
+                        List<string> paths = await FileManagementService.GetPathForFilesAsync(appData.Structure, false, @"wwwroot/data");
                         List<string> FilePath = paths.Where(x => (x.ToLower().Contains(".wexbim")) || (x.ToLower().Contains(".ifc"))).ToList();
 
                         foreach (var pa in FilePath)

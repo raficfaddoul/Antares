@@ -2,18 +2,19 @@
 @using AliantWebS.Data
 @using Microsoft.Extensions.Configuration
 @using Microsoft.AspNetCore.Identity
+@using System.Threading;
+
 @inject AppData appData;
 @inject IJSRuntime js
 @inject Blazored.LocalStorage.ILocalStorageService localStorage
 @inject NavigationManager navigationManager
 @inject RoleManager<IdentityRole> roleManager
 @attribute [AllowAnonymous]
-
+@inject ReportsService ReportsService
+@inject HttpClient _httpClient
+@inject EntitiesService entitiesService
 
 <NavigationLock OnBeforeInternalNavigation="OnBeforeInternalNavigation" />
-
-
-<h1>Hello, world!</h1>
 
 @*Welcome to your new app.
 
@@ -57,8 +58,42 @@
 
     bool userAuthenticated { get; set; } = false;
 
+    private List<Report> reportsList = new List<Report>();
+    private  CancellationTokenSource _cts;
+
     protected override async Task OnInitializedAsync()
     {
+
+        // Start background fetching when the component initializes
+        _cts = new CancellationTokenSource();
+
+        // Kick off the continuous fetch
+        // We append new reports to our local list so the UI can show them
+        //   _ = ReportsService.StartContinuousFetch(
+        //     onNewReports: newReports =>
+        //     {
+        //         // We must switch to the Blazor UI thread (InvokeAsync) if we want to modify
+        //         // the component’s state from a background thread
+        //         InvokeAsync(() =>
+        //         {
+        //             reportsList.AddRange(newReports);
+        //             StateHasChanged();
+        //         });
+        //     },
+        //     cancellationToken: _cts.Token,entitiesService,_httpClient,
+        //     pollingIntervalSeconds: 60
+        // );
+
+      //  List<Report> reports = new();
+
+
+
+
+        //long fromTimestamp = 1731577300; // Replace this with your dynamic logic
+        //reports = await ReportsService.GetReportsAsync(fromTimestamp, _httpClient);
+
+        //var l = await InfluxService.QueryLatestTimestampFromInfluxAsync();
+
 
 
         if (! await roleManager.RoleExistsAsync("Developer"))

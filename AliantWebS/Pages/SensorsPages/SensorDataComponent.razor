@@ -245,7 +245,7 @@
         foreach (Element element in elements)
         {
 
-            var pff = await FileManagementService.GetPathForFilesAsync(element, false, @"CSVs\");
+            var pff = await FileManagementService.GetPathForFilesAsync(element, false, @"CSVs/");
             pathsForFiles.AddRange(pff);
 
 

@@ -126,7 +126,7 @@ else
     protected override async Task OnInitializedAsync()
     {
         ScrollHeight = "400px";
-        element = (Element)AppData.obj;
+        element = (Element)AppData.obj1;
 
 
         entitiesService.LoadCollection(element, "InspectionResults");
@@ -186,7 +186,7 @@ else
         InspectionResult inspectionResult = new InspectionResult();
         inspectionResult.ElementId = element.ElementId;
         inspectionResult.InspectionResultTypeId = element.ElementType.InspectionResultTypeElementTypes.FirstOrDefault().InspectionResultTypeId;
-        inspectionResult.Date = DateTime.Now;
+        inspectionResult.Date = DateOnly.FromDateTime(DateTime.Now);
 
         element.InspectionResults.Add(inspectionResult);
         await entitiesService.UpdateEntityAsync(element);

@@ -1,0 +1,728 @@
+/* Dashboard Container */
+.dashboard-container {
+    padding: 1.5rem;
+    background: #f8f9fa;
+    min-height: 100vh;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    overflow-x: hidden; /* AJOUT: Empêcher le défilement horizontal de la page */
+}
+
+/* Dashboard Header */
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.header-controls {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.indicators-count-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.count-label {
+    font-size: 0.9em;
+    color: #666;
+    white-space: nowrap;
+}
+
+/* NOUVEAU: Conteneur principal pour les flèches fixes */
+.indicators-section-wrapper {
+    position: relative;
+    margin-bottom: 20px;
+    width: 100%;
+    overflow: hidden; /* Empêche le débordement */
+}
+
+/* NOUVEAU: Zone de défilement avec flèches fixes */
+.indicators-scroll-container {
+    position: relative;
+    width: 100%;
+    display: flex;
+    align-items: center;
+}
+
+/* MODIFIÉ: Section des indicateurs avec largeur contrainte */
+.indicators-section {
+    display: flex !important;
+    gap: 20px;
+    padding: 10px 60px; /* Padding pour faire place aux flèches */
+    flex: 1;
+    flex-wrap: nowrap !important;
+    overflow-x: visible;
+    max-width: calc(100vw - 3rem - 120px); /* Largeur max moins padding et espace pour flèches */
+    box-sizing: border-box;
+}
+
+.indicators-section.scrollable {
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-behavior: smooth;
+    padding-bottom: 15px;
+    scrollbar-width: thin;
+    scrollbar-color: #c1c1c1 #f1f1f1;
+    /* Masquer les barres de défilement par défaut */
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.indicators-section.scrollable::-webkit-scrollbar {
+    display: none; /* Masquer la barre de défilement sur WebKit */
+}
+
+.indicator-group {
+    flex: 0 0 auto !important;
+    min-width: 160px;
+    max-width: 160px;
+    background: white;
+    border-radius: 8px;
+    padding: 0.25rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    text-align: center;
+    position: relative;
+    height: 100px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    margin: 0;
+}
+
+.indicator-group:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+/* NOUVEAU: Flèches de défilement positionnées de manière absolue aux bords */
+.scroll-btn-fixed {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0, 123, 255, 0.9);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 45px;
+    height: 45px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 16px;
+    transition: all 0.2s;
+    z-index: 20;
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
+    backdrop-filter: blur(4px);
+}
+
+.scroll-btn-fixed:hover {
+    background: rgba(0, 86, 179, 0.95);
+    transform: translateY(-50%) scale(1.1);
+    box-shadow: 0 6px 16px rgba(0, 123, 255, 0.6);
+}
+
+.scroll-btn-fixed:active {
+    transform: translateY(-50%) scale(0.95);
+}
+
+.scroll-btn-fixed.scroll-left {
+    left: 10px;
+}
+
+.scroll-btn-fixed.scroll-right {
+    right: 10px;
+}
+
+/* Styles pour masquer/afficher les boutons selon le besoin */
+.scroll-btn-fixed.disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* SUPPRIMÉ: Anciens styles des boutons de défilement */
+.scroll-btn-side {
+    display: none !important;
+}
+
+/* Information de défilement en bas */
+.scroll-info-bottom {
+    position: absolute;
+    bottom: -30px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.8em;
+    color: #666;
+    font-weight: 500;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 4px 12px;
+    border-radius: 6px;
+    white-space: nowrap;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Supprimer les anciens styles */
+.scroll-indicators {
+    display: none !important;
+}
+
+.scroll-btn {
+    display: none !important;
+}
+
+.scroll-info {
+    display: none !important;
+}
+
+/* Dashboard Content */
+.dashboard-content {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+.gauge-container {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex: 1;
+    padding: 0.1rem;
+}
+
+.gauge-canvas {
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-radius: 8px;
+    width: 140px !important;
+    height: 70px !important;
+}
+
+.gauge-canvas:hover {
+    transform: scale(1.05);
+}
+
+.gauge-canvas.selected {
+    box-shadow: 0 0 0 3px #052767;
+    border-radius: 8px;
+}
+
+.change-indicator-btn {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: #6c757d;
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    font-size: 0.6rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 15;
+}
+
+.change-indicator-btn:hover {
+    background: #052767;
+    transform: scale(1.1);
+}
+
+/* Label positionné à l'intérieur du cadre bleu de la jauge */
+.indicator-label {
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.7rem;
+    color: white;
+    font-weight: 600;
+    line-height: 1.1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: calc(100% - 20px);
+    background: rgba(5, 39, 103, 0.85);
+    padding: 3px 8px;
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    z-index: 10;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(2px);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Main Chart Section */
+.main-chart-section {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.chart-header {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #052767;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.chart-content {
+    min-height: 300px;
+    margin-bottom: 1rem;
+}
+
+.no-chart-data {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 300px;
+    color: #6c757d;
+    text-align: center;
+}
+
+.no-chart-data p {
+    margin: 0.5rem 0;
+    font-size: 1.1rem;
+}
+
+.no-chart-subtitle {
+    font-size: 0.9rem !important;
+    color: #adb5bd !important;
+}
+
+.chart-description {
+    font-size: 0.9rem;
+    color: #6c757d;
+    font-style: italic;
+    padding-top: 1rem;
+    border-top: 1px solid #f8f9fa;
+}
+
+/* Bottom Section */
+.bottom-section {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2rem;
+    align-items: center;
+}
+
+/* System Status */
+.system-status {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.status-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #052767;
+    margin-bottom: 1rem;
+}
+
+.status-items-container {
+    display: flex;
+    gap: 2rem;
+    flex-wrap: wrap;
+}
+
+.status-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.status-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #4CAF50;
+    box-shadow: 0 0 8px rgba(76, 175, 80, 0.4);
+}
+
+.status-label {
+    font-size: 0.9rem;
+    color: #495057;
+    font-weight: 500;
+}
+
+.status-value {
+    font-size: 0.9rem;
+    color: #052767;
+    font-weight: 600;
+}
+
+/* Export Section */
+.export-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.export-button {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.export-button:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+}
+
+.export-label {
+    font-size: 0.8rem;
+    color: #6c757d;
+    font-weight: 500;
+}
+
+/* Indicator Selector Modal */
+.selector-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    animation: fadeIn 0.3s ease;
+}
+
+.selector-content {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    animation: slideIn 0.3s ease;
+}
+
+.selector-header {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: #052767;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid #e9ecef;
+    text-align: center;
+}
+
+.no-indicators-message {
+    text-align: center;
+    padding: 2rem;
+    color: #6c757d;
+}
+
+.no-indicators-message p {
+    margin: 0.5rem 0;
+}
+
+.indicator-option {
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.indicator-option:hover {
+    border-color: #052767;
+    background: #f8f9fa;
+}
+
+.indicator-option.selected {
+    border-color: #052767;
+    background: linear-gradient(135deg, #052767 0%, #3a0647 100%);
+    color: white;
+}
+
+.indicator-option-name {
+    font-weight: 600;
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.storage-badge {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-weight: 500;
+}
+
+.storage-badge.database {
+    background: #007bff;
+    color: white;
+}
+
+.storage-badge.local {
+    background: #6f42c1;
+    color: white;
+}
+
+.indicator-option-description {
+    color: #6c757d;
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+}
+
+.indicator-option.selected .indicator-option-description {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.indicator-option-details {
+    font-size: 0.8rem;
+    color: #adb5bd;
+}
+
+.indicator-option.selected .indicator-option-details {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.selector-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e9ecef;
+}
+
+/* Debug Info */
+.debug-info {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 1rem 0;
+    font-family: 'Courier New', monospace;
+    font-size: 0.8rem;
+    color: #856404;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideIn {
+    from { 
+        opacity: 0; 
+        transform: translateY(-20px); 
+    }
+    to { 
+        opacity: 1; 
+        transform: translateY(0); 
+    }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .dashboard-container {
+        padding: 1rem;
+    }
+
+    .dashboard-header {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+    }
+
+    .header-controls {
+        justify-content: space-between;
+    }
+
+    .indicators-section-wrapper {
+        margin-bottom: 15px;
+    }
+    
+    .scroll-btn-fixed {
+        width: 35px;
+        height: 35px;
+        font-size: 14px;
+    }
+    
+    .scroll-btn-fixed.scroll-left {
+        left: 5px;
+    }
+    
+    .scroll-btn-fixed.scroll-right {
+        right: 5px;
+    }
+    
+    .indicators-section {
+        padding: 10px 45px;
+        max-width: calc(100vw - 2rem - 90px);
+        flex-wrap: wrap !important;
+        justify-content: center;
+    }
+
+    .indicator-group {
+        height: auto;
+        padding: 0.5rem;
+        min-width: 120px;
+        max-width: 120px;
+    }
+
+    .gauge-canvas {
+        width: 120px !important;
+        height: 65px !important;
+    }
+
+    .indicator-label {
+        font-size: 0.65rem;
+        bottom: 6px;
+        padding: 2px 6px;
+    }
+
+    .bottom-section {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .status-items-container {
+        justify-content: center;
+    }
+
+    .export-section {
+        align-self: center;
+    }
+
+    .selector-content {
+        width: 95%;
+        padding: 1.5rem;
+    }
+
+    .scroll-info-bottom {
+        bottom: -25px;
+    }
+}
+
+@media (max-width: 480px) {
+    .dashboard-subtitle {
+        font-size: 1.4rem;
+    }
+
+    .structure-name {
+        font-size: 1rem;
+    }
+
+    .configure-button {
+        padding: 0.5rem 1rem;
+        font-size: 0.9rem;
+    }
+
+    .status-items-container {
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .indicator-group {
+        height: 90px;
+        padding: 0.15rem;
+        min-width: 100px;
+        max-width: 100px;
+    }
+
+    .gauge-canvas {
+        width: 100px !important;
+        height: 55px !important;
+    }
+
+    .indicator-label {
+        font-size: 0.6rem;
+        bottom: 4px;
+        padding: 1px 4px;
+    }
+
+    .scroll-btn-fixed {
+        width: 30px;
+        height: 30px;
+        font-size: 12px;
+    }
+    
+    .indicators-section {
+        padding: 10px 35px;
+        max-width: calc(100vw - 2rem - 70px);
+    }
+}
+
+/* Focus States for Accessibility */
+.gauge-canvas:focus,
+.configure-button:focus,
+.change-indicator-btn:focus,
+.export-button:focus,
+.scroll-btn-fixed:focus {
+    outline: 2px solid #052767;
+    outline-offset: 2px;
+}
+
+.indicator-option:focus {
+    outline: 2px solid #052767;
+    outline-offset: -2px;
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+    .dashboard-container {
+        background: white;
+    }
+
+    .indicator-group,
+    .main-chart-section,
+    .system-status {
+        border: 2px solid #000;
+    }
+
+    .configure-button,
+    .export-button,
+    .scroll-btn-fixed {
+        border: 2px solid white;
+    }
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}

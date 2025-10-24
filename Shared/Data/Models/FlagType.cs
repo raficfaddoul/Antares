@@ -19,20 +19,20 @@ public partial class FlagType
     public string? Description { get; set; }
 
     [InverseProperty("FlagType")]
-    public virtual ICollection<FlagElement> FlagElements { get; } = new List<FlagElement>();
+    public virtual ICollection<FlagElement> FlagElements { get; set; } = new List<FlagElement>();
 
     [InverseProperty("FlagType")]
-    public virtual ICollection<FlagStructure> FlagStructures { get; } = new List<FlagStructure>();
+    public virtual ICollection<FlagStructure> FlagStructures { get; set; } = new List<FlagStructure>();
 
     [InverseProperty("FlagType")]
-    public virtual ICollection<FlagTypeDefectType> FlagTypeDefectTypes { get; } = new List<FlagTypeDefectType>();
+    public virtual ICollection<FlagTypeDefectType> FlagTypeDefectTypes { get; set; } = new List<FlagTypeDefectType>();
 
     [InverseProperty("FlagType")]
-    public virtual ICollection<FlagTypeElementType> FlagTypeElementTypes { get; } = new List<FlagTypeElementType>();
+    public virtual ICollection<FlagTypeElementType> FlagTypeElementTypes { get; set; } = new List<FlagTypeElementType>();
 
     [InverseProperty("FlagType")]
-    public virtual ICollection<FlagTypeInspectionResultType> FlagTypeInspectionResultTypes { get; } = new List<FlagTypeInspectionResultType>();
+    public virtual ICollection<FlagTypeInspectionResultType> FlagTypeInspectionResultTypes { get; set; } = new List<FlagTypeInspectionResultType>();
 
     [InverseProperty("FlagType")]
-    public virtual ICollection<StructureTypeFlagType> StructureTypeFlagTypes { get; } = new List<StructureTypeFlagType>();
+    public virtual ICollection<StructureTypeFlagType> StructureTypeFlagTypes { get; set; } = new List<StructureTypeFlagType>();
 }

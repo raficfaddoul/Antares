@@ -6,7 +6,7 @@
 @using System.Net.Sockets
 @using System.Net
 @using System
-
+@using Microsoft.EntityFrameworkCore
 @using System.Net.WebSockets;
 @using System.Threading;
 
@@ -52,7 +52,7 @@
                     <RadzenSplitterPane Size="33%">
 
                         <RadzenDataGrid AllowFiltering="false" AllowPaging="true" AllowSorting="false" PageSize="10"
-                                        Data="@sourceTypes" TItem="string" ColumnWidth="150px">
+                        Data="@sourceTypes" TItem="string" ColumnWidth="150px">
                             <Columns>
                                 <RadzenDataGridColumn TItem="string" Property="Name" Title="@L["Source Type"]">
                                     <Template Context="sourceType">
@@ -67,9 +67,9 @@
                                             {
                                                 <Div Style="display: flex; margin-left: auto;">
 
-                                                <Label>Step size: </Label>
-                                                <InputNumber style="width:40px" @bind-Value="stepSize"></InputNumber>
-                                            </Div>
+                                                    <Label>Step size: </Label>
+                                                    <InputNumber style="width:40px" @bind-Value="stepSize"></InputNumber>
+                                                </Div>
                                             }
 
                                         </Div>
@@ -108,13 +108,13 @@
                     <RadzenSplitterPane Size="33%">
 
                         <RadzenDataGrid AllowFiltering="false" AllowPaging="true" AllowSorting="false" PageSize="10"
-                                        Data="@chartsTypes" TItem="string" ColumnWidth="150px">
+                        Data="@chartsTypes" TItem="string" ColumnWidth="150px">
                             <Columns>
                                 <RadzenDataGridColumn TItem="string" Property="Name" Title="@L["Chart Type"]">
                                     <Template Context="chartType">
                                         <Div Style="display: flex">
                                             <Label>@chartType</Label>
-                                                @if (chartType == "ModalDeformation")
+                                            @if (chartType == "ModalDeformation")
                                             {
                                                 <InputNumber disabled="@(!selectedChartsTypes.Contains("ModalDeformation") || (str == null))" TValue="int" style="width:50px;" @bind-Value=@Vp></InputNumber>
                                             }
@@ -183,7 +183,7 @@
                     <Items>
                         <RadzenAccordionItem Text="Sensors" Icon="group_work" Selected=true>
                             <RadzenDataGrid AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="10"
-                                            Data="@selectedElements" TItem="Element" ColumnWidth="150px">
+                            Data="@selectedElements" TItem="Element" ColumnWidth="150px">
                                 <Columns>
                                     <RadzenDataGridColumn TItem="Element" Property="Name" Title="@L["Sensing Device"]" Width="60px"></RadzenDataGridColumn>
 
@@ -191,13 +191,13 @@
 
                                         <FilterTemplate>
                                             <RadzenDropDown @bind-Value=@selectedChannelDataTypes Multiple="true" AllowSelectAll=false Style="width:100%;"
-                                                            Change=@OnChangeSelectedChannelDataTypes Data=@channelDataTypeList TextProperty="Name" ValueProperty="ChannelDataTypeId" />
+                                            Change=@OnChangeSelectedChannelDataTypes Data=@channelDataTypeList TextProperty="Name" ValueProperty="ChannelDataTypeId" />
                                         </FilterTemplate>
                                         <Template Context="element">
                                             <Div Style="display: flex">
                                                 @foreach (ChannelDataType cdt in element.ElementType.ChannelDataTypeElementTypes.Select(x => x.ChannelDataType))
                                                 {
-                                                    <img src="@AI.Helpers.GetSource(cdt.Icon)" />
+                                                    <img src="@Helpers.Helpers.GetSource(cdt.Icon)" />
                                                     <RadzenCheckBox TValue=bool Change=@(args =>plot(args,element,cdt))></RadzenCheckBox>
                                                 }
                                             </Div>
@@ -223,29 +223,29 @@
                                                     <PlotlyChart style="height:100%;width:100%" @bind-Config="chartBundles[cst+sst].Config" @bind-Layout="chartBundles[cst+sst].Layout" @bind-Data="chartBundles[cst+sst].Data" @ref=chartBundles[cst+sst].Chart />
                                                     <div style="width:140px">
                                                         <RadzenDataGrid AllowFiltering="false" AllowPaging="true" AllowSorting="false" PageSize="10"
-                                                                        Data="@ValeursPropres" TItem="double" ColumnWidth="90px">
+                                                        Data="@ValeursPropres" TItem="double" ColumnWidth="90px">
                                                             <Columns>
                                                                 <RadzenDataGridColumn TItem="double" Title="@L["Mode"]" Width="40px">
                                                                     <Template Context="valeurPropre">
                                                                         <Label>@ValeursPropres.IndexOf(valeurPropre)</Label>
-                                                                        </Template>
-                                                                    </RadzenDataGridColumn>
+                                                                    </Template>
+                                                                </RadzenDataGridColumn>
 
-                                                                    <RadzenDataGridColumn TItem="double" Title="@L["Eigen Value"]" Width="50px">
-                                                                        <Template Context="valeurPropre">
-                                                                            <Label>@valeurPropre</Label>
-                                                                        </Template>
-                                                                    </RadzenDataGridColumn>
-                                                                </Columns>
-                                                            </RadzenDataGrid>
-                                                        </div>
+                                                                <RadzenDataGridColumn TItem="double" Title="@L["Eigen Value"]" Width="50px">
+                                                                    <Template Context="valeurPropre">
+                                                                        <Label>@valeurPropre</Label>
+                                                                    </Template>
+                                                                </RadzenDataGridColumn>
+                                                            </Columns>
+                                                        </RadzenDataGrid>
                                                     </div>
-                                                </RadzenAccordionItem>
+                                                </div>
+                                            </RadzenAccordionItem>
                                         }
                                         else if ((cst + sst) == "TimeDomainLive")
                                         {
                                             <RadzenAccordionItem Text="@title" Icon="assessment" Selected=@Selected>
-                                            <DyGraphComponent FilterAddress="filterAddress"></DyGraphComponent>
+                                                <DyGraphComponent FilterAddress="filterAddress"></DyGraphComponent>
                                             </RadzenAccordionItem>
                                         }
                                         else
@@ -392,7 +392,7 @@
     IEnumerable<Guid?> elementTypesIDs;
 
 
-    DateTime startDate { get; set; } = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+    DateTime startDate { get; set; } = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
     DateTime endDate { get; set; } = DateTime.UtcNow;
 
 
@@ -509,20 +509,30 @@
 
         if ((ListJson is null)||(ListJson == string.Empty))
         {
+
+
+
             sensors = await entitiesService.GetFilteredEntitiesAsync<Element>(a => ((a.StructureId == appData.Structure.StructureId) && (elligibleElementTypesID.Contains(a.ElementTypeId ?? new Guid()))), "ElementType.ChannelDataTypeElementTypes");
 
         }
         else
         {
 
+
+
             sensorsIDs = JsonSerializer.Deserialize<List<Guid?>>(ListJson);
 
-            sensors = await entitiesService.GetFilteredEntitiesAsync<Element>(a => (sensorsIDs.Contains(a.ElementId)
-                    && (elligibleElementTypesID.Contains(a.ElementTypeId ?? new Guid()))));
-            foreach(var s in sensors)
-            {
-                entitiesService.LoadCollection("ElementType.ChannelDataTypeElementTypes");
-            }
+            sensors = await entitiesService._appDBContext.Elements
+    .Include(e => e.ElementType) // Include ElementType
+    .ThenInclude(et => et.ChannelDataTypeElementTypes) // Include ChannelDataTypeElementTypes within ElementType
+    .Where(e => sensorsIDs.Contains(e.ElementId) && (elligibleElementTypesID.Contains(e.ElementTypeId ?? new Guid()))).ToListAsync();
+
+            // sensors = await entitiesService.GetFilteredEntitiesAsync<Element>(a => (sensorsIDs.Contains(a.ElementId)
+            //         && (elligibleElementTypesID.Contains(a.ElementTypeId ?? new Guid()))));
+            // foreach(var s in sensors)
+            // {
+            //     entitiesService.LoadCollection("ElementType.ChannelDataTypeElementTypes");
+            // }
 
 
         }
@@ -1037,7 +1047,7 @@
             {
                 if (str == null)
                 {
-                    str = Structural.Simulation.CreateStructure(appData.Structure, null, entitiesService);
+                    str = await Structural.Simulation.CreateStructure(appData.Structure, null, entitiesService);
                 }
 
                 if ((ValeursPropres == null) || (VecteursPropres == null))
@@ -1052,7 +1062,7 @@
 
             foreach (var v in selectedSensorsChannelDataTypes)
             {
-                ploti(true, v.Item1, v.Item2);
+                await ploti(true, v.Item1, v.Item2);
             }
         }
         else
@@ -1063,7 +1073,7 @@
                 {
                     if (chartBundles[chb].Data.Count != 0)
                     {
-                        chartBundles[chb].Chart.Clear();
+                        await chartBundles[chb].Chart.Clear();
                     }
                 }
 
@@ -1120,7 +1130,7 @@
                             Directory.CreateDirectory(path);
                         }
                         string fileName = Path.Combine(path, "SimulationResults.csv");
-                        await AI.Helpers.WriteArrayToCsvAsync(qTime, fileName);
+                        await Helpers.Helpers.WriteArrayToCsvAsync(qTime, fileName);
 
                     }
 

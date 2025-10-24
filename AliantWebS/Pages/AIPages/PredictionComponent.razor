@@ -176,9 +176,9 @@
 
     protected override async Task OnInitializedAsync()
     {
-        structure = (Structure)appData.obj;
+        structure = appData.Structure;
 
-        var pff = await FileManagementService.GetPathForFilesAsync(structure,false, @"TrainingSets\");
+        var pff = await FileManagementService.GetPathForFilesAsync(structure,false, @"TrainingSets/");
         pathsForFiles.AddRange(pff);
         //SelectedPath = pathsForFiles.FirstOrDefault();
         selectedPath = "NoFileSelected";
@@ -229,7 +229,7 @@
             int idd = 0;
             foreach (Element sensor in listSensors)
             {
-                var pff = await FileManagementService.GetPathForFilesAsync(sensor,false, @"CSVs\");
+                var pff = await FileManagementService.GetPathForFilesAsync(sensor,false, @"CSVs/");
 
                 csvsFilesPaths.Add((pff.FirstOrDefault(), sensedNdes[idd]));
 
@@ -243,7 +243,7 @@
 
         string prompted = await js.InvokeAsync<string>("prompt", "Enter Element(s) Index:");
 
-        var elementsIndexes = Helpers.ListFromString<int>(prompted).ToList();
+        var elementsIndexes = Helpers.Helpers.ListFromString<int>(prompted).ToList();
 
         List<double> predictions = new List<double>();
 

@@ -1,0 +1,176 @@
+﻿@page "/ConfigurationIndicateurs"
+@using AliantWebS.IndicatorCalculator
+@using AliantWebS.Models
+@using AliantWebS.Data
+@inject AppData appData
+@inject IStringLocalizer<Languages> L
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@layout TrafficLayout
+
+<style>
+    .config-container {
+        padding: 20px;
+        background-color: #f5f5f5;
+        min-height: calc(100vh - 120px);
+    }
+    
+    .page-header {
+        background-color: white;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .page-title {
+        font-size: 2em;
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 10px;
+    }
+    
+    .page-description {
+        color: #666;
+        font-size: 1.1em;
+    }
+    
+    .structure-info {
+        background-color: #e3f2fd;
+        border: 1px solid #2196f3;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+    
+    .tabs-container {
+        background-color: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        overflow: hidden;
+    }
+</style>
+
+<div class="config-container">
+    <div class="page-header">
+        <h1 class="page-title">⚙️ Configuration des Indicateurs</h1>
+        <p class="page-description">
+            Créez et gérez des indicateurs personnalisés basés sur les résultats d'inspection de votre structure.
+        </p>
+    </div>
+    
+    @if (appData.Structure != null)
+    {
+        <div class="structure-info">
+            <strong>Structure actuelle :</strong> @appData.Structure.Name
+            <br />
+            <small>Les indicateurs seront basés sur les données d'inspection de cette structure.</small>
+        </div>
+        
+        <div class="tabs-container">
+            <RadzenTabs>
+                <Tabs>
+                    <RadzenTabsItem Text="Créer Indicateurs" Icon="build">
+                        <IndicatorBuilderComponent OnIndicatorsChanged="@OnIndicatorsChanged" />
+                    </RadzenTabsItem>
+                    
+                    <RadzenTabsItem Text="Calculateur d'Indicateurs" Icon="calculate">
+                        <IndicatorCalculatorComponent AvailableIndicators="@availableIndicators" />
+                    </RadzenTabsItem>
+                    
+                    <RadzenTabsItem Text="Visualisation" Icon="insights">
+                        <IndicatorVisualizationComponent CalculatedIndicators="@calculatedIndicators" />
+                    </RadzenTabsItem>
+                </Tabs>
+            </RadzenTabs>
+        </div>
+    }
+    else
+    {
+        <div class="structure-info">
+            <strong>⚠️ Aucune structure sélectionnée</strong>
+            <br />
+            Veuillez sélectionner une structure pour pouvoir créer et configurer des indicateurs.
+            <br />
+            <RadzenButton Text="Sélectionner une Structure" 
+                         ButtonStyle="ButtonStyle.Primary" 
+                         Icon="home" 
+                         Click="@NavigateToStructures" />
+        </div>
+    }
+</div>
+
+@code {
+    private List<CustomIndicator> availableIndicators = new();
+    private List<CalculatedIndicator> calculatedIndicators = new();
+    private const string LOCAL_STORAGE_KEY = "customIndicators";
+    
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadIndicators();
+    }
+    
+    private async Task LoadIndicators()
+    {
+        try
+        {
+            // Load from both database and local storage
+            var databaseIndicators = await LoadIndicatorsFromDatabase();
+            var localStorageIndicators = await LoadIndicatorsFromLocalStorage();
+            
+            availableIndicators.Clear();
+            availableIndicators.AddRange(databaseIndicators);
+            availableIndicators.AddRange(localStorageIndicators);
+            
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading indicators: {ex.Message}");
+        }
+    }
+    
+    private async Task<List<CustomIndicator>> LoadIndicatorsFromDatabase()
+    {
+        // TODO: Implement database loading logic
+        await Task.Delay(10); // Placeholder
+        return new List<CustomIndicator>();
+    }
+    
+    private async Task<List<CustomIndicator>> LoadIndicatorsFromLocalStorage()
+    {
+        try
+        {
+            var indicators = await localStorage.GetItemAsync<List<CustomIndicator>>(LOCAL_STORAGE_KEY) ?? new List<CustomIndicator>();
+            // Ensure all local storage indicators have the correct storage mode
+            indicators.ForEach(i => i.StorageMode = "localStorage");
+            return indicators;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading from local storage: {ex.Message}");
+            return new List<CustomIndicator>();
+        }
+    }
+    
+    private async Task OnIndicatorsChanged(List<CustomIndicator> indicators)
+    {
+        // Reload all indicators to ensure we have the latest data
+        await LoadIndicators();
+    }
+    
+    private void NavigateToStructures()
+    {
+        // TODO: Navigation vers la page de sélection de structures
+    }
+    
+    public class CalculatedIndicator
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = "";
+        public double Value { get; set; }
+        public string Unit { get; set; } = "";
+        public DateTime CalculatedAt { get; set; }
+        public bool IsAboveThreshold { get; set; }
+        public List<Dictionary<object, double>> TimeSeriesData { get; set; } = new();
+    }
+}

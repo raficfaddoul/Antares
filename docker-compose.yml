@@ -1,26 +1,63 @@
-
-networks:
+﻿networks:
   AliantNetwork:
 
 services:
   AliantDb:
     container_name: AliantDbContainer
     image: mcr.microsoft.com/mssql/server:2022-latest
-    build:
-      context: ./sqlserver
-      dockerfile: Dockerfilesqlserver # Or just Dockerfile if you didn't rename it
     ports:
-      - 8005:1433
+      - "8005:1433"
     volumes:
       - ../data/sql/Aliant:/var/opt/mssql/data
- 
     environment:
       - ACCEPT_EULA=Y
-      - MSSQL_SA_PASSWORD=password@12345# 
+      - MSSQL_SA_PASSWORD=password@12345#
+      - MSSQL_PID=Developer
       - MSSQL_SSL_CERTIFICATE_CREATION=disabled
     networks:
       - AliantNetwork
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'password@12345#' -Q 'SELECT 1' -C"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
 
+  aliant-db-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    depends_on:
+      AliantDb:
+        condition: service_healthy
+    user: root
+    networks: 
+      - AliantNetwork
+    volumes:
+      - ../data/sql/Aliant:/var/opt/mssql/data
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=password@12345#
+    entrypoint:
+      - /bin/bash
+      - -e
+      - -c
+      - |
+        echo '📂 AliantWeb files'; ls -la /var/opt/mssql/data/AliantWeb*;
+        chown -R 10001:0 /var/opt/mssql/data;
+        echo '⏳ Waiting for AliantDb…';
+        until /opt/mssql-tools18/bin/sqlcmd -S AliantDb -U sa -P "$$MSSQL_SA_PASSWORD" -C -Q 'SELECT 1' >/dev/null 2>&1; do
+          echo '   …still starting'; sleep 5;
+        done
+        echo '✅ AliantDb is up';
+        /opt/mssql-tools18/bin/sqlcmd -S AliantDb -U sa -P "$$MSSQL_SA_PASSWORD" -C -Q "
+          USE master;
+          IF DB_ID('AliantWeb') IS NULL
+          CREATE DATABASE [AliantWeb]
+            ON (FILENAME='/var/opt/mssql/data/AliantWeb.mdf'),
+               (FILENAME='/var/opt/mssql/data/AliantWeb.ldf')
+            FOR ATTACH;
+          SELECT 'AliantWeb attached successfully' AS Status;"
+        echo '🏁 AliantWeb attached';
+    restart: "no"
 
   aliantwebs:
     container_name: AliantWebContainer
@@ -29,25 +66,51 @@ services:
       context: .
       dockerfile: AliantWebS/Dockerfile
     ports:
-      - 8004:80
-      #- "9229:9229" # Add for debugger
+      - "8004:80"
     volumes:
       - ../data/images:/app/Images
-      # - /usr/bin/node:/usr/bin/node
-      # - /usr/bin/npm:/usr/bin/npm
-     # - ./AliantWebS:/app
-     # - ~/.vsdbg:/root/.vsdbg:rw
-
     depends_on:
       - AliantDb
-
+      - aliant-db-init      # ← wait for database initialization
     environment:
       - ASPNETCORE_URLS=http://+:80
+      - ASPNETCORE_ENVIRONMENT=Production
       - DB_HOST=AliantDb
       - DB_NAME=AliantWeb
       - DB_SA_PASSWORD=password@12345#
       - MSSQL_SSL_CERTIFICATE_CREATION=disabled
       - BasePath=Aliant1  
-
+      - API_URL=http://host.docker.internal:8080
     networks:
       - AliantNetwork
+
+  influxdb2:
+    image: influxdb:2
+    container_name: InfluxDbContainer
+    ports:
+      - "8086:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME_FILE: /run/secrets/influxdb2-admin-username
+      DOCKER_INFLUXDB_INIT_PASSWORD_FILE: /run/secrets/influxdb2-admin-password
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN_FILE: /run/secrets/influxdb2-admin-token
+      DOCKER_INFLUXDB_INIT_ORG: Aliant
+      DOCKER_INFLUXDB_INIT_BUCKET: AliantWebT
+    secrets:
+      - influxdb2-admin-username
+      - influxdb2-admin-password
+      - influxdb2-admin-token
+    volumes:
+      - ../data/influx:/var/lib/influxdb2
+      - ../data/influx:/etc/influxdb2
+    networks:
+      - AliantNetwork
+
+secrets:
+  influxdb2-admin-username:
+    file: .env.influxdb2-admin-username
+  influxdb2-admin-password:
+    file: .env.influxdb2-admin-password
+  influxdb2-admin-token:
+    file: .env.influxdb2-admin-token
+

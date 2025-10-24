@@ -35,7 +35,7 @@
 
     public override async Task SetParametersAsync(ParameterView parameters)
     {
-        callerType = (DefectType)AppData.obj;
+        callerType = (DefectType)AppData.obj1;
         entitiesService.LoadCollection(callerType, "AttributeTypeDefectTypes");
         //EditContext = new EditContext(callerType.AttributeTypeDefectTypes);
         await base.SetParametersAsync(parameters);

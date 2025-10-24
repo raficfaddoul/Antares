@@ -28,26 +28,26 @@ public partial class AttributeType
     public string? FileAddr { get; set; }
 
     [InverseProperty("AttributeType")]
-    public virtual ICollection<AttributeDefect> AttributeDefects { get; } = new List<AttributeDefect>();
+    public virtual ICollection<AttributeDefect> AttributeDefects { get; set; } = new List<AttributeDefect>();
 
     [InverseProperty("AttributeType")]
-    public virtual ICollection<AttributeElement> AttributeElements { get; } = new List<AttributeElement>();
+    public virtual ICollection<AttributeElement> AttributeElements { get; set; } = new List<AttributeElement>();
 
     [InverseProperty("AttributeType")]
-    public virtual ICollection<AttributeEquipement> AttributeEquipements { get; } = new List<AttributeEquipement>();
+    public virtual ICollection<AttributeEquipement> AttributeEquipements { get; set; } = new List<AttributeEquipement>();
 
     [InverseProperty("AttributeType")]
-    public virtual ICollection<AttributeStructure> AttributeStructures { get; } = new List<AttributeStructure>();
+    public virtual ICollection<AttributeStructure> AttributeStructures { get; set; } = new List<AttributeStructure>();
 
     [InverseProperty("AttributeType")]
-    public virtual ICollection<AttributeTypeDefectType> AttributeTypeDefectTypes { get; } = new List<AttributeTypeDefectType>();
+    public virtual ICollection<AttributeTypeDefectType> AttributeTypeDefectTypes { get; set; } = new List<AttributeTypeDefectType>();
 
     [InverseProperty("AttributeType")]
-    public virtual ICollection<AttributeTypeElementType> AttributeTypeElementTypes { get; } = new List<AttributeTypeElementType>();
+    public virtual ICollection<AttributeTypeElementType> AttributeTypeElementTypes { get; set; } = new List<AttributeTypeElementType>();
 
     [InverseProperty("AttributeType")]
-    public virtual ICollection<EquipementTypeAttributeType> EquipementTypeAttributeTypes { get; } = new List<EquipementTypeAttributeType>();
+    public virtual ICollection<EquipementTypeAttributeType> EquipementTypeAttributeTypes { get; set; } = new List<EquipementTypeAttributeType>();
 
     [InverseProperty("AttributeType")]
-    public virtual ICollection<StructureTypeAttributeType> StructureTypeAttributeTypes { get; } = new List<StructureTypeAttributeType>();
+    public virtual ICollection<StructureTypeAttributeType> StructureTypeAttributeTypes { get; set; } = new List<StructureTypeAttributeType>();
 }

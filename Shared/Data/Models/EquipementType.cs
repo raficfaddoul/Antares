@@ -26,8 +26,8 @@ public partial class EquipementType
     public int? Inventory { get; set; }
 
     [InverseProperty("EquipementType")]
-    public virtual ICollection<EquipementTypeAttributeType> EquipementTypeAttributeTypes { get; } = new List<EquipementTypeAttributeType>();
+    public virtual ICollection<EquipementTypeAttributeType> EquipementTypeAttributeTypes { get; set; } = new List<EquipementTypeAttributeType>();
 
     [InverseProperty("EquipementType")]
-    public virtual ICollection<Equipement> Equipements { get; } = new List<Equipement>();
+    public virtual ICollection<Equipement> Equipements { get; set; } = new List<Equipement>();
 }

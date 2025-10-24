@@ -49,5 +49,5 @@ public partial class MobileLoad
     public virtual LoadCase LoadCase { get; set; } = null!;
 
     [InverseProperty("MobileLoad")]
-    public virtual ICollection<MobileLoadElement> MobileLoadElements { get; } = new List<MobileLoadElement>();
+    public virtual ICollection<MobileLoadElement> MobileLoadElements { get; set; } = new List<MobileLoadElement>();
 }

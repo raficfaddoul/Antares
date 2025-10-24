@@ -118,7 +118,7 @@ namespace AliantWebS.Data
             File.Delete(fileName);
         }
 
-        static public async Task<List<string>> GetPathForFilesAsync(Object obj,bool recurseSubdirectories, string folder = @"Images\")
+        static public async Task<List<string>> GetPathForFilesAsync(Object obj,bool recurseSubdirectories, string folder = @"Images/")
         {
          
             const int charactersFromGuid = 10;

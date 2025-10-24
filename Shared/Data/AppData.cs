@@ -41,7 +41,9 @@ namespace AliantWebS.Data
 
 
         public bool creating { get; set; } = false;
-        public object obj { get; set; }
+        public object obj1 { get; set; }
+        public object obj2 { get; set; }
+        public object obj3 { get; set; }
 
 
         private Element element;
@@ -263,6 +265,26 @@ namespace AliantWebS.Data
 
             }
         }
+
+        static private bool _isAlarmActive;
+        static public event Action OnAlarmStateChanged;
+
+        static public bool IsAlarmActive
+        {
+            get => _isAlarmActive;
+            set
+            {
+               // if (_isAlarmActive != value)
+                {
+                    _isAlarmActive = value;
+                    NotifyAlarmStateChanged();
+                }
+            }
+        }
+
+        static private void NotifyAlarmStateChanged() => OnAlarmStateChanged?.Invoke();
+
+
 
         public async Task OnBeforeInternalNavigation(LocationChangingContext context)
         {

@@ -19,14 +19,14 @@ public partial class StructureType
     public string? Description { get; set; }
 
     [InverseProperty("StructureType")]
-    public virtual ICollection<StructureTypeAttributeType> StructureTypeAttributeTypes { get; } = new List<StructureTypeAttributeType>();
+    public virtual ICollection<StructureTypeAttributeType> StructureTypeAttributeTypes { get; set; } = new List<StructureTypeAttributeType>();
 
     [InverseProperty("StructureType")]
-    public virtual ICollection<StructureTypeFlagType> StructureTypeFlagTypes { get; } = new List<StructureTypeFlagType>();
+    public virtual ICollection<StructureTypeFlagType> StructureTypeFlagTypes { get; set; } = new List<StructureTypeFlagType>();
 
     [InverseProperty("StructureType")]
-    public virtual ICollection<StructureTypeInspectionResultType> StructureTypeInspectionResultTypes { get; } = new List<StructureTypeInspectionResultType>();
+    public virtual ICollection<StructureTypeInspectionResultType> StructureTypeInspectionResultTypes { get; set; } = new List<StructureTypeInspectionResultType>();
 
     [InverseProperty("StructureType")]
-    public virtual ICollection<Structure> Structures { get; } = new List<Structure>();
+    public virtual ICollection<Structure> Structures { get; set; } = new List<Structure>();
 }

@@ -25,10 +25,13 @@ public partial class StaticLoad
 
     public double? EndValue { get; set; }
 
+    [Column("DOF")]
+    public int? Dof { get; set; }
+
     [ForeignKey("LoadCaseId")]
     [InverseProperty("StaticLoads")]
     public virtual LoadCase LoadCase { get; set; } = null!;
 
     [InverseProperty("StaticLoad")]
-    public virtual ICollection<StaticLoadElement> StaticLoadElements { get; } = new List<StaticLoadElement>();
+    public virtual ICollection<StaticLoadElement> StaticLoadElements { get; set; } = new List<StaticLoadElement>();
 }

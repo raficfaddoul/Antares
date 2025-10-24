@@ -26,5 +26,5 @@ public partial class Site
     public string? Address { get; set; }
 
     [InverseProperty("Site")]
-    public virtual ICollection<Structure> Structures { get; } = new List<Structure>();
+    public virtual ICollection<Structure> Structures { get; set; } = new List<Structure>();
 }

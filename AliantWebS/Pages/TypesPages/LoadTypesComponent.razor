@@ -261,14 +261,14 @@ else
     async Task InspectionResultTypes(ElementType elementType)
     {
 
-        AppData.obj = elementType;
+        AppData.obj1 = elementType;
 
         navigationManager.NavigateTo("/ElementTypeInspectionResultTypes/" + elementType.ElementTypeId);
     }
 
     async Task DefectsTypes(ElementType elementType)
     {
-        AppData.obj = elementType;
+        AppData.obj1 = elementType;
 
         navigationManager.NavigateTo("/ElementTypeDefectTypes/" + elementType.ElementTypeId);
 
@@ -276,21 +276,21 @@ else
 
     async Task FlagsTypes(ElementType elementType)
     {
-        AppData.obj = elementType;
+        AppData.obj1 = elementType;
 
         navigationManager.NavigateTo("/ElementTypeFlagTypes/" + elementType.ElementTypeId);
     }
 
     async Task AttributesTypes(ElementType elementType)
     {
-        AppData.obj = elementType;
+        AppData.obj1 = elementType;
 
         navigationManager.NavigateTo("/ElementTypeAttributeTypes/" + elementType.ElementTypeId);
     }
 
     async Task ChannelDataTypes(ElementType elementType)
     {
-        AppData.obj = elementType;
+        AppData.obj1 = elementType;
 
         navigationManager.NavigateTo("/ElementTypeChannelDataTypes/" + elementType.ElementTypeId);
     }

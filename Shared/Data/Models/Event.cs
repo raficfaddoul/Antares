@@ -32,22 +32,22 @@ public partial class Event
     public double? Point0Y { get; set; }
 
     [InverseProperty("Event")]
-    public virtual ICollection<Axe> Axes { get; } = new List<Axe>();
+    public virtual ICollection<Axe> Axes { get; set; } = new List<Axe>();
 
     [InverseProperty("Event")]
-    public virtual ICollection<ChargesScenique> ChargesSceniques { get; } = new List<ChargesScenique>();
+    public virtual ICollection<ChargesScenique> ChargesSceniques { get; set; } = new List<ChargesScenique>();
 
     [InverseProperty("Event")]
-    public virtual ICollection<Charpente> Charpentes { get; } = new List<Charpente>();
+    public virtual ICollection<Charpente> Charpentes { get; set; } = new List<Charpente>();
 
     [InverseProperty("Event")]
-    public virtual ICollection<Equipement> Equipements { get; } = new List<Equipement>();
+    public virtual ICollection<Equipement> Equipements { get; set; } = new List<Equipement>();
 
     [InverseProperty("Event")]
-    public virtual ICollection<EventLoadCase> EventLoadCases { get; } = new List<EventLoadCase>();
+    public virtual ICollection<EventLoadCase> EventLoadCases { get; set; } = new List<EventLoadCase>();
 
     [InverseProperty("Event")]
-    public virtual ICollection<EventMpscenario> EventMpscenarios { get; } = new List<EventMpscenario>();
+    public virtual ICollection<EventMpscenario> EventMpscenarios { get; set; } = new List<EventMpscenario>();
 
     [ForeignKey("StructureId")]
     [InverseProperty("Events")]

@@ -1,0 +1,1394 @@
+﻿@using AliantWebS.Models
+@using AliantWebS.Data
+@using AliantWebS.IndicatorCalculator
+@inject EntitiesService entitiesService
+@inject AppData appData
+@inject IStringLocalizer<Languages> L
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@inject IJSRuntime jsRuntime
+
+<style>
+    .indicator-builder-container {
+        padding: 20px;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        margin: 20px 0;
+    }
+    
+    .section-header {
+        font-size: 1.3em;
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 15px;
+        padding-bottom: 8px;
+        border-bottom: 2px solid #007bff;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .section-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    
+    .storage-selector {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.8em;
+        font-weight: normal;
+    }
+    
+    .storage-toggle {
+        display: flex;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        overflow: hidden;
+        background-color: white;
+    }
+    
+    .storage-option-compact {
+        padding: 6px 12px;
+        cursor: pointer;
+        background-color: #f8f9fa;
+        border: none;
+        font-size: 0.75em;
+        font-weight: 500;
+        color: #666;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+    
+    .storage-option-compact:hover {
+        background-color: #e9ecef;
+    }
+    
+    .storage-option-compact.selected {
+        background-color: #007bff;
+        color: white;
+    }
+    
+    .storage-icon {
+        font-size: 12px;
+    }
+    
+    .form-section {
+        background-color: white;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .form-row {
+        display: flex;
+        gap: 20px;
+        margin-bottom: 15px;
+        align-items: end;
+    }
+    
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        flex: 1;
+    }
+    
+    .form-label {
+        font-weight: bold;
+        color: #555;
+        font-size: 0.9em;
+    }
+    
+    .criteria-list {
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 10px;
+        max-height: 300px;
+        overflow-y: auto;
+        background-color: #fafafa;
+    }
+    
+    .criteria-item {
+        background-color: white;
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+        padding: 10px;
+        margin-bottom: 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .criteria-item:last-child {
+        margin-bottom: 0;
+    }
+    
+    .criteria-description {
+        font-size: 0.9em;
+        color: #666;
+    }
+    
+    .indicator-preview {
+        background-color: #e3f2fd;
+        border: 1px solid #2196f3;
+        border-radius: 8px;
+        padding: 15px;
+        margin-top: 20px;
+    }
+    
+    .preview-title {
+        font-weight: bold;
+        color: #1976d2;
+        margin-bottom: 10px;
+    }
+    
+    .saved-indicators {
+        background-color: white;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .indicator-card {
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 15px;
+        background-color: #fafafa;
+        transition: background-color 0.3s;
+        position: relative;
+    }
+    
+    .indicator-card:hover {
+        background-color: #f0f0f0;
+    }
+    
+    .indicator-card.selected {
+        background-color: #e3f2fd;
+        border-color: #2196f3;
+    }
+    
+    .storage-badge {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 0.7em;
+        font-weight: bold;
+        text-transform: uppercase;
+    }
+    
+    .storage-badge.database {
+        background-color: #4caf50;
+        color: white;
+    }
+    
+    .storage-badge.local {
+        background-color: #ff9800;
+        color: white;
+    }
+    
+    .indicator-name {
+        font-weight: bold;
+        font-size: 1.1em;
+        color: #333;
+        margin-bottom: 5px;
+    }
+    
+    .indicator-description {
+        color: #666;
+        font-size: 0.9em;
+        margin-bottom: 10px;
+    }
+    
+    .indicator-criteria-count {
+        color: #888;
+        font-size: 0.8em;
+    }
+    
+    .action-buttons {
+        display: flex;
+        gap: 10px;
+        margin-top: 15px;
+    }
+    
+    .sub-form {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 15px;
+        margin-top: 10px;
+    }
+    
+    .preview-result {
+        background-color: #fff3e0;
+        border: 2px solid #ff9800;
+        border-radius: 8px;
+        padding: 15px;
+        margin-top: 20px;
+    }
+    
+    .preview-result-title {
+        font-weight: bold;
+        color: #f57c00;
+        margin-bottom: 10px;
+        font-size: 1.2em;
+    }
+    
+    .preview-value {
+        font-size: 2em;
+        font-weight: bold;
+        text-align: center;
+        margin: 15px 0;
+    }
+    
+    .preview-details {
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px solid #e0e0e0;
+    }
+    
+    .criteria-value {
+        display: flex;
+        justify-content: space-between;
+        margin: 5px 0;
+        padding: 5px;
+        background-color: #f5f5f5;
+        border-radius: 4px;
+    }
+
+    .name-validation-message {
+        font-size: 0.8em;
+        color: #f44336;
+        margin-top: 5px;
+        display: none;
+    }
+
+    .name-validation-message.show {
+        display: block;
+    }
+
+    .form-group.has-error .form-label {
+        color: #f44336;
+    }
+
+    .form-group.has-error input {
+        border-color: #f44336 !important;
+    }
+</style>
+
+<div class="indicator-builder-container">
+    <div class="section-header">
+        <div class="section-title">
+            🔧 Créateur d'Indicateurs Personnalisés
+        </div>
+        <div class="storage-selector">
+            <span style="color: #666; font-size: 0.75em;">Stockage:</span>
+            <div class="storage-toggle">
+                <button class="storage-option-compact @(selectedStorageMode == "database" ? "selected" : "")" 
+                        @onclick="@(() => SetStorageMode("database"))">
+                    <span class="storage-icon">🗄️</span>
+                    <span>Base</span>
+                </button>
+                <button class="storage-option-compact @(selectedStorageMode == "localStorage" ? "selected" : "")" 
+                        @onclick="@(() => SetStorageMode("localStorage"))">
+                    <span class="storage-icon">💻</span>
+                    <span>Local</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="form-section">
+        <h4>Définition de l'Indicateur</h4>
+        
+        <div class="form-row">
+            <div class="form-group @(HasNameError() ? "has-error" : "")">
+                <label class="form-label">Nom de l'indicateur</label>
+                <RadzenTextBox @bind-Value="@newIndicator.Name" 
+                               Placeholder="Ex: Indice d'état des dalles"
+                               @oninput="@OnNameChanged" />
+                @if (HasNameError())
+                {
+                    <div class="name-validation-message show">
+                        ⚠️ Un indicateur avec ce nom existe déjà. Veuillez choisir un nom différent.
+                    </div>
+                }
+            </div>
+            <div class="form-group">
+                <label class="form-label">Type d'indicateur</label>
+                <RadzenDropDown @bind-Value="@newIndicator.Type" 
+                                Data="@indicatorTypes" 
+                                TextProperty="Name" 
+                                ValueProperty="Value" />
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Description</label>
+                <RadzenTextArea @bind-Value="@newIndicator.Description" 
+                               Placeholder="Description de l'indicateur et de son utilité" 
+                               Rows="3" />
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Seuil d'alerte (valeur critique)</label>
+                <RadzenNumeric @bind-Value="@newIndicator.AlertThreshold" 
+                              TValue="double?" 
+                              Placeholder="Ex: 7.0" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Valeur maximale (échelle de la jauge)</label>
+                <RadzenNumeric @bind-Value="@newIndicator.MaxValue" 
+                              TValue="double?" 
+                              Placeholder="Ex: 10.0" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Unité</label>
+                <RadzenTextBox @bind-Value="@newIndicator.Unit" 
+                              Placeholder="Ex: %, index, mm" />
+            </div>
+        </div>
+    </div>
+    
+    <div class="form-section">
+        <h4>Critères de Calcul</h4>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Source de données</label>
+                <RadzenDropDown @bind-Value="@selectedDataSource" 
+                                Data="@dataSources" 
+                                TextProperty="Name" 
+                                ValueProperty="Value"
+                                Change="@OnDataSourceChanged" />
+            </div>
+        </div>
+        
+        @* Configuration spécifique selon la source de données *@
+        @if (selectedDataSource == "structure_attributes")
+        {
+            <div class="sub-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Type d'attribut de structure</label>
+                        <RadzenDropDown @bind-Value="@selectedStructureAttributeType" 
+                                        Data="@structureAttributeTypes" 
+                                        TextProperty="Name" 
+                                        ValueProperty="AttributeTypeId" />
+                    </div>
+                </div>
+            </div>
+        }
+        
+        @if (selectedDataSource == "structure_inspections")
+        {
+            <div class="sub-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Type de résultat d'inspection</label>
+                        <RadzenDropDown @bind-Value="@selectedInspectionResultType" 
+                                        Data="@structureInspectionResultTypes" 
+                                        TextProperty="Name" 
+                                        ValueProperty="InspectionResultTypeId" />
+                    </div>
+                </div>
+            </div>
+        }
+        
+        @if (selectedDataSource == "element_attributes")
+        {
+            <div class="sub-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Type d'élément</label>
+                        <RadzenDropDown @bind-Value="@selectedElementType" 
+                                        Data="@elementTypes" 
+                                        TextProperty="Name" 
+                                        ValueProperty="ElementTypeId"
+                                        Change="@OnElementTypeChanged" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Type d'attribut d'élément</label>
+                        <RadzenDropDown @bind-Value="@selectedElementAttributeType" 
+                                        Data="@elementAttributeTypes" 
+                                        TextProperty="Name" 
+                                        ValueProperty="AttributeTypeId" />
+                    </div>
+                </div>
+            </div>
+        }
+        
+        @if (selectedDataSource == "element_inspections")
+        {
+            <div class="sub-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Type d'élément</label>
+                        <RadzenDropDown @bind-Value="@selectedElementType" 
+                                        Data="@elementTypes" 
+                                        TextProperty="Name" 
+                                        ValueProperty="ElementTypeId"
+                                        Change="@OnElementTypeChanged" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Type de résultat d'inspection</label>
+                        <RadzenDropDown @bind-Value="@selectedElementInspectionResultType" 
+                                        Data="@elementInspectionResultTypes" 
+                                        TextProperty="Name" 
+                                        ValueProperty="InspectionResultTypeId" />
+                    </div>
+                </div>
+            </div>
+        }
+        
+        @if (selectedDataSource == "defect_attributes")
+        {
+            <div class="sub-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Type d'élément</label>
+                        <RadzenDropDown @bind-Value="@selectedElementType" 
+                                        Data="@elementTypes" 
+                                        TextProperty="Name" 
+                                        ValueProperty="ElementTypeId"
+                                        Change="@OnElementTypeChanged" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Type de défaut (optionnel)</label>
+                        <RadzenDropDown @bind-Value="@selectedDefectType" 
+                                        Data="@defectTypes" 
+                                        TextProperty="Name" 
+                                        ValueProperty="DefectTypeId"
+                                        AllowClear="true" />
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Type d'attribut de défaut</label>
+                        <RadzenDropDown @bind-Value="@selectedDefectAttributeType" 
+                                        Data="@defectAttributeTypes" 
+                                        TextProperty="Name" 
+                                        ValueProperty="AttributeTypeId" />
+                    </div>
+                </div>
+            </div>
+        }
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Méthode de calcul</label>
+                <RadzenDropDown @bind-Value="@selectedCalculationMethod" 
+                                Data="@calculationMethods" 
+                                TextProperty="Name" 
+                                ValueProperty="Value" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Pondération</label>
+                <RadzenNumeric @bind-Value="@currentCriteriaWeight" 
+                               TValue="double"                     
+                               Min="0.1m" 
+                               Max="10.0m" 
+                               Step="0.1m" />
+            </div>
+            <div class="form-group">
+                <RadzenButton Text="Ajouter Critère" 
+                             Icon="add" 
+                             ButtonStyle="ButtonStyle.Primary" 
+                             Click="@AddCriteria" />
+            </div>
+        </div>
+        
+        <div class="criteria-list">
+            <h5>Critères définis (@newIndicator.Criteria.Count)</h5>
+            @if (!newIndicator.Criteria.Any())
+            {
+                <p class="criteria-description">Aucun critère défini. Ajoutez des critères pour calculer l'indicateur.</p>
+            }
+            else
+            {
+                @foreach (var criteria in newIndicator.Criteria)
+                {
+                    <div class="criteria-item">
+                        <div>
+                            <strong>@criteria.Name</strong><br/>
+                            <span class="criteria-description">@criteria.Description</span><br/>
+                            <small>Pondération: @criteria.Weight</small>
+                        </div>
+                        <RadzenButton Icon="delete" 
+                                     ButtonStyle="ButtonStyle.Danger" 
+                                     Variant="Variant.Text" 
+                                     Click="@(() => RemoveCriteria(criteria))" />
+                    </div>
+                }
+            }
+        </div>
+    </div>
+    
+    @* Utilisation du composant éditeur de formule *@
+    @if (newIndicator.Criteria.Any())
+    {
+        <FormulaEditorComponent @bind-CustomFormula="@newIndicator.CustomFormula"
+                              @bind-IsCustomMode="@isCustomFormula"
+                              Variables="@GetFormulaVariables()"
+                              SimpleFormulaPreview="@GetFormulaPreview()"
+                              ValidateFormula="@ValidateFormulaMethod"
+                              GetDefaultFormula="@GetDefaultFormulaMethod"
+                              OnModeToggled="@OnFormulaModeToggled" />
+    }
+
+    @* Résultat de l'aperçu *@
+    @if (previewResult != null)
+    {
+        <div class="preview-result">
+            <div class="preview-result-title">🎯 Résultat de l'Aperçu</div>
+            <div class="preview-value" style="color: @GetPreviewValueColor()">
+                @previewResult.Value.ToString("F2") @newIndicator.Unit
+            </div>
+            <div style="text-align: center;">
+                @if (newIndicator.AlertThreshold.HasValue && previewResult.Value > newIndicator.AlertThreshold.Value)
+                {
+                    <RadzenBadge BadgeStyle="BadgeStyle.Danger" Text="⚠️ Seuil d'alerte dépassé" />
+                }
+                else
+                {
+                    <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="✅ Valeur normale" />
+                }
+            </div>
+
+            @if (previewResult.Details.Any())
+            {
+                <div class="preview-details">
+                    <h6>Détails du calcul :</h6>
+                    @foreach (var detail in previewResult.Details)
+                    {
+                        <div class="criteria-value">
+                            <span><strong>@detail.CriteriaName :</strong></span>
+                            <span>@detail.Value.ToString("F2") (poids: @detail.Weight)</span>
+                        </div>
+                    }
+                    @if (newIndicator.UseCustomFormula && !string.IsNullOrEmpty(newIndicator.CustomFormula))
+                    {
+                        <div style="margin-top: 10px; font-style: italic;">
+                            <strong>Formule appliquée :</strong> @newIndicator.CustomFormula
+                        </div>
+                    }
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(previewResult.ErrorMessage))
+            {
+                <div class="formula-error">
+                    <strong>Erreur de calcul :</strong> @previewResult.ErrorMessage
+                </div>
+            }
+        </div>
+    }
+    
+    @if (newIndicator.Criteria.Any())
+    {
+        <div class="indicator-preview">
+            <div class="preview-title">📊 Aperçu de l'Indicateur</div>
+            <p><strong>Nom:</strong> @newIndicator.Name</p>
+            <p><strong>Type:</strong> @GetIndicatorTypeName(newIndicator.Type)</p>
+            <p><strong>Nombre de critères:</strong> @newIndicator.Criteria.Count</p>
+            <p><strong>Seuil d'alerte:</strong> @newIndicator.AlertThreshold @newIndicator.Unit</p>
+            <p><strong>Valeur maximale:</strong> @newIndicator.MaxValue @newIndicator.Unit</p>
+            <p><strong>Formule:</strong> @(isCustomFormula && !string.IsNullOrEmpty(newIndicator.CustomFormula) ? newIndicator.CustomFormula : GetFormulaPreview())</p>
+            <p><strong>Mode de sauvegarde:</strong> @(selectedStorageMode == "database" ? "Base de données" : "Stockage local")</p>
+        </div>
+    }
+    
+    <div class="action-buttons">
+        <RadzenButton Text="@GetSaveButtonText()" 
+                     Icon="save" 
+                     ButtonStyle="ButtonStyle.Success" 
+                     Click="@SaveIndicator" 
+                     Disabled="@(!CanSaveIndicator())" />
+        <RadzenButton Text="Réinitialiser" 
+                     Icon="refresh" 
+                     ButtonStyle="ButtonStyle.Secondary" 
+                     Click="@ResetForm" />
+        <RadzenButton Text="Calculer Aperçu" 
+                     Icon="calculate" 
+                     ButtonStyle="ButtonStyle.Info" 
+                     Click="@CalculatePreview" 
+                     Disabled="@(!newIndicator.Criteria.Any())" />
+    </div>
+</div>
+
+<div class="saved-indicators">
+    <div class="section-header">
+        <div class="section-title">
+            📈 Indicateurs Disponibles
+        </div>
+    </div>
+    
+    @if (!savedIndicators.Any())
+    {
+        <p class="criteria-description">Aucun indicateur personnalisé créé.</p>
+    }
+    else
+    {
+        @foreach (var indicator in savedIndicators)
+        {
+            <div class="indicator-card @(selectedIndicators.Contains(indicator.Id) ? "selected" : "")"
+                 @onclick="@(() => ToggleIndicatorSelection(indicator.Id))">
+                <div class="storage-badge @(indicator.StorageMode == "database" ? "database" : "local")">
+                    @(indicator.StorageMode == "database" ? "DB" : "LOCAL")
+                </div>
+                <div class="indicator-name">@indicator.Name</div>
+                <div class="indicator-description">@indicator.Description</div>
+                <div class="indicator-criteria-count">
+                    @indicator.Criteria.Count critère(s) • Seuil: @indicator.AlertThreshold @indicator.Unit
+                </div>
+                <div style="margin-top: 10px;">
+                    <RadzenButton Text="Modifier" 
+                                 Icon="edit" 
+                                 ButtonStyle="ButtonStyle.Light" 
+                                 Size="ButtonSize.Small"
+                                 Click="@(() => EditIndicator(indicator))" />
+                    <RadzenButton Text="Supprimer" 
+                                 Icon="delete" 
+                                 ButtonStyle="ButtonStyle.Danger" 
+                                 Size="ButtonSize.Small"
+                                 Click="@(() => DeleteIndicator(indicator.Id))" />
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public EventCallback<List<CustomIndicator>> OnIndicatorsChanged { get; set; }
+    
+    private CustomIndicator newIndicator = new CustomIndicator();
+    private List<CustomIndicator> savedIndicators = new();
+    private List<Guid> selectedIndicators = new();
+    
+    // Add a field to track the indicator being edited
+    private CustomIndicator? originalIndicatorBeingEdited = null;
+    
+    // Storage mode selection
+    private string selectedStorageMode = "database"; // Default to database
+    private const string LOCAL_STORAGE_KEY = "customIndicators";
+    private const string STORAGE_MODE_KEY = "indicatorStorageMode";
+    
+    // Formula editor state
+    private bool isCustomFormula = false;
+    
+    // Preview result
+    private PreviewResult? previewResult;
+    
+    // Data sources
+    private string selectedDataSource = "structure_attributes";
+    private Guid? selectedInspectionResultType;
+    private Guid? selectedElementType;
+    private Guid? selectedElementInspectionResultType;
+    private Guid? selectedDefectType;
+    private Guid? selectedStructureAttributeType;
+    private Guid? selectedElementAttributeType;
+    private Guid? selectedDefectAttributeType;
+    private string selectedCalculationMethod = "average";
+    private double currentCriteriaWeight = 1.0;
+    
+    // Lists for dropdowns
+    private List<DropdownItem> dataSources = new();
+    private List<DropdownItem> indicatorTypes = new();
+    private List<DropdownItem> calculationMethods = new();
+    private List<InspectionResultType> structureInspectionResultTypes = new();
+    private List<ElementType> elementTypes = new();
+    private List<InspectionResultType> elementInspectionResultTypes = new();
+    private List<DefectType> defectTypes = new();
+    private List<AttributeType> structureAttributeTypes = new();
+    private List<AttributeType> elementAttributeTypes = new();
+    private List<AttributeType> defectAttributeTypes = new();
+    
+    // Calculator instance
+    private IndicatorCalculator calculator;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        calculator = new IndicatorCalculator(entitiesService);
+        InitializeDropdowns();
+        await LoadAvailableTypes();
+        await LoadStoragePreference();
+        await LoadSavedIndicators();
+    }
+    
+    private async Task LoadStoragePreference()
+    {
+        try
+        {
+            var storageMode = await localStorage.GetItemAsync<string>(STORAGE_MODE_KEY);
+            if (!string.IsNullOrEmpty(storageMode))
+            {
+                selectedStorageMode = storageMode;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading storage preference: {ex.Message}");
+        }
+    }
+    
+    private async Task SetStorageMode(string mode)
+    {
+        selectedStorageMode = mode;
+        try
+        {
+            await localStorage.SetItemAsync(STORAGE_MODE_KEY, selectedStorageMode);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving storage preference: {ex.Message}");
+        }
+        StateHasChanged();
+    }
+    
+    private void InitializeDropdowns()
+    {
+        dataSources = new List<DropdownItem>
+        {
+            new DropdownItem { Name = "Attributs de structure", Value = "structure_attributes" },
+            new DropdownItem { Name = "Résultats d'inspection de structure", Value = "structure_inspections" },
+            new DropdownItem { Name = "Attributs d'éléments", Value = "element_attributes" },
+            new DropdownItem { Name = "Résultats d'inspection d'éléments", Value = "element_inspections" },
+            new DropdownItem { Name = "Attributs de défauts", Value = "defect_attributes" }
+        };
+        
+        indicatorTypes = new List<DropdownItem>
+        {
+            new DropdownItem { Name = "Indice de santé", Value = "health" },
+            new DropdownItem { Name = "Indice de fréquence", Value = "frequency" },
+            new DropdownItem { Name = "Indice critique", Value = "critical" },
+            new DropdownItem { Name = "Indicateur composite", Value = "composite" }
+        };
+        
+        calculationMethods = new List<DropdownItem>
+        {
+            new DropdownItem { Name = "Moyenne", Value = "average" },
+            new DropdownItem { Name = "Moyenne pondérée", Value = "weighted_average" },
+            new DropdownItem { Name = "Maximum", Value = "max" },
+            new DropdownItem { Name = "Minimum", Value = "min" },
+            new DropdownItem { Name = "Pourcentage critique", Value = "critical_percentage" },
+            new DropdownItem { Name = "Somme", Value = "sum" },
+            new DropdownItem { Name = "Comptage", Value = "count" }
+        };
+    }
+    
+    private async Task LoadAvailableTypes()
+    {
+        try
+        {
+            if (appData.Structure != null)
+            {
+                // Charger les types de résultats d'inspection pour la structure
+                var structureTypeInspectionResults = await entitiesService.GetFilteredEntitiesAsync<StructureTypeInspectionResultType>(
+                    x => x.StructureTypeId == appData.Structure.StructureTypeId);
+                var structureInspectionResultTypeIds = structureTypeInspectionResults.Select(x => x.InspectionResultTypeId).ToList();
+                structureInspectionResultTypes = await entitiesService.GetFilteredEntitiesAsync<InspectionResultType>(
+                    x => structureInspectionResultTypeIds.Contains(x.InspectionResultTypeId));
+                
+                // Charger les types d'éléments
+                elementTypes = await entitiesService.GetAllEntitiesAsync<ElementType>();
+                
+                // Charger les types d'attributs pour la structure
+                var structureTypeAttributeTypes = await entitiesService.GetFilteredEntitiesAsync<StructureTypeAttributeType>(
+                    x => x.StructureTypeId == appData.Structure.StructureTypeId);
+                var structureAttributeTypeIds = structureTypeAttributeTypes.Select(x => x.AttributeTypeId).ToList();
+                structureAttributeTypes = await entitiesService.GetFilteredEntitiesAsync<AttributeType>(
+                    x => structureAttributeTypeIds.Contains(x.AttributeTypeId));
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur lors du chargement des types: {ex.Message}");
+        }
+    }
+    
+    private async Task OnDataSourceChanged()
+    {
+        // Reset all selections
+        selectedInspectionResultType = null;
+        selectedElementType = null;
+        selectedElementInspectionResultType = null;
+        selectedDefectType = null;
+        selectedStructureAttributeType = null;
+        selectedElementAttributeType = null;
+        selectedDefectAttributeType = null;
+        
+        // Clear dependent lists
+        elementInspectionResultTypes.Clear();
+        defectTypes.Clear();
+        elementAttributeTypes.Clear();
+        defectAttributeTypes.Clear();
+        
+        StateHasChanged();
+    }
+    
+    private async Task OnElementTypeChanged()
+    {
+        if (selectedElementType.HasValue)
+        {
+            try
+            {
+                // Charger les types de résultats d'inspection pour ce type d'élément
+                var elementTypeInspectionResults = await entitiesService.GetFilteredEntitiesAsync<InspectionResultTypeElementType>(
+                    x => x.ElementTypeId == selectedElementType.Value);
+                var inspectionResultTypeIds = elementTypeInspectionResults.Select(x => x.InspectionResultTypeId).ToList();
+                elementInspectionResultTypes = await entitiesService.GetFilteredEntitiesAsync<InspectionResultType>(
+                    x => inspectionResultTypeIds.Contains(x.InspectionResultTypeId));
+                
+                // Charger les types de défauts pour ce type d'élément
+                var elementTypeDefects = await entitiesService.GetFilteredEntitiesAsync<ElementTypeDefectType>(
+                    x => x.ElementTypeId == selectedElementType.Value);
+                var defectTypeIds = elementTypeDefects.Select(x => x.DefectTypeId).ToList();
+                defectTypes = await entitiesService.GetFilteredEntitiesAsync<DefectType>(
+                    x => defectTypeIds.Contains(x.DefectTypeId));
+                
+                // Charger les types d'attributs pour ce type d'élément
+                var elementTypeAttributeTypes = await entitiesService.GetFilteredEntitiesAsync<AttributeTypeElementType>(
+                    x => x.ElementTypeId == selectedElementType.Value);
+                var attributeTypeIds = elementTypeAttributeTypes.Select(x => x.AttributeTypeId).ToList();
+                elementAttributeTypes = await entitiesService.GetFilteredEntitiesAsync<AttributeType>(
+                    x => attributeTypeIds.Contains(x.AttributeTypeId));
+                
+                // Charger les types d'attributs pour les défauts de ce type d'élément
+                var defectAttributeTypeRelations = await entitiesService.GetFilteredEntitiesAsync<AttributeTypeDefectType>(
+                    x => defectTypeIds.Contains(x.DefectTypeId));
+                var defectAttributeTypeIds = defectAttributeTypeRelations.Select(x => x.AttributeTypeId).ToList();
+                defectAttributeTypes = await entitiesService.GetFilteredEntitiesAsync<AttributeType>(
+                    x => defectAttributeTypeIds.Contains(x.AttributeTypeId));
+                
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erreur lors du chargement des types pour l'élément: {ex.Message}");
+            }
+        }
+    }
+    
+    #region Formula Editor Methods
+    
+    private Dictionary<string, string> GetFormulaVariables()
+    {
+        var variables = new Dictionary<string, string>();
+        for (int i = 0; i < newIndicator.Criteria.Count; i++)
+        {
+            variables[$"C{i + 1}"] = newIndicator.Criteria[i].Name;
+        }
+        return variables;
+    }
+    
+    private string ValidateFormulaMethod(string formula)
+    {
+        return IndicatorCalculator.ValidateFormula(formula, newIndicator.Criteria);
+    }
+    
+    private string GetDefaultFormulaMethod()
+    {
+        return IndicatorCalculator.GetDefaultCustomFormula(newIndicator.Criteria);
+    }
+    
+    private void OnFormulaModeToggled(bool isCustomMode)
+    {
+        this.isCustomFormula = isCustomMode;
+        newIndicator.UseCustomFormula = isCustomMode;
+        
+        if (!isCustomMode)
+        {
+            newIndicator.CustomFormula = "";
+        }
+        else if (string.IsNullOrEmpty(newIndicator.CustomFormula))
+        {
+            newIndicator.CustomFormula = IndicatorCalculator.GetDefaultCustomFormula(newIndicator.Criteria);
+        }
+        
+        StateHasChanged();
+    }
+    
+    #endregion
+    
+    private void AddCriteria()
+    {
+        if (CanAddCriteria())
+        {
+            var criteria = new IndicatorCriteria
+            {
+                Id = Guid.NewGuid(),
+                Name = GenerateCriteriaName(),
+                Description = GenerateCriteriaDescription(),
+                DataSource = selectedDataSource,
+                CalculationMethod = selectedCalculationMethod,
+                Weight = currentCriteriaWeight,
+                InspectionResultTypeId = selectedDataSource switch
+                {
+                    "structure_inspections" => selectedInspectionResultType,
+                    "element_inspections" => selectedElementInspectionResultType,
+                    _ => null
+                },
+                ElementTypeId = selectedElementType,
+                DefectTypeId = selectedDefectType,
+                AttributeTypeId = selectedDataSource switch
+                {
+                    "structure_attributes" => selectedStructureAttributeType,
+                    "element_attributes" => selectedElementAttributeType,
+                    "defect_attributes" => selectedDefectAttributeType,
+                    _ => null
+                }
+            };
+            
+            newIndicator.Criteria.Add(criteria);
+            
+            // Mettre à jour la formule personnalisée si en mode avancé
+            if (isCustomFormula)
+            {
+                newIndicator.CustomFormula = IndicatorCalculator.GetDefaultCustomFormula(newIndicator.Criteria);
+            }
+            
+            ResetCriteriaForm();
+        }
+    }
+    
+    private bool CanAddCriteria()
+    {
+        return selectedDataSource switch
+        {
+            "structure_attributes" => selectedStructureAttributeType.HasValue,
+            "structure_inspections" => selectedInspectionResultType.HasValue,
+            "element_attributes" => selectedElementType.HasValue && selectedElementAttributeType.HasValue,
+            "element_inspections" => selectedElementType.HasValue && selectedElementInspectionResultType.HasValue,
+            "defect_attributes" => selectedElementType.HasValue && selectedDefectAttributeType.HasValue,
+            _ => false
+        };
+    }
+    
+    private string GenerateCriteriaName()
+    {
+        return selectedDataSource switch
+        {
+            "structure_attributes" => $"Structure - Attribut: {GetAttributeTypeName(selectedStructureAttributeType)}",
+            "structure_inspections" => $"Structure - Inspection: {GetInspectionResultTypeName(selectedInspectionResultType)}",
+            "element_attributes" => $"{GetElementTypeName(selectedElementType)} - Attribut: {GetAttributeTypeName(selectedElementAttributeType)}",
+            "element_inspections" => $"{GetElementTypeName(selectedElementType)} - Inspection: {GetInspectionResultTypeName(selectedElementInspectionResultType)}",
+            "defect_attributes" => $"{GetElementTypeName(selectedElementType)} - Défaut: {GetAttributeTypeName(selectedDefectAttributeType)}",
+            _ => "Critère personnalisé"
+        };
+    }
+    
+    private string GenerateCriteriaDescription()
+    {
+        var method = GetCalculationMethodName(selectedCalculationMethod);
+        return selectedDataSource switch
+        {
+            "structure_attributes" => $"{method} des valeurs d'attribut '{GetAttributeTypeName(selectedStructureAttributeType)}' au niveau structure",
+            "structure_inspections" => $"{method} des résultats d'inspection '{GetInspectionResultTypeName(selectedInspectionResultType)}' au niveau structure",
+            "element_attributes" => $"{method} des valeurs d'attribut '{GetAttributeTypeName(selectedElementAttributeType)}' pour les éléments de type '{GetElementTypeName(selectedElementType)}'",
+            "element_inspections" => $"{method} des résultats d'inspection '{GetInspectionResultTypeName(selectedElementInspectionResultType)}' pour les éléments de type '{GetElementTypeName(selectedElementType)}'",
+            "defect_attributes" => $"{method} des valeurs d'attribut '{GetAttributeTypeName(selectedDefectAttributeType)}' pour les défauts des éléments de type '{GetElementTypeName(selectedElementType)}'",
+            _ => "Calcul personnalisé"
+        };
+    }
+    
+    private void RemoveCriteria(IndicatorCriteria criteria)
+    {
+        newIndicator.Criteria.Remove(criteria);
+        
+        // Mettre à jour la formule personnalisée si en mode avancé
+        if (isCustomFormula)
+        {
+            newIndicator.CustomFormula = IndicatorCalculator.GetDefaultCustomFormula(newIndicator.Criteria);
+        }
+    }
+    
+    private void ResetCriteriaForm()
+    {
+        selectedInspectionResultType = null;
+        selectedElementType = null;
+        selectedElementInspectionResultType = null;
+        selectedDefectType = null;
+        selectedStructureAttributeType = null;
+        selectedElementAttributeType = null;
+        selectedDefectAttributeType = null;
+        currentCriteriaWeight = 1.0;
+    }
+    
+    private bool CanSaveIndicator()
+    {
+        var basicValidation = !string.IsNullOrWhiteSpace(newIndicator.Name) && 
+                         newIndicator.Criteria.Any() && 
+                         newIndicator.AlertThreshold.HasValue;
+        
+        if (!basicValidation) return false;
+        
+        // Vérifier si un indicateur avec le même nom existe déjà
+        var nameExists = savedIndicators.Any(indicator => 
+            string.Equals(indicator.Name.Trim(), newIndicator.Name.Trim(), StringComparison.OrdinalIgnoreCase));
+        
+        if (nameExists) return false;
+        
+        // Si en mode formule personnalisée, vérifier qu'elle est valide
+        if (isCustomFormula)
+        {
+            var validationResult = IndicatorCalculator.ValidateFormula(newIndicator.CustomFormula, newIndicator.Criteria);
+            return !string.IsNullOrWhiteSpace(newIndicator.CustomFormula) && 
+                   string.IsNullOrEmpty(validationResult);
+        }
+        
+        return true;
+    }
+    
+    private string GetSaveButtonText()
+    {
+        return selectedStorageMode == "database" 
+            ? "Sauvegarder en Base" 
+            : "Sauvegarder Localement";
+    }
+    
+    private async Task SaveIndicator()
+    {
+        if (!CanSaveIndicator())
+        {
+            // Vérifier spécifiquement si le problème est le nom en double
+            var nameExists = savedIndicators.Any(indicator => 
+                string.Equals(indicator.Name.Trim(), newIndicator.Name.Trim(), StringComparison.OrdinalIgnoreCase));
+            
+            if (nameExists)
+            {
+                await jsRuntime.InvokeVoidAsync("alert", 
+                    $"⚠️ Un indicateur avec le nom '{newIndicator.Name}' existe déjà. " +
+                    "Veuillez choisir un nom différent.");
+                return;
+            }
+            
+            // Autres validations
+            if (string.IsNullOrWhiteSpace(newIndicator.Name))
+            {
+                await jsRuntime.InvokeVoidAsync("alert", "⚠️ Le nom de l'indicateur est requis.");
+                return;
+            }
+            
+            if (!newIndicator.Criteria.Any())
+            {
+                await jsRuntime.InvokeVoidAsync("alert", "⚠️ Au moins un critère est requis.");
+                return;
+            }
+            
+            if (!newIndicator.AlertThreshold.HasValue)
+            {
+                await jsRuntime.InvokeVoidAsync("alert", "⚠️ Le seuil d'alerte est requis.");
+                return;
+            }
+            
+            if (isCustomFormula)
+            {
+                var validationResult = IndicatorCalculator.ValidateFormula(newIndicator.CustomFormula, newIndicator.Criteria);
+                if (!string.IsNullOrEmpty(validationResult))
+                {
+                    await jsRuntime.InvokeVoidAsync("alert", $"⚠️ Erreur dans la formule: {validationResult}");
+                    return;
+                }
+            }
+            
+            return;
+        }
+
+        try
+        {
+            newIndicator.Id = Guid.NewGuid();
+            newIndicator.CreatedDate = DateTime.Now;
+            newIndicator.UseCustomFormula = isCustomFormula;
+            newIndicator.StorageMode = selectedStorageMode;
+            
+            if (selectedStorageMode == "database")
+            {
+                await SaveIndicatorToDatabase();
+            }
+            else
+            {
+                await SaveIndicatorToLocalStorage();
+            }
+            
+            savedIndicators.Add(newIndicator);
+            await OnIndicatorsChanged.InvokeAsync(savedIndicators);
+            
+            await jsRuntime.InvokeVoidAsync("alert", $"✅ Indicateur '{newIndicator.Name}' sauvegardé avec succès en {(selectedStorageMode == "database" ? "base de données" : "stockage local")}!");
+            
+            // Clear the original indicator being edited since we saved successfully
+            originalIndicatorBeingEdited = null;
+            
+            ResetForm();
+        }
+        catch (Exception ex)
+        {
+            await jsRuntime.InvokeVoidAsync("alert", $"❌ Erreur lors de la sauvegarde: {ex.Message}");
+        }
+    }
+    
+    private async Task SaveIndicatorToLocalStorage()
+    {
+        try
+        {
+            var existingIndicators = await localStorage.GetItemAsync<List<CustomIndicator>>(LOCAL_STORAGE_KEY) ?? new List<CustomIndicator>();
+            
+            // Double vérification pour éviter les doublons dans le stockage local
+            var nameExists = existingIndicators.Any(indicator => 
+                string.Equals(indicator.Name.Trim(), newIndicator.Name.Trim(), StringComparison.OrdinalIgnoreCase));
+            
+            if (nameExists)
+            {
+                throw new Exception($"Un indicateur avec le nom '{newIndicator.Name}' existe déjà dans le stockage local.");
+            }
+            
+            existingIndicators.Add(newIndicator);
+            await localStorage.SetItemAsync(LOCAL_STORAGE_KEY, existingIndicators);
+        }
+        catch (Exception ex)
+        {
+            throw new Exception($"Erreur lors de la sauvegarde en stockage local: {ex.Message}");
+        }
+    }
+    
+    private async Task SaveIndicatorToDatabase()
+    {
+        try
+        {
+            // TODO: Implement database saving logic with duplicate name check
+            // Example pseudo-code:
+            // var existingIndicator = await entitiesService.GetFilteredEntitiesAsync<CustomIndicatorEntity>(
+            //     x => x.Name.ToLower() == newIndicator.Name.ToLower());
+            // if (existingIndicator.Any())
+            // {
+            //     throw new Exception($"Un indicateur avec le nom '{newIndicator.Name}' existe déjà en base de données.");
+            // }
+            
+            await Task.Delay(100); // Placeholder
+        }
+        catch (Exception ex)
+        {
+            throw new Exception($"Erreur lors de la sauvegarde en base de données: {ex.Message}");
+        }
+    }
+    
+    private void ResetForm()
+    {
+        // If we were editing an indicator, restore it to the list
+        if (originalIndicatorBeingEdited != null)
+        {
+            savedIndicators.Add(originalIndicatorBeingEdited);
+            originalIndicatorBeingEdited = null;
+        }
+        
+        // Clear the preview result
+        previewResult = null;
+        
+        // Reset the form to a new indicator
+        newIndicator = new CustomIndicator();
+        isCustomFormula = false;
+        ResetCriteriaForm();
+        
+        StateHasChanged();
+    }
+    
+    private async Task CalculatePreview()
+    {
+        try
+        {
+            if (appData.Structure == null)
+            {
+                previewResult = new PreviewResult
+                {
+                    Value = 0,
+                    ErrorMessage = "Aucune structure sélectionnée."
+                };
+                StateHasChanged();
+                return;
+            }
+            
+            previewResult = await calculator.CalculateIndicatorAsync(newIndicator, appData.Structure);
+        }
+        catch (Exception ex)
+        {
+            previewResult = new PreviewResult
+            {
+                Value = 0,
+                ErrorMessage = $"Erreur lors du calcul de l'aperçu: {ex.Message}",
+                CalculatedAt = DateTime.Now
+            };
+        }
+        
+        StateHasChanged();
+    }
+
+    private string GetPreviewValueColor()
+    {
+        if (previewResult == null) return "#333";
+
+        if (!string.IsNullOrEmpty(previewResult.ErrorMessage)) return "#f44336";
+
+        if (newIndicator.AlertThreshold.HasValue && previewResult.Value > newIndicator.AlertThreshold.Value)
+            return "#f44336";
+
+        if (newIndicator.AlertThreshold.HasValue && previewResult.Value > newIndicator.AlertThreshold.Value * 0.8)
+            return "#ff9800";
+
+        return "#4caf50";
+    }
+    
+    private void ToggleIndicatorSelection(Guid indicatorId)
+    {
+        if (selectedIndicators.Contains(indicatorId))
+        {
+            selectedIndicators.Remove(indicatorId);
+        }
+        else
+        {
+            selectedIndicators.Add(indicatorId);
+        }
+    }
+    
+    private void EditIndicator(CustomIndicator indicator)
+    {
+        // Store the original indicator before editing
+        originalIndicatorBeingEdited = indicator.Clone();
+        
+        newIndicator = indicator.Clone();
+        isCustomFormula = indicator.UseCustomFormula;
+        selectedStorageMode = indicator.StorageMode ?? "database";
+        savedIndicators.Remove(indicator);
+    }
+    
+    private async Task DeleteIndicator(Guid indicatorId)
+    {
+        var indicator = savedIndicators.FirstOrDefault(x => x.Id == indicatorId);
+        if (indicator != null)
+        {
+            try
+            {
+                if (indicator.StorageMode == "database")
+                {
+                    await DeleteIndicatorFromDatabase(indicatorId);
+                }
+                else
+                {
+                    await DeleteIndicatorFromLocalStorage(indicatorId);
+                }
+                
+                savedIndicators.RemoveAll(x => x.Id == indicatorId);
+                selectedIndicators.Remove(indicatorId);
+                
+                await jsRuntime.InvokeVoidAsync("alert", "Indicateur supprimé avec succès!");
+            }
+            catch (Exception ex)
+            {
+                await jsRuntime.InvokeVoidAsync("alert", $"Erreur lors de la suppression: {ex.Message}");
+            }
+        }
+    }
+    
+    private async Task DeleteIndicatorFromDatabase(Guid indicatorId)
+    {
+        // TODO: Implement database deletion logic
+        await Task.Delay(100); // Placeholder
+    }
+    
+    private async Task DeleteIndicatorFromLocalStorage(Guid indicatorId)
+    {
+        try
+        {
+            var existingIndicators = await localStorage.GetItemAsync<List<CustomIndicator>>(LOCAL_STORAGE_KEY) ?? new List<CustomIndicator>();
+            existingIndicators.RemoveAll(x => x.Id == indicatorId);
+            await localStorage.SetItemAsync(LOCAL_STORAGE_KEY, existingIndicators);
+        }
+        catch (Exception ex)
+        {
+            throw new Exception($"Failed to delete from local storage: {ex.Message}");
+        }
+    }
+    
+    private async Task LoadSavedIndicators()
+    {
+        try
+        {
+            // Load from both sources
+            var databaseIndicators = await LoadIndicatorsFromDatabase();
+            var localStorageIndicators = await LoadIndicatorsFromLocalStorage();
+            
+            savedIndicators.Clear();
+            savedIndicators.AddRange(databaseIndicators);
+            savedIndicators.AddRange(localStorageIndicators);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading saved indicators: {ex.Message}");
+        }
+    }
+    
+    private async Task<List<CustomIndicator>> LoadIndicatorsFromDatabase()
+    {
+        // TODO: Implement database loading logic
+        // This would typically involve calling entitiesService to get saved indicators
+        await Task.Delay(10); // Placeholder
+        return new List<CustomIndicator>();
+    }
+    
+    private async Task<List<CustomIndicator>> LoadIndicatorsFromLocalStorage()
+    {
+        try
+        {
+            var indicators = await localStorage.GetItemAsync<List<CustomIndicator>>(LOCAL_STORAGE_KEY) ?? new List<CustomIndicator>();
+            // Ensure all local storage indicators have the correct storage mode
+            indicators.ForEach(i => i.StorageMode = "localStorage");
+            return indicators;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading from local storage: {ex.Message}");
+            return new List<CustomIndicator>();
+        }
+    }
+    
+    private string GetFormulaPreview()
+    {
+        return IndicatorCalculator.GetFormulaPreview(newIndicator.Criteria);
+    }
+    
+    // Helper methods
+    private string GetIndicatorTypeName(string type) => indicatorTypes.FirstOrDefault(x => x.Value == type)?.Name ?? type;
+    private string GetCalculationMethodName(string method) => calculationMethods.FirstOrDefault(x => x.Value == method)?.Name ?? method;
+    private string GetInspectionResultTypeName(Guid? id) => structureInspectionResultTypes.Concat(elementInspectionResultTypes).FirstOrDefault(x => x.InspectionResultTypeId == id)?.Name ?? "Non spécifié";
+    private string GetElementTypeName(Guid? id) => elementTypes.FirstOrDefault(x => x.ElementTypeId == id)?.Name ?? "Non spécifié";
+    private string GetAttributeTypeName(Guid? id) => structureAttributeTypes.Concat(elementAttributeTypes).Concat(defectAttributeTypes).FirstOrDefault(x => x.AttributeTypeId == id)?.Name ?? "Non spécifié";
+    
+    // Supporting classes moved to IndicatorCalculator.cs - remove from here
+    public class DropdownItem
+    {
+        public string Name { get; set; } = "";
+        public string Value { get; set; } = "";
+    }
+    
+    private bool HasNameError()
+    {
+        if (string.IsNullOrWhiteSpace(newIndicator.Name)) return false;
+        
+        return savedIndicators.Any(indicator => 
+            string.Equals(indicator.Name.Trim(), newIndicator.Name.Trim(), StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void OnNameChanged(ChangeEventArgs e)
+    {
+        newIndicator.Name = e.Value?.ToString() ?? "";
+        StateHasChanged();
+    }
+}

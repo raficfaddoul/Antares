@@ -28,5 +28,5 @@ public partial class EventMpscenario
     public virtual Event Event { get; set; } = null!;
 
     [InverseProperty("EventMpscenario")]
-    public virtual ICollection<MotherGridPalonnier> MotherGridPalonniers { get; } = new List<MotherGridPalonnier>();
+    public virtual ICollection<MotherGridPalonnier> MotherGridPalonniers { get; set; } = new List<MotherGridPalonnier>();
 }

@@ -1,0 +1,340 @@
+﻿@using AliantWebS.IndicatorCalculator
+
+<h3>FormulaEditorComponent</h3>
+
+<div class="formula-editor">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <h4>🧮 @Title</h4>
+        <div>
+            <RadzenButton Text="@(IsCustomMode ? "Mode Simple" : "Mode Avancé")" 
+                         Icon="@(IsCustomMode ? "auto_awesome" : "code")"
+                         ButtonStyle="ButtonStyle.Info" 
+                         Size="ButtonSize.Small"
+                         Click="@ToggleFormulaMode" />
+        </div>
+    </div>
+    
+    @if (IsCustomMode)
+    {
+        <div>
+            <label class="form-label">Formule personnalisée :</label>
+            
+            @if (ShowVariables && Variables.Any())
+            {
+                <div class="formula-variables">
+                    <strong>Variables disponibles :</strong>
+                    @foreach (var variable in Variables)
+                    {
+                        <div class="variable-chip" @onclick="@(() => InsertText(variable.Key))">
+                            @variable.Key : @variable.Value
+                        </div>
+                    }
+                </div>
+            }
+            
+            @if (ShowFunctions)
+            {
+                <div class="formula-functions">
+                    <strong>Fonctions :</strong>
+                    <div class="function-button" @onclick="@(() => InsertFunction("MAX("))">MAX</div>
+                    <div class="function-button" @onclick="@(() => InsertFunction("MIN("))">MIN</div>
+                    <div class="function-button" @onclick="@(() => InsertFunction("AVG("))">AVG</div>
+                    <div class="function-button" @onclick="@(() => InsertFunction("SQRT("))">SQRT</div>
+                    <div class="function-button" @onclick="@(() => InsertFunction("ABS("))">ABS</div>
+                    <div class="function-button" @onclick="@(() => InsertFunction("IF("))">IF</div>
+                    <div class="function-button" @onclick="@(() => InsertOperator(" + "))">+</div>
+                    <div class="function-button" @onclick="@(() => InsertOperator(" - "))">-</div>
+                    <div class="function-button" @onclick="@(() => InsertOperator(" * "))">×</div>
+                    <div class="function-button" @onclick="@(() => InsertOperator(" / "))">÷</div>
+                    <div class="function-button" @onclick="@(() => InsertOperator("("))">(</div>
+                    <div class="function-button" @onclick="@(() => InsertOperator(")"))">)</div>
+                </div>
+            }
+            
+            <RadzenTextArea @bind-Value="@CustomFormula" 
+                           @ref="formulaTextArea"
+                           Placeholder="@Placeholder"
+                           Rows="@TextAreaRows" 
+                           Style="font-family: monospace; font-size: 1.1em;" 
+                           Change="@OnFormulaChanged" />
+                           
+            <div style="margin-top: 10px;">
+                <RadzenButton Text="Valider Formule" 
+                             Icon="check_circle" 
+                             ButtonStyle="ButtonStyle.Success" 
+                             Size="ButtonSize.Small"
+                             Click="@ValidateFormulaInternal" />
+                <RadzenButton Text="Réinitialiser" 
+                             Icon="refresh" 
+                             ButtonStyle="ButtonStyle.Secondary" 
+                             Size="ButtonSize.Small"
+                             Click="@ResetFormulaInternal" />
+            </div>
+            
+            @if (!string.IsNullOrEmpty(ValidationError))
+            {
+                <div class="formula-error">
+                    <strong>Erreur :</strong> @ValidationError
+                </div>
+            }
+            
+            @if (!string.IsNullOrEmpty(ValidationSuccess))
+            {
+                <div class="formula-success">
+                    <strong>✓</strong> @ValidationSuccess
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div>
+            <label class="form-label">@SimpleFormulaLabel :</label>
+            <div class="formula-display">@SimpleFormulaPreview</div>
+            @if (!string.IsNullOrEmpty(SimpleFormulaDescription))
+            {
+                <small class="text-muted">@SimpleFormulaDescription</small>
+            }
+        </div>
+    }
+</div>
+
+<style>
+    .formula-editor {
+        background-color: #fff8dc;
+        border: 2px solid #ffd700;
+        border-radius: 8px;
+        padding: 20px;
+        margin-top: 20px;
+    }
+    
+    .formula-display {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 10px;
+        font-family: monospace;
+        font-size: 1.1em;
+        margin: 10px 0;
+        min-height: 50px;
+        white-space: pre-wrap;
+    }
+    
+    .formula-variables {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px;
+        margin: 15px 0;
+    }
+    
+    .variable-chip {
+        background-color: #e3f2fd;
+        border: 1px solid #2196f3;
+        border-radius: 20px;
+        padding: 5px 10px;
+        text-align: center;
+        cursor: pointer;
+        font-size: 0.9em;
+        transition: all 0.3s;
+    }
+    
+    .variable-chip:hover {
+        background-color: #2196f3;
+        color: white;
+    }
+    
+    .formula-functions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin: 15px 0;
+    }
+    
+    .function-button {
+        background-color: #fff3e0;
+        border: 1px solid #ff9800;
+        border-radius: 4px;
+        padding: 5px 10px;
+        cursor: pointer;
+        font-size: 0.9em;
+        transition: all 0.3s;
+    }
+    
+    .function-button:hover {
+        background-color: #ff9800;
+        color: white;
+    }
+    
+    .formula-error {
+        color: #f44336;
+        background-color: #ffebee;
+        border: 1px solid #f44336;
+        border-radius: 4px;
+        padding: 10px;
+        margin-top: 10px;
+    }
+    
+    .formula-success {
+        color: #4caf50;
+        background-color: #e8f5e8;
+        border: 1px solid #4caf50;
+        border-radius: 4px;
+        padding: 10px;
+        margin-top: 10px;
+    }
+    
+    .form-label {
+        font-weight: bold;
+        color: #555;
+        font-size: 0.9em;
+    }
+</style>
+
+@code {
+    // Parameters
+    [Parameter] public string Title { get; set; } = "Éditeur de Formule";
+    [Parameter] public string CustomFormula { get; set; } = "";
+    [Parameter] public EventCallback<string> CustomFormulaChanged { get; set; }
+    [Parameter] public bool IsCustomMode { get; set; } = false;
+    [Parameter] public EventCallback<bool> IsCustomModeChanged { get; set; }
+    [Parameter] public Dictionary<string, string> Variables { get; set; } = new();
+    [Parameter] public string Placeholder { get; set; } = "Ex: (C1 * 0.5 + C2 * 0.3) / MAX(C1, C2)";
+    [Parameter] public int TextAreaRows { get; set; } = 4;
+    [Parameter] public bool ShowVariables { get; set; } = true;
+    [Parameter] public bool ShowFunctions { get; set; } = true;
+    [Parameter] public string SimpleFormulaLabel { get; set; } = "Formule automatique (moyenne pondérée)";
+    [Parameter] public string SimpleFormulaPreview { get; set; } = "";
+    [Parameter] public string SimpleFormulaDescription { get; set; } = "Cette formule calcule la moyenne pondérée de tous les critères selon leurs poids respectifs.";
+    
+    // Validation parameters
+    [Parameter] public Func<string, string> ValidateFormula { get; set; } = _ => "";
+    [Parameter] public Func<string> GetDefaultFormula { get; set; } = () => "";
+    
+    // Events
+    [Parameter] public EventCallback<string> OnFormulaValidated { get; set; }
+    [Parameter] public EventCallback OnFormulaReset { get; set; }
+    [Parameter] public EventCallback<bool> OnModeToggled { get; set; }
+    
+    // Internal state
+    private string ValidationError = "";
+    private string ValidationSuccess = "";
+    private RadzenTextArea formulaTextArea;
+    
+    private async Task ToggleFormulaMode()
+    {
+        IsCustomMode = !IsCustomMode;
+        ValidationError = "";
+        ValidationSuccess = "";
+        
+        if (!IsCustomMode)
+        {
+            CustomFormula = "";
+        }
+        else if (string.IsNullOrEmpty(CustomFormula) && GetDefaultFormula != null)
+        {
+            CustomFormula = GetDefaultFormula();
+        }
+        
+        await IsCustomModeChanged.InvokeAsync(IsCustomMode);
+        await OnModeToggled.InvokeAsync(IsCustomMode);
+        StateHasChanged();
+    }
+    
+    private async Task InsertText(string text)
+    {
+        if (formulaTextArea != null)
+        {
+            var currentValue = CustomFormula ?? "";
+            CustomFormula = currentValue + text;
+            await CustomFormulaChanged.InvokeAsync(CustomFormula);
+            StateHasChanged();
+        }
+    }
+    
+    private async Task InsertFunction(string function)
+    {
+        await InsertText(function);
+    }
+    
+    private async Task InsertOperator(string op)
+    {
+        await InsertText(op);
+    }
+    
+    private async Task OnFormulaChanged()
+    {
+        await CustomFormulaChanged.InvokeAsync(CustomFormula);
+        await ValidateFormulaInternal();
+    }
+    
+    private async Task ValidateFormulaInternal()
+    {
+        ValidationError = "";
+        ValidationSuccess = "";
+        
+        if (ValidateFormula != null)
+        {
+            var validationResult = ValidateFormula(CustomFormula);
+            
+            if (!string.IsNullOrEmpty(validationResult))
+            {
+                ValidationError = validationResult;
+            }
+            else
+            {
+                ValidationSuccess = "Formule valide !";
+            }
+        }
+        
+        await OnFormulaValidated.InvokeAsync(CustomFormula);
+        StateHasChanged();
+    }
+    
+    private async Task ResetFormulaInternal()
+    {
+        if (GetDefaultFormula != null)
+        {
+            CustomFormula = GetDefaultFormula();
+        }
+        else
+        {
+            CustomFormula = "";
+        }
+        
+        ValidationError = "";
+        ValidationSuccess = "";
+        
+        await CustomFormulaChanged.InvokeAsync(CustomFormula);
+        await OnFormulaReset.InvokeAsync();
+        StateHasChanged();
+    }
+    
+    // Public methods for external control
+    public async Task SetFormula(string formula)
+    {
+        CustomFormula = formula;
+        await CustomFormulaChanged.InvokeAsync(CustomFormula);
+        StateHasChanged();
+    }
+    
+    public async Task ClearValidation()
+    {
+        ValidationError = "";
+        ValidationSuccess = "";
+        StateHasChanged();
+    }
+    
+    public async Task SetValidationError(string error)
+    {
+        ValidationError = error;
+        ValidationSuccess = "";
+        StateHasChanged();
+    }
+    
+    public async Task SetValidationSuccess(string success)
+    {
+        ValidationSuccess = success;
+        ValidationError = "";
+        StateHasChanged();
+    }
+}

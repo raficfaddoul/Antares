@@ -24,7 +24,7 @@
 
       
                 <RadzenDataGrid @ref="AttributesGrid" AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="10" RowSelect=@RowSelect
-                            Data="@attributeElementsList" TItem="Titem1" ColumnWidth="90px" RowEdit=@RowChanged RowDeselect=@RowDeselect>
+                            Data="@attributeElementsList" TItem="Titem1" ColumnWidth="90px" AllowColumnResize="true" RowEdit=@RowChanged RowDeselect=@RowDeselect>
                     <Columns>
                         <RadzenDataGridColumn TItem="Titem1" Title="Attribute">
                             <Template Context="attributeElement">

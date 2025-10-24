@@ -3,6 +3,8 @@
 @using AliantWebS.Data
 @using System.Text.Json
 @using AliantWebS.Pages.InventoryElementPages
+@using Microsoft.EntityFrameworkCore
+@using OpenAI.Chat;
 
 @inject EntitiesService entitiesService
 @inject NavigationManager navigationManager
@@ -176,8 +178,8 @@ else
                         @if (!((@Structure.AttributeStructures == null) || (@Structure.AttributeStructures.Count == 0)))
                         {
                             <AttributesComponent Titem1="AttributeStructure" Titem2="Structure" Titem3="StructureTypeAttributeType" CallerIdName="StructureId"
-                                                 CallerTypeIdName="StructureTypeId" CallerTypeName="Structure" JunctionPropName="AttributeStructures"
-                                                 element="Structure"></AttributesComponent>
+                            CallerTypeIdName="StructureTypeId" CallerTypeName="Structure" JunctionPropName="AttributeStructures"
+                            element="Structure"></AttributesComponent>
                         }
                         @if (coordinates != null)
                         {
@@ -273,9 +275,9 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        sitesList = await Task.Run(() => entitiesService.GetAllEntitiesAsync<Site>());
+        sitesList = await entitiesService.GetAllEntitiesAsync<Site>();
 
-        structureTypesList = await Task.Run(() => entitiesService.GetAllEntitiesAsync<StructureType>());
+        structureTypesList = await entitiesService.GetAllEntitiesAsync<StructureType>();
 
 
         appData.ButtonText = ButtonText;
@@ -299,8 +301,8 @@ else
             ((Structure.StructureId.ToString(),"Structure", Structure.Name, Structure.Geolocation.Coordinate.X, Structure.Geolocation.Coordinate.Y, 100))
         };
         }
-
-
+        await ExtractAttributesEfficientAsync();
+        //await AI();
     }
 
 
@@ -353,18 +355,31 @@ else
 
     async Task FiniteElements()
     {
-        Structural.Structure frame = Structural.Simulation.CreateStructure3D(Structure, null, entitiesService);
+        // selectedLoadCases;// = new Dictionary<LoadCase, double>();
 
-        double[] q = new double[frame.nddl];
-        List<double[]> Fe = new List<double[]>();
+        List<LoadCase> loadCases = await entitiesService.GetFilteredEntitiesAsync<LoadCase>(x => x.StructureId == appData.Structure.StructureId);
+
+        Dictionary<LoadCase, double> selectedLoadCases = loadCases.ToDictionary(lc => lc, lc => 1.0); // Assuming all load cases are selected with a factor of 1.0
+
+
+        Structural.Structure frame = Structural.Simulation.CreateStructure3D(Structure, selectedLoadCases, null, entitiesService);
+
+        double[] q;
+        List<double[]> Fe;
 
         int j = 0;
         foreach (var node in frame.noeud)
         {
-        //        frame.ChargesStatiquePonctuelles.Add((node.ElementId, new List<int>() { j++ }, 1, 0));
+            //        frame.ChargesStatiquePonctuelles.Add((node.ElementId, new List<int>() { j++ }, 1, 0));
         }
 
-        Structural.StructuralStatic.StaticAnalysis(frame, q, Fe);
+        Structural.StructuralStatic.StaticAnalysis(frame, out q, out Fe);
+
+        appData.obj1 = q;
+        appData.obj2 = Fe;
+        appData.obj3 = frame;
+        navigationManager.NavigateTo("StaticFiniteElementResponse");
+
 
     }
 
@@ -372,13 +387,13 @@ else
 
     void DeepLearning()
     {
-        appData.obj = Structure;
+        appData.Structure = Structure;
         navigationManager.NavigateTo("LearningLayout");
     }
 
     void InspectionButtonClick()
     {
-        appData.obj = Structure;
+        appData.Structure = Structure;
 
         navigationManager.NavigateTo("/StructureInspections/" + Structure.StructureId);
 
@@ -387,10 +402,10 @@ else
     private async Task LoadFiles(InputFileChangeEventArgs e)
     {
         await DialogService.OpenAsync<FilesUpload>($"Files Upload",
-    new Dictionary<string, object>() { { "obj", Structure }, { "e", e }, { "Folder", "wwwroot\\data" } },
+    new Dictionary<string, object>() { { "obj", Structure }, { "e", e }, { "Folder", "wwwroot/data" } },
        new DialogOptions() { Width = "700px", Height = "570px" });
 
-        List<string> paths = await FileManagementService.GetPathForFilesAsync(Structure, false, @"wwwroot\data");
+        List<string> paths = await FileManagementService.GetPathForFilesAsync(Structure, false, @"wwwroot/data");
         string path = paths.Find(x => x.ToLower().Contains(".wexbim"));
 
         if (path == null)
@@ -456,7 +471,226 @@ else
         this.StateHasChanged();
     }
 
+    //     public class Structuree
+    //     {
+    //         public string Name { get; set; } = string.Empty;
+    //         public string ShortDescription { get; set; } = string.Empty;
+    //         public double Length { get; set; }
+    //         public DateTime YearBuilt { get; set; }
+    //         public double DesignLoad { get; set; }
+    //         public double Latitude { get; set; }
+    //         public double Longitude { get; set; }
+    //         public Guid StructureType { get; set; }
+    //         public Guid Site { get; set; }
+    //     }
+
+
+
+
+    // Most efficient approach - single query
+    private async Task<List<(string Name, string Description, string Value)>> ExtractAttributesEfficientAsync()
+    {
+        var l =  await AttributeExtractor.ExtractInfoAsync(entitiesService, Structure);
+
+        return l;
+
+
+
+        // if (Structure?.StructureTypeId == null)
+        // {
+        //     return new Dictionary<string, string>();
+        // }
+
+        // try
+        // {
+        //     if (Structure.AttributeStructures?.Count == 0)
+        //     {
+        //         await entitiesService._appDBContext.Entry(Structure)
+        //             .Collection(s => s.AttributeStructures)
+        //             .LoadAsync();
+        //     }
+
+        //     // Single query with Include to get all needed data
+        //     var structureType = await entitiesService._appDBContext.StructureTypes
+        //         .Include(st => st.StructureTypeAttributeTypes)
+        //             .ThenInclude(stat => stat.AttributeType)
+        //         .FirstOrDefaultAsync(st => st.StructureTypeId == Structure.StructureTypeId);
+
+        //     if (structureType?.StructureTypeAttributeTypes == null)
+        //     {
+        //         return new Dictionary<string, string>();
+        //     }
+
+        //     var attributesList = new Dictionary<string, string>();
+
+        //     foreach (var structureTypeAttr in structureType.StructureTypeAttributeTypes)
+        //     {
+        //         if (structureTypeAttr.AttributeType == null) continue;
+
+        //         var attributeStructure = Structure.AttributeStructures?
+        //             .FirstOrDefault(x => x.AttributeTypeId == structureTypeAttr.AttributeTypeId);
+
+        //         if (attributeStructure != null && !string.IsNullOrWhiteSpace(attributeStructure.Value))
+        //         {
+        //             attributesList.Add(structureTypeAttr.AttributeType.Name, attributeStructure.Value);
+        //           //  attributesList.Add($"{structureTypeAttr.AttributeType.Name}: {attributeStructure.Value}");
+        //         }
+        //     }
+
+        //     return attributesList;
+        // }
+        // catch (Exception ex)
+        // {
+        //     return new Dictionary<string, string>();
+        // }
+    }
+
+  
+
+    private async Task AI()
+    {      
+
+        ChatClient client = new(model: "gpt-4o", apiKey: "***REMOVED***");
+
+        var structureTypes = structureTypesList.Select(x => x.Name);
+        var sites = sitesList.Select(x => x.Name);
+
+        
+
+
+        var elementTypes = await entitiesService.GetAllEntitiesAsync<ElementType>();
+        var elementTypesNames = elementTypes.Select(d => d.Name);
+
+        string schemaJson = Helpers.JsonSchemaBuilder
+            .Create("Structure")
+            .Property("Name", "string")
+            .Property("ShortDescription", "string")
+            .Property("Length", "number")
+            .PropertyWithPattern("YearBuilt", "string", @"^\d{4}-\d{2}-\d{2}$")
+            .Property("DesignLoad", "number")
+            .Property("Latitude", "number")
+            .Property("Longitude", "number")
+            .EnumProperty("StructureType", structureTypes)
+            .EnumProperty("Site", sites)
+            .ArrayProperty("Elements", item => item
+                .Property("Name", "string")
+                .Property("ShortDescription", "string")
+                .EnumProperty("ElementType", elementTypesNames)
+                
+            )
+            .Build();
+
+
+        // List<string> structureTypesl = structureTypesList.Select(x => x.Name).ToList();
+        // List<string> sitesl = sitesList.Select(x => x.Name).ToList();
+
+         var structureTypesDict = structureTypesList.ToDictionary(x => x.Name, x => x.StructureTypeId);
+         var sitesDict = sitesList.ToDictionary(x => x.Name, x => x.SiteId);
+        var elementTypesDict = elementTypes.ToDictionary(x => x.Name, x => x.ElementTypeId);
+
+
+        // string schemaJson = Helpers.JsonSchemaBuilder
+        //     .Create("Structure")
+        //     .Property("Name", "string")
+        //     .Property("ShortDescription", "string")
+        //     .Property("Length", "number")
+        //     .PropertyWithPattern("YearBuilt", "string", @"^\d{4}-\d{2}-\d{2}$")
+        //     //.Property("YearBuilt", "string", format: "date-time")
+        //     .Property("DesignLoad", "number")
+        //     .Property("Latitude", "number")
+        //     .Property("Longitude", "number")
+        //     .EnumProperty("StructureType", structureTypesl)  // use dictionary overload for titles
+        //     .EnumProperty("Site", sitesl)                    // use dictionary overload
+        //     .Build();
+        
+        string InputText ="Le pont lolita est en beton au dessus de la rivière. il a été construit en 1995. Il mesure 150 mètres de long et est situé à Paris. Sa charge de conception est de 500 tonnes. Le pont est un élément clé de l'infrastructure locale. il est compose de deux elements. un noeud 3d and un beam 3d";
+        ChatCompletionOptions options = new()
+        {
+            ResponseFormat = ChatResponseFormat.CreateJsonSchemaFormat(
+                    jsonSchemaFormatName: "schemaJson",
+                jsonSchema: BinaryData.FromString(schemaJson),
+                jsonSchemaIsStrict: true),
+
+        };
+
+        var messages = new List<ChatMessage>
+{
+    new SystemChatMessage(@"
+        Tu es un moteur d’extraction d’informations médicales.
+        - Ne crée aucune donnée qui n’existe pas explicitement dans le texte fourni.
+        - Si une information n’est pas présente, renvoie un tableau vide [] pour ce champ.
+        - Mets chaque antécédent familial dans :
+            - ""LiesAuDiagnosticActuel"" si pertinent pour ce diagnostic,
+            - ""NonLiesAuDiagnostic"" sinon.
+        - Si aucun diagnostic n’est donné, mets TOUT dans ""NonLiesAuDiagnostic""
+
+        - Contenu uniquement – aucun commentaire ou interprétation.
+        Réponds exclusivement au format JSON conforme au schéma."),
+    new UserChatMessage(InputText)
+};
+
+
+        ChatCompletion completion = await client.CompleteChatAsync(messages, options);
+
+        string json = completion.Content[0].Text;
+
+        var jsonOoptions = new JsonSerializerOptions
+    {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            PropertyNameCaseInsensitive = true
+        };
+
+        var combinedMap = structureTypesDict
+        .Concat(sitesDict)
+         .Concat(elementTypesDict)
+             .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+
+        jsonOoptions.Converters.Add(new Helpers.StringToGuidConverter(combinedMap));
+
+
+        
+        var value = JsonSerializer.Deserialize<Structuree>(json, jsonOoptions)!;
+
+        // 3.  Désérialisation stricte dans votre DTO
+      //  var Value = JsonSerializer.Deserialize<Structure>(json)!;
+
+        
+
+
+    }
+
+
+    // Example: Building a schema including a Defects list
+    // --------------------------------------------------
+
+
+    // DTO classes:
+    public class Structuree
+    {
+        public string Name { get; set; } = string.Empty;
+        public string ShortDescription { get; set; } = string.Empty;
+        public double Length { get; set; }
+        public DateTime YearBuilt { get; set; }
+        public double DesignLoad { get; set; }
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+        public Guid StructureType { get; set; }
+        public Guid Site { get; set; }
+        public List<Elemente> Elements { get; set; } = new();
+    }
+
+    public class Elemente
+    {
+        public string Name { get; set; } = string.Empty;
+        public string ShortDescription { get; set; } = string.Empty;
+        public Guid ElementType { get; set; }   
+    }
+
+
 
     //AAPK274607c7de9e4f4fb30c76c251512d7e4j3uZoIX1rKcsG7joh9KXVL81WsT8siX31STYOFn17sFq-kAr45ZAMMl2u0sibIp
+
+
+
 
 }

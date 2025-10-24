@@ -48,9 +48,9 @@
         await base.SetParametersAsync(parameters);
 
 
-        if (appData.obj is Structure)
+        if (appData.Structure != null)
         {
-            Structure = (Structure)appData.obj;
+            Structure = appData.Structure;
 
         }
         else

@@ -79,7 +79,7 @@ namespace AliantWebS.Pages {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to .
+        ///   Looks up a localized string similar to Name.
         /// </summary>
         public static string Name {
             get {

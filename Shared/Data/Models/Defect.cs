@@ -24,11 +24,10 @@ public partial class Defect
 
     public string? Description { get; set; }
 
-    [Column(TypeName = "date")]
-    public DateTime? Date { get; set; }
+    public DateOnly? Date { get; set; }
 
     [InverseProperty("Defect")]
-    public virtual ICollection<AttributeDefect> AttributeDefects { get; } = new List<AttributeDefect>();
+    public virtual ICollection<AttributeDefect> AttributeDefects { get; set; } = new List<AttributeDefect>();
 
     [ForeignKey("DefectTypeId")]
     [InverseProperty("Defects")]

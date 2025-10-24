@@ -30,6 +30,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AliantDesktop", "AliantDesk
 EndProject
 Project("{E53339B2-1760-4266-BCC7-CA923CBCF16C}") = "docker-compose", "docker-compose.dcproj", "{1E845D0F-40B7-4A20-8C7F-BC9861EB98B1}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OperationalModalAnalysis", "OperationalModalAnalysis\OperationalModalAnalysis.csproj", "{292DE2AF-EE78-BB64-14D4-A0562D41CAF0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -68,6 +70,10 @@ Global
 		{1E845D0F-40B7-4A20-8C7F-BC9861EB98B1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1E845D0F-40B7-4A20-8C7F-BC9861EB98B1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1E845D0F-40B7-4A20-8C7F-BC9861EB98B1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{292DE2AF-EE78-BB64-14D4-A0562D41CAF0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{292DE2AF-EE78-BB64-14D4-A0562D41CAF0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{292DE2AF-EE78-BB64-14D4-A0562D41CAF0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{292DE2AF-EE78-BB64-14D4-A0562D41CAF0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

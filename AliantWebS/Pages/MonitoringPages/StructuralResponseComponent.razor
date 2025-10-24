@@ -131,13 +131,13 @@
 
     private async Task Calcul()
     {
-        structuralStructure = Structural.Simulation.CreateStructure(appData.Structure, selectedLoadCases, entitiesService);
+        structuralStructure = await Structural.Simulation.CreateStructure(appData.Structure, selectedLoadCases, entitiesService);
 
         if (simPa.Duree == 0)
         {
-            double[] q = new double[structuralStructure.nddl];
-            List<double[]> Fe = new List<double[]>();
-            Structural.StructuralStatic.StaticAnalysis(structuralStructure, q, Fe);
+            double[] q;// = new double[structuralStructure.nddl];
+            List<double[]> Fe;// = new List<double[]>();
+            Structural.StructuralStatic.StaticAnalysis(structuralStructure, out q, out Fe);
         }
         else
         {

@@ -28,8 +28,11 @@ public partial class DynamicPointLoad
     [Column(TypeName = "xml")]
     public string? TemporalFunc { get; set; }
 
+    [Column("DOF")]
+    public int? Dof { get; set; }
+
     [InverseProperty("DynamicPointLoad")]
-    public virtual ICollection<DynamicPointLoadElement> DynamicPointLoadElements { get; } = new List<DynamicPointLoadElement>();
+    public virtual ICollection<DynamicPointLoadElement> DynamicPointLoadElements { get; set; } = new List<DynamicPointLoadElement>();
 
     [ForeignKey("LoadCaseId")]
     [InverseProperty("DynamicPointLoads")]

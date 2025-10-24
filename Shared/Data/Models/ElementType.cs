@@ -26,27 +26,27 @@ public partial class ElementType
     public byte[]? Icon { get; set; }
 
     [InverseProperty("ElementType")]
-    public virtual ICollection<AttributeTypeElementType> AttributeTypeElementTypes { get; } = new List<AttributeTypeElementType>();
+    public virtual ICollection<AttributeTypeElementType> AttributeTypeElementTypes { get; set; } = new List<AttributeTypeElementType>();
 
     [ForeignKey("CategoryId")]
     [InverseProperty("ElementTypes")]
     public virtual Category? Category { get; set; }
 
     [InverseProperty("ElementType")]
-    public virtual ICollection<ChannelDataTypeElementType> ChannelDataTypeElementTypes { get; } = new List<ChannelDataTypeElementType>();
+    public virtual ICollection<ChannelDataTypeElementType> ChannelDataTypeElementTypes { get; set; } = new List<ChannelDataTypeElementType>();
 
     [InverseProperty("ElementType")]
-    public virtual ICollection<ElementTypeDefectType> ElementTypeDefectTypes { get; } = new List<ElementTypeDefectType>();
+    public virtual ICollection<ElementTypeDefectType> ElementTypeDefectTypes { get; set; } = new List<ElementTypeDefectType>();
 
     [InverseProperty("ElementType")]
-    public virtual ICollection<Element> Elements { get; } = new List<Element>();
+    public virtual ICollection<Element> Elements { get; set; } = new List<Element>();
 
     [InverseProperty("ElementType")]
-    public virtual ICollection<FlagTypeElementType> FlagTypeElementTypes { get; } = new List<FlagTypeElementType>();
+    public virtual ICollection<FlagTypeElementType> FlagTypeElementTypes { get; set; } = new List<FlagTypeElementType>();
 
     [InverseProperty("ElementType")]
-    public virtual ICollection<InspectionResultTypeElementType> InspectionResultTypeElementTypes { get; } = new List<InspectionResultTypeElementType>();
+    public virtual ICollection<InspectionResultTypeElementType> InspectionResultTypeElementTypes { get; set; } = new List<InspectionResultTypeElementType>();
 
     [InverseProperty("ElementType")]
-    public virtual ICollection<MotherGridPalonnier> MotherGridPalonniers { get; } = new List<MotherGridPalonnier>();
+    public virtual ICollection<MotherGridPalonnier> MotherGridPalonniers { get; set; } = new List<MotherGridPalonnier>();
 }

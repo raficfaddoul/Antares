@@ -23,5 +23,5 @@ public partial class Token
     public DateTime? Timestamp { get; set; }
 
     [InverseProperty("Token")]
-    public virtual ICollection<TokenAspNetRole> TokenAspNetRoles { get; } = new List<TokenAspNetRole>();
+    public virtual ICollection<TokenAspNetRole> TokenAspNetRoles { get; set; } = new List<TokenAspNetRole>();
 }

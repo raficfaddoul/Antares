@@ -164,7 +164,7 @@
         SaveConfirmation = (cac ?? true);
 
         cac = await localStorage.GetItemAsync<bool?>("copyAttributes");
-        CopyAttributes = (cac ?? true);
+        CopyAttributes = (cac ?? false);
 
 
         StateHasChanged();

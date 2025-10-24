@@ -19,17 +19,17 @@ public partial class InspectionResultType
     public string? Description { get; set; }
 
     [InverseProperty("InspectionResultType")]
-    public virtual ICollection<FlagTypeInspectionResultType> FlagTypeInspectionResultTypes { get; } = new List<FlagTypeInspectionResultType>();
+    public virtual ICollection<FlagTypeInspectionResultType> FlagTypeInspectionResultTypes { get; set; } = new List<FlagTypeInspectionResultType>();
 
     [InverseProperty("InspectionResultType")]
-    public virtual ICollection<InspectionResultTypeElementType> InspectionResultTypeElementTypes { get; } = new List<InspectionResultTypeElementType>();
+    public virtual ICollection<InspectionResultTypeElementType> InspectionResultTypeElementTypes { get; set; } = new List<InspectionResultTypeElementType>();
 
     [InverseProperty("InspectionResultType")]
-    public virtual ICollection<InspectionResult> InspectionResults { get; } = new List<InspectionResult>();
+    public virtual ICollection<InspectionResult> InspectionResults { get; set; } = new List<InspectionResult>();
 
     [InverseProperty("InspectionResultType")]
-    public virtual ICollection<StructureInspectionResult> StructureInspectionResults { get; } = new List<StructureInspectionResult>();
+    public virtual ICollection<StructureInspectionResult> StructureInspectionResults { get; set; } = new List<StructureInspectionResult>();
 
     [InverseProperty("InspectionResultType")]
-    public virtual ICollection<StructureTypeInspectionResultType> StructureTypeInspectionResultTypes { get; } = new List<StructureTypeInspectionResultType>();
+    public virtual ICollection<StructureTypeInspectionResultType> StructureTypeInspectionResultTypes { get; set; } = new List<StructureTypeInspectionResultType>();
 }

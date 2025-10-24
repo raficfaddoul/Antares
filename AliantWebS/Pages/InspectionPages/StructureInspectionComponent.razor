@@ -141,7 +141,7 @@ else
     protected override async Task OnInitializedAsync()
     {
         ScrollHeight = "400px";
-        structure = (Structure)AppData.obj;
+        structure = AppData.Structure;
 
 
         entitiesService.LoadCollection(structure, "StructureInspectionResults");
@@ -201,7 +201,7 @@ else
         StructureInspectionResult structureInspectionResult = new StructureInspectionResult();
         structureInspectionResult.StructureId = structure.StructureId;
         structureInspectionResult.InspectionResultTypeId = structure.StructureType.StructureTypeInspectionResultTypes.FirstOrDefault().InspectionResultTypeId;
-        structureInspectionResult.Date = DateTime.Now;
+        structureInspectionResult.Date = DateOnly.FromDateTime(DateTime.Now);
 
         structure.StructureInspectionResults.Add(structureInspectionResult);
         await entitiesService.UpdateEntityAsync(structure);

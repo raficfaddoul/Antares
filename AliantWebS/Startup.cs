@@ -27,6 +27,8 @@ using Radzen;
 using Blazored.LocalStorage;
 using Microsoft.AspNetCore.Localization;
 using System.Globalization;
+using System.Net.Http;
+using Microsoft.AspNetCore.Http.Features;
 
 namespace AliantWebS
 {
@@ -102,9 +104,30 @@ namespace AliantWebS
 
             services.AddScoped<Data.AppData>();
             services.AddScoped<Data.DataUpdateService>();
+
+            /// for antares api
+            /// 
+            var apiUrl = Environment.GetEnvironmentVariable("API_URL") ?? "http://localhost:8080/";
+            services.AddScoped(sp => new HttpClient
+            {
+                BaseAddress = new Uri(apiUrl) // Antares API running on local machine
+            });
+            services.AddMemoryCache();
+            services.AddScoped<ReportsService>();
+            services.AddHostedService<ReportBackgroundFetcher>();
+            /////////////////////////////////
+
+
             services.AddBlazoredLocalStorage();
             services.AddLocalization();// opts => { opts.ResourcesPath = "/Resources"; });
 
+            services.Configure<FormOptions>(options =>
+            {
+                options.MultipartBodyLengthLimit = 50 * 1024 * 1024;
+            });
+            services.AddSignalR(e => {
+                e.MaximumReceiveMessageSize = 40960000;
+            });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

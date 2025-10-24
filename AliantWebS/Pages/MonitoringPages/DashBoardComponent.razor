@@ -10,31 +10,31 @@
 
 <style>
     .chart-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-        gap: 10px;
-        padding: 10px;
-        width: 100%;
-        height: auto;
-        overflow: auto;
-        max-height: 600px;
-        min-width: 100%;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 10px;
+    padding: 10px;
+    width: 100%;
+    height: auto;
+    overflow: auto;
+    max-height: 600px;
+    min-width: 100%;
     }
 
 
 
     .radzen-chart {
-        height: 300px; /* Fixed height for each chart */
-        width: 100%; /* Chart width is responsive to the grid column width */
+    height: 300px; /* Fixed height for each chart */
+    width: 100%; /* Chart width is responsive to the grid column width */
     }
 
     .chart-container {
-        text-align: center; /* Centers the label and chart within the container */
-        margin: 10px; /* Optional: Adds some space around each chart container */
+    text-align: center; /* Centers the label and chart within the container */
+    margin: 10px; /* Optional: Adds some space around each chart container */
     }
 
     .chart-label {
-        margin-bottom: 5px; /* Spacing between the label and the chart */
+    margin-bottom: 5px; /* Spacing between the label and the chart */
     }
 
 
@@ -45,7 +45,7 @@
 
 
 <RadzenSplitter Orientation="Radzen.Orientation.Horizontal" style="height: 80vh; border: 1px solid rgba(0,0,0,.08);">
-    <RadzenSplitterPane Size="50%">
+    <RadzenSplitterPane Size="10%">
 
         <RadzenSplitter Orientation="Radzen.Orientation.Vertical" style="height: 100%; border: 1px solid rgba(0,0,0,.08);">
             <RadzenSplitterPane Size="25%">
@@ -89,10 +89,10 @@
 
     </RadzenSplitterPane>
 
-    <RadzenSplitterPane Size="50%">
+    <RadzenSplitterPane Size="90%">
 
         <RadzenSplitter Orientation="Radzen.Orientation.Vertical" style="height: 100%; border: 1px solid rgba(0,0,0,.08);">
-            <RadzenSplitterPane Size="50%">
+            <RadzenSplitterPane Size="10%">
                 @*                 @if (@present)
                 {
 
@@ -113,11 +113,11 @@
                 <IndicesInTimeComponent GraphId="g1" Headers="headers" Indices="indices"></IndicesInTimeComponent>
             </RadzenSplitterPane>
 
-            <RadzenSplitterPane Size="50%">
-                @* <ModalShapesComponent structure="appData.Structure"></ModalShapesComponent> *@
-                @* <ModalShapesDygraphsComponent structure="appData.Structure"></ModalShapesDygraphsComponent> *@
+            <RadzenSplitterPane Size="90%">
+                  <ModalShapesComponent structure="appData.Structure" Simulate=true></ModalShapesComponent>  
+                @* <ModalShapesDygraphsComponent structure="appData.Structure"></ModalShapesDygraphsComponent>  *@
 
-                <div class="chart-grid">
+@*                 <div class="chart-grid">
                     @foreach (var d in dataItemsLists)
                     {
                         <div class="chart-container">
@@ -130,8 +130,8 @@
                                 </RadzenPieSeries>
                             </RadzenChart>
                         </div>
-                    }
-                </div>
+                    } 
+                </div>*@
             </RadzenSplitterPane>
 
         </RadzenSplitter>
@@ -146,7 +146,7 @@
 
 
 
-    List<Dictionary<DateTime, double>> indices = new List<Dictionary<DateTime, double>>();
+    List<Dictionary<object, double>> indices = new List<Dictionary<object, double>>();
 
 
     //string jsonlistIDs;
@@ -201,6 +201,15 @@
         try
         {
             ir = await ir.Load(appData.Structure);
+
+            if (ir != null)
+            {
+                value1 = (int)ir.Kpi1;
+                value2 = (int)ir.Kpi2;
+                value3 = (int)ir.Kpi3;
+
+                rigidities = ir.Rigidités;
+            }
         }
         catch (Exception ex)
         {
@@ -208,11 +217,7 @@
             return;
         }
 
-        value1 = (int)ir.Kpi1;
-        value2 = (int)ir.Kpi2;
-        value3 = (int)ir.Kpi3;
 
-        rigidities = ir.Rigidités;
 
 
 
@@ -234,7 +239,7 @@
             var ress = await entitiesService.GetFilteredEntitiesAsync<StructureInspectionResult>(x => (x.InspectionResultTypeId == v) && (x.StructureId == appData.Structure.StructureId));
             var resultDictionary = ress.Where(x => x.Date != null && x.ResultNumeric != null)
         .GroupBy(x => x.Date)
-        .ToDictionary(group => (DateTime)group.Key, group => (double)group.Average(x => x.ResultNumeric));
+        .ToDictionary(group => (object)group.Key, group => (double)group.Average(x => x.ResultNumeric));
             indices.Add(resultDictionary);
             InspectionResultType irt = await entitiesService.GetEntityAsync<InspectionResultType>(v);
 

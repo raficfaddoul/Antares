@@ -22,20 +22,20 @@ public partial class LoadCase
     public string? Description { get; set; }
 
     [InverseProperty("LoadCase")]
-    public virtual ICollection<DynamicLoad> DynamicLoads { get; } = new List<DynamicLoad>();
+    public virtual ICollection<DynamicLoad> DynamicLoads { get; set; } = new List<DynamicLoad>();
 
     [InverseProperty("LoadCase")]
-    public virtual ICollection<DynamicPointLoad> DynamicPointLoads { get; } = new List<DynamicPointLoad>();
+    public virtual ICollection<DynamicPointLoad> DynamicPointLoads { get; set; } = new List<DynamicPointLoad>();
 
     [InverseProperty("LoadCase")]
-    public virtual ICollection<EventLoadCase> EventLoadCases { get; } = new List<EventLoadCase>();
+    public virtual ICollection<EventLoadCase> EventLoadCases { get; set; } = new List<EventLoadCase>();
 
     [InverseProperty("LoadCase")]
-    public virtual ICollection<MobileLoad> MobileLoads { get; } = new List<MobileLoad>();
+    public virtual ICollection<MobileLoad> MobileLoads { get; set; } = new List<MobileLoad>();
 
     [InverseProperty("LoadCase")]
-    public virtual ICollection<StaticLoad> StaticLoads { get; } = new List<StaticLoad>();
+    public virtual ICollection<StaticLoad> StaticLoads { get; set; } = new List<StaticLoad>();
 
     [InverseProperty("LoadCase")]
-    public virtual ICollection<StaticPointLoad> StaticPointLoads { get; } = new List<StaticPointLoad>();
+    public virtual ICollection<StaticPointLoad> StaticPointLoads { get; set; } = new List<StaticPointLoad>();
 }

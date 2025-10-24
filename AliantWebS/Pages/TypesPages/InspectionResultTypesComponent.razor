@@ -154,14 +154,14 @@ else
 
     async Task FlagTypes(InspectionResultType inspectionResultType)
     {
-        AppData.obj = inspectionResultType;
+        AppData.obj1 = inspectionResultType;
 
         navigationManager.NavigateTo("/InspectionResultTypeFlagTypes/" + inspectionResultType.InspectionResultTypeId);
     }
 
     async Task ElementTypes(InspectionResultType inspectionResultType)
     {
-        AppData.obj = inspectionResultType;
+        AppData.obj1 = inspectionResultType;
 
         navigationManager.NavigateTo("/InspectionResultTypeElementTypes/" + inspectionResultType.InspectionResultTypeId);
     }

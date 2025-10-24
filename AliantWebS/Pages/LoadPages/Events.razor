@@ -51,7 +51,7 @@ else
                                         <a title="@L["Delete"]" @onclick="@(() => DeleteEvent(data))" @onclick:preventDefault="true" href="">
                                             <span class="oi oi-trash" aria-hidden="true"></span>
                                         </a>
-                                        <a title="@L["Charges"]" class="nav-link" @onclick="@(args => Report(data))" @onclick:preventDefault="true" href="">
+                                        <a title="@L["Charges"]" class="nav-link" @onclick="@(args => Charges(data))" @onclick:preventDefault="true" href="">
                                             <span class="oi oi-document" aria-hidden="true"></span>
                                         </a>
                                     </Div>
@@ -146,7 +146,7 @@ else
         }
     }
 
-    async Task Report(Event eventt)
+    async Task Charges(Event eventt)
     {
         appData.EventID = eventt.EventId;
         navigationManager.NavigateTo(@"/ChargesSceniques/" + eventt.EventId);

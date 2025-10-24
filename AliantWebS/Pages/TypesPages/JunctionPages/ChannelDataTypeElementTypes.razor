@@ -32,7 +32,7 @@
 
     public override async Task SetParametersAsync(ParameterView parameters)
     {
-        channelDataType = (ChannelDataType)AppData.obj;
+        channelDataType = (ChannelDataType)AppData.obj1;
         entitiesService.LoadCollection(channelDataType, "ChannelDataTypeElementTypes");
         await base.SetParametersAsync(parameters);
     }

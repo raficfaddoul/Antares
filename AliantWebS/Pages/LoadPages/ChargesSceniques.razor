@@ -170,11 +170,11 @@
     }
 
 
-    async Task DeleteChargeScenique(ChargesScenique equipementType)
+    async Task DeleteChargeScenique(ChargesScenique chargesScenique)
     {
-        if (await entitiesService.DeleteEntityAsync(equipementType))
+        if (await entitiesService.DeleteEntityAsync(chargesScenique))
         {
-            if (chargeSceniqueList.Remove(equipementType))
+            if (chargeSceniqueList.Remove(chargesScenique))
             {
                 await chargeSceniqueGrid.Reload();
 

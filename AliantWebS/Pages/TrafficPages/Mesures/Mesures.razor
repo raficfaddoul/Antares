@@ -1,0 +1,152 @@
+﻿@page "/Mesures"
+@using AliantWebS.Models
+@inject IStringLocalizer<Languages> L
+
+@layout TrafficLayout
+
+<style>
+    .pesage-container {
+        padding: 20px;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .tabs-container {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .tab-content {
+        padding: 10px;
+        height: 100%;
+        overflow: hidden;
+    }
+
+    .placeholder-content {
+        text-align: center;
+        color: #666;
+        padding: 40px;
+    }
+
+    .placeholder-icon {
+        font-size: 3em;
+        margin-bottom: 20px;
+        opacity: 0.3;
+    }
+
+    .loading-indicator {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #007bff;
+        font-style: italic;
+        justify-content: center;
+        padding: 20px;
+    }
+
+    .rz-tabs {
+        height: 100%;
+    }
+</style>
+
+<div class="pesage-container">
+    <h3 style="flex-shrink: 0;">@L["Mesures"]</h3>
+
+    <div class="tabs-container">
+        <RadzenTabs Style="height: 100%;">
+            <Tabs>
+                <RadzenTabsItem Text="@L["Analyse Rainflow"]" Icon="analytics">
+                    <div class="tab-content">
+                        <RainflowCountingComponent IsLoading="@isLoading"
+                                                   OnDataLoaded="@OnChildDataLoaded"
+                                                   OnStartDateChanged="@OnStartDateChanged"
+                                                   OnEndDateChanged="@OnEndDateChanged" />
+                    </div>
+                </RadzenTabsItem>
+
+                <RadzenTabsItem Text="@L["Corrélation des capteurs"]" Icon="scatter_plot">
+                    <div class="tab-content">
+                        <CorrelationComponent IsLoading="@isLoading"
+                                             OnDataLoaded="@OnChildDataLoaded"
+                                             OnStartDateChanged="@OnStartDateChanged"
+                                             OnEndDateChanged="@OnEndDateChanged" />
+                    </div>
+                </RadzenTabsItem>
+
+                <RadzenTabsItem Text="@L["Couplage des indicateurs"]" Icon="compare_arrows">
+                    <div class="tab-content">
+                        <IndicatorCouplingComponent IsLoading="@isLoading"
+                                                   OnDataLoaded="@OnChildDataLoaded"
+                                                   OnStartDateChanged="@OnStartDateChanged"
+                                                   OnEndDateChanged="@OnEndDateChanged" />
+                    </div>
+                </RadzenTabsItem>
+
+                <RadzenTabsItem Text="@L["Analyse de contrainte"]" Icon="show_chart">
+                    <div class="tab-content">
+                        <div class="placeholder-content">
+                            <div class="placeholder-icon">📊</div>
+                            <h4>@L["Analyse de contrainte"]</h4>
+                            <p>@L["Période"] : @startDate.ToString("dd/MM/yyyy") - @endDate.ToString("dd/MM/yyyy")</p>
+                            @* Ajoutez ici le contenu de l'analyse de contrainte *@
+                        </div>
+                    </div>
+                </RadzenTabsItem>
+
+                <RadzenTabsItem Text="@L["Inversions de charge"]" Icon="swap_horiz">
+                    <div class="tab-content">
+                        <div class="placeholder-content">
+                            <div class="placeholder-icon">🔄</div>
+                            <h4>@L["Inversions de charge"]</h4>
+                            <p>@L["Période"] : @startDate.ToString("dd/MM/yyyy") - @endDate.ToString("dd/MM/yyyy")</p>
+                            @* Ajoutez ici le contenu des inversions de charge *@
+                        </div>
+                    </div>
+                </RadzenTabsItem>
+            </Tabs>
+        </RadzenTabs>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="loading-indicator">
+            <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Small" />
+            <span>@L["Chargement en cours..."]</span>
+        </div>
+    }
+</div>
+
+@code {
+    private DateTime startDate = DateTime.Today.AddDays(-7);
+    private DateTime endDate = DateTime.Today;
+    private bool isLoading = false;
+
+    private async Task OnStartDateChanged(DateTime newStartDate)
+    {
+        startDate = newStartDate;
+        StateHasChanged();
+    }
+
+    private async Task OnEndDateChanged(DateTime newEndDate)
+    {
+        endDate = newEndDate;
+        StateHasChanged();
+    }
+
+    private void OnChildDataLoaded()
+    {
+        try
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur dans OnChildDataLoaded: {ex.Message}");
+        }
+    }
+}

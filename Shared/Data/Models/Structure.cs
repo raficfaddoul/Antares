@@ -31,35 +31,34 @@ public partial class Structure
 
     public double? Length { get; set; }
 
-    [Column(TypeName = "date")]
-    public DateTime? YearBuilt { get; set; }
+    public DateOnly? YearBuilt { get; set; }
 
     public double? DesignLoad { get; set; }
 
     [InverseProperty("Structure")]
-    public virtual ICollection<AttributeStructure> AttributeStructures { get; } = new List<AttributeStructure>();
+    public virtual ICollection<AttributeStructure> AttributeStructures { get; set; } = new List<AttributeStructure>();
 
     [InverseProperty("Structure")]
-    public virtual ICollection<Document> Documents { get; } = new List<Document>();
+    public virtual ICollection<Document> Documents { get; set; } = new List<Document>();
 
     [InverseProperty("Structure")]
-    public virtual ICollection<Element> Elements { get; } = new List<Element>();
+    public virtual ICollection<Element> Elements { get; set; } = new List<Element>();
 
     [InverseProperty("Structure")]
-    public virtual ICollection<Event> Events { get; } = new List<Event>();
+    public virtual ICollection<Event> Events { get; set; } = new List<Event>();
 
     [InverseProperty("Structure")]
-    public virtual ICollection<FlagStructure> FlagStructures { get; } = new List<FlagStructure>();
+    public virtual ICollection<FlagStructure> FlagStructures { get; set; } = new List<FlagStructure>();
 
     [ForeignKey("SiteId")]
     [InverseProperty("Structures")]
     public virtual Site? Site { get; set; }
 
     [InverseProperty("Structure")]
-    public virtual ICollection<StructureImage> StructureImages { get; } = new List<StructureImage>();
+    public virtual ICollection<StructureImage> StructureImages { get; set; } = new List<StructureImage>();
 
     [InverseProperty("Structure")]
-    public virtual ICollection<StructureInspectionResult> StructureInspectionResults { get; } = new List<StructureInspectionResult>();
+    public virtual ICollection<StructureInspectionResult> StructureInspectionResults { get; set; } = new List<StructureInspectionResult>();
 
     [ForeignKey("StructureTypeId")]
     [InverseProperty("Structures")]

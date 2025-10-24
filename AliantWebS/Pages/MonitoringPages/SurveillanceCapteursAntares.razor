@@ -51,7 +51,7 @@ else
     List<string> headers = new List<string>()
      {
          "Date" };
-    List<(string,Dictionary<DateTime, double>)> indices = new List<(string,Dictionary<DateTime, double>)>();
+    List<(string,Dictionary<object, double>)> indices = new List<(string,Dictionary<object, double>)>();
 
 
 
@@ -64,7 +64,7 @@ else
     {
         if (args)
         {
-            Dictionary<DateTime, double> dic = new Dictionary<DateTime, double>();
+            Dictionary<object, double> dic = new Dictionary<object, double>();
 
             List<object[]> la = await GetLa(sensor, channelDataType,startDate,endDate);
 
@@ -79,7 +79,7 @@ else
             headers.Add(sensor.Name + "|" + channelDataType.Name);
             indices.Add((sensor.ElementId.ToString() + "|" + channelDataType.ChannelDataTypeId.ToString(), dic));
            // iitc.Indices = indices.Select(x => x.Item2).ToList();
-            await iitc.DisplayData(indices.Select(x => x.Item2).ToList());
+            await iitc.DisplayData(indices.Select(x => x.Item2).ToList(),headers);
             StateHasChanged();
 
             
@@ -89,7 +89,7 @@ else
             headers.Remove(sensor.Name + "|" + channelDataType.Name);
             var d = indices.Find(x => x.Item1 == sensor.ElementId.ToString() + "|" + channelDataType.ChannelDataTypeId.ToString());
             indices.Remove(d);
-            await iitc.DisplayData(indices.Select(x => x.Item2).ToList());
+            await iitc.DisplayData(indices.Select(x => x.Item2).ToList(),headers);
             StateHasChanged();
         }
 
