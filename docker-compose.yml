@@ -2,9 +2,26 @@
   AliantNetwork:
 
 services:
+  # Add this service to fix ownership before AliantDb starts
+  fix-permissions:
+    image: alpine:latest
+    user: root
+    volumes:
+      - ../data/sql/Aliant:/data
+    command: >
+      sh -c "
+        chown -R 10001:0 /data &&
+        echo 'Ownership fixed for SQL Server'
+      "
+    restart: "no"
+
   AliantDb:
     container_name: AliantDbContainer
     image: mcr.microsoft.com/mssql/server:2022-latest
+    user: "10001:0"  # Add this line
+    depends_on:
+      fix-permissions:
+        condition: service_completed_successfully
     ports:
       - "8005:1433"
     volumes:
