@@ -26,8 +26,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		sqlserver\run-sql.sh = sqlserver\run-sql.sh
 	EndProjectSection
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AliantDesktop", "AliantDesktop\AliantDesktop.csproj", "{89B870C7-DBAF-49BD-AC09-2723D53E6ED4}"
-EndProject
 Project("{E53339B2-1760-4266-BCC7-CA923CBCF16C}") = "docker-compose", "docker-compose.dcproj", "{1E845D0F-40B7-4A20-8C7F-BC9861EB98B1}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OperationalModalAnalysis", "OperationalModalAnalysis\OperationalModalAnalysis.csproj", "{292DE2AF-EE78-BB64-14D4-A0562D41CAF0}"
@@ -62,10 +60,6 @@ Global
 		{9CE82324-6769-495C-A412-3F055DA82CBC}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9CE82324-6769-495C-A412-3F055DA82CBC}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9CE82324-6769-495C-A412-3F055DA82CBC}.Release|Any CPU.Build.0 = Release|Any CPU
-		{89B870C7-DBAF-49BD-AC09-2723D53E6ED4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{89B870C7-DBAF-49BD-AC09-2723D53E6ED4}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{89B870C7-DBAF-49BD-AC09-2723D53E6ED4}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{89B870C7-DBAF-49BD-AC09-2723D53E6ED4}.Release|Any CPU.Build.0 = Release|Any CPU
 		{1E845D0F-40B7-4A20-8C7F-BC9861EB98B1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{1E845D0F-40B7-4A20-8C7F-BC9861EB98B1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1E845D0F-40B7-4A20-8C7F-BC9861EB98B1}.Release|Any CPU.ActiveCfg = Release|Any CPU
