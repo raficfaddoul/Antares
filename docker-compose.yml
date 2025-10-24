@@ -90,12 +90,13 @@ services:
     environment:
       - ASPNETCORE_URLS=http://+:80
       - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_HTTPS_PORT=
       - DB_HOST=AliantDb
       - DB_NAME=AliantWeb
       - DB_SA_PASSWORD=password@12345#
       - MSSQL_SSL_CERTIFICATE_CREATION=disabled
       - BasePath=Aliant1  
-      - API_URL=http://host.docker.internal:8080
+      - API_URL=http://172.17.0.1:8080
     networks:
       - AliantNetwork
 
