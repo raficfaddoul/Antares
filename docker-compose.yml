@@ -18,7 +18,6 @@ services:
   AliantDb:
     container_name: AliantDbContainer
     image: mcr.microsoft.com/mssql/server:2022-latest
-    user: "10001:0"  # Add this line
     depends_on:
       fix-permissions:
         condition: service_completed_successfully
