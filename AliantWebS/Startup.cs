@@ -186,7 +186,7 @@ namespace AliantWebS
             app.UseRequestLocalization(options);
             // End I18N configuration
 
-            app.UseHttpsRedirection();
+            //app.UseHttpsRedirection();  // Disabled for Docker deployment - HTTPS handled by Nginx
             app.UseStaticFiles();
 
             app.UseRouting();
