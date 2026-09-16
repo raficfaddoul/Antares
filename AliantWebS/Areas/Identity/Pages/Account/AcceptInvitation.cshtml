@@ -1,0 +1,60 @@
+@page
+@model AcceptInvitationModel
+@{
+    ViewData["Title"] = "Activer mon compte";
+}
+
+<h1>@ViewData["Title"]</h1>
+
+@if (!Model.TokenValid)
+{
+    <div class="alert alert-danger" role="alert">
+        <h5 class="alert-heading">Ce lien d'invitation n'est plus valable</h5>
+        <p class="mb-0">@Model.ErrorMessage</p>
+    </div>
+    <p>
+        Demandez à l'administrateur qui vous a invité de vous renvoyer une invitation :
+        il dispose d'un bouton « Renvoyer l'invitation » dans la gestion des utilisateurs.
+    </p>
+    <p><a asp-area="Identity" asp-page="/Account/Login">Retour à la page de connexion</a></p>
+}
+else
+{
+    <p>
+        Bienvenue. Votre compte <strong>@Model.Email</strong> est prêt : il ne reste qu'à choisir
+        votre mot de passe. Il sera activé immédiatement et vous serez connecté.
+    </p>
+
+    <div class="row">
+        <div class="col-md-4">
+            <form method="post">
+                <div asp-validation-summary="ModelOnly" class="text-danger" role="alert"></div>
+                <input asp-for="Input.UserId" type="hidden" />
+                <input asp-for="Input.Code" type="hidden" />
+
+                <div class="form-floating mb-3">
+                    <input value="@Model.Email" class="form-control" disabled aria-label="Adresse e-mail" />
+                    <label class="form-label">Adresse e-mail</label>
+                </div>
+                <div class="form-floating mb-3">
+                    <input asp-for="Input.Password" class="form-control" autocomplete="new-password"
+                           aria-required="true" placeholder="Choisissez un mot de passe" />
+                    <label asp-for="Input.Password" class="form-label">Mot de passe</label>
+                    <span asp-validation-for="Input.Password" class="text-danger"></span>
+                </div>
+                <div class="form-floating mb-3">
+                    <input asp-for="Input.ConfirmPassword" class="form-control" autocomplete="new-password"
+                           aria-required="true" placeholder="Confirmez le mot de passe" />
+                    <label asp-for="Input.ConfirmPassword" class="form-label">Confirmation</label>
+                    <span asp-validation-for="Input.ConfirmPassword" class="text-danger"></span>
+                </div>
+
+                <button type="submit" class="w-100 btn btn-lg btn-primary">Activer mon compte</button>
+            </form>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

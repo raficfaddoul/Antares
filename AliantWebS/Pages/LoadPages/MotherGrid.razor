@@ -1,86 +1,115 @@
-﻿@page "/MotherGrid/{EventMpscenarioId:guid}"
+@page "/MotherGrid/{EventMpscenarioId:guid}"
 @using AliantWebS.Pages
 @using Models
 @using AliantWebS.Data
 
 @inject AppData appData;
 @inject EntitiesService entitiesService
+@inject ScenarioStorageService scenarioStorage
 @inject IJSRuntime js
 
 @layout AntaresConceptionLayout
 
 <style>
     .selected-background {
-        background-color: rgba(0, 255, 0, 0.1); /* Very faint green color */
+        background-color: rgba(0, 255, 0, 0.1);
     }
 </style>
 
 <RadzenSplitter Orientation="Radzen.Orientation.Vertical" Style="height:90vh; border: 1px solid rgba(0,0,0,.08);">
-<RadzenSplitterPane>
-    <RadzenSplitter Orientation="Radzen.Orientation.Horizontal" Style="height:100%; border: 1px solid rgba(0,0,0,.08);">
-        @* MotherGrid   *@
+    <RadzenSplitterPane>
+        <RadzenSplitter Orientation="Radzen.Orientation.Horizontal" Style="height:100%; border: 1px solid rgba(0,0,0,.08);">
+            @* MotherGrid *@
             <RadzenSplitterPane Style="overflow: auto;" Size="50%">
                 @if (MList != null)
                 {
-                    <div class="@(palonnierComponentSelected ? "" : "selected-background" )" @onclick="MotherGridComponentClicked">
-                    <MotherGridComponent @ref="MotherGridGridRef" ElementTypesList="ElementTypesList" MPList="MList" Title="MotherGrids" MPGridChanged="HandleMGridChanged" MotherGridPalonnierListChanged="HandleMotherGridListChanged" Famille="true" EventMpscenarioId="@EventMpscenarioId" @bind-SelectedMP="selectedMotherGrid"></MotherGridComponent>
-            </div>
-                }
-            </RadzenSplitterPane>
-
-            @* Palonnier   *@
-            <RadzenSplitterPane Style="overflow: auto;" Size="50%">
-                          @if (PList != null)
-                {
-                    <div class="@(palonnierComponentSelected ? "selected-background" : "")"  @onclick="PalonnierComponentClicked">
-                  
-                        <MotherGridComponent  @ref="PalonnierGridRef" ElementTypesList="ElementTypesList" MPList="PList" Title="Palonniers" MPGridChanged="HandlePGridChanged" MotherGridPalonnierListChanged="HandlePalonnierListChanged" Famille="false" EventMpscenarioId="@EventMpscenarioId" @bind-SelectedMP="selectedPalonnier"></MotherGridComponent>
-                      
+                    <div class="@(palonnierComponentSelected ? "" : "selected-background" )" @onclick="MotherGridComponentEntered">
+                        <MotherGridComponent @ref="MotherGridGridRef" ElementTypesList="ElementTypesList" MPList="MList" Title="MotherGrids"
+                                           MPGridChanged="HandleMGridChanged" MotherGridPalonnierListChanged="HandleMotherGridListChanged"
+                                           Famille="true" EventMpscenarioId="@EventMpscenarioId" @bind-SelectedMP="selectedMotherGrid"
+                                           Inventory="inventory" InventoryError="@inventoryError">
+                        </MotherGridComponent>
                     </div>
                 }
             </RadzenSplitterPane>
-        </RadzenSplitter>
 
-    </RadzenSplitterPane>
-
-
-
-    <RadzenSplitterPane >
-        <RadzenSplitter Orientation="Radzen.Orientation.Horizontal" style="height: 100%; border: 1px solid rgba(0,0,0,.08);">
-            @* Charge   *@
+            @* Palonnier *@
             <RadzenSplitterPane Style="overflow: auto;" Size="50%">
-                <ChargeMPComponent EventMpscenarioId="@EventMpscenarioId" MotherGridPalonnierID="@(selectedMotherGrid?.MotherGridPalonnierId ?? selectedPalonnier?.MotherGridPalonnierId)" />
-            </RadzenSplitterPane>
+                @if (PList != null)
+                {
+                    <div class="@(palonnierComponentSelected ? "selected-background" : "")" @onclick="PalonnierComponentEntered">
+                        <MotherGridComponent @ref="PalonnierGridRef" ElementTypesList="ElementTypesList" MPList="PList" Title="Palonniers"
+                                           MPGridChanged="HandlePGridChanged" MotherGridPalonnierListChanged="HandlePalonnierListChanged"
+                                           Famille="false" EventMpscenarioId="@EventMpscenarioId" @bind-SelectedMP="selectedPalonnier"
+                                           Inventory="inventory" InventoryError="@inventoryError">
+                        </MotherGridComponent>
+                    </div>
 
-            @* Autocad   *@
-            <RadzenSplitterPane Style="overflow: auto;" @onwheel:stopPropagation Size="50%">
-                <AliantWebS.Pages.CADPages.SVGComponent OnErase="HandleErase" LineDrawn="HandleLineDrawn" Palonniers="PList" MotherGrids="MList"></AliantWebS.Pages.CADPages.SVGComponent>
-
+                    @* Where the selected palonnier hangs, and hooking or unhooking a crossing by hand. *@
+                    <PalonnierAccrochages Palonnier="selectedPalonnier" Palonniers="PList" MotherGrids="MList" OnChanged="HandleHooksChanged" />
+                }
             </RadzenSplitterPane>
         </RadzenSplitter>
     </RadzenSplitterPane>
 
+    <RadzenSplitterPane>
+        <RadzenSplitter Orientation="Radzen.Orientation.Horizontal" style="height: 100%; border: 1px solid rgba(0,0,0,.08);">
+            @* Charge *@
+            <RadzenSplitterPane Style="overflow: auto;" Size="50%">
+                <ChargeMPComponent @ref="chargeMpComponent"
+                    EventMpscenarioId="@EventMpscenarioId"
+                    ChargeList="ChargeList"
+                    MotherGridPalonnierID="@(selectedMotherGrid?.MotherGridPalonnierId ?? selectedPalonnier?.MotherGridPalonnierId)"
+
+                    ChargeListChanged="HandleChargeListChanged"
+                    @bind-selectedChargeMP="selectedCharge" />
+            </RadzenSplitterPane>
+
+            @* SVG/CAD *@
+            <RadzenSplitterPane Style="overflow: auto;" @onwheel:stopPropagation Size="50%">
+                <AliantWebS.Pages.CADPages.SVGComponent @ref="svgComponent"
+                                                        OnErase="HandleErase"
+                                                        LineDrawn="HandleLineDrawn"
+                                                        Palonniers="PList"
+                                                        MotherGrids="MList"
+                                                        IntersectionPoints="intersectionPoints"
+                                                        CharpenteLoads="charpenteLoads"
+                                                        PalonnierLoads="ChargeList"
+                                                        Point0X="@(Layout?.selectedEvent?.Point0X ?? 0)"
+                                                        Point0Y="@(Layout?.selectedEvent?.Point0Y ?? 0)"
+                                                        EventName="@Layout?.selectedEvent?.Name"
+                                                        EventId="@Layout?.selectedEvent?.EventId"
+                                                        ScenarioName="@Layout?.selectedScenario?.Name"
+                                                        ScenarioId="@Layout?.selectedScenario?.EventMpscenarioId"
+                                                        ModuleName="Mother Grid"
+                                                        SelectedPalonnier="selectedPalonnier"
+                                                        SelectedPalonnierChanged="HandleSvgPalonnierSelected"
+                                                        SelectedMotherGrid="selectedMotherGrid"
+                                                        SelectedMotherGridChanged="HandleSvgMotherGridSelected"
+                                                        SelectedCharge="selectedCharge"
+                                                        SelectedChargeChanged="HandleSvgChargeSelected">
+                </AliantWebS.Pages.CADPages.SVGComponent>
+            </RadzenSplitterPane>
+        </RadzenSplitter>
+    </RadzenSplitterPane>
 </RadzenSplitter>
 
-
 @code {
-
-
+    [CascadingParameter]
+    public AntaresConceptionLayout Layout { get; set; }
     [Parameter]
     public Guid EventMpscenarioId { get; set; }
 
-
     List<MotherGridPalonnier> MList { get; set; } = new List<MotherGridPalonnier>();
-
-
     List<MotherGridPalonnier> PList { get; set; } = new List<MotherGridPalonnier>();
-
 
     MotherGridComponent MotherGridGridRef;
     MotherGridComponent PalonnierGridRef;
+    AliantWebS.Pages.CADPages.SVGComponent svgComponent;
 
     private MotherGridPalonnier selectedMotherGrid { get; set; }
     private MotherGridPalonnier selectedPalonnier { get; set; }
+    private ChargeMp selectedCharge { get; set; }
 
     RadzenDataGrid<MotherGridPalonnier> MGrid { get; set; }
     RadzenDataGrid<MotherGridPalonnier> PGrid { get; set; }
@@ -89,36 +118,131 @@
 
     bool palonnierComponentSelected = false;
 
+    // Données de visualisation
+    private Dictionary<Guid, List<(double X, double Y)>> intersectionPoints = new Dictionary<Guid, List<(double X, double Y)>>();
+    private Dictionary<string, double> charpenteLoads = new Dictionary<string, double>();
+
+    //   Liste des charges sur les palonniers et sur les mothers
+    private List<ChargeMp> ChargeList = new List<ChargeMp>();
+
+    // ── Add alongside the other @ref fields ──────────────────────────────────
+    ChargeMPComponent chargeMpComponent;
+
+    // The truss inventory, MotherGrill.xlsx and Palonnier.xlsx: the scenario's copies first, then the shared
+    // ones in _common/data, as Calcul Charpente and the study read them. Read once per scenario, for the
+    // "Pièces" column of both lists, which proposes pieces from it and checks them against it.
+    private RiggingOptimizer.IO.Inventory inventory;
+    private string inventoryError;
+    private Guid? inventoryScenarioId;
+
     protected override async Task OnInitializedAsync()
     {
-        ElementTypesList = await entitiesService.GetFilteredEntitiesAsync<ElementType>(x => x.Category.Name.ToLower() == "mothergridpalonnier", "Category");
+        ElementTypesList = await entitiesService.GetFilteredEntitiesAsync<ElementType>(
+            x => x.Category != null && x.Category.Name.ToLower() == "mothergridpalonnier", "Category");
+
         if (ElementTypesList.Count == 0)
         {
             await js.InvokeVoidAsync("alert", $"Aucun type d'élements n'a été défini pour la catégorie MotherGridPalonnier");
         }
-
-
     }
 
     protected override async Task OnParametersSetAsync()
     {
-        MList = await entitiesService.GetFilteredEntitiesAsync<MotherGridPalonnier>(x => ((x.EventMpscenarioId == EventMpscenarioId) && (x.Famille == true)));
-        PList = await entitiesService.GetFilteredEntitiesAsync<MotherGridPalonnier>(x => ((x.EventMpscenarioId == EventMpscenarioId) && (x.Famille == false)));
+        // The element types again, not only once in OnInitializedAsync: « Générer l'implantation » creates a
+        // type for any model of the inventory the database does not have yet, and it lands on this very
+        // URL - so the page is re-parameterised, never re-initialised, and the list the edit dropdown offers
+        // would be missing exactly the types the layout just used.
+        ElementTypesList = await entitiesService.GetFilteredEntitiesAsync<ElementType>(
+            x => x.Category != null && x.Category.Name.ToLower() == "mothergridpalonnier", "Category");
 
+        // "ElementType" is INCLUDED, because the grid prints mp.ElementType.Name. It used to work without,
+        // and only by accident: EF filled the navigation from whatever types this circuit's context already
+        // tracked. Since the generation writes through a context of its own (Pipeline.GenerateLayout,
+        // EntitiesService.CreateOwnedContext), a type it creates is not tracked here, and every row of that
+        // type came back with ElementType = null - and a NullReferenceException in the middle of rendering.
+        MList = await entitiesService.GetFilteredEntitiesAsync<MotherGridPalonnier>(
+            x => ((x.EventMpscenarioId == EventMpscenarioId) && (x.Famille == true)), "ElementType");
+        PList = await entitiesService.GetFilteredEntitiesAsync<MotherGridPalonnier>(
+            x => ((x.EventMpscenarioId == EventMpscenarioId) && (x.Famille == false)), "ElementType");
+        RebindSelection();
+
+        //   Charger toutes les charges pour la visualisation
+        ChargeList = await LoadChargesAsync();
+
+        await LoadInventoryAsync();
     }
-    private void MotherGridComponentClicked(MouseEventArgs e)
+
+    // Every charge on the scenario's elements: on the palonniers, and on the mother lines they hang from
+    // directly (a motor within 8 cm of a point line), so the list and the plan show them all.
+    private Task<List<ChargeMp>> LoadChargesAsync() =>
+        entitiesService.GetFilteredEntitiesAsync<ChargeMp>(
+            x => x.MotherGridPalonnier.EventMpscenarioId == EventMpscenarioId,
+            "MotherGridPalonnier");
+
+    private async Task LoadInventoryAsync()
+    {
+        if (inventoryScenarioId == EventMpscenarioId) return;
+        inventoryScenarioId = EventMpscenarioId;
+        inventory = null;
+        inventoryError = null;
+
+        try
+        {
+            // The scenario's own folder, from the layout when it shows this scenario, else from the database.
+            AliantWebS.Models.EventMpscenario scenario =
+                Layout?.selectedScenario?.EventMpscenarioId == EventMpscenarioId ? Layout.selectedScenario : null;
+            AliantWebS.Models.Event ev =
+                scenario != null && Layout?.selectedEvent?.EventId == scenario.EventId ? Layout.selectedEvent : null;
+            if (scenario == null || ev == null)
+            {
+                scenario = await entitiesService.GetEntityAsync<AliantWebS.Models.EventMpscenario>(EventMpscenarioId);
+                ev = scenario == null ? null : await entitiesService.GetEntityAsync<AliantWebS.Models.Event>(scenario.EventId);
+            }
+
+            string dataDir = scenario != null && ev != null
+                ? scenarioStorage.GetScenarioPaths(ev, scenario, create: false).DataDir
+                : null;
+            inventory = RiggingOptimizer.IO.InventoryFiles.Load(dataDir, scenarioStorage.CommonDataDir);
+        }
+        catch (Exception ex)
+        {
+            inventoryError = ex.Message;
+        }
+    }
+
+    private async Task HandleCalculCharpente(ChargeMPComponent.LoadTransmissionResult result)
+    {
+        // Convertir les données pour la visualisation
+        intersectionPoints.Clear();
+
+        foreach (var motherGridLoad in result.MotherGridLoads)
+        {
+            intersectionPoints[motherGridLoad.Key] = motherGridLoad.Value.IntersectionPoints;
+        }
+
+        charpenteLoads = result.CharpenteLoads;
+
+        //  Rafraîchir aussi les charges
+        ChargeList = await LoadChargesAsync();
+
+        // Forcer la mise à jour du SVGComponent
+        StateHasChanged();
+
+        if (svgComponent != null)
+        {
+            await svgComponent.RefreshVisualization();
+        }
+    }
+
+    private void MotherGridComponentEntered(MouseEventArgs e)
     {
         palonnierComponentSelected = false;
-        PGrid.SelectRow(null);
-        selectedPalonnier = null;
         StateHasChanged();
     }
 
-    private void PalonnierComponentClicked(MouseEventArgs e)
+    private void PalonnierComponentEntered(MouseEventArgs e)
     {
         palonnierComponentSelected = true;
-        MGrid.SelectRow(null);
-        selectedMotherGrid = null;
         StateHasChanged();
     }
 
@@ -132,42 +256,49 @@
         PGrid = grid;
     }
 
-    private void HandleMotherGridListChanged(List<MotherGridPalonnier> l)
+    private async void HandleMotherGridListChanged(List<MotherGridPalonnier> l)
     {
-        //   MList = l;
+
+            await RefreshChargeList();
+        RebindSelection();
         StateHasChanged();
     }
 
-    private void HandlePalonnierListChanged(List<MotherGridPalonnier> l)
+    private async void HandlePalonnierListChanged(List<MotherGridPalonnier> l)
     {
-        //  PList = l;
+
+            await RefreshChargeList();
+        RebindSelection();
         StateHasChanged();
     }
-
-
+    private async Task RefreshChargeList()
+    {
+        ChargeList = await LoadChargesAsync();
+    }
 
     private async void HandleErase(MotherGridPalonnier mp)
     {
         if (MList.Contains(mp))
         {
             await MotherGridGridRef.DeleteMP(mp);
-            //MList.Remove(mp);
-
         }
 
         if (PList.Contains(mp))
         {
             await PalonnierGridRef.DeleteMP(mp);
-            //PList.Remove(mp);
         }
     }
 
+    // A line drawn on the plan becomes a mother or a palonnier, of the type last chosen in its list, made of the
+    // pieces the stock can still make for it (MotherGridComponent.ProposeFor).
     private async void HandleLineDrawn((double x1, double y1, double x2, double y2) t)
     {
         if (!palonnierComponentSelected)
         {
-            if ((MotherGridGridRef.lastSelectedElementType == null) || (MotherGridGridRef.lastSelectedElementType.ElementTypeId == Guid.Empty))
+            if ((MotherGridGridRef.lastSelectedElementType == null) ||
+                (MotherGridGridRef.lastSelectedElementType.ElementTypeId == Guid.Empty))
             {
+                if (ElementTypesList.Count == 0) return;
                 MotherGridGridRef.lastSelectedElementType = ElementTypesList.FirstOrDefault();
             }
 
@@ -176,19 +307,19 @@
             mp.EventMpscenarioId = EventMpscenarioId;
             mp.Famille = true;
             mp.ElementTypeId = MotherGridGridRef.lastSelectedElementType.ElementTypeId;
-
-
             mp.X1 = t.x1; mp.Y1 = t.y1;
-
             mp.X2 = t.x2; mp.Y2 = t.y2;
+
+            var proposal = MotherGridGridRef.ProposeFor(mp);
+            mp.Composition = proposal.Composition;
 
             if ((await entitiesService.InsertEntityAsync(mp)) != null)
             {
                 MList.Add(mp);
                 StateHasChanged();
-
                 await MotherGridGridRef.MPGrid.InsertRow(mp);
                 await MotherGridGridRef.MPGrid.UpdateRow(mp);
+                MotherGridGridRef.ShowStatus(ProposalNote(proposal));
             }
             else
             {
@@ -197,37 +328,102 @@
         }
         else
         {
-            if ((PalonnierGridRef.lastSelectedElementType == null) || (PalonnierGridRef.lastSelectedElementType.ElementTypeId == Guid.Empty))
+            if ((PalonnierGridRef.lastSelectedElementType == null) ||
+                (PalonnierGridRef.lastSelectedElementType.ElementTypeId == Guid.Empty))
             {
+                if (ElementTypesList.Count == 0) return;
                 PalonnierGridRef.lastSelectedElementType = ElementTypesList.FirstOrDefault();
             }
-
 
             MotherGridPalonnier mp = new MotherGridPalonnier();
             mp.EventMpscenarioId = EventMpscenarioId;
             mp.Famille = false;
-            mp.ElementTypeId = MotherGridGridRef.lastSelectedElementType.ElementTypeId;
-
-
+            mp.ElementTypeId = PalonnierGridRef.lastSelectedElementType.ElementTypeId;
             mp.X1 = t.x1; mp.Y1 = t.y1;
-
             mp.X2 = t.x2; mp.Y2 = t.y2;
+
+            var proposal = PalonnierGridRef.ProposeFor(mp);
+            mp.Composition = proposal.Composition;
 
             if ((await entitiesService.InsertEntityAsync(mp)) != null)
             {
                 PList.Add(mp);
                 StateHasChanged();
-
                 await PalonnierGridRef.MPGrid.InsertRow(mp);
                 await PalonnierGridRef.MPGrid.UpdateRow(mp);
+                PalonnierGridRef.ShowStatus(ProposalNote(proposal));
             }
             else
             {
                 await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
             }
-            //await PalonnierGridRef.Insertmp(t.x1, t.y1, t.x2, t.y2);
         }
-
     }
 
+    // What to tell about the pieces of a line just drawn: why the stock proposed none, or a caveat about the
+    // ones it proposed; nothing when it made them without one.
+    private static string ProposalNote(TrussPieces.Proposal proposal) =>
+        proposal.Composition is null
+            ? $"Ligne dessinée : aucune pièce proposée. {proposal.Message}"
+            : proposal.Message;
+
+    private void HandleChargeListChanged()
+    {
+        StateHasChanged();
+    }
+
+    // The lists are reloaded as new instances, and Generate Layout replaces every row. A selection still
+    // pointing at an old instance had the Accrochages panel show - and try to save - a row that no longer
+    // exists. So the selection follows its row by id, and is dropped when the row is gone.
+    private void RebindSelection()
+    {
+        if (selectedPalonnier is not null)
+            selectedPalonnier = PList.FirstOrDefault(p => p.MotherGridPalonnierId == selectedPalonnier.MotherGridPalonnierId);
+        if (selectedMotherGrid is not null)
+            selectedMotherGrid = MList.FirstOrDefault(m => m.MotherGridPalonnierId == selectedMotherGrid.MotherGridPalonnierId);
+    }
+
+    // A crossing hooked or unhooked by hand: redraw the plan, whose markers show where the palonnier hangs.
+    private async Task HandleHooksChanged(MotherGridPalonnier palonnier)
+    {
+        StateHasChanged();
+        if (svgComponent != null)
+            await svgComponent.RefreshVisualization();
+    }
+
+    // ── Add these three handlers anywhere in @code ────────────────────────────
+    private void HandleSvgPalonnierSelected(MotherGridPalonnier mp)
+    {
+        selectedPalonnier = mp;
+        if (mp != null)
+        {
+            selectedMotherGrid = null;
+            selectedCharge = null;
+            palonnierComponentSelected = true;
+        }
+        StateHasChanged();
+    }
+
+    private void HandleSvgMotherGridSelected(MotherGridPalonnier mp)
+    {
+        selectedMotherGrid = mp;
+        if (mp != null)
+        {
+            selectedPalonnier = null;
+            selectedCharge = null;
+            palonnierComponentSelected = false;
+        }
+        StateHasChanged();
+    }
+
+    private void HandleSvgChargeSelected(ChargeMp charge)
+    {
+        selectedCharge = charge;
+        if (charge != null)
+        {
+            selectedPalonnier = null;
+            selectedMotherGrid = null;
+        }
+        StateHasChanged();
+    }
 }

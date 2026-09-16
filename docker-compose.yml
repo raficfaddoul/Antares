@@ -1,4 +1,5 @@
-﻿networks:
+﻿
+networks:
   AliantNetwork:
 
 services:
@@ -8,9 +9,12 @@ services:
     user: root
     volumes:
       - ../data/sql/Aliant:/data
+      - ../data/backups:/backups     # ← create & fix perms for backup folder too
     command: >
       sh -c "
         chown -R 10001:0 /data &&
+        mkdir -p /backups &&
+        chown -R 10001:0 /backups &&
         echo 'Ownership fixed for SQL Server'
       "
     restart: "no"
@@ -25,6 +29,7 @@ services:
       - "8005:1433"
     volumes:
       - ../data/sql/Aliant:/var/opt/mssql/data
+      - ../data/backups:/backups     # ← SMO writes the .bak here
     environment:
       - ACCEPT_EULA=Y
       - MSSQL_SA_PASSWORD=password@12345#
@@ -45,7 +50,7 @@ services:
       AliantDb:
         condition: service_healthy
     user: root
-    networks: 
+    networks:
       - AliantNetwork
     volumes:
       - ../data/sql/Aliant:/var/opt/mssql/data
@@ -57,7 +62,7 @@ services:
       - -e
       - -c
       - |
-        echo '📂 AliantWeb files'; ls -la /var/opt/mssql/data/AliantWeb*;
+        echo '📂 Antares files'; ls -la /var/opt/mssql/data/Antares*;
         chown -R 10001:0 /var/opt/mssql/data;
         echo '⏳ Waiting for AliantDb…';
         until /opt/mssql-tools18/bin/sqlcmd -S AliantDb -U sa -P "$$MSSQL_SA_PASSWORD" -C -Q 'SELECT 1' >/dev/null 2>&1; do
@@ -66,13 +71,13 @@ services:
         echo '✅ AliantDb is up';
         /opt/mssql-tools18/bin/sqlcmd -S AliantDb -U sa -P "$$MSSQL_SA_PASSWORD" -C -Q "
           USE master;
-          IF DB_ID('AliantWeb') IS NULL
-          CREATE DATABASE [AliantWeb]
-            ON (FILENAME='/var/opt/mssql/data/AliantWeb.mdf'),
-               (FILENAME='/var/opt/mssql/data/AliantWeb.ldf')
+          IF DB_ID('Antares') IS NULL
+          CREATE DATABASE [Antares]
+            ON (FILENAME='/var/opt/mssql/data/Antares.mdf'),
+               (FILENAME='/var/opt/mssql/data/Antares_log.ldf')
             FOR ATTACH;
-          SELECT 'AliantWeb attached successfully' AS Status;"
-        echo '🏁 AliantWeb attached';
+          SELECT 'Antares attached successfully' AS Status;"
+        echo '🏁 Antares attached';
     restart: "no"
 
   aliantwebs:
@@ -84,19 +89,29 @@ services:
     ports: []
     volumes:
       - ../data/images:/app/Images
+      - ../data/ScenariosData:/app/ScenariosData
+      - ../data/backups:/backups     # ← app reads the .bak from here
     depends_on:
-      - AliantDb
-      - aliant-db-init      # ← wait for database initialization
+      AliantDb:
+        condition: service_healthy
+      aliant-db-init:
+        condition: service_completed_successfully  # ← wait for DB attach to finish
+    env_file:
+      - .env.secrets
     environment:
       - ASPNETCORE_URLS=http://+:80
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_HTTPS_PORT=
       - DB_HOST=AliantDb
-      - DB_NAME=AliantWeb
+      - DB_NAME=Antares
       - DB_SA_PASSWORD=password@12345#
       - MSSQL_SSL_CERTIFICATE_CREATION=disabled
-      - BasePath=Aliant1  
+      - BasePath=Aliant1
       - API_URL=http://172.17.0.1:8080
+      - BackupPath=/backups          # ← tells Settings.razor where to read the .bak
+      # Set here rather than only in appsettings so it still matches the bind mount below when
+      # docker-compose.override.yml switches the environment to Development.
+      - ScenariosDataPath=/app/ScenariosData
     networks:
       - AliantNetwork
 
@@ -118,7 +133,7 @@ services:
       - influxdb2-admin-token
     volumes:
       - ../data/influx:/var/lib/influxdb2
-      - ../data/influx:/etc/influxdb2
+      - ../data/influx-config:/etc/influxdb2  # ← was pointing to same path as data
     networks:
       - AliantNetwork
 
@@ -126,7 +141,7 @@ services:
     image: nginx:alpine
     ports:
       - "443:443"
-      - "80:80"
+      - "8080:80"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf
       - ./ssl:/etc/nginx/ssl
@@ -142,4 +157,8 @@ secrets:
     file: .env.influxdb2-admin-password
   influxdb2-admin-token:
     file: .env.influxdb2-admin-token
+
+volumes:
+  sqlserver-data:
+  backup-data:
 

@@ -7,8 +7,8 @@ namespace AliantWebS.Data
     {
         public string? FirstName { get; set; }
         public string? LastName { get; set; }
-        public int UsernameChangeLimit { get; set; } = 10;
-        public byte[]? ProfilePicture { get; set; }
+       // public int UsernameChangeLimit { get; set; } = 10;
+        //public byte[]? ProfilePicture { get; set; }
         public string? Token { get; set; }
     }
 

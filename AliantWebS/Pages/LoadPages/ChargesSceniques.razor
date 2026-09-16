@@ -1,11 +1,13 @@
-﻿@page "/ChargesSceniques/{EventID:guid}"
+﻿@page "/ChargesSceniques/{EventId:guid}"
 
 @using AliantWebS.Data
+@inject AppData appData;
 @inject EntitiesService entitiesService
 @inject NavigationManager navigationManager
 @inject IJSRuntime js
 @inject AliantWebS.Data.AppData AppData
 @using Models
+@using RiggingOptimizer.IO
 @inject IStringLocalizer<Languages> L
 
 @layout AntaresConceptionLayout
@@ -27,14 +29,37 @@
                     <a class="nav-link" @onclick="@(args => InsertChargeScenique())" @onclick:preventDefault="true" href="">
                         <span class="oi oi-plus" aria-hidden="true">@L["Add New"]</span>
                     </a>
-                <div style="margin-left: auto; ">
-                    <Label> @L["Page Size"]: &nbsp;&nbsp;</Label>
+                    <a class="nav-link" @onclick="@(args => DeleteAllChargesSceniques())" @onclick:preventDefault="true" href="" title="@L["Delete All"]">
+                        <span class="oi oi-trash" aria-hidden="true"> @L["Delete All"]</span>
+                    </a>
+                    @if (isImporting)
+                    {
+                        <span class="spinner-border spinner-border-sm text-primary ms-2" role="status" aria-hidden="true"></span>
+                        <span class="ms-1">@L["Importing..."]</span>
+                    }
+                    else
+                    {
+                        <a class="nav-link" @onclick="TriggerExcelImport" @onclick:preventDefault="true" href="" title="@L["Import from Excel"]">
+                            <span class="oi oi-data-transfer-upload" aria-hidden="true"> @L["Import Excel"]</span>
+                        </a>
+                    }
+                    <InputFile id="excelFileInput" OnChange="ImportChargesFromExcel" accept=".xlsx" style="display:none" />
+                <div style="margin-left: auto; display: flex; align-items: center; gap: 10px;">
+                    <Label>@L["Page Size"]: &nbsp;&nbsp;</Label>
                     <RadzenNumeric @bind-Value="PageSize" Style="width:60px"></RadzenNumeric>
+                    <a class="nav-link" title="@L["Display Settings"]" @onclick="() => showDecimalSettings = !showDecimalSettings" @onclick:preventDefault="true" href="">
+                        <span class="oi oi-cog" aria-hidden="true"></span>
+                    </a>
+                    @if (showDecimalSettings)
+                    {
+                        <div style="display: flex; align-items: center; gap: 6px; background: #f0f4ff; border: 1px solid #667eea; border-radius: 8px; padding: 4px 10px;">
+                            <span style="font-size: 12px; color: #4a5568;">@L["Decimals"]:</span>
+                            <RadzenNumeric @bind-Value="decimalPlaces" Min="0" Max="6" Style="width:55px;" />
+                        </div>
+                    }
                 </div>
             </Div>
   
-     
-
                 <RadzenDataGrid @ref="chargeSceniqueGrid" AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="PageSize"
                                 Data="@chargeSceniqueList" TItem="ChargesScenique" ColumnWidth="150px" @bind-Value="@SelectedChargesSceniques">
                     <Columns>
@@ -47,35 +72,29 @@
                                 <InputTextArea @bind-Value="chargesScenique.Name" Style="width:100%" />
                             </EditTemplate>
                         </RadzenDataGridColumn>
-@*                         <RadzenDataGridColumn Width="50" TItem="ChargesScenique" Property="Numero" TextAlign="TextAlign.Center">
-                            <HeaderTemplate>
-                                <span class="gridColumndStyle">@L["Numéro"]</span>       
-                            </HeaderTemplate>
-                            <EditTemplate Context="chargesScenique">
-                                <InputNumber @bind-Value="chargesScenique.Numero" TValue="int?" Style="width:100%" />
-                            </EditTemplate>
-                        </RadzenDataGridColumn> *@
 
-                        <RadzenDataGridColumn Width="50" TItem="ChargesScenique" Property="X" TextAlign="TextAlign.Center">
+                        @* X and Y in the studies' axes (StudyX, StudyY): metres from Point0 (E5), X along the beams
+                           towards point 9, Y across them towards J. The stored X and Y stay in the grid's axes. *@
+                        <RadzenDataGridColumn Width="50" TItem="ChargesScenique" Property="StudyX" TextAlign="TextAlign.Center" FormatString="@($"{{0:N{decimalPlaces}}}")">
                             <HeaderTemplate>
                                 <span class="gridColumndStyle">@L["X"]</span>               
                             </HeaderTemplate>
                             <EditTemplate Context="chargesScenique">
-                                <InputNumber @bind-Value="chargesScenique.X" Style="width:100%" />
+                                <InputNumber @bind-Value="chargesScenique.StudyX" Style="width:100%" />
                             </EditTemplate>
                         </RadzenDataGridColumn>
 
-                        <RadzenDataGridColumn Width="50" TItem="ChargesScenique" Property="Y" TextAlign="TextAlign.Center">
+                        <RadzenDataGridColumn Width="50" TItem="ChargesScenique" Property="StudyY" TextAlign="TextAlign.Center" FormatString="@($"{{0:N{decimalPlaces}}}")">
                             <HeaderTemplate>
                                 <span class="gridColumndStyle">@L["Y"]</span>                  
                             </HeaderTemplate>
                             <EditTemplate Context="chargesScenique">
-                                <InputNumber @bind-Value="chargesScenique.Y" Style="width:100%" />
+                                <InputNumber @bind-Value="chargesScenique.StudyY" Style="width:100%" />
                             </EditTemplate>
                         </RadzenDataGridColumn>
 
 
-                        <RadzenDataGridColumn Width="50" TItem="ChargesScenique" Property="Charge" TextAlign="TextAlign.Center">
+                        <RadzenDataGridColumn Width="50" TItem="ChargesScenique" Property="Charge" TextAlign="TextAlign.Center" FormatString="@($"{{0:N{decimalPlaces}}}")">
                             <HeaderTemplate>
                                 <span class="gridColumndStyle">@L["Charge"]</span>                                              </HeaderTemplate>
                             <EditTemplate Context="chargesScenique">
@@ -103,13 +122,6 @@
                         </RadzenDataGridColumn>
                     </Columns>
                 </RadzenDataGrid>
-
-
-
-
-
-
-
             }
         </RadzenSplitterPane>
         <RadzenSplitterPane Size="50%">
@@ -123,18 +135,21 @@
                                 <label>@L["Charge Totale"] :</label>
                                 <div>
                                     <InputNumber disabled="true" @bind-Value="@ChargeTotale" />
-                                    @*   <ValidationMessage For="@(() => Structure.DesignLoad)" /> *@
                                 </div>
                             </div>
-                        </div>
-                        <div style="display: flex; align-items: center;">
-                            <Blazorise.Button Color="Blazorise.Color.Primary" Clicked="Calcul" >@L["Calcul MotherGrid"]</Blazorise.Button>
                         </div>
                     </div>
 
                 </RadzenSplitterPane>
                 <RadzenSplitterPane Size="80">
-                    <AliantWebS.Pages.CADPages.SVGComponent></AliantWebS.Pages.CADPages.SVGComponent>
+                    <AliantWebS.Pages.CADPages.SVGComponent ChargesSceniques="chargeSceniqueList"
+                                                            Point0X="@(Layout?.selectedEvent?.Point0X ?? 0)"
+                                                            Point0Y="@(Layout?.selectedEvent?.Point0Y ?? 0)"
+                                                            EventName="@Layout?.selectedEvent?.Name"
+                                                            EventId="@Layout?.selectedEvent?.EventId"
+                                                            ScenarioName="@Layout?.selectedScenario?.Name"
+                                                            ScenarioId="@Layout?.selectedScenario?.EventMpscenarioId"
+                                                            ModuleName="Charges Scéniques"></AliantWebS.Pages.CADPages.SVGComponent>
 
                 </RadzenSplitterPane>
             </RadzenSplitter>
@@ -152,23 +167,25 @@
 
     IList<ChargesScenique> SelectedChargesSceniques { get; set; }
 
-
     RadzenDataGrid<ChargesScenique> chargeSceniqueGrid;
 
-
-    List<ChargesScenique> chargeSceniqueList;
+    List<ChargesScenique> chargeSceniqueList = new List<ChargesScenique>();
 
     [Parameter]
-    public Guid EventID { get; set; }
+    public Guid EventId { get; set; }
 
     double ChargeTotale { get; set; }
 
-    protected override async Task OnInitializedAsync()
+    bool isImporting = false;
+
+    private int decimalPlaces = 3;
+private bool showDecimalSettings = false;
+
+    protected override async Task OnParametersSetAsync()
     {
-        chargeSceniqueList = await entitiesService.GetFilteredEntitiesAsync<ChargesScenique>(x => x.EventId == EventID);
+        chargeSceniqueList = await entitiesService.GetFilteredEntitiesAsync<ChargesScenique>(x => x.EventMpscenarioId == Layout.selectedScenario?.EventMpscenarioId);
         CalculateChargeTotale();
     }
-
 
     async Task DeleteChargeScenique(ChargesScenique chargesScenique)
     {
@@ -177,7 +194,6 @@
             if (chargeSceniqueList.Remove(chargesScenique))
             {
                 await chargeSceniqueGrid.Reload();
-
             }
         }
         CalculateChargeTotale();
@@ -185,22 +201,31 @@
 
     void EditRow(ChargesScenique chargeScenique)
     {
-
         chargeSceniqueGrid.EditRow(chargeScenique);
-
     }
 
     async Task InsertChargeScenique()
     {
+        if (Layout?.selectedScenario is null)
+        {
+            await js.InvokeVoidAsync("alert",
+                L["No scenario selected. Please select a scenario before adding a charge."].ToString());
+            return;
+        }
+
         ChargesScenique chargeScenique = new ChargesScenique();
-        chargeScenique.EventId = EventID;
+        chargeScenique.EventMpscenarioId = Layout.selectedScenario.EventMpscenarioId;
+
+        // The row is persisted before it is opened for editing, so UpdateRow's checks never see it: a stray
+        // click, or adding a row and leaving the page, used to leave a nameless charge behind and
+        // « Générer l'implantation » then refused the whole plan naming a row nobody could pick out. Name it
+        // here instead — the user has only its position and its weight left to fill in.
+        chargeScenique.Name = NextFreeChargeName(chargeScenique.EventMpscenarioId);
 
         if ((await entitiesService.InsertEntityAsync(chargeScenique)) != null)
         {
             chargeSceniqueList.Add(chargeScenique);
-
             await chargeSceniqueGrid.InsertRow(chargeScenique);
-
         }
         else
         {
@@ -208,7 +233,23 @@
         }
 
         CalculateChargeTotale();
+    }
 
+    // « Charge 1 », « Charge 2 », … : the first number this scenario does not already use. Compared trimmed
+    // and ignoring case, the way UpdateRow and the optimiser compare names, so the name handed out here can
+    // never be the duplicate UpdateRow would refuse — even though the database would take it.
+    string NextFreeChargeName(Guid scenarioId)
+    {
+        int n = 1;
+
+        while (chargeSceniqueList.Any(c =>
+            c.EventMpscenarioId == scenarioId
+            && string.Equals((c.Name ?? string.Empty).Trim(), $"Charge {n}", StringComparison.OrdinalIgnoreCase)))
+        {
+            n++;
+        }
+
+        return $"Charge {n}";
     }
 
     private void CalculateChargeTotale()
@@ -216,88 +257,171 @@
         ChargeTotale = 0;
         foreach (var v in chargeSceniqueList)
         {
-
             ChargeTotale += v.Charge ?? 0;
         }
     }
 
-
-
+    // « Générer l'implantation » now reads these rows instead of Charges.xlsx, and it refuses a plan whose
+    // load names are empty or duplicated — the optimiser and the study match a load to its row by name.
+    // Checking here tells the person at the moment they typed the name, rather than several screens later
+    // when the placement stops on a table they can no longer relate to what they did.
     async Task UpdateRow(ChargesScenique chargeScenique)
     {
-        if (await entitiesService.UpdateEntityAsync(chargeScenique))
-        {
-            await chargeSceniqueGrid.UpdateRow(chargeScenique);
-        }
-        CalculateChargeTotale();
-    }
+        var name = (chargeScenique.Name ?? string.Empty).Trim();
 
-    private async void Calcul()
-    {
-        foreach(var cs in chargeSceniqueList)
+        if (name.Length == 0)
         {
-            double x = cs.X ?? 0;
-            double y = cs.Y ?? 0;
-            double charge = cs.Charge ?? 0;
+            await js.InvokeVoidAsync("alert",
+                "Le nom de la charge est obligatoire : l'implantation identifie chaque charge par son nom.");
+            return;
         }
 
-
-
-
-        ////sortie des resultats
-
-        EventMpscenario emps = new EventMpscenario();
-        emps.EventId = EventID;
-        emps.Name = DateTime.Now.ToString();
-
-        if ((await entitiesService.InsertEntityAsync(emps)) != null)
+        if (name.Length > 50)
         {
-            
-        }
-        else
-        {
-            await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
+            await js.InvokeVoidAsync("alert",
+                $"Le nom « {name} » fait {name.Length} caractères ; 50 au maximum. Raccourcissez-le avant d'enregistrer.");
+            return;
         }
 
+        // Trimmed and ignoring case — that is how the optimiser and the study match the names, so two rows
+        // the database would happily keep side by side would still be one single load for the placement.
+        bool duplicate = chargeSceniqueList.Any(c =>
+            !ReferenceEquals(c, chargeScenique)
+            && c.EventMpscenarioId == chargeScenique.EventMpscenarioId
+            && string.Equals((c.Name ?? string.Empty).Trim(), name, StringComparison.OrdinalIgnoreCase));
 
-
-        List<MotherGridPalonnier> mgps = new List<MotherGridPalonnier>();
-
-        MotherGridPalonnier mgp = new MotherGridPalonnier();
-        mgp.EventMpscenarioId = emps.EventMpscenarioId;
-        mgp.X1 = 12.5;
-        mgp.Y1 = 0;
-        mgp.X2 = 1;
-        mgp.Y2 = 5;
-        mgp.Famille = true; // meaning it is a mothergrid not a palonnier.
-
-        mgps.Add(mgp);
-
-        foreach(var mg in mgps)
+        if (duplicate)
         {
-            if ((await entitiesService.InsertEntityAsync(mg)) != null)
+            await js.InvokeVoidAsync("alert",
+                $"Le nom « {name} » est déjà utilisé par une autre charge de ce scénario. Les noms doivent être uniques.");
+            return;
+        }
+
+        chargeScenique.Name = name;
+
+        try
+        {
+            if (await entitiesService.UpdateEntityAsync(chargeScenique))
             {
+                await chargeSceniqueGrid.UpdateRow(chargeScenique);
             }
             else
             {
-                await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
+                await js.InvokeVoidAsync("alert",
+                    "L'enregistrement a échoué. La ligne reste en édition, rien n'est perdu.");
             }
         }
+        catch (Exception ex)
+        {
+            // UpdateEntityAsync rethrows DbUpdateException. Unhandled here it kills the Blazor circuit, so a
+            // name the column cannot hold used to blank the whole page and take the other rows' edits with it.
+            await js.InvokeVoidAsync("alert",
+                $"L'enregistrement a échoué : {ex.Message}\nLa ligne reste en édition, rien n'est perdu.");
+        }
 
-
-        Layout?.RequestRedraw();
-
+        CalculateChargeTotale();
     }
 
+    async Task DeleteAllChargesSceniques()
+    {
+        bool confirmed = await js.InvokeAsync<bool>("confirm", L["Are you sure you want to delete all charges scéniques?"].ToString());
+        if (!confirmed) return;
 
+        var toDelete = chargeSceniqueList.ToList();
+        foreach (var item in toDelete)
+        {
+            await entitiesService.DeleteEntityAsync(item);
+            chargeSceniqueList.Remove(item);
+        }
 
+        await chargeSceniqueGrid.Reload();
+        CalculateChargeTotale();
+    }
 
+    async Task TriggerExcelImport()
+    {
+        // Checked before the file dialog opens, as "Add New" does: the loads belong to a scenario, and
+        // there is none while the event has no scenario or the selected one was just deleted.
+        if (Layout?.selectedScenario is null)
+        {
+            await js.InvokeVoidAsync("alert",
+                L["No scenario selected. Please select or create a scenario before importing charges."].ToString());
+            return;
+        }
+        await js.InvokeVoidAsync("eval", "document.getElementById('excelFileInput').click()");
+    }
 
+    async Task ImportChargesFromExcel(InputFileChangeEventArgs e)
+    {
+        // Read once, up front. Reading it unchecked was the "Object reference not set to an instance of
+        // an object" the import showed when no scenario was selected.
+        var scenarioId = Layout?.selectedScenario?.EventMpscenarioId;
+        if (scenarioId is null)
+        {
+            await js.InvokeVoidAsync("alert",
+                L["No scenario selected. Please select or create a scenario before importing charges."].ToString());
+            return;
+        }
 
+        isImporting = true;
+        StateHasChanged();
+        try
+        {
+            using var mem = new System.IO.MemoryStream();
+            await e.File.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024).CopyToAsync(mem);
+            mem.Position = 0;
 
+            // ── Directly reuse Pipeline's function ───────────────────
+            // The reader says what it made of the file — a first line taken as a header, columns read in
+            // order for want of one, a row it could not use. Silently, the only sign of a misread header
+            // was a load missing from the grid, which nobody looks for.
+            var warnings = new List<string>();
+            var toInsert = await RiggingOptimizer.Pipeline.ImportChargesSceniquesFromStream(
+                mem,
+                scenarioId.Value,
+                chargeSceniqueList.Select(x => x.Name),
+                warnings);
 
+            // ── Show what the reader noticed ──────────────────────────
+            if (warnings.Any())
+            {
+                string msg = string.Join("\n", warnings);
+                await js.InvokeVoidAsync("alert", $"⚠️ Lecture du fichier :\n\n{msg}");
+            }
 
+            if (toInsert.Count == 0)
+            {
+                await js.InvokeVoidAsync("alert", L["All charges already exist, import ignored."].ToString());
+                return;
+            }
 
+            if (await entitiesService.InsertEntitiesAsync(toInsert))
+            {
+                chargeSceniqueList.AddRange(toInsert);
+                await chargeSceniqueGrid.Reload();
+                CalculateChargeTotale();
+                await js.InvokeVoidAsync("alert",
+                    L["{0} charge(s) imported successfully.", toInsert.Count].ToString());
+            }
+            else
+            {
+                await js.InvokeVoidAsync("alert", L["Import failed."].ToString());
+            }
+        }
+        catch (Exception ex)
+        {
+            await js.InvokeVoidAsync("alert", L["Error: {0}", ex.Message].ToString());
+        }
+        finally
+        {
+            isImporting = false;
+            StateHasChanged();
+        }
+    }
 
+    // « Calcul MotherGrid » removed with its button: it was debug scaffolding on a production page. It put a
+    // scenario id into EventMpscenario.EventId — a foreign key to Event — so the insert could only be
+    // rejected, then inserted a hard-coded MotherGridPalonnier; and being « async void » it took the circuit
+    // down with it. The loads it was meant to compute are what « Générer l'implantation » does properly.
 }
 

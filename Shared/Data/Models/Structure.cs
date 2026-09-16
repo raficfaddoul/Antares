@@ -39,16 +39,10 @@ public partial class Structure
     public virtual ICollection<AttributeStructure> AttributeStructures { get; set; } = new List<AttributeStructure>();
 
     [InverseProperty("Structure")]
-    public virtual ICollection<Document> Documents { get; set; } = new List<Document>();
-
-    [InverseProperty("Structure")]
     public virtual ICollection<Element> Elements { get; set; } = new List<Element>();
 
     [InverseProperty("Structure")]
     public virtual ICollection<Event> Events { get; set; } = new List<Event>();
-
-    [InverseProperty("Structure")]
-    public virtual ICollection<FlagStructure> FlagStructures { get; set; } = new List<FlagStructure>();
 
     [ForeignKey("SiteId")]
     [InverseProperty("Structures")]
@@ -56,9 +50,6 @@ public partial class Structure
 
     [InverseProperty("Structure")]
     public virtual ICollection<StructureImage> StructureImages { get; set; } = new List<StructureImage>();
-
-    [InverseProperty("Structure")]
-    public virtual ICollection<StructureInspectionResult> StructureInspectionResults { get; set; } = new List<StructureInspectionResult>();
 
     [ForeignKey("StructureTypeId")]
     [InverseProperty("Structures")]

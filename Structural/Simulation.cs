@@ -15,17 +15,14 @@ using HDF5CSharp;
 using AliantWebS.Data;
 using AliantWebS.Models;
 using Microsoft.AspNetCore.Components;
-using TorchSharp;
-using TorchSharp.Modules;
-using static TorchSharp.torch;
-using static TorchSharp.torch.nn;
+
 using System.Globalization;
 using MathNet.Numerics.LinearAlgebra;
 using System.Runtime.Intrinsics.X86;
 using Microsoft.SqlServer.Management.Smo;
 using System.Xml.Linq;
 using Microsoft.EntityFrameworkCore;
-using static TorchSharp.torch.nn.utils;
+
 
 namespace Structural
 {
@@ -615,14 +612,6 @@ namespace Structural
             Dictionary<StaticPointLoad, double> staticPointLoads = el.StaticPointLoadElements.Where(x => selectedLoadCasesids.Contains(x.StaticPointLoad.LoadCaseId)).Select(sle => (sle.StaticPointLoad, selectedLoadCases[sle.StaticPointLoad.LoadCase])).
     ToDictionary(x => x.StaticPointLoad, x => x.Item2);
 
-            Dictionary<DynamicLoad, double> dynamicLoads = el.DynamicLoadElements.Where(x => selectedLoadCasesids.Contains(x.DynamicLoad.LoadCaseId)).Select(sle => (sle.DynamicLoad, selectedLoadCases[sle.DynamicLoad.LoadCase])).
-                ToDictionary(x => x.DynamicLoad, x => x.Item2);
-
-            Dictionary<DynamicPointLoad, double> dynamicPointLoads = el.DynamicPointLoadElements.Where(x => selectedLoadCasesids.Contains(x.DynamicPointLoad.LoadCaseId)).Select(sle => (sle.DynamicPointLoad, selectedLoadCases[sle.DynamicPointLoad.LoadCase])).
-    ToDictionary(x => x.DynamicPointLoad, x => x.Item2);
-
-            Dictionary<MobileLoad, double> mobileLoads = el.MobileLoadElements.Where(x => selectedLoadCasesids.Contains(x.MobileLoad.LoadCaseId)).Select(sle => (sle.MobileLoad, selectedLoadCases[sle.MobileLoad.LoadCase])).
-ToDictionary(x => x.MobileLoad, x => x.Item2);
 
             //foreach (var lc in selectedLoadCases)
             //  {
@@ -658,53 +647,11 @@ ToDictionary(x => x.MobileLoad, x => x.Item2);
                 }
             }
 
-            foreach (DynamicLoad sl in dynamicLoads.Keys)
-            {
-                int ind = ChargesDynamiqueReparties.FindIndex(x => x.id == sl.DynamicLoadId);
-                if (ind == -1)
-                {
-                    Dictionary<double, double> dic = new Dictionary<double, double>();
-                    if (sl.TemporalFunc != null)
-                        dic = Converter.ConvertFromXml(sl.TemporalFunc);
-                    ChargesDynamiqueReparties.Add((sl.DynamicLoadId, new List<int>() { elementIndex }, (int)sl.Dof, (sl.StartValue ?? 0) * (dynamicLoads?[sl] ?? 1), (sl.EndValue ?? 0) * (dynamicLoads?[sl] ?? 1), dic));
-                }
-                else
-                {
-                    ChargesDynamiqueReparties[ind].noeudInd.Add(elementIndex);
-                }
-            }
 
-            foreach (DynamicPointLoad sl in dynamicPointLoads.Keys)
-            {
-                int ind = ChargesDynamiquePonctuelles.FindIndex(x => x.id == sl.DynamicPointLoadId);
-                if (ind == -1)
-                {
-                    Dictionary<double, double> dic = new Dictionary<double, double>();
-                    if (sl.TemporalFunc != null)
-                        dic = Converter.ConvertFromXml(sl.TemporalFunc);
-                    ChargesDynamiquePonctuelles.Add((sl.DynamicPointLoadId, new List<int>() { elementIndex }, (int)sl.Dof, (sl.Value ?? 0) * (dynamicPointLoads?[sl] ?? 1), sl.ApplicationPointDistance ?? 0, dic));
-                }
-                else
-                {
-                    ChargesDynamiquePonctuelles[ind].noeudInd.Add(elementIndex);
-                }
-            }
 
-            foreach (MobileLoad sl in mobileLoads.Keys)
-            {
-                int ind = ChargesMobiles.FindIndex(x => x.id == sl.MobileLoadId);
-                if (ind == -1)
-                {
-                    ChargesMobiles.Add((sl.MobileLoadId, new List<int>() { elementIndex },
-                        sl.ValueVl ?? 0, sl.ValuePl ?? 0, sl.ValueConvoi ?? 0, sl.SpeedVl ?? 0, sl.SpeedPl ?? 0,
-                        sl.AverageHourlyTraffic ?? 0, sl.PercentagePl ?? 0, sl.LoadUncertainty ?? 0, sl.SpeedUncertainty ?? 0));
 
-                }
-                else
-                {
-                    ChargesMobiles[ind].noeudInd.Add(elementIndex);
-                }
-            }
+
+
 
 
             //}
@@ -727,122 +674,6 @@ ToDictionary(x => x.MobileLoad, x => x.Item2);
 
         }
 
-
-        static public async Task<(Tensor, Tensor)> OnlineSimulate(Structural.Structure structuralStructure, Structural.SimulationParameters simulationParameters, int[] sensedNodes, long[] elementsOfIntrest)
-        {
-            int batchsize = simulationParameters.SimulationNum * simulationParameters.Multiplicity;
-
-            int maximumFrequency = simulationParameters.SamplingFrequency * simulationParameters.Duree / 2;
-
-
-            float[,,,] inputBatch = new float[batchsize, 2, 51, maximumFrequency];
-            float[,] outputBatch = new float[batchsize, structuralStructure.element.Rows.Count];
-
-            Random rndGlobal;
-            //  if (simulationParameters.GlobalSeed == null)
-            //  {
-            rndGlobal = new Random();
-            //  }
-            //  else
-            //  {
-            //     rndGlobal = new Random((int)simulationParameters.GlobalSeed);
-            // }
-            int globalSeed = rndGlobal.Next();
-
-
-            ParallelOptions po = new ParallelOptions();
-            po.MaxDegreeOfParallelism = 100;
-            Parallel.For(0, simulationParameters.SimulationNum, po, n =>
-            {
-                Random rnd = new Random(n + globalSeed);
-
-                Structure Str = new Structure();
-
-                Str.CL = structuralStructure.CL;
-                Str.noeud = structuralStructure.noeud;
-                Str.element = structuralStructure.element.Copy();
-                Str.MasseNodale = structuralStructure.MasseNodale;
-
-                // ********Paramètres à introduire *****
-                int loadCase = 4;
-                //**************************************
-
-
-
-                double dTemps = 1.0 / simulationParameters.SamplingFrequency;
-                List<double[]> Vehicle = null;
-                //string loadType = CreateLoad(1, 1, 1,
-                //    Str.ChargeStatiquePonctuelle, Str.ChargeStatiqueRepartie, Str.ChargeDynamiquePonctuelle,
-                //       Str.ChargeDynamiqueRepartie, Str.ChargeMobile,
-                //    simulationParameters.Duree, out Vehicle);
-
-
-
-                double[] qt;
-
-                foreach (DataRow dr in Str.element.Rows)
-                {
-
-                    dr["E"] = dr.Field<double>("E") * rnd.NextDouble();
-
-                }
-
-                double[,] qTime = new double[0, 0];
-
-                StructuralTimeIntegration.Calcul_Dynamique(duree: simulationParameters.Duree, nbReponse: simulationParameters.SamplingFrequency,
-                    nbIntegration: simulationParameters.SamplingFrequency * 10, nddl: Str.nddl, noeud: Str.noeud, element: Str.element,
-                     CL: Str.CL, MasseNodale: Str.MasseNodale,
-                    Str.ChargesStatiquePonctuelles, Str.ChargesStatiqueReparties, Str.ChargesDynamiquePonctuelles,
-                       Str.ChargesDynamiqueReparties, Str.ChargesMobiles);
-
-
-                List<Complex[,]> FFTs = SP.SmoothAndAverageFFT(simulationParameters.SamplingFrequency, simulationParameters.Duree, qTime, simulationParameters.Divider, simulationParameters.Multiplicity);
-
-
-
-
-
-
-                for (int k = 0; k < simulationParameters.Multiplicity; k++)
-                {
-
-                    for (int i = 0; i < FFTs[k].Rows(); i++)
-                    {
-                        for (int j = 0; j < FFTs[k].Columns(); j++)
-                        {
-                            inputBatch[n * (k + 1), 0, i, j] = (float)FFTs[k][i, j].Magnitude;
-                            inputBatch[n * (k + 1), 1, i, j] = (float)FFTs[k][i, j].Phase;
-                        }
-
-                    }
-
-                    int l = 0;
-                    foreach (DataRow dr in Str.element.Rows)
-                    {
-
-                        outputBatch[n * (k + 1), l] = (float)dr.Field<double>("E");
-                        l++;
-                    }
-                }
-
-
-            });
-
-            var nt = torch.tensor(sensedNodes);
-
-            var tens = torch.tensor(inputBatch, ScalarType.Float32)[TensorIndex.Colon, TensorIndex.Colon, TensorIndex.Tensor(nt), TensorIndex.Slice(0, 996)];
-
-            //   var outputBatcht = torch.tensor(outputBatch);
-
-
-            var outputBatcht = torch.tensor(outputBatch, ScalarType.Float32)[TensorIndex.Colon, TensorIndex.Tensor(elementsOfIntrest)].reshape(-1, 1);
-
-
-
-            outputBatcht = outputBatcht / 2.1000e+11;
-
-            return (tens, outputBatcht);
-        }
 
 
 

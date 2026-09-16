@@ -10,89 +10,1092 @@
 @inject IWebHostEnvironment Environment
 @inject IStringLocalizer<Languages> L
 @inject NavigationManager navigationManager
+@inject AliantWebS.Data.JournalService journal
+@inject AuthenticationStateProvider authenticationStateProvider
 
-<EditForm Model="ec">
-    <div class="form-group " style="display: flex">
+<style>
+    .settings-container {
+        padding: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+    }
 
-        <label>@L["Edit Element On Select in the TreeView"] :   </label>
-        <div>
-            <InputCheckbox @bind-Value="SettingEditElementOnSelect"></InputCheckbox>
+    .settings-card {
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        padding: 30px;
+        margin-bottom: 20px;
+        max-width: 1200px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .settings-header {
+        margin-bottom: 40px;
+        padding-bottom: 20px;
+        border-bottom: 3px solid #667eea;
+    }
+
+    .settings-title {
+        font-size: 36px;
+        font-weight: 700;
+        color: #2d3748;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+
+    .settings-subtitle {
+        color: #718096;
+        font-size: 16px;
+        margin-top: 10px;
+    }
+
+    .settings-section {
+        margin-bottom: 40px;
+    }
+
+    .section-title {
+        font-size: 20px;
+        font-weight: 700;
+        color: #2d3748;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .section-icon {
+        width: 28px;
+        height: 28px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 16px;
+    }
+
+    .settings-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+    }
+
+    .setting-item {
+        background: #f7fafc;
+        padding: 20px;
+        border-radius: 12px;
+        transition: all 0.3s ease;
+        border: 2px solid transparent;
+    }
+
+    .setting-item:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        border-color: #667eea;
+    }
+
+    .setting-label {
+        font-size: 14px;
+        font-weight: 600;
+        color: #4a5568;
+        margin-bottom: 10px;
+        display: block;
+    }
+
+    .checkbox-container {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .custom-checkbox {
+        width: 50px;
+        height: 28px;
+        background: #cbd5e0;
+        border-radius: 14px;
+        position: relative;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .custom-checkbox.checked {
+        background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+    }
+
+    .checkbox-slider {
+        width: 24px;
+        height: 24px;
+        background: white;
+        border-radius: 50%;
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .custom-checkbox.checked .checkbox-slider {
+        left: 24px;
+    }
+
+    .action-card {
+        background: white;
+        border: 2px solid #e2e8f0;
+        padding: 20px;
+        border-radius: 12px;
+        transition: all 0.3s ease;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 15px;
+    }
+
+    .action-card:hover {
+        border-color: #667eea;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+        transform: translateY(-2px);
+    }
+
+    .action-info {
+        flex: 1;
+    }
+
+    .action-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: #2d3748;
+        margin-bottom: 5px;
+    }
+
+    .action-description {
+        font-size: 13px;
+        color: #718096;
+    }
+
+    .btn-modern {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        white-space: nowrap;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+    }
+
+    .btn-success {
+        background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(72, 187, 120, 0.4);
+    }
+
+    .btn-success:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(72, 187, 120, 0.6);
+    }
+
+    .btn-warning {
+        background: linear-gradient(135deg, #ed8936 0%, #dd6b20 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(237, 137, 54, 0.4);
+    }
+
+    .btn-warning:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(237, 137, 54, 0.6);
+    }
+
+    .btn-danger {
+        background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(245, 101, 101, 0.4);
+    }
+
+    .btn-danger:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(245, 101, 101, 0.6);
+    }
+
+    .divider {
+        height: 2px;
+        background: linear-gradient(90deg, transparent, #e2e8f0, transparent);
+        margin: 30px 0;
+    }
+
+    .backup-spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255, 255, 255, 0.4);
+        border-top-color: white;
+        border-radius: 50%;
+        display: inline-block;
+        animation: spin 0.7s linear infinite;
+    }
+
+    @@keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    /* The optimiser's ranking: one row per criterion, its rank on the left, its two buttons on the right. */
+    .rank-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 12px 14px;
+        background: #f7fafc;
+        border-radius: 10px;
+        margin-bottom: 10px;
+    }
+
+    .rank-number {
+        width: 26px;
+        height: 26px;
+        flex: none;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        font-size: 13px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .row-body {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .rank-buttons {
+        display: flex;
+        gap: 6px;
+        flex: none;
+    }
+
+    .rank-btn {
+        width: 32px;
+        height: 32px;
+        border: 2px solid #e2e8f0;
+        background: white;
+        border-radius: 8px;
+        color: #4a5568;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .rank-btn:hover:not(:disabled) {
+        border-color: #667eea;
+        color: #667eea;
+    }
+
+    .rank-btn:disabled {
+        opacity: 0.35;
+        cursor: default;
+    }
+
+    /* One choice out of two. Drawn rather than a native radio: the dot follows the value that is actually
+       stored, including when a write fails and the page falls back to the previous one - a native radio
+       would keep the click the browser already applied to it. */
+    .choice-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 14px;
+        background: #f7fafc;
+        border-radius: 10px;
+        margin-bottom: 10px;
+        cursor: pointer;
+        border: 2px solid transparent;
+        transition: all 0.2s ease;
+    }
+
+    .choice-row:hover {
+        border-color: #667eea;
+    }
+
+    .choice-row.selected {
+        border-color: #667eea;
+        background: #eef2ff;
+    }
+
+    .radio-dot {
+        width: 18px;
+        height: 18px;
+        flex: none;
+        margin-top: 2px;
+        border: 2px solid #cbd5e0;
+        border-radius: 50%;
+        position: relative;
+        transition: all 0.2s ease;
+    }
+
+    .radio-dot.on {
+        border-color: #667eea;
+    }
+
+    .radio-dot.on::after {
+        content: "";
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .setting-note {
+        font-size: 13px;
+        color: #718096;
+        margin-bottom: 15px;
+        line-height: 1.5;
+    }
+
+    .setting-warning {
+        font-size: 13px;
+        color: #dd6b20;
+        font-weight: 600;
+        margin-bottom: 15px;
+    }
+</style>
+
+<div class="settings-container">
+    <div class="settings-card">
+        <div class="settings-header">
+            <h1 class="settings-title">
+                <span>⚙️</span>
+                @L["Settings"]
+            </h1>
+            <p class="settings-subtitle">@L["Configure application preferences and manage system settings"]</p>
         </div>
+
+        <EditForm Model="ec">
+            <!-- User Preferences Section -->
+            <div class="settings-section">
+                <h2 class="section-title">
+                    <span class="section-icon">👤</span>
+                    @L["User Preferences"]
+                </h2>
+                <div class="settings-grid">
+                    <div class="setting-item">
+                        <label class="setting-label">@L["Edit Element On Select in the TreeView"]</label>
+                        <div class="checkbox-container">
+                            <div class="custom-checkbox @(SettingEditElementOnSelect ? "checked" : "")" @onclick="() => SettingEditElementOnSelect = !SettingEditElementOnSelect">
+                                <div class="checkbox-slider"></div>
+                            </div>
+                            <span style="color: #718096; font-size: 13px;">@(SettingEditElementOnSelect ? L["Enabled"] : L["Disabled"])</span>
+                        </div>
+                    </div>
+
+                    <div class="setting-item">
+                        <label class="setting-label">@L["In camera tool preview captured image before saving"]</label>
+                        <div class="checkbox-container">
+                            <div class="custom-checkbox @(CapturePreview ? "checked" : "")" @onclick="() => CapturePreview = !CapturePreview">
+                                <div class="checkbox-slider"></div>
+                            </div>
+                            <span style="color: #718096; font-size: 13px;">@(CapturePreview ? L["Enabled"] : L["Disabled"])</span>
+                        </div>
+                    </div>
+
+                    <div class="setting-item">
+                        <label class="setting-label">@L["Requires confirmation for saving when user navigate out of a given page"]</label>
+                        <div class="checkbox-container">
+                            <div class="custom-checkbox @(SaveConfirmation ? "checked" : "")" @onclick="() => SaveConfirmation = !SaveConfirmation">
+                                <div class="checkbox-slider"></div>
+                            </div>
+                            <span style="color: #718096; font-size: 13px;">@(SaveConfirmation ? L["Enabled"] : L["Disabled"])</span>
+                        </div>
+                    </div>
+
+                    <div class="setting-item">
+                        <label class="setting-label">@L["Copy elements attributes when pasting elements in tree view"]</label>
+                        <div class="checkbox-container">
+                            <div class="custom-checkbox @(CopyAttributes ? "checked" : "")" @onclick="() => CopyAttributes = !CopyAttributes">
+                                <div class="checkbox-slider"></div>
+                            </div>
+                            <span style="color: #718096; font-size: 13px;">@(CopyAttributes ? L["Enabled"] : L["Disabled"])</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <!-- System Management Section -->
+            <div class="settings-section">
+                <h2 class="section-title">
+                    <span class="section-icon">🔧</span>
+                    @L["System Management"]
+                </h2>
+                <div class="settings-grid">
+                    @* Hidden: the Token flow this card opened is legacy. It minted Token GUIDs
+                       redeemable only at /Account/Register, which administrator invitations
+                       replaced (UserManager.razor -> AcceptInvitation). The card was mislabelled
+                       too: it read "Role Manager" but opened Token Management. The page itself
+                       still exists at /Account/Manage/TokenManager, restricted to the
+                       Administrator and Developer roles.
+                    <div class="action-card">
+                        <div class="action-info">
+                            <div class="action-title">@L["Role Manager"]</div>
+                            <div class="action-description">@L["Manage user roles and permissions"]</div>
+                        </div>
+                        <button type="button" class="btn-modern btn-primary" @onclick="RoleManager">
+                            <span>🔐</span> @L["Manage"]
+                        </button>
+                    </div>
+                    *@
+
+                    <div class="action-card">
+                        <div class="action-info">
+                            <div class="action-title">@L["User Manager"]</div>
+                            <div class="action-description">@L["Manage system users"]</div>
+                        </div>
+                        <button type="button" class="btn-modern btn-primary" @onclick="UserManager">
+                            <span>👥</span> @L["Manage"]
+                        </button>
+                    </div>
+
+                    <div class="action-card">
+                        <div class="action-info">
+                            <div class="action-title">@L["InfluxDB Management"]</div>
+                            <div class="action-description">@L["Configure database buckets"]</div>
+                        </div>
+                        <button type="button" class="btn-modern btn-primary" @onclick="InfluxManagement">
+                            <span>📊</span> @L["Manage Buckets"]
+                        </button>
+                    </div>
+
+                    <div class="action-card">
+                        <div class="action-info">
+                            <div class="action-title">@L["Palonnier & MotherGrid Definition"]</div>
+                            <div class="action-description">@L["Define palonniers and mother grids"]</div>
+                        </div>
+                        <button type="button" class="btn-modern btn-primary" @onclick="PalonnierMotherGridDefinition">
+                            <span>🏗️</span> @L["Configure"]
+                        </button>
+                    </div>
+
+                    <div class="action-card">
+                        <div class="action-info">
+                            <div class="action-title">@L["Charpente Element Mapping"]</div>
+                            <div class="action-description">@L["Map charpente elements for Antares structure"]</div>
+                        </div>
+                        <button type="button" class="btn-modern btn-success" @onclick="CharpenteMapping">
+                            <span>🗺️</span> @L["Configure"]
+                        </button>
+                    </div>
+
+                    <div class="action-card">
+                        <div class="action-info">
+                            <div class="action-title">@L["Tag Mapping Manager"]</div>
+                            <div class="action-description">@L["Map custom tags to system tags"]</div>
+                        </div>
+                        <button type="button" class="btn-modern btn-success" @onclick="TagMapping">
+                            <span>🏷️</span> @L["Manage Tags"]
+                        </button>
+                    </div>
+
+                    <div class="action-card">
+                        <div class="action-info">
+                            <div class="action-title">@L["Action Journal"]</div>
+                            <div class="action-description">@L["Who did what, and when"]</div>
+                        </div>
+                        <button type="button" class="btn-modern btn-primary" @onclick="JournalPage">
+                            <span>📓</span> @L["View"]
+                        </button>
+                    </div>
+
+                    <div class="action-card">
+                        <div class="action-info">
+                            <div class="action-title">@L["Sensor Attribute Types"]</div>
+                            <div class="action-description">@L["Auto-create calibration and threshold attributes for sensor types"]</div>
+                        </div>
+                        <button type="button" class="btn-modern btn-success" @onclick="SensorAttributesSetup">
+                            <span>⚙️</span> @L["Configure"]
+                        </button>
+                    </div>
+
+                    <div class="action-card">
+                        <div class="action-info">
+                            <div class="action-title">@L["Alarm Management"]</div>
+                            <div class="action-description">@L["Monitor and reset system alarms"]</div>
+                        </div>
+                        <button type="button" class="btn-modern btn-danger" @onclick="AlarmManagement">
+                            <span>⚠️</span> @L["Manage Alarms"]
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            @if (appData.GetRole().Result == "Administrator")
+            {
+            <div class="divider"></div>
+
+            <!-- Database Operations Section (Administrator only) -->
+            <div class="settings-section">
+                <h2 class="section-title">
+                    <span class="section-icon">💾</span>
+                    @L["Database Operations"]
+                </h2>
+                <div class="settings-grid">
+                    <div class="action-card">
+                        <div class="action-info">
+                            <div class="action-title">@L["Backup Database"]</div>
+                            <div class="action-description">
+                                @if (isBackingUp)
+                                {
+                                    <span style="color: #38a169; font-weight: 600;">@L["Backup in progress, please wait..."]</span>
+                                }
+                                else
+                                {
+                                    @L["Create a backup and download it"]
+                                }
+                            </div>
+                        </div>
+                        <button type="button" class="btn-modern btn-success" @onclick="BackupDatabase" disabled="@isBackingUp">
+                            @if (isBackingUp)
+                            {
+                                <span class="backup-spinner"></span>
+                            }
+                            else
+                            {
+                                <span>💾</span>
+                            }
+                            @L["Backup"]
+                        </button>
+                    </div>
+
+                    <div class="action-card">
+                        <div class="action-info">
+                            <div class="action-title">@L["Restore Database"]</div>
+                            <div class="action-description">
+                                @if (isRestoring)
+                                {
+                                    <span style="color: #ed8936; font-weight: 600;">@L["Restore in progress, please wait..."]</span>
+                                }
+                                else
+                                {
+                                    @L["Restore from a .bak file"]
+                                }
+                            </div>
+                        </div>
+                        <InputFile id="restoreFileInput" OnChange="OnRestoreFileSelected" accept=".bak" style="display:none" disabled="@isRestoring" />
+                        <label for="restoreFileInput" class="btn-modern btn-warning"
+                               style="@(isRestoring ? "pointer-events:none;opacity:0.65;cursor:default;" : "cursor:pointer;")">
+                            @if (isRestoring)
+                            {
+                                <span class="backup-spinner"></span>
+                            }
+                            else
+                            {
+                                <span>🔄</span>
+                            }
+                            @L["Restore"]
+                        </label>
+                    </div>
+
+             
+                </div>
+            </div>
+            }
+
+            <div class="divider"></div>
+
+            <!-- Layout Optimiser Section (Administrator and Developer) -->
+            @if (CanConfigureOptimizer)
+            {
+            <div class="settings-section">
+                <h2 class="section-title">
+                    <span class="section-icon">📐</span>
+                    @L["Layout Optimiser"]
+                </h2>
+                <div class="settings-grid">
+                    <div class="setting-item">
+                        <label class="setting-label">@L["Orthogonal orientations only (no inclined palonnier)"]</label>
+                        <div class="checkbox-container">
+                            <div class="custom-checkbox @(orthogonalOnly ? "checked" : "")"
+                                 style="@(savingOrthogonalOnly ? "opacity: 0.6; pointer-events: none;" : "")"
+                                 @onclick="ToggleOrthogonalOnlyAsync">
+                                <div class="checkbox-slider"></div>
+                            </div>
+                            <span style="color: #718096; font-size: 13px;">@(orthogonalOnly ? L["Enabled"] : L["Disabled"])</span>
+                        </div>
+                        <div class="action-description" style="margin-top: 10px;">
+                            @L["The studies use only palonniers along the beams: Generate Layout then proposes no inclined palonnier. Applies to everyone."]
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="divider"></div>
+            }
+
+            <!-- Developer Tools Section -->
+            <div class="settings-section">
+                <h2 class="section-title">
+                    <span class="section-icon">🛠️</span>
+                    @L["Developer Tools"]
+                </h2>
+                <div class="settings-grid">
+                    @* Reserved to the Developer role: the manual explains the placement engine itself -
+                       its rules, its tolerances and its refusals - which is a developer's reading, not a
+                       setting anyone can act on. Checked again in the page it opens and in the controller
+                       that exports it, because a hidden card is not a permission. *@
+                    @if (IsDeveloper)
+                    {
+                        <div class="action-card">
+                            <div class="action-info">
+                                <div class="action-title">@L["Optimiser Manual"]</div>
+                                <div class="action-description">@L["How the layout optimiser works: the rules, the tolerances, the refusals, and where each one lives in the code. Exportable to Word."]</div>
+                            </div>
+                            <button type="button" class="btn-modern btn-primary" @onclick="OptimizerManualPage">
+                                <span>📘</span> @L["Open the manual"]
+                            </button>
+                        </div>
+                    }
+
+                    <div class="action-card" style="flex-direction: column; align-items: flex-start; gap: 15px;">
+                        <div class="action-info">
+                            <div class="action-title">@L["Override Report Fetch Timestamp"]</div>
+                            <div class="action-description">@L["Force the report service to re-fetch from an earlier point in time. This override is transient — it is consumed once on the next polling cycle."]</div>
+                        </div>
+                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; width: 100%;">
+                            <input type="datetime-local"
+                                   @bind="timestampOverrideDate"
+                                   style="padding: 8px 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 14px; color: #2d3748;" />
+                            <button type="button" class="btn-modern btn-warning"
+                                    @onclick="ApplyTimestampOverride"
+                                    disabled="@(!timestampOverrideDate.HasValue)">
+                                <span>⏪</span> @L["Apply Override"]
+                            </button>
+                            @if (timestampOverrideApplied)
+                            {
+                                <span style="color: #38a169; font-weight: 600; font-size: 14px;">
+                                    ✅ @L["Override queued — service will re-fetch on the next cycle."]
+                                </span>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                @* Reserved to the Developer role, like the manual card above: this order is what the venue
+                   actually gets, not a display preference, and moving a line changes every layout the tool
+                   proposes from then on. Checked again in SaveObjectiveOrderAsync, because a hidden card is
+                   not a permission. *@
+                @if (IsDeveloper)
+                {
+                    <div class="settings-grid" style="grid-template-columns: 1fr; margin-top: 20px;">
+                        <div class="action-card" style="flex-direction: column; align-items: stretch; gap: 0;">
+                            <div class="action-info" style="margin-bottom: 15px;">
+                                <div class="action-title">@L["Optimiser ranking"]</div>
+                            </div>
+
+                            <div class="setting-note">
+                                @L["The order below decides which of two possible layouts the optimiser keeps. The criteria are read from top to bottom, and the first line that separates the two layouts decides alone: the lines under it never come into play."]
+                            </div>
+                            <div class="setting-note">
+                                @L["Criteria 1 and 2 can disagree: an inclined palonnier carrying three charges wins on the number of palonniers and can lose on the mass. That trade-off is a rigging decision, and this order is where it is made."]
+                            </div>
+                            <div class="setting-note">
+                                @L["Applies to everyone: one layout engine, one answer. Only a developer can change it."]
+                            </div>
+
+                            @if (objectiveOrderNotStored)
+                            {
+                                <div class="setting-note">@L["No order is stored: the ranking below is the default one, and it is the one in force."]</div>
+                            }
+                            @if (objectiveOrderUnreadable != null)
+                            {
+                                <div class="setting-warning">
+                                    ⚠️ @(string.Format(L["The stored order could not be read (« {0} »): the default ranking below is the one in force."].Value, objectiveOrderUnreadable))
+                                </div>
+                            }
+
+                            @for (int i = 0; i < objectiveOrder.Count; i++)
+                            {
+                                var rank = i;                          // captured for this row's two buttons
+                                var key  = objectiveOrder[rank];
+                                <div class="rank-row">
+                                    <div class="rank-number">@(rank + 1)</div>
+                                    <div class="row-body">
+                                        <div class="action-title" style="font-size: 15px;">@(L[CriterionLabelKey(key)])</div>
+                                        <div class="action-description">@(L[CriterionExplanationKey(key)])</div>
+                                    </div>
+                                    <div class="rank-buttons">
+                                        <button type="button" class="rank-btn" title="@L["Move up"]"
+                                                disabled="@(savingObjectiveOrder || rank == 0)"
+                                                @onclick="() => MoveCriterionAsync(rank, -1)">▲</button>
+                                        <button type="button" class="rank-btn" title="@L["Move down"]"
+                                                disabled="@(savingObjectiveOrder || rank == objectiveOrder.Count - 1)"
+                                                @onclick="() => MoveCriterionAsync(rank, 1)">▼</button>
+                                    </div>
+                                </div>
+                            }
+
+                            <div style="margin-top: 10px;">
+                                <button type="button" class="btn-modern btn-warning"
+                                        disabled="@savingObjectiveOrder"
+                                        @onclick="ResetObjectiveOrderAsync">
+                                    <span>↩️</span> @L["Restore the default order"]
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                @* Reserved to the Developer role, like the manual card above: the exact search can take
+                   minutes on a large plan, which is a choice to make knowingly. Checked again in
+                   SetSearchLevelAsync, because a hidden card is not a permission. *@
+                @if (IsDeveloper)
+                {
+                    <div class="settings-grid" style="grid-template-columns: 1fr; margin-top: 20px;">
+                        <div class="action-card" style="flex-direction: column; align-items: stretch; gap: 0;">
+                            <div class="action-info" style="margin-bottom: 15px;">
+                                <div class="action-title">@L["Layout search"]</div>
+                            </div>
+
+                            <div class="setting-note">
+                                @L["Applies to everyone: one layout engine, one answer. Only a developer can change it."]
+                            </div>
+
+                            @if (searchLevelUnreadable != null)
+                            {
+                                <div class="setting-warning">
+                                    ⚠️ @(string.Format(L["The stored search level could not be read (« {0} »): the fast search is the one in force."].Value, searchLevelUnreadable))
+                                </div>
+                            }
+
+                            <div class="choice-row @(searchLevel == SearchLevelBounds ? "selected" : "")"
+                                 style="@(savingSearchLevel ? "opacity: 0.6; pointer-events: none;" : "")"
+                                 @onclick="() => SetSearchLevelAsync(SearchLevelBounds)">
+                                <div class="radio-dot @(searchLevel == SearchLevelBounds ? "on" : "")"></div>
+                                <div class="row-body">
+                                    <div class="action-title" style="font-size: 15px;">
+                                        @L["Fast, with a bound"]
+                                        <span style="font-size: 11px; font-weight: 600; color: #667eea; margin-left: 6px;">@L["Default"]</span>
+                                    </div>
+                                    <div class="action-description">
+                                        @L["The optimiser places greedily and states, beside the result, the bound nobody can beat — instantaneous."]
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="choice-row @(searchLevel == SearchLevelExact ? "selected" : "")"
+                                 style="@(savingSearchLevel ? "opacity: 0.6; pointer-events: none;" : "")"
+                                 @onclick="() => SetSearchLevelAsync(SearchLevelExact)">
+                                <div class="radio-dot @(searchLevel == SearchLevelExact ? "on" : "")"></div>
+                                <div class="row-body">
+                                    <div class="action-title" style="font-size: 15px;">@L["Exact, with proof"]</div>
+                                    <div class="action-description">
+                                        @L["The optimiser examines the possible groupings and keeps the best one by the ranking above; it states whether the optimum is proven or whether the search was stopped by its budget. Slower on a large plan, never worse than the fast search."]
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+
+        </EditForm>
     </div>
-    <div class="form-group " style="display: flex">
-
-        <label>@L["In camera tool preview captured image before saving"] :   </label>
-        <div>
-            <InputCheckbox @bind-Value="CapturePreview"></InputCheckbox>
-        </div>
-    </div>
-    <div class="form-group " style="display: flex">
-
-        <label>@L["Requires confirmation for saving when user navigate out of a given page"]:   </label>
-        <div>
-            <InputCheckbox @bind-Value="SaveConfirmation"></InputCheckbox>
-        </div>
-    </div>
-
-    <div class="form-group " style="display: flex">
-
-        <label>@L["Copy elements attributes when pasting elements in tree view"]:   </label>
-        <div>
-            <InputCheckbox @bind-Value="CopyAttributes"></InputCheckbox>
-        </div>
-    </div>
-
-    <div class="form-group " style="display: flex">
-
-        <label>@L["Role Manager"]:   </label>
-        <div>
-            <button @onclick="RoleManager">@L["Role Manager"]</button>
-        </div>
-    </div>
-
-    <div class="form-group " style="display: flex">
-
-        <label>@L["Role Manager"]:   </label>
-        <div>
-            <button @onclick="UserManager">@L["User Manager"]</button>
-        </div>
-    </div>
-
-    <div class="form-group " style="display: flex">
-
-        <label>@L["Backup Database to Desktop"]:   </label>
-        <div>
-            <button @onclick="BackupDatabase">@L["Backup Database"]</button>
-        </div>
-    </div>
-    <div class="form-group " style="display: flex">
-
-        <label>@L["Restore Database"]:   </label>
-        <div>
-            <button @onclick=@Restore>@L["Restore"]</button>
-        </div>
-    </div>
-    <div class="form-group " style="display: flex">
-
-        <label>@L["Copy data files (with images)"]:   </label>
-        <div>
-            <button @onclick=@CopyData> @L["Copy"]</button>
-        </div>
-    </div>
-
-
-
-</EditForm>
-
+</div>
 
 @code {
     Structure ec = new Structure();
+
+    // ── Layout optimiser (Administrator and Developer) ──────────────────────────────────────────────
+    // "Orientations orthogonales uniquement": one value for everyone, in the AppSetting table, read by
+    // Generate Layout (Pipeline.GenerateLayout). Off by default, which lets the optimiser incline palonniers.
+    string currentRole;
+    bool orthogonalOnly;
+    bool savingOrthogonalOnly;
+
+    bool CanConfigureOptimizer => currentRole is "Administrator" or "Developer";
+
+    // The manual card is the Developer role's alone, as the owner asked. Read from the user's roles rather
+    // than from appData.GetRole(), which answers "Administrator" first and would hide the card from someone
+    // holding both roles - and the page and the controller behind it both test IsInRole("Developer").
+    bool isDeveloper;
+    bool IsDeveloper => isDeveloper;
+
+    protected override async Task OnInitializedAsync()
+    {
+        currentRole = await appData.GetRole();
+        isDeveloper = (await authenticationStateProvider.GetAuthenticationStateAsync()).User.IsInRole("Developer");
+        if (CanConfigureOptimizer)
+            orthogonalOnly = await AppSettings.GetBoolAsync(AppSettings.OptimizerOrthogonalOnly, false);
+
+        // Read only for the role that can see the two cards: nobody else is shown these values, so nobody
+        // else needs them fetched.
+        if (isDeveloper)
+        {
+            var storedOrder = await AppSettings.GetStringAsync(AppSettings.OptimizerObjectiveOrder, null);
+            objectiveOrder = ParseObjectiveOrder(storedOrder, out objectiveOrderNotStored, out objectiveOrderUnreadable);
+            await ReadSearchLevelAsync();
+        }
+    }
+
+    private async Task ToggleOrthogonalOnlyAsync()
+    {
+        if (savingOrthogonalOnly) return;
+
+        // Checked again here: the section is hidden from other roles, but the handler must not rely on that.
+        var role = await appData.GetRole();
+        if (role is not ("Administrator" or "Developer")) return;
+
+        bool wanted = !orthogonalOnly;
+        savingOrthogonalOnly = true;
+        try
+        {
+            await AppSettings.SetAsync(AppSettings.OptimizerOrthogonalOnly, wanted,
+                "Optimiseur d'implantation : palonniers le long des poutres uniquement, aucun palonnier incliné");
+
+            // SetAsync logs a failed write instead of throwing, so read the value back. The fallback is the
+            // opposite of what was asked: an unreadable table cannot pass for a successful write.
+            bool stored = await AppSettings.GetBoolAsync(AppSettings.OptimizerOrthogonalOnly, !wanted);
+            orthogonalOnly = stored;
+
+            if (stored != wanted)
+            {
+                await js.InvokeVoidAsync("alert", L["The setting could not be saved."].Value);
+                return;
+            }
+
+            await journal.WriteAsync(JournalCategory.Configuration, "optimizer.orthogonalOnly",
+                "Orientations orthogonales uniquement",
+                wanted ? "Activé : Generate Layout ne propose aucun palonnier incliné"
+                       : "Désactivé : Generate Layout peut proposer des palonniers inclinés",
+                severity: 1);
+        }
+        catch (Exception ex)
+        {
+            await js.InvokeVoidAsync("alert", L["Error"] + ": " + ex.Message);
+        }
+        finally
+        {
+            savingOrthogonalOnly = false;
+            StateHasChanged();
+        }
+    }
+
+    // ── Optimiser ranking, and search level (Developer only) ────────────────────────────────────────
+    // Two rows in the AppSetting table, read by the placement engine itself. This page only writes them:
+    // what they mean is written down in Objective.cs, which is the file that applies them.
+
+    // The criterion KEYS, in the order the ranking in force is written in. They are the contract with the
+    // engine - a key is what the row stores - so the five words below are spelled exactly as the engine
+    // spells them. The French labels further down can be reworded at any time; these five cannot.
+    static readonly string[] DefaultObjectiveOrder = { "palonniers", "masse", "pieces", "longueur", "marge" };
+
+    List<string> objectiveOrder = new(DefaultObjectiveOrder);
+    bool savingObjectiveOrder;
+    bool objectiveOrderNotStored;      // nothing written yet: the default applies, and the page says so
+    string objectiveOrderUnreadable;   // what was stored and could not be used, quoted back to the reader
+
+    const string SearchLevelBounds = "bounds";
+    const string SearchLevelExact  = "exact";
+
+    string searchLevel = SearchLevelBounds;
+    bool savingSearchLevel;
+    string searchLevelUnreadable;
+
+    /// <summary>The criterion's name on the page. Keyed by the stored key, so rewording never touches the table.</summary>
+    static string CriterionLabelKey(string key) => key switch
+    {
+        "palonniers" => "Fewer palonniers",
+        "masse"      => "Less truss mass hung",
+        "pieces"     => "Fewer assembled pieces",
+        "longueur"   => "Less truss length out of the stock",
+        "marge"      => "More margin on the worst-loaded bay",
+        _            => key,
+    };
+
+    /// <summary>What the criterion costs on site, in one line - the reason it is worth a rank at all.</summary>
+    static string CriterionExplanationKey(string key) => key switch
+    {
+        "palonniers" => "Every palonnier is a hang, work at height, and its own mass added to the mothers that carry it.",
+        "masse"      => "The truss mass that actually reaches the venue's beams.",
+        "pieces"     => "Every piece is assembly work, and every joint an assumption.",
+        "longueur"   => "The metres that leave the stock and serve nowhere else.",
+        "marge"      => "The reserve on the worst-loaded bay, for what the production will add afterwards.",
+        _            => key,
+    };
+
+    /// <summary>
+    /// Reads the stored CSV back into the five criteria. Anything that is not exactly those five keys, each
+    /// one once, is not a ranking: the default is taken and the page says so, because half an order would
+    /// be a guess about what the developer meant - and a guess here changes what the venue gets.
+    /// </summary>
+    static List<string> ParseObjectiveOrder(string stored, out bool notStored, out string unreadable)
+    {
+        notStored  = false;
+        unreadable = null;
+
+        if (string.IsNullOrWhiteSpace(stored))
+        {
+            notStored = true;
+            return new List<string>(DefaultObjectiveOrder);
+        }
+
+        var parsed = stored.Split(',')
+                           .Select(k => k.Trim().ToLowerInvariant())
+                           .Where(k => k.Length > 0)
+                           .ToList();
+
+        bool usable = parsed.Count == DefaultObjectiveOrder.Length
+                   && parsed.Distinct().Count() == parsed.Count
+                   && parsed.All(k => DefaultObjectiveOrder.Contains(k));
+
+        if (!usable)
+        {
+            unreadable = stored;
+            return new List<string>(DefaultObjectiveOrder);
+        }
+
+        return parsed;
+    }
+
+    /// <summary>
+    /// The role read again from the user's roles, exactly as the manual card's guard reads it. The two
+    /// cards are hidden from every other role, but hiding a card grants nothing and forbids nothing.
+    /// </summary>
+    private async Task<bool> IsDeveloperNowAsync()
+        => (await authenticationStateProvider.GetAuthenticationStateAsync()).User.IsInRole("Developer");
+
+    private Task MoveCriterionAsync(int index, int delta)
+    {
+        int target = index + delta;
+        if (index < 0 || index >= objectiveOrder.Count) return Task.CompletedTask;
+        if (target < 0 || target >= objectiveOrder.Count) return Task.CompletedTask;   // already first or last
+
+        var wanted = new List<string>(objectiveOrder);
+        (wanted[index], wanted[target]) = (wanted[target], wanted[index]);
+        return SaveObjectiveOrderAsync(wanted);
+    }
+
+    private Task ResetObjectiveOrderAsync() => SaveObjectiveOrderAsync(new List<string>(DefaultObjectiveOrder));
+
+    private async Task SaveObjectiveOrderAsync(List<string> wanted)
+    {
+        if (savingObjectiveOrder) return;
+
+        // Checked again here: the card is hidden from other roles, but the handler must not rely on that.
+        if (!await IsDeveloperNowAsync()) return;
+
+        string csv = string.Join(",", wanted);
+        savingObjectiveOrder = true;
+        try
+        {
+            await AppSettings.SetAsync(AppSettings.OptimizerObjectiveOrder, csv,
+                "Optimiseur d'implantation : ordre des critères de classement, du premier au dernier");
+
+            // SetAsync logs a failed write instead of throwing, so read the value back and show what the
+            // table actually holds - never the order that was merely asked for.
+            string stored = await AppSettings.GetStringAsync(AppSettings.OptimizerObjectiveOrder, null);
+            objectiveOrder = ParseObjectiveOrder(stored, out objectiveOrderNotStored, out objectiveOrderUnreadable);
+
+            if (!string.Equals(stored, csv, StringComparison.OrdinalIgnoreCase))
+            {
+                await js.InvokeVoidAsync("alert", L["The setting could not be saved."].Value);
+                return;
+            }
+
+            await journal.WriteAsync(JournalCategory.Configuration, AppSettings.OptimizerObjectiveOrder,
+                "Classement de l'optimiseur",
+                $"Nouvel ordre des critères : {csv}", severity: 1);
+        }
+        catch (Exception ex)
+        {
+            await js.InvokeVoidAsync("alert", L["Error"] + ": " + ex.Message);
+        }
+        finally
+        {
+            savingObjectiveOrder = false;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Reads the stored search level back and normalises it. Anything that is neither level is not a
+    /// level: the fast search is in force, the page says so, and the raw value is quoted so a developer
+    /// can see what is really in the table. Returns the stored value as read, to compare against a write.
+    /// </summary>
+    private async Task<string> ReadSearchLevelAsync()
+    {
+        string stored = (await AppSettings.GetStringAsync(AppSettings.OptimizerSearchLevel, SearchLevelBounds))
+                        .Trim().ToLowerInvariant();
+
+        bool known = stored is SearchLevelBounds or SearchLevelExact;
+        searchLevel           = known ? stored : SearchLevelBounds;
+        searchLevelUnreadable = known ? null : stored;
+        return stored;
+    }
+
+    private async Task SetSearchLevelAsync(string wanted)
+    {
+        if (savingSearchLevel) return;
+        if (wanted == searchLevel && searchLevelUnreadable == null) return;   // already that level: nothing to write
+
+        // Checked again here, for the same reason as the ranking above.
+        if (!await IsDeveloperNowAsync()) return;
+
+        savingSearchLevel = true;
+        try
+        {
+            await AppSettings.SetAsync(AppSettings.OptimizerSearchLevel, wanted,
+                "Optimiseur d'implantation : niveau de recherche (bounds = rapide avec borne, exact = preuve)");
+
+            // Read back, as the ranking does: a write that did not take must not be shown as a choice made.
+            string stored = await ReadSearchLevelAsync();
+            if (stored != wanted)
+            {
+                await js.InvokeVoidAsync("alert", L["The setting could not be saved."].Value);
+                return;
+            }
+
+            await journal.WriteAsync(JournalCategory.Configuration, AppSettings.OptimizerSearchLevel,
+                "Recherche de l'implantation",
+                wanted == SearchLevelExact
+                    ? "Recherche exacte : l'optimiseur examine les regroupements et annonce si l'optimum est prouvé"
+                    : "Recherche rapide : placement glouton, avec la borne affichée à côté du résultat",
+                severity: 1);
+        }
+        catch (Exception ex)
+        {
+            await js.InvokeVoidAsync("alert", L["Error"] + ": " + ex.Message);
+        }
+        finally
+        {
+            savingSearchLevel = false;
+            StateHasChanged();
+        }
+    }
 
     bool settingEditElementOnSelect;
 
     public bool SettingEditElementOnSelect
     {
-        get { return settingEditElementOnSelect; }   // get method
+        get { return settingEditElementOnSelect; }
         set
         {
             if (settingEditElementOnSelect == value) return;
@@ -105,7 +1108,7 @@
 
     public bool CapturePreview
     {
-        get { return capturePreview; }   // get method
+        get { return capturePreview; }
         set
         {
             if (capturePreview == value) return;
@@ -118,10 +1121,9 @@
 
     public bool SaveConfirmation
     {
-        get { return saveConfirmation; }   // get method
+        get { return saveConfirmation; }
         set
         {
-
             if (saveConfirmation == value) return;
             saveConfirmation = value;
             localStorage.SetItemAsync("saveConfirmation", SaveConfirmation);
@@ -129,13 +1131,11 @@
         }
     }
 
-
-
     bool copyAttributes;
 
     public bool CopyAttributes
     {
-        get { return copyAttributes; }   // get method
+        get { return copyAttributes; }
         set
         {
             if (copyAttributes == value) return;
@@ -144,18 +1144,31 @@
         }
     }
 
+    DateTime? timestampOverrideDate { get; set; }
+    bool timestampOverrideApplied = false;
 
+    void ApplyTimestampOverride()
+    {
+        if (!timestampOverrideDate.HasValue) return;
+
+        long unixTimestamp = new DateTimeOffset(timestampOverrideDate.Value, TimeSpan.Zero).ToUnixTimeSeconds();
+        ReportsService.SetTimestampOverride(unixTimestamp);
+
+        timestampOverrideApplied = true;
+        _= Task.Run(async () =>
+        {
+            await Task.Delay(4000);
+            timestampOverrideApplied = false;
+            await InvokeAsync(StateHasChanged);
+        });
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
-        {
-
-        }
+        if (!firstRender) return;
 
         var cac = await localStorage.GetItemAsync<bool?>("capturePreview");
         CapturePreview = (cac ?? false);
-
 
         cac = await localStorage.GetItemAsync<bool?>("settingEditElementOnSelect");
         SettingEditElementOnSelect = (cac ?? true);
@@ -166,92 +1179,203 @@
         cac = await localStorage.GetItemAsync<bool?>("copyAttributes");
         CopyAttributes = (cac ?? false);
 
-
         StateHasChanged();
-
     }
 
-    void RoleManager()
-    {
-        navigationManager.NavigateTo(@"/Account/Manage/TokenManager");
-    }
+    // Hidden with its card in the System Management grid above: the Token flow is legacy,
+    // replaced by administrator invitations (UserManager.razor -> AcceptInvitation).
+    // void RoleManager()
+    // {
+    //     navigationManager.NavigateTo("/Account/Manage/TokenManager");
+    // }
 
     void UserManager()
     {
         navigationManager.NavigateTo(@"/Account/UserManager");
     }
 
-    void BackupDatabase()
+    void InfluxManagement()
     {
-        string sourcePath = string.Empty;
-        try
-        {
-            string connectString = configuration.GetConnectionString("DefaultConnection");
-            //DatabaseManagement.Detach(connectString);
-            string path = System.Environment.GetFolderPath(System.Environment.SpecialFolder.Desktop);
-
-            sourcePath = DatabaseManagement.BackupDatabase(connectString,path);
-            js.InvokeVoidAsync("alert", "Backup completed...");
-        }
-        catch (Exception ex)
-        {
-            js.InvokeVoidAsync("alert", "Error: " + ex.Message);
-        }
-
-
+        navigationManager.NavigateTo(@"/influxmanagement");
     }
 
-    private void Restore()
+    void PalonnierMotherGridDefinition()
     {
-        try
+        if (appData.Structure != null)
         {
-            string connectString = configuration.GetConnectionString("DefaultConnection");
-            string path = System.Environment.GetFolderPath(System.Environment.SpecialFolder.Desktop);
-           
-            DatabaseManagement.Restore(connectString, Path.Combine(path,"AliantWeb.bak"));
-
-            js.InvokeVoidAsync("alert", "Restore completed...");
-
+            navigationManager.NavigateTo($@"/PalonnierMotherGridDefinition/{appData.Structure.StructureId}");
         }
-        catch (Exception ex)
+        else
         {
-            js.InvokeVoidAsync("alert", "Error: " + ex.Message);
+            js.InvokeVoidAsync("alert", L["Please select a structure first."].Value);
         }
     }
 
+    void CharpenteMapping()
+    {
+        navigationManager.NavigateTo(@"/settingsFolder/charpente-mapping");
+    }
 
-    private void CopyData()
+    void TagMapping()
+    {
+        navigationManager.NavigateTo(@"/settingsFolder/tag-mapping");
+    }
+
+    void OptimizerManualPage()
+    {
+        navigationManager.NavigateTo(@"/settingsFolder/optimizer-manual");
+    }
+
+    void JournalPage()
+    {
+        navigationManager.NavigateTo(@"/settingsFolder/journal");
+    }
+
+    void SensorAttributesSetup()
+    {
+        navigationManager.NavigateTo(@"/settingsFolder/sensor-attributes");
+    }
+
+    void AlarmManagement()
+    {
+        navigationManager.NavigateTo(@"/alarm-management");
+    }
+
+    bool isBackingUp = false;
+    bool isRestoring = false;
+
+    private async Task BackupDatabase()
     {
         try
         {
-            string sourceDir = Path.Combine(Environment.ContentRootPath, "Images");
+            if (await appData.GetRole() != "Administrator")
+                return; // server-side guard (the UI is admin-gated; this is defense in depth)
 
-            string destinationDir = Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.Desktop),"AliantWebData");
+            // Show the Save-As dialog FIRST, while the click's transient activation is
+            // still valid (the backup below is slow, and a Blazor Server round-trip would
+            // otherwise lose the gesture the picker requires).
+            // >0 = user chose a location, 0 = browser lacks the picker (normal download),
+            // -1 = user cancelled.
+            int handleId = await js.InvokeAsync<int>("openSaveDialog", "AliantWeb.bak");
+            if (handleId == -1) return;
 
-            var allDirectories = Directory.GetDirectories(sourceDir, "*", SearchOption.AllDirectories);
+            isBackingUp = true;
+            StateHasChanged();
 
-            foreach (string dir in allDirectories)
+            // Build connection string
+            var dbHost     = System.Environment.GetEnvironmentVariable("DB_HOST");
+            var dbName     = System.Environment.GetEnvironmentVariable("DB_NAME");
+            var dbPassword = System.Environment.GetEnvironmentVariable("DB_SA_PASSWORD");
+
+            string connectString = !string.IsNullOrEmpty(dbHost)
+                ? $"Data Source={dbHost};Initial Catalog={dbName};User ID=sa;Password={dbPassword};TrustServerCertificate=true;Encrypt=False;"
+                : configuration.GetConnectionString("DefaultConnection");
+
+            string backupPath = configuration["BackupPath"];
+            if (string.IsNullOrEmpty(backupPath))
+                backupPath = Path.GetTempPath();
+
+            // Unique name so the download endpoint targets exactly this backup and
+            // concurrent backups can't collide.
+            string fileName = $"AliantWeb_{DateTime.Now:yyyyMMdd_HHmmss}_{Guid.NewGuid():N}.bak";
+
+            // SQL Server writes the .bak into the shared /backups volume (server-side).
+            await Task.Run(() => DatabaseManagement.BackupDatabase(connectString, backupPath, fileName));
+
+            // Pull the file from a plain HTTP endpoint that streams it (and deletes it
+            // afterwards) — the bytes never travel over the SignalR circuit, so there's no
+            // base64 inflation or server-side buffering regardless of DB size.
+            // ToAbsoluteUri honours UsePathBase (BasePath).
+            string url = navigationManager
+                .ToAbsoluteUri($"Backup/Download?file={Uri.EscapeDataString(fileName)}")
+                .ToString();
+
+            if (handleId > 0)
+                await js.InvokeVoidAsync("streamToHandle", handleId, url); // user-chosen folder
+            else
+                await js.InvokeVoidAsync("triggerFileDownload", url);      // fallback download
+
+            await journal.WriteAsync(JournalCategory.Donnees, "database.backup", fileName,
+                                     "Sauvegarde de la base téléchargée");
+        }
+        catch (Exception ex)
+        {
+            await js.InvokeVoidAsync("alert", L["Error"] + ": " + ex.Message);
+        }
+        finally
+        {
+            isBackingUp = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnRestoreFileSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file is null) return; // no file chosen
+
+        if (await appData.GetRole() != "Administrator")
+            return; // server-side guard (the UI is admin-gated; this is defense in depth)
+
+        isRestoring = true;
+        StateHasChanged();
+
+        // Write the upload into the SHARED backup folder, not /tmp. RESTORE FROM DISK
+        // runs inside the SQL Server container, which cannot see the web app's local
+        // temp dir. BackupPath (/backups) is volume-mounted into both containers —
+        // the same folder backup already uses.
+        string restoreFolder = configuration["BackupPath"];
+        if (string.IsNullOrEmpty(restoreFolder))
+            restoreFolder = Path.GetTempPath();
+
+        string tempFile = Path.Combine(restoreFolder, "AliantWeb_restore.bak");
+
+        try
+        {
+            // Stream the upload straight to disk. <InputFile> chunks the transfer over
+            // a dedicated stream, so it is NOT bound by SignalR's MaximumReceiveMessageSize
+            // (the 1 MB limit that broke the old base64-over-JS-interop upload).
+            const long maxSize = 10L * 1024 * 1024 * 1024; // 10 GB cap
+            await using (var fs = new FileStream(tempFile, FileMode.Create, FileAccess.Write))
+            await using (var upload = file.OpenReadStream(maxSize))
             {
-                string dirToCreate = dir.Replace(sourceDir, destinationDir);
-                Directory.CreateDirectory(dirToCreate);
+                await upload.CopyToAsync(fs);
             }
 
-            var allFiles = Directory.GetFiles(sourceDir, "*.*", SearchOption.AllDirectories);
+            // Build connection string
+            var dbHost     = System.Environment.GetEnvironmentVariable("DB_HOST");
+            var dbName     = System.Environment.GetEnvironmentVariable("DB_NAME");
+            var dbPassword = System.Environment.GetEnvironmentVariable("DB_SA_PASSWORD");
 
-            foreach (string newPath in allFiles)
-            {
-                File.Copy(newPath, newPath.Replace(sourceDir, destinationDir), true);
-            }
+            string connectString = !string.IsNullOrEmpty(dbHost)
+                ? $"Data Source={dbHost};Initial Catalog={dbName};User ID=sa;Password={dbPassword};TrustServerCertificate=true;Encrypt=False;"
+                : configuration.GetConnectionString("DefaultConnection");
 
-          
+            // Run the restore on a background thread
+            await Task.Run(() => DatabaseManagement.Restore(connectString, tempFile));
 
-            js.InvokeVoidAsync("alert", "Successfull copied data.");
+            // Journaled AFTER the restore, deliberately: the restore replaces the whole database,
+            // Journal included, so a row written beforehand would be overwritten. This one lands in
+            // the restored database, which is where somebody would look to explain the discontinuity.
+            await journal.WriteAsync(JournalCategory.Donnees, "database.restore", file.Name,
+                                     $"Base restaurée depuis « {file.Name} » ({file.Size} octets)", severity: 2);
 
+            // Force a full page reload — data in memory is now stale
+            await js.InvokeVoidAsync("alert", L["Restore completed. The page will now reload."].Value);
+            navigationManager.NavigateTo(navigationManager.Uri, forceLoad: true);
         }
         catch (Exception ex)
         {
-            js.InvokeVoidAsync("alert", "Error: " + ex.Message);
+            Console.WriteLine($"Restore failed: {ex}");
+            await js.InvokeVoidAsync("alert", L["Error"] + ": " + ex.Message);
+        }
+        finally
+        {
+            try { if (File.Exists(tempFile)) File.Delete(tempFile); } catch { /* best-effort cleanup */ }
+            isRestoring = false;
+            StateHasChanged();
         }
     }
+
 
 }

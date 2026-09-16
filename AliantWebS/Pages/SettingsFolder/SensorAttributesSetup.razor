@@ -1,0 +1,471 @@
+@page "/settingsFolder/sensor-attributes"
+@using AliantWebS.Data
+@using AliantWebS.Models
+@using Microsoft.EntityFrameworkCore
+@inject EntitiesService entitiesService
+@inject IDbContextFactory<AliantWebContext> dbContextFactory
+@inject NavigationManager navigationManager
+@inject IStringLocalizer<Languages> L
+@inject IJSRuntime js
+@inject JournalService journal
+
+<style>
+    .sa-container { padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+    .sa-card { background: white; border-radius: 15px; box-shadow: 0 10px 40px rgba(0,0,0,.1); padding: 30px; margin-bottom: 20px; }
+    .sa-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 18px; border-bottom: 3px solid #667eea; }
+    .sa-title { font-size: 30px; font-weight: 700; color: #2d3748; margin: 0; }
+    .sa-sub { color: #718096; font-size: 14px; margin-top: 5px; }
+    .btn-modern { padding: 11px 22px; border: none; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+    .btn-primary-modern { background: linear-gradient(135deg,#667eea,#764ba2); color: #fff; }
+    .btn-success-modern { background: linear-gradient(135deg,#48bb78,#38a169); color: #fff; }
+    .btn-secondary-modern { background: #e2e8f0; color: #4a5568; }
+    .btn-modern:disabled { opacity: .5; cursor: not-allowed; }
+    .sa-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+    .sa-table th { text-align: left; padding: 10px 12px; background: #f7fafc; color: #4a5568; font-weight: 600; border-bottom: 2px solid #e2e8f0; }
+    .sa-table td { padding: 9px 12px; border-bottom: 1px solid #edf2f7; vertical-align: top; }
+    .type-badge { display: inline-block; padding: 4px 12px; background: linear-gradient(135deg,#667eea,#764ba2); color: #fff; border-radius: 6px; font-weight: 600; font-size: 13px; }
+    .pill { display: inline-block; padding: 3px 9px; border-radius: 12px; font-size: 12px; font-weight: 600; margin: 2px 4px 2px 0; }
+    .pill-ok { background: #e6ffed; color: #1a7f37; border: 1px solid #a7e3b8; }
+    .pill-link { background: #fff3cd; color: #8a6100; border: 1px solid #ffe08a; }
+    .pill-new { background: #e6f1fb; color: #0c447c; border: 1px solid #b5d4f4; }
+    .pill-warn { background: #fde8e8; color: #9b1c1c; border: 1px solid #f5b5b5; }
+    .warn-box { background: #fff5f5; border-left: 4px solid #e53e3e; border-radius: 8px; padding: 14px 18px; margin-bottom: 18px; font-size: 13px; color: #742a2a; }
+    .warn-box code { background: #fff; padding: 1px 5px; border-radius: 4px; }
+    .legend { font-size: 13px; color: #4a5568; display: flex; gap: 18px; flex-wrap: wrap; margin: 6px 0 18px; }
+    .opts { display: flex; gap: 20px; flex-wrap: wrap; align-items: center; background: #f7fafc; border-radius: 10px; padding: 14px 18px; margin-bottom: 18px; }
+    .opts label { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #2d3748; cursor: pointer; }
+</style>
+
+<div class="sa-container">
+    <div class="sa-card">
+        <div class="sa-header">
+            <div>
+                <h1 class="sa-title">@L["Attributs des capteurs"]</h1>
+                <p class="sa-sub">@L["Crée les types d'attributs manquants (C1/C0 par canal, seuil d'alarme, statut) et les associe aux types de capteurs"]</p>
+            </div>
+            <button type="button" class="btn-modern btn-secondary-modern" @onclick="Cancel">← @L["Back"]</button>
+        </div>
+
+        @if (isLoading)
+        {
+            <p><em>@L["Loading..."]</em></p>
+        }
+        else
+        {
+            <div class="opts">
+                <label><input type="checkbox" @bind="genCalibration" @bind:after="Analyse" /> @L["Coefficients C1 / C0 (par canal)"]</label>
+                <label><input type="checkbox" @bind="genThreshold" @bind:after="Analyse" /> @L["Seuil d'alarme (un par type)"]</label>
+                <label><input type="checkbox" @bind="genStatut" @bind:after="Analyse" /> @L["Statut"]</label>
+            </div>
+
+            <div class="legend">
+                <span><span class="pill pill-ok">✓ @L["présent"]</span> @L["déjà créé et associé"]</span>
+                <span><span class="pill pill-link">⚭ @L["à associer"]</span> @L["l'attribut existe mais n'est pas lié à ce type"]</span>
+                <span><span class="pill pill-new">+ @L["à créer"]</span> @L["l'attribut n'existe pas encore"]</span>
+                <span><span class="pill pill-warn">! @L["conflit"]</span> @L["un attribut au nom très proche existe déjà"]</span>
+            </div>
+
+            @if (Conflicts.Count > 0)
+            {
+                <div class="warn-box">
+                    <strong>@L["Noms presque identiques — rien ne sera généré pour ceux-ci."]</strong>
+                    <div style="margin-top:6px;">
+                        @L["Les moteurs (alarmes, calibration) comparent les noms à l'identique. Pour que l'attribut existant soit reconnu, ajoutez son nom exact comme alias dans"]
+                        <a href="/settingsFolder/tag-mapping">@L["Tag Mapping"]</a> @L["ou renommez-le."]
+                    </div>
+                    <ul style="margin:8px 0 0 18px;">
+                        @foreach (var c in Conflicts.Take(12))
+                        {
+                            <li>@c.Type : @L["attendu"] <code>@c.Wanted</code> — @L["présent"] <code>@c.Existing</code></li>
+                        }
+                    </ul>
+                    @if (Conflicts.Count > 12)
+                    {
+                        <div style="margin-top:6px;">… @(Conflicts.Count - 12) @L["autre(s)"]</div>
+                    }
+                </div>
+            }
+
+            <div style="display:flex; gap:12px; margin-bottom:18px; flex-wrap:wrap; align-items:center;">
+                <button type="button" class="btn-modern btn-success-modern" @onclick="Generate" disabled="@(isWorking || TotalMissing == 0)">
+                    <span>⚡</span> @(isWorking ? L["Génération…"] : $"{L["Générer les attributs manquants"]} ({TotalMissing})")
+                </button>
+                <button type="button" class="btn-modern btn-primary-modern" @onclick="Analyse" disabled="@isWorking">
+                    <span>🔄</span> @L["Ré-analyser"]
+                </button>
+                @if (!string.IsNullOrEmpty(statusMessage))
+                {
+                    <span style="color:#2d3748; font-size:14px;">@statusMessage</span>
+                }
+            </div>
+
+            @if (plan.Count == 0)
+            {
+                <p style="color:#718096;">@L["Aucun type de capteur trouvé (catégorie « sensing device »)."]</p>
+            }
+            else
+            {
+                <table class="sa-table">
+                    <thead>
+                        <tr>
+                            <th style="width:230px;">@L["Type de capteur"]</th>
+                            <th style="width:180px;">@L["Canaux"]</th>
+                            <th>@L["Attributs attendus"]</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var t in plan)
+                        {
+                            <tr>
+                                <td>
+                                    <span class="type-badge">@t.ElementTypeName</span>
+                                    <div style="font-size:12px; color:#888; margin-top:5px;">@t.SensorCount @L["capteur(s)"]</div>
+                                </td>
+                                <td style="color:#4a5568;">
+                                    @if (t.Channels.Count == 0)
+                                    {
+                                        <span style="color:#c05621;">@L["aucun canal configuré"]</span>
+                                    }
+                                    else
+                                    {
+                                        @string.Join(", ", t.Channels)
+                                    }
+                                </td>
+                                <td>
+                                    @foreach (var a in t.Attributes)
+                                    {
+                                        <span class="pill @PillClass(a.State)" title="@PillTitle(a)">
+                                            @PillIcon(a.State) @a.Name
+                                        </span>
+                                    }
+                                    @if (t.Attributes.Count == 0)
+                                    {
+                                        <span style="color:#888;">—</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    private enum AttrState { Present, NeedsLink, NeedsCreate, Conflict }
+
+    private class PlannedAttribute
+    {
+        public string Name { get; set; }
+        public string Units { get; set; }
+        public AttrState State { get; set; }
+        public string ConflictsWith { get; set; }  // an almost-identically-named attribute already linked
+        public Guid ExistingTypeId { get; set; }   // set when the AttributeType already exists
+    }
+
+    /// <summary>Loose comparison used only to spot near-duplicates ("Seuil Alarme" vs "seuil_alarme").</summary>
+    private static string Normalize(string s)
+        => new string((s ?? "").Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+
+    private class TypePlan
+    {
+        public Guid ElementTypeId { get; set; }
+        public string ElementTypeName { get; set; }
+        public int SensorCount { get; set; }
+        public List<string> Channels { get; } = new();
+        public List<PlannedAttribute> Attributes { get; } = new();
+    }
+
+    private List<TypePlan> plan = new();
+    private bool isLoading = true;
+    private bool isWorking = false;
+    private bool isGenerating = false;
+    private string statusMessage = "";
+
+    private bool genCalibration = true;
+    private bool genThreshold = true;
+    private bool genStatut = false;
+
+    // Conflicts are deliberately excluded: generating them would sit a second, near-identical
+    // attribute next to the one the user already has.
+    private int TotalMissing => plan.Sum(t => t.Attributes.Count(
+        a => a.State == AttrState.NeedsLink || a.State == AttrState.NeedsCreate));
+
+    private List<(string Type, string Wanted, string Existing)> Conflicts =>
+        plan.SelectMany(t => t.Attributes
+                .Where(a => a.State == AttrState.Conflict)
+                .Select(a => (t.ElementTypeName, a.Name, a.ConflictsWith)))
+            .ToList();
+
+    private string PillClass(AttrState s) => s switch
+    {
+        AttrState.Present   => "pill-ok",
+        AttrState.NeedsLink => "pill-link",
+        AttrState.Conflict  => "pill-warn",
+        _                   => "pill-new"
+    };
+
+    private string PillIcon(AttrState s) => s switch
+    {
+        AttrState.Present   => "✓",
+        AttrState.NeedsLink => "⚭",
+        AttrState.Conflict  => "!",
+        _                   => "+"
+    };
+
+    private string PillTitle(PlannedAttribute a) => a.State switch
+    {
+        AttrState.Present   => L["présent"].Value,
+        AttrState.NeedsLink => L["à associer"].Value,
+        AttrState.Conflict  => $"{L["Ce type possède déjà"]} « {a.ConflictsWith} » — {L["nom trop proche, non généré"]}",
+        _                   => L["à créer"].Value
+    };
+
+    protected override async Task OnInitializedAsync() => await Analyse();
+
+    private async Task Analyse()
+    {
+        isLoading = true;
+        statusMessage = "";
+        try
+        {
+            // Canonical names come from the tag mapping: if an alias already exists as an
+            // AttributeType we reuse it, otherwise we create the code tag itself. That keeps this
+            // page in step with how the alarm engine and the calibration resolve names.
+            var tagRows = await entitiesService.GetAllEntitiesAsync<TagMappingTable>() ?? new List<TagMappingTable>();
+            var thresholdNames = TagMappingResolver.AcceptedNames(tagRows, "seuil_alarme");
+            var c1Prefixes = TagMappingResolver.AcceptedNames(tagRows, "C1");
+            var c0Prefixes = TagMappingResolver.AcceptedNames(tagRows, "C0");
+
+            var allAttrTypes = await entitiesService.GetAllEntitiesAsync<AttributeType>() ?? new List<AttributeType>();
+            var byName = new Dictionary<string, AttributeType>(StringComparer.OrdinalIgnoreCase);
+            foreach (var at in allAttrTypes)
+                if (!string.IsNullOrWhiteSpace(at.Name)) byName[at.Name.Trim()] = at;
+
+            // Sensing-device element types, with their channels and current attribute links.
+            var elementTypes = await entitiesService.GetFilteredEntitiesAsync<ElementType>(
+                et => et.Category != null && et.Category.Name != null
+                   && et.Category.Name.Equals("sensing device", StringComparison.OrdinalIgnoreCase),
+                "Category", "ChannelDataTypeElementTypes.ChannelDataType", "AttributeTypeElementTypes.AttributeType");
+
+            // How many sensors each type has, counted in SQL — the Element table is far too big to
+            // pull into memory just for a count.
+            Dictionary<Guid, int> sensorCounts;
+            using (var db = await dbContextFactory.CreateDbContextAsync())
+            {
+                sensorCounts = await db.Set<Element>()
+                    .Where(e => e.ElementTypeId != null)
+                    .GroupBy(e => e.ElementTypeId.Value)
+                    .Select(g => new { TypeId = g.Key, Count = g.Count() })
+                    .AsNoTracking()
+                    .ToDictionaryAsync(x => x.TypeId, x => x.Count);
+            }
+
+            plan = new List<TypePlan>();
+            foreach (var et in (elementTypes ?? new List<ElementType>()).OrderBy(x => x.Name))
+            {
+                var tp = new TypePlan
+                {
+                    ElementTypeId = et.ElementTypeId,
+                    ElementTypeName = et.Name,
+                    SensorCount = sensorCounts.TryGetValue(et.ElementTypeId, out var n) ? n : 0
+                };
+
+                tp.Channels.AddRange(et.ChannelDataTypeElementTypes
+                    .OrderBy(c => c.SortOrder ?? int.MaxValue)
+                    .Select(c => c.ChannelDataType?.Name)
+                    .Where(n => !string.IsNullOrWhiteSpace(n)));
+
+                var linkedNames = new HashSet<string>(
+                    et.AttributeTypeElementTypes.Where(a => a.AttributeType?.Name != null)
+                                                .Select(a => a.AttributeType.Name.Trim()),
+                    StringComparer.OrdinalIgnoreCase);
+
+                // Which exact name to use. Candidates are the code tag then its aliases (deterministic
+                // order); an existing AttributeType wins, so we never create a near-duplicate of one
+                // the user already has. Falling back to the code tag matters on a fresh database.
+                string PickName(HashSet<string> accepted, string codeTag, string channel)
+                {
+                    var candidates = new List<string> { codeTag };
+                    candidates.AddRange(accepted
+                        .Where(x => !string.Equals(x, codeTag, StringComparison.OrdinalIgnoreCase))
+                        .OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
+
+                    var full = candidates
+                        .Select(c => channel == null ? c : $"{c}_{channel}")
+                        .ToList();
+
+                    return full.FirstOrDefault(byName.ContainsKey) ?? full[0];
+                }
+
+                void Want(string name, string units)
+                {
+                    if (string.IsNullOrWhiteSpace(name)) return;
+                    if (tp.Attributes.Any(a => string.Equals(a.Name, name, StringComparison.OrdinalIgnoreCase))) return;
+
+                    var state = linkedNames.Contains(name) ? AttrState.Present
+                              : byName.ContainsKey(name) ? AttrState.NeedsLink
+                              : AttrState.NeedsCreate;
+
+                    // A linked attribute that only differs by spacing/case/punctuation is NOT the same
+                    // to the engines (they match names exactly), but creating a second one next to it
+                    // would just add confusion. Flag it and let the user decide.
+                    string conflict = null;
+                    if (state != AttrState.Present)
+                    {
+                        conflict = linkedNames.FirstOrDefault(l => Normalize(l) == Normalize(name));
+                        if (conflict != null) state = AttrState.Conflict;
+                    }
+
+                    tp.Attributes.Add(new PlannedAttribute
+                    {
+                        Name = name,
+                        Units = units,
+                        State = state,
+                        ConflictsWith = conflict,
+                        ExistingTypeId = byName.TryGetValue(name, out var found) ? found.AttributeTypeId : Guid.Empty
+                    });
+                }
+
+                if (genCalibration)
+                    foreach (var ch in tp.Channels)
+                    {
+                        Want(PickName(c1Prefixes, "C1", ch), null);
+                        Want(PickName(c0Prefixes, "C0", ch), null);
+                    }
+
+                if (genThreshold)
+                    Want(PickName(thresholdNames, "seuil_alarme", null), null);
+
+                if (genStatut)
+                    Want("Statut", null);
+
+                plan.Add(tp);
+            }
+        }
+        catch (Exception ex)
+        {
+            await js.InvokeVoidAsync("alert", $"Erreur d'analyse : {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task Generate()
+    {
+        // Two clicks queue two Generate calls on the same plan, both waiting on their confirm: the
+        // second would write the same links while the first is still writing them.
+        if (isGenerating) return;
+        isGenerating = true;
+        try
+        {
+            await GenerateOnce();
+        }
+        finally
+        {
+            isGenerating = false;
+        }
+    }
+
+    private async Task GenerateOnce()
+    {
+        var missing = TotalMissing;
+        if (missing == 0) return;
+
+        var confirmed = await js.InvokeAsync<bool>("confirm",
+            $"{L["Créer et associer"]} {missing} {L["attribut(s) manquant(s) ?"]}");
+        if (!confirmed) return;
+
+        isWorking = true;
+        statusMessage = "";
+        int created = 0, linked = 0;
+
+        try
+        {
+            // Cache newly created types so the same name is not created twice across element types.
+            var createdTypes = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+
+            // The plan is what the database held when the page was analysed; the junction page, the
+            // import or another session may have made part of it since. So what exists is asked of the
+            // database itself, on a context of its own that holds no tracked copies.
+            using var db = await dbContextFactory.CreateDbContextAsync();
+
+            foreach (var tp in plan)
+            {
+                foreach (var a in tp.Attributes.Where(
+                    x => x.State == AttrState.NeedsLink || x.State == AttrState.NeedsCreate))
+                {
+                    Guid typeId = a.ExistingTypeId;
+
+                    if (typeId == Guid.Empty && !createdTypes.TryGetValue(a.Name, out typeId))
+                    {
+                        // Created meanwhile under the same name: reuse it rather than add a twin.
+                        typeId = await db.AttributeTypes.AsNoTracking()
+                            .Where(t => t.Name == a.Name)
+                            .Select(t => t.AttributeTypeId)
+                            .FirstOrDefaultAsync();
+
+                        if (typeId == Guid.Empty)
+                        {
+                            var newType = await entitiesService.InsertEntityAsync(new AttributeType
+                            {
+                                Name = a.Name,
+                                Units = a.Units,
+                                Description = "Créé automatiquement depuis Paramètres → Attributs des capteurs"
+                            });
+                            if (newType == null) continue;
+
+                            typeId = newType.AttributeTypeId;
+                            created++;
+                        }
+
+                        createdTypes[a.Name] = typeId;
+                    }
+
+                    if (typeId == Guid.Empty) continue;
+
+                    // A second link for the same pair is what gives every element of the type two rows
+                    // for that attribute, and the unique index now refuses it.
+                    bool alreadyLinked = await db.AttributeTypeElementTypes.AsNoTracking()
+                        .AnyAsync(l => l.ElementTypeId == tp.ElementTypeId && l.AttributeTypeId == typeId);
+                    if (alreadyLinked) continue;
+
+                    var link = await entitiesService.InsertEntityAsync(new AttributeTypeElementType
+                    {
+                        ElementTypeId = tp.ElementTypeId,
+                        AttributeTypeId = typeId
+                    });
+                    if (link == null)
+                    {
+                        // InsertEntityAsync swallows the exception; not counting it keeps the status honest.
+                        Console.WriteLine($"SensorAttributesSetup: linking « {a.Name} » to « {tp.ElementTypeName} » failed.");
+                        continue;
+                    }
+                    linked++;
+                }
+            }
+
+            statusMessage = $"{created} attribut(s) créé(s), {linked} association(s) ajoutée(s).";
+            SensorCalibration.Invalidate();   // new C1/C0 names must be picked up on the next read
+
+            await journal.WriteAsync(JournalCategory.Configuration, "attributetypes.generate",
+                target: $"{plan.Count} type(s) de capteur",
+                details: $"{created} type(s) d'attribut créé(s), {linked} association(s) ajoutée(s)\n"
+                       + $"Familles : {(genCalibration ? "C1/C0 " : "")}{(genThreshold ? "seuil " : "")}{(genStatut ? "statut" : "")}".Trim());
+        }
+        catch (Exception ex)
+        {
+            await js.InvokeVoidAsync("alert", $"Erreur de génération : {ex.Message}");
+        }
+        finally
+        {
+            isWorking = false;
+            await Analyse();     // re-read so the badges reflect what was written
+        }
+    }
+
+    private void Cancel() => navigationManager.NavigateTo("/settings");
+}

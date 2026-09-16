@@ -22,11 +22,5 @@ public partial class StructureType
     public virtual ICollection<StructureTypeAttributeType> StructureTypeAttributeTypes { get; set; } = new List<StructureTypeAttributeType>();
 
     [InverseProperty("StructureType")]
-    public virtual ICollection<StructureTypeFlagType> StructureTypeFlagTypes { get; set; } = new List<StructureTypeFlagType>();
-
-    [InverseProperty("StructureType")]
-    public virtual ICollection<StructureTypeInspectionResultType> StructureTypeInspectionResultTypes { get; set; } = new List<StructureTypeInspectionResultType>();
-
-    [InverseProperty("StructureType")]
     public virtual ICollection<Structure> Structures { get; set; } = new List<Structure>();
 }

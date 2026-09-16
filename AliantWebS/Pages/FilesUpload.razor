@@ -114,11 +114,6 @@ else
 
         }
 
-        else if (obj.GetType() == typeof(Defect))
-        {
-            fullPath = Path.Combine(path, guidElement.Substring(1, charactersFromGuid) + guidDefect.Substring(0, charactersFromGuid) + fileName);
-
-        }
         else if (obj.GetType() == typeof(Site))
         {
             fullPath = Path.Combine(path, fileName);

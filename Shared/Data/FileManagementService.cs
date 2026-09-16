@@ -97,14 +97,6 @@ namespace AliantWebS.Data
             {
                 path = Path.Combine(path, ((Structure)obj).StructureId.ToString());
             }
-            else if (obj.GetType() == typeof(Defect))
-            {
-                path = Path.Combine(path, ((Defect)obj).Element.Structure.StructureId.ToString());
-
-                guidElement = ((Defect)obj).Element.ElementId.ToString("N");
-                guidDefect = ((Defect)obj).DefectId.ToString("N");
-                path = Path.Combine(path, guidElement[0].ToString());
-            }
             else if (obj.GetType() == typeof(Site))
             {
                 path = Path.Combine(path, ((Site)obj).SiteId.ToString());
@@ -149,13 +141,7 @@ namespace AliantWebS.Data
                 {
 
                     v = Directory.EnumerateFiles(path,"*",eo).ToList();
-                }
-
-                else if (obj.GetType() == typeof(Defect))
-                {
-                    v = Directory.EnumerateFiles(path, "*" + guidElement.Substring(1, charactersFromGuid) + guidDefect.Substring(0, charactersFromGuid) + "*",eo).ToList();
-
-                }
+                }   
             }
 
             return await Task.FromResult(v);

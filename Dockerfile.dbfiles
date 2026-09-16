@@ -1,0 +1,4 @@
+FROM alpine:latest
+WORKDIR /dbfiles
+COPY data/sql/Aliant/Antares.mdf .
+COPY data/sql/Aliant/Antares_log.ldf .

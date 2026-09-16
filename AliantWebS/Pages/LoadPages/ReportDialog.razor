@@ -1,0 +1,168 @@
+﻿@using AliantWebS.Data
+@using AliantWebS.Models
+@using AliantWebS.Reporting
+@using AliantWebS.Controllers
+@inject Radzen.DialogService dialogService
+@inject ReportGenerator reportGenerator
+@inject AppData appData
+@inject JournalService journal
+
+<RadzenStack Gap="1rem">
+
+    @if (result is null)
+    {
+        <RadzenText TextStyle="TextStyle.Body2">
+            Édition de l'étude d'implantation pour <b>@Scenario?.Name</b>.
+        </RadzenText>
+
+        @* Fully qualified: Blazorise and Radzen both define FlexWrap and both are globally imported. *@
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="1rem" Wrap="Radzen.FlexWrap.Wrap">
+            <RadzenStack Gap="0.25rem" Style="min-width: 260px; flex: 1;">
+                <RadzenLabel Text="Auteur" />
+                <RadzenTextBox @bind-Value="author" Style="width: 100%;" />
+            </RadzenStack>
+
+            <RadzenStack Gap="0.25rem" Style="width: 120px;">
+                <RadzenLabel Text="Indice" />
+                <RadzenTextBox @bind-Value="revision" Style="width: 100%;" />
+            </RadzenStack>
+
+            <RadzenStack Gap="0.25rem" Style="width: 170px;">
+                <RadzenLabel Text="Date d'émission" />
+                <RadzenDatePicker @bind-Value="issueDate" DateFormat="dd/MM/yyyy" Style="width: 100%;" />
+            </RadzenStack>
+        </RadzenStack>
+
+        <RadzenStack Gap="0.25rem">
+            <RadzenLabel Text="Modifications" />
+            <RadzenTextBox @bind-Value="revisionNote" Style="width: 100%;" />
+        </RadzenStack>
+
+        <RadzenText TextStyle="TextStyle.Caption">
+            Le document reprend les charges scéniques, les ponts et les charges calculées de la
+            charpente. Lancez « Calcul Charpente » au préalable pour que le tableau des points
+            d'accroche soit renseigné.
+        </RadzenText>
+
+        @if (error != null)
+        {
+            <RadzenText Style="color: #b00020;">@error</RadzenText>
+        }
+
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal"
+                     JustifyContent="Radzen.JustifyContent.End" Gap="0.5rem">
+            <RadzenButton Text="Annuler" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat"
+                          Disabled="@isGenerating" Click="@(() => dialogService.Close(false))" />
+            <RadzenButton Text="@(isGenerating ? "Génération…" : "Générer")" Icon="description"
+                          ButtonStyle="ButtonStyle.Primary" Disabled="@isGenerating"
+                          Click="Generate" />
+        </RadzenStack>
+
+        @if (isGenerating)
+        {
+            <RadzenProgressBar Mode="ProgressBarMode.Indeterminate" Style="width: 100%;" />
+        }
+    }
+    else
+    {
+        <RadzenText TextStyle="TextStyle.H6">Rapport généré</RadzenText>
+        <RadzenText TextStyle="TextStyle.Body2"><code>@result.FileName</code></RadzenText>
+
+        @if (result.HasWarnings)
+        {
+            @* Shown before the download, not after: these are the reasons the document may be
+               incomplete, and they belong in front of whoever is about to send it out. *@
+            <RadzenText TextStyle="TextStyle.Subtitle2" Style="color: #9a6700;">
+                @result.Warnings.Count réserve(s) sur les données
+            </RadzenText>
+            <ul style="margin: 0; padding-left: 1.2rem;">
+                @foreach (var warning in result.Warnings)
+                {
+                    <li><RadzenText TextStyle="TextStyle.Body2">@warning</RadzenText></li>
+                }
+            </ul>
+            <RadzenText TextStyle="TextStyle.Caption">
+                Ces réserves figurent également dans le document, en fin de conclusion.
+            </RadzenText>
+        }
+        else
+        {
+            <RadzenText TextStyle="TextStyle.Body2" Style="color: green;">
+                Aucune réserve : toutes les données nécessaires étaient disponibles.
+            </RadzenText>
+        }
+
+        <RadzenText TextStyle="TextStyle.Caption">
+            À l'ouverture, Word renseigne lui-même la table des matières et la pagination.
+        </RadzenText>
+
+        <RadzenStack Orientation="Radzen.Orientation.Horizontal"
+                     JustifyContent="Radzen.JustifyContent.End" Gap="0.5rem">
+            <RadzenLink Path="@downloadUrl" Icon="download" Text="Télécharger" />
+            <RadzenButton Text="Fermer" ButtonStyle="ButtonStyle.Primary"
+                          Click="@(() => dialogService.Close(true))" />
+        </RadzenStack>
+    }
+
+</RadzenStack>
+
+@code {
+    [Parameter] public Event? Event { get; set; }
+    [Parameter] public EventMpscenario? Scenario { get; set; }
+
+    private string author = "";
+    private string revision = "V0";
+    private string revisionNote = "Version initiale";
+    private DateTime? issueDate = DateTime.Today;
+
+    private bool isGenerating;
+    private string? error;
+    private ReportResult? result;
+    private string? downloadUrl;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Same shape the invitation e-mail uses, so the author reads as a person rather than a login.
+        var me = await appData.GetCurrentUserAsync();
+        author = string.IsNullOrWhiteSpace(me?.FirstName) && string.IsNullOrWhiteSpace(me?.LastName)
+            ? (me?.UserName ?? me?.Email ?? "")
+            : $"{me?.FirstName} {me?.LastName}".Trim();
+    }
+
+    private async Task Generate()
+    {
+        if (Event is null || Scenario is null)
+        {
+            error = "Scénario introuvable.";
+            return;
+        }
+
+        isGenerating = true;
+        error = null;
+        StateHasChanged();
+
+        try
+        {
+            result = await reportGenerator.GenerateAsync(
+                Event, Scenario, author, revision, revisionNote, issueDate);
+
+            downloadUrl = ScenarioFilesController.BuildDownloadUrl(
+                Event.EventId, Scenario.EventMpscenarioId,
+                ScenarioStorageService.OutputFolderName, result.FileName);
+
+            await journal.WriteAsync(JournalCategory.Donnees, "scenario.report.generate",
+                result.FileName,
+                details: result.HasWarnings ? string.Join(" | ", result.Warnings) : null,
+                eventId: Event.EventId);
+        }
+        catch (Exception ex)
+        {
+            error = $"Génération impossible : {ex.Message}";
+        }
+        finally
+        {
+            isGenerating = false;
+            StateHasChanged();
+        }
+    }
+}

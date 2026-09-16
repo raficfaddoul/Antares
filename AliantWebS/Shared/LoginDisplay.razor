@@ -4,11 +4,13 @@
     <Authorized>
         <a href="Identity/Account/Manage">Hello, @context.User.Identity.Name!</a>
         <form method="post" action="Identity/Account/LogOut">
-            <button type="submit" class="nav-link btn btn-link">@L["Log ou0t"]</button>
+            <button type="submit" class="nav-link btn btn-link">@L["Log out"]</button>
         </form>
     </Authorized>
     <NotAuthorized>
-        <a href="Identity/Account/Register">@L["Register"]</a>
+        @* Registration is by administrator invitation only (UserManager.razor -> AcceptInvitation).
+           /Account/Register still exists but demands a Token GUID that flow never issues, so this
+           link led to a form that silently redisplayed itself. Hidden rather than deleted. *@
         <a href="Identity/Account/Login">@L["Log in"]</a>
     </NotAuthorized>
 </AuthorizeView>

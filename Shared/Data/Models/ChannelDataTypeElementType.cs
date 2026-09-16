@@ -19,6 +19,12 @@ public partial class ChannelDataTypeElementType
     [Column("ElementTypeID")]
     public Guid ElementTypeId { get; set; }
 
+    // Display/plot order of this channel type within its element type (lower = first; the lowest is
+    // effectively the "main" channel). Nullable so pre-existing rows sort last, preserving old order.
+    // The column is added idempotently at startup (Program.EnsureDatabaseSchema).
+    [Column("SortOrder")]
+    public int? SortOrder { get; set; }
+
     [ForeignKey("ChannelDataTypeId")]
     [InverseProperty("ChannelDataTypeElementTypes")]
     public virtual ChannelDataType ChannelDataType { get; set; } = null!;

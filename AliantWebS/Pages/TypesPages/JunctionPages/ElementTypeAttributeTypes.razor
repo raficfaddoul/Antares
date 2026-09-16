@@ -1,8 +1,10 @@
 ﻿@page "/ElementTypeAttributeTypes/{CallerID:guid}"
 @using Models
 @using AliantWebS.Data
+@using Microsoft.EntityFrameworkCore
 @inject AliantWebS.Data.AppData AppData
 @inject EntitiesService entitiesService
+@inject IJSRuntime js
 
 
 
@@ -30,6 +32,10 @@
 
     ElementType elementType;
 
+    // Set while a save runs: a second click on Save would otherwise start another SaveChanges on the
+    // circuit's shared context before the first has finished.
+    bool saving;
+
     public override async Task SetParametersAsync(ParameterView parameters)
     {
         elementType = (ElementType)AppData.obj1;
@@ -43,9 +49,64 @@
         titre = "Element Type \"" + elementType.Name + "\" Attributes Types Association";
     }
 
-    protected async void Update()
+    protected async Task Update()
     {
-        await entitiesService.UpdateEntityAsync(elementType);
+        if (saving) return;
+        saving = true;
+
+        try
+        {
+            await entitiesService.UpdateEntityAsync(elementType);
+        }
+        catch (Exception ex)
+        {
+            // An exception out of this handler ends the user's circuit. The one to expect is a link that
+            // already exists - the unique index on (ElementTypeID, AttributeTypeID) - made meanwhile by
+            // another page or session. UpdateEntityAsync has already detached what the failed save held,
+            // the element type itself included, so the list no longer says what is saved: read it again.
+            Console.WriteLine($"ElementTypeAttributeTypes: saving the attribute types of « {elementType?.Name} » failed: {ex.GetBaseException().Message}");
+
+            try
+            {
+                ReloadLinks();
+            }
+            catch (Exception reloadEx)
+            {
+                Console.WriteLine($"ElementTypeAttributeTypes: reading the links of « {elementType?.Name} » again failed: {reloadEx.GetBaseException().Message}");
+            }
+
+            await js.InvokeVoidAsync("alert", "Error: the associations could not be saved (" + ex.GetBaseException().Message + ")."
+                + "\n\nThey were read again from the database: check them and save again.");
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+
+    // Brings the element type's links back in line with the database after a failed save.
+    void ReloadLinks()
+    {
+        var context = entitiesService._appDBContext;
+
+        // Back under tracking, without walking its other navigations as Attach would. Its own columns
+        // are not edited here, and every save of it goes through Update, which marks them all modified.
+        var entry = context.Entry(elementType);
+        if (entry.State == EntityState.Detached)
+            entry.State = EntityState.Unchanged;
+
+        // LoadCollection does nothing once a collection is marked loaded; this brings in the link that
+        // made the save fail, so its checkbox shows checked.
+        entry.Collection(nameof(ElementType.AttributeTypeElementTypes)).IsLoaded = false;
+        entitiesService.LoadCollection(elementType, nameof(ElementType.AttributeTypeElementTypes));
+
+        // The links the failed save tried to write are no longer tracked; left in the list they would show
+        // as saved though they are not. Done last: tracking the element type again can put one back.
+        foreach (var link in elementType.AttributeTypeElementTypes.ToList())
+        {
+            if (context.Entry(link).State == EntityState.Detached)
+                elementType.AttributeTypeElementTypes.Remove(link);
+        }
     }
 
 }

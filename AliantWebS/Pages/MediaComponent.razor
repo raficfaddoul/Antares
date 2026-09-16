@@ -129,26 +129,6 @@ else
     [Parameter]
     public Element DefectSelectedElement { get; set; }
 
-    [Parameter]
-    public List<Defect> DefectList { get; set; } // if this parameter is null all tags will be displayed or else only those related to the list
-
-    private Defect selectedDefect;
-
-    [Parameter]
-    public Defect SelectedDefect
-    { // this parameter must be no null in order to insert new tags
-        get => selectedDefect;
-        set
-        {
-            if (selectedDefect == value) return;
-            selectedDefect = value;
-            if (selectedDefect != null)
-            {
-                js.InvokeVoidAsync("renderjQueryComponents", objRef, SelectedDefect.DefectId);
-            }
-        }
-    }
-
     List<string> pathsForFiles = new List<string>();
 
     private DotNetObjectReference<MediaComponent>? objRef;
@@ -169,19 +149,6 @@ else
     {
         pathsForFiles = await GetPathForFiles();
     }
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        // if (firstRender)
-        if (SelectedDefect != null)
-        {
-            await js.InvokeVoidAsync("renderjQueryComponents", objRef, SelectedDefect.DefectId);
-        }
-
-        DisplayTags(index);
-        await base.OnAfterRenderAsync(firstRender);
-    }
-
 
     /* async Task StoreSelectedFiles(IFileListEntry[] files)
          {
@@ -324,20 +291,7 @@ else
         List<Guid> defectIds = new List<Guid>();
         List<string> comments = new List<string>();
 
-        List<Guid> defectIdList = DefectList?.Select(x => x.DefectId).ToList();
 
-        for (int i = 0; i < tags.Count; i++)
-        {
-            if ((defectIdList is null) || (defectIdList.Contains(tags[i].defectID)))
-            {
-                ids.Add(tags[i].id);
-                xs.Add(tags[i].x);
-                ys.Add(tags[i].y);
-                defectIds.Add(tags[i].defectID);
-                comments.Add(tags[i].comment);
-            }
-
-        }
         await js.InvokeVoidAsync("renderTags", objRef, ids.ToArray(), xs.ToArray(), ys.ToArray(), comments.ToArray(), defectIds.ToArray());
     }
 
@@ -352,74 +306,6 @@ else
             await OnTagClicked.InvokeAsync(r);
         }
     }
-
-
-
-    [JSInvokable]
-    public async Task SaveTag(bool save, string imageSource, double? left_perc, double? top_perc, string _id)
-    {
-        if (SelectedDefect == null && save) return;
-
-        if ((SelectedDefect != null) && (SelectedDefect.DefectId == Guid.Parse("7c9e6679-7425-40de-944b-e07fc1f90ae7")))
-        {
-            await OnNewTagForNewDefect.InvokeAsync(SelectedDefect.DefectId);
-        }
-
-
-
-        Tag tag = null;
-        if (save)
-        {
-            tag = new Tag() { id = _id, x = (double)left_perc, y = (double)top_perc, defectID = SelectedDefect.DefectId, comment = (DefectSelectedElement).Name + ": " + SelectedDefect.DefectType.Name };
-        }
-
-        List<Tag> aList;
-
-
-        var file = ExifLibrary.ImageFile.FromFile(imageSource);
-
-        var reee = file.Properties.Get(ExifTag.ImageDescription);
-
-        try
-        {
-            var vv = JsonSerializer.Deserialize<List<Tag>>(reee?.ToString());
-            aList = vv;
-        }
-        catch
-        {
-            aList = new System.Collections.Generic.List<Tag>();
-        }
-        if (save)
-        {
-            var ta = aList.Find(t => (t.id == _id));
-
-            if (ta == null)
-            {
-                aList.Add(tag);
-            }
-            else
-            {
-                aList.Remove(ta);
-                aList.Add(tag);
-            }
-        }
-        else
-        {
-
-            bool b = aList.Remove(aList.Find(t => (t.id == _id)));
-        }
-
-        var json = JsonSerializer.Serialize(aList);
-
-
-        file.Properties.Set(ExifTag.ImageDescription, json);
-
-
-
-        file.Save(imageSource);
-
-    }
-
 
 }
 @*

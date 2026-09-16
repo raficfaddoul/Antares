@@ -3,14 +3,19 @@
 @using BlazorSvgEditor.SvgEditor
 @using BlazorSvgEditor.SvgEditor.Misc;
 @using BlazorSvgEditor.SvgEditor.Shapes;
-@using Models
+@using AliantWebS.Models
 @using AliantWebS.Data
+@using Microsoft.AspNetCore.Components
+@using System.Globalization
 @inject IJSRuntime js
+@inject AliantWebS.Data.JournalService journal
+
+@implements IAsyncDisposable
 
 <style>
     .toolbar-button {
-        width: 30px; /* Set a fixed width */
-        height: 40px; /* Set a fixed height if needed */
+        width: 30px;
+        height: 40px;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -19,80 +24,433 @@
 
 <PageTitle>BlazorSvgEditor Demo</PageTitle>
 
-
-@if (origPt != null)
+@if (planReady)
 {
-    <div style="position: relative; display: inline-block;">
-        <svg id="no-scroll-svg" width="@width" height="@height" viewBox="@viewBox"
+    <div style="position: relative; width: 100%; height: 100%;">
+        <svg id="no-scroll-svg" width="100%" height="100%" viewBox="@viewBox"
              @onmousedown="OnMouseDown"
+             @onpointerenter="RefreshSvgRect"
              @onmousemove="OnMouseMove"
              @onmouseup="OnMouseUp"
              @onwheel="OnWheel"
              @onwheel:stopPropagation
              @onwheel:preventDefault
-             @onclick="OnClick"
-             style="border: 1px solid black; cursor: @(isPanning ? "grabbing" : "default");">
-            <image href="PLAN ANTARES-ALIANT.jpg" x="@GetSVGCoordinatesFromReal(origPt).X" y="@GetSVGCoordinatesFromReal(origPt).Y"
-                   width="@($"{imageScale * 100}%")" height="@($"{imageScale * 100}%")"
-                   preserveAspectRatio="xMidYMid meet" />
-            @if (currentLine != null)
+             @onclick="HandleSvgClick"
+             style="display: block; cursor: @(isPanning ? "grabbing" : IsPositioningMode ? "crosshair" : "default");">
+    
+            @* Line 36 - image element *@
+    
+                @* Layer groups (class="dxf-layer-*") let the export hide what the dialog unticks. *@
+                @* The picture draws the grid a quarter turn from the plan (beams vertical, J at the left): it is
+                   turned a quarter turn clockwise onto the charpente points, by the measured positions of its own
+                   grid lines (PlanView). *@
+                <g class="dxf-layer-background">
+                    <image href="@PlanView.BackgroundImage" x="0" y="0"
+                           width="@PlanView.ImageWidthPx" height="@PlanView.ImageHeightPx"
+                           preserveAspectRatio="none"
+                           transform="@PlanView.ImageTransform(Point0X, Point0Y)" />
+                </g>
+
+                @* Beam letters and point numbers, upright. The picture's own turn on their side with it: the
+                   numbers and the right-hand letters are drawn over them. Kept in every export. *@
+                <g class="plan-grid-labels" style="pointer-events: none;">
+                    @foreach (var label in PlanView.GridLabels)
+                    {
+                        var at = GetSVGCoordinatesFromReal(new Point(label.GridXmm, label.GridYmm));
+                        <g transform="translate(@Fmt(at.X), @Fmt(at.Y))">
+                            <circle cx="0" cy="0" r="@Fmt(PlanView.LabelRadius)" fill="white" stroke="#1e88e5" stroke-width="0.8" />
+                            <text x="0" y="0" font-size="6.5" font-weight="bold" fill="#1a1a1a" text-anchor="middle"
+                                  dominant-baseline="central" font-family="Arial, Helvetica, sans-serif">@label.Text</text>
+                        </g>
+                    }
+                </g>
+           
+            @* Origin landmark *@
+            @{
+                var originSvg = GetSVGCoordinatesFromReal(new Point(Point0X * MmToM, Point0Y * MmToM));
+
+            }
+            <g class="dxf-layer-origin" transform="translate(@Fmt(originSvg.X), @Fmt(originSvg.Y))" style="pointer-events: none;">
+                @* The axes belong to the beams, not to the screen (PlanView): the plan is horizontal, so X - along
+                   the beams, towards point 9 - points UP, and Y - across them, towards J - points LEFT. *@
+
+                @* X axis ↑ *@
+                <line x1="0" y1="0" x2="0" y2="-20" stroke="#2255cc" stroke-width="1.5" />
+                <polygon points="0,-20 -3,-15 3,-15" fill="#2255cc" />
+                <text x="3" y="-23" font-size="8" fill="#2255cc" font-weight="bold" font-family="monospace">X</text>
+
+                @* Y axis ← *@
+                <line x1="0" y1="0" x2="-20" y2="0" stroke="#cc2222" stroke-width="1.5" />
+                <polygon points="-20,0 -15,-3 -15,3" fill="#cc2222" />
+                <text x="-30" y="-3" font-size="8" fill="#cc2222" font-weight="bold" font-family="monospace">Y</text>
+
+                @* Origin dot + label *@
+                <circle cx="0" cy="0" r="3" fill="black" />
+                <text x="5" y="-5" font-size="8" fill="black" font-weight="bold" font-family="monospace">
+                    (0, 0)
+                </text>
+            </g>
+                   @if (currentLine != null && isDrawing && !IsPositioningMode)
             {
-                <line x1="@GetSVGCoordinatesFromReal(currentLine?.Item1).X" y1="@GetSVGCoordinatesFromReal(currentLine?.Item1).Y" x2="@GetSVGCoordinatesFromReal(currentLine?.Item2).X" y2="@GetSVGCoordinatesFromReal(currentLine?.Item2).Y" stroke="black" stroke-width="2" />
+                <line x1="@Fmt(GetSVGCoordinatesFromReal(currentLine?.Item1).X)"
+                      y1="@Fmt(GetSVGCoordinatesFromReal(currentLine?.Item1).Y)"
+                      x2="@Fmt(GetSVGCoordinatesFromReal(currentLine?.Item2).X)"
+                      y2="@Fmt(GetSVGCoordinatesFromReal(currentLine?.Item2).Y)"
+                      stroke="black" stroke-width="2" />
             }
 
             @foreach (var line in lines)
             {
-                <line x1="@GetSVGCoordinatesFromReal(line.Item1).X
-                                    " y1="@GetSVGCoordinatesFromReal(line.Item1).Y
-                                    " x2="@GetSVGCoordinatesFromReal(line.Item2).X
-                                    " y2="@GetSVGCoordinatesFromReal(line.Item2).Y
-                                    " stroke="black" stroke-width="2" />
+                <line x1="@Fmt(GetSVGCoordinatesFromReal(line.Item1).X)"
+                      y1="@Fmt(GetSVGCoordinatesFromReal(line.Item1).Y)"
+                      x2="@Fmt(GetSVGCoordinatesFromReal(line.Item2).X)"
+                      y2="@Fmt(GetSVGCoordinatesFromReal(line.Item2).Y)"
+                      stroke="black" stroke-width="2" />
             }
+
+            <g class="dxf-layer-palonniers">
             @if (Palonniers != null)
             {
                 @foreach (var pal in Palonniers)
                 {
                     if ((pal.X1 != null) && (pal.Y1 != null) && (pal.X2 != null) && (pal.Y2 != null))
                     {
-                        var p1 = new Point((double)pal.X1, (double)pal.Y1);
-                        var p2 = new Point((double)pal.X2, (double)pal.Y2);
-                        <line x1="@GetSVGCoordinatesFromReal(p1).X
-                                                                " y1="@GetSVGCoordinatesFromReal(p1).Y
-                                                                " x2="@GetSVGCoordinatesFromReal(p2).X
-                                                                " y2="@GetSVGCoordinatesFromReal(p2).Y"
-                              stroke="@(pal == selectedPalonnier ? "red" : pal == hoveredPalonnier ? "orange" : "green")"
-                              stroke-width="@(pal == selectedPalonnier ? "4" : pal == hoveredPalonnier ? "3" : "2")" />
-                    }
+                        var p1 = new Point((double)pal.X1 * MmToM + Point0X * MmToM, (double)pal.Y1 * MmToM + Point0Y * MmToM);
+                        var p2 = new Point((double)pal.X2 * MmToM + Point0X * MmToM, (double)pal.Y2 * MmToM + Point0Y * MmToM);
+                        var svgP1 = GetSVGCoordinatesFromReal(p1);
+                        var svgP2 = GetSVGCoordinatesFromReal(p2);
+                        <g>
+                            <title>@(pal.Name ?? "Palonnier") — @Ends(pal)</title>
+                            <line x1="@Fmt(svgP1.X)" y1="@Fmt(svgP1.Y)"
+                                  x2="@Fmt(svgP2.X)" y2="@Fmt(svgP2.Y)"
+                                  stroke="transparent" stroke-width="10" />
+                            <line x1="@Fmt(svgP1.X)" y1="@Fmt(svgP1.Y)"
+                                  x2="@Fmt(svgP2.X)" y2="@Fmt(svgP2.Y)"
+                                  stroke="@(pal == SelectedPalonnier ? "#99bbff" : pal == hoveredPalonnier ? "#aaccff" : "#4488ff")"
+                                  stroke-width="@(pal == SelectedPalonnier ? "4" : pal == hoveredPalonnier ? "3" : "2")" />
+                        </g>
                     }
                 }
             }
+            </g>
+
+            <g class="dxf-layer-mothergrids">
             @if (MotherGrids != null)
             {
                 @foreach (var moth in MotherGrids)
                 {
                     if ((moth.X1 != null) && (moth.Y1 != null) && (moth.X2 != null) && (moth.Y2 != null))
                     {
-                        var p1 = new Point((double)moth.X1, (double)moth.Y1);
-                        var p2 = new Point((double)moth.X2, (double)moth.Y2);
-                        <line x1="@GetSVGCoordinatesFromReal(p1).X
-                                                                        " y1="@GetSVGCoordinatesFromReal(p1).Y
-                                                                        " x2="@GetSVGCoordinatesFromReal(p2).X
-                                                                        " y2="@GetSVGCoordinatesFromReal(p2).Y"
-                              stroke="@(moth == selectedPalonnier ? "blue" : moth == hoveredMotherGrid ? "orange" : "yellow")"
-                              stroke-width="@(moth == selectedPalonnier ? "4" : moth == hoveredMotherGrid ? "3" : "2")" />
+                        var p1 = new Point((double)moth.X1 * MmToM + Point0X * MmToM, (double)moth.Y1 * MmToM + Point0Y * MmToM);
+                        var p2 = new Point((double)moth.X2 * MmToM + Point0X * MmToM, (double)moth.Y2 * MmToM + Point0Y * MmToM);
+                        var svgP1 = GetSVGCoordinatesFromReal(p1);
+                        var svgP2 = GetSVGCoordinatesFromReal(p2);
+                        <g>
+                            <title>@(moth.Name ?? "MotherGrid") — @Ends(moth)</title>
+                            <line x1="@Fmt(svgP1.X)" y1="@Fmt(svgP1.Y)"
+                                  x2="@Fmt(svgP2.X)" y2="@Fmt(svgP2.Y)"
+                                  stroke="transparent" stroke-width="10" />
+                            <line x1="@Fmt(svgP1.X)" y1="@Fmt(svgP1.Y)"
+                                  x2="@Fmt(svgP2.X)" y2="@Fmt(svgP2.Y)"
+                                  stroke="@(moth == SelectedMotherGrid ? "#ff8888" : moth == hoveredMotherGrid ? "#ffaaaa" : "#cc2222")"
+                                  stroke-width="@(moth == SelectedMotherGrid ? "4" : moth == hoveredMotherGrid ? "3" : "2")" />
+                        </g>
                     }
                 }
             }
 
-            @foreach (var circle in circles)
+            </g>
+
+            @* Where the selected palonnier hangs: a green dot where it is hooked, a red cross where it crosses a
+               mother without being hooked. An editing aid, left out of every export. *@
+            <g class="plan-editing-only">
+            @if (SelectedPalonnier is { Famille: false } && MotherGrids != null)
             {
-                <circle cx="@GetSVGCoordinatesFromReal(circle.Center).X" cy="@GetSVGCoordinatesFromReal(circle.Center).Y" r="@circle.Radius" fill="@circle.Color" />
+                var hanging = global::Helpers.PalonnierHanging.Resolve(SelectedPalonnier, MotherGrids);
+                foreach (var crossing in hanging.Crossings)
+                {
+                    var at = crossing.HungFrom ?? crossing.Candidates[0];
+                    var mark = GetSVGCoordinatesFromReal(new Point(at.X * MmToM + Point0X * MmToM, at.Y * MmToM + Point0Y * MmToM));
+                    var why = global::Helpers.PalonnierHanging.DescribeDecision(crossing);
+                    if (crossing.Hooked)
+                    {
+                        <circle cx="@Fmt(mark.X)" cy="@Fmt(mark.Y)" r="6" fill="#1e9e4a" stroke="white" stroke-width="1.5">
+                            <title>Accroché à @(at.Mother.Name) — @why</title>
+                        </circle>
+                    }
+                    else
+                    {
+                        <g>
+                            <title>Non accroché à @(at.Mother.Name) — @why</title>
+                            <circle cx="@Fmt(mark.X)" cy="@Fmt(mark.Y)" r="6" fill="white" stroke="#d11a2a" stroke-width="2" />
+                            <line x1="@Fmt(mark.X - 4)" y1="@Fmt(mark.Y - 4)" x2="@Fmt(mark.X + 4)" y2="@Fmt(mark.Y + 4)" stroke="#d11a2a" stroke-width="2" />
+                            <line x1="@Fmt(mark.X - 4)" y1="@Fmt(mark.Y + 4)" x2="@Fmt(mark.X + 4)" y2="@Fmt(mark.Y - 4)" stroke="#d11a2a" stroke-width="2" />
+                        </g>
+                    }
+                }
+            }
+            </g>
+
+            @* Afficher les points d'intersection *@
+            <g class="dxf-layer-intersections">
+            @if (IntersectionPoints != null && IntersectionPoints.Any())
+            {
+                @foreach (var kvp in IntersectionPoints)
+                {
+                    @foreach (var point in kvp.Value)
+                    {
+                        var svgPoint = GetSVGCoordinatesFromReal(new Point(point.X * MmToM + Point0X * MmToM, point.Y * MmToM + Point0Y * MmToM));
+                        <circle cx="@Fmt(svgPoint.X)" cy="@Fmt(svgPoint.Y)" r="5" fill="red" stroke="darkred" stroke-width="2" opacity="0.8">
+                            <title>Intersection : @StudyPair(point.X, point.Y) m</title>
+                        </circle>
+                    }
+                }
             }
 
+            </g>
+
+            @* Afficher les charges sur la charpente *@
+            @if (CharpenteLoads != null && CharpenteLoads.Any())
+            {
+                @foreach (var load in CharpenteLoads)
+                {
+                    var coords = CharpenteCoordinates.GetCoordinates(load.Key);
+                    if (coords.HasValue)
+                    {
+                        var svgPoint = GetSVGCoordinatesFromReal(new Point(coords.Value.X * MmToM, coords.Value.Y * MmToM));
+                        var color = load.Value > 100 ? "red" : load.Value > 50 ? "orange" : "green";
+                        var loadText = load.Value.ToString("F1");
+                        
+                        @* Cercle coloré *@
+                        <circle cx="@Fmt(svgPoint.X)" cy="@Fmt(svgPoint.Y)" r="8" 
+                                fill="@color" stroke="black" stroke-width="1" opacity="0.7">
+                            <title>@load.Key: @load.Value.ToString("F2")</title>
+                        </circle>
+                        
+                        @* Afficher la valeur de la charge - émettre via MarkupString *@
+                        @SvgLabel(svgPoint.X + 12, svgPoint.Y + 5, color, loadText)
+                    }
+                }
+            }
+
+            @* Afficher les charges utilisateur (ChargesSceniques) *@
+            <g class="dxf-layer-charges">
+            @if (ChargesSceniques != null && ChargesSceniques.Any())
+            {
+                @foreach (var load in ChargesSceniques)
+                {
+                    if (load.X is not null && load.Y is not null && load.Charge is not null)
+                    {
+                        @* load.X/Y are in user/event coords → convert to absolute real coords for SVG *@
+                        var svgPoint = GetSVGCoordinatesFromReal(new Point(load.X.Value * MmToM + Point0X * MmToM, load.Y.Value * MmToM + Point0Y * MmToM));
+                        var chargeValue = load.Charge.Value;
+                        var color = chargeValue > 500 ? "darkred" : chargeValue > 200 ? "darkorange" : "darkgreen";
+                        var loadText = chargeValue.ToString("F1");
+
+                        <g transform="translate(@Fmt(svgPoint.X), @Fmt(svgPoint.Y))"
+                           style="pointer-events: none;">
+                            <line x1="0" y1="-20" x2="0" y2="-5"
+                                  stroke="@color" stroke-width="2" />
+                            <polygon points="0,-5 -4,-10 4,-10"
+                                     fill="@color" stroke="@color" stroke-width="1" />
+                            <circle cx="0" cy="0" r="6"
+                                    fill="@color" stroke="white" stroke-width="1.5" opacity="0.85">
+                                <title>@(load.Name ?? "Charge") : @chargeValue.ToString("0.00", Fr) kg — @StudyPair(load.X.Value, load.Y.Value) m</title>
+                            </circle>
+                            <text x="8" y="-12"
+                                  font-size="11"
+                                  font-weight="bold"
+                                  fill="@color"
+                                  stroke="white"
+                                  stroke-width="0.5"
+                                  paint-order="stroke"
+                                  style="pointer-events: none;">@loadText</text>
+                        </g>
+                    }
+                }
+            }
+
+            </g>
+
+            @* Afficher les charges sur les palonniers, et sur les mothers auxquels elles sont accrochées directement *@
+            <g class="dxf-layer-palonnierloads">
+            @if (PalonnierLoads != null && PalonnierLoads.Any())
+            {
+                @foreach (var charge in PalonnierLoads)
+                {
+                    var palonnier = CarrierOf(charge);   // a palonnier, or a mother line the charge hangs from directly
+                    if (palonnier != null && palonnier.X1 != null && palonnier.Y1 != null &&
+                        palonnier.X2 != null && palonnier.Y2 != null && charge.X != null)
+                    {
+                        double x1 = (double)palonnier.X1;
+                        double y1 = (double)palonnier.Y1;
+                        double x2 = (double)palonnier.X2;
+                        double y2 = (double)palonnier.Y2;
+
+                        double palonnierLength = Math.Sqrt(Math.Pow(x2 - x1, 2) + Math.Pow(y2 - y1, 2));
+                        double ratio = palonnierLength > 0 ? (charge.X ?? 0) / palonnierLength : 0;
+
+                        double chargeX = x1 + ratio * (x2 - x1);
+                        double chargeY = y1 + ratio * (y2 - y1);
+
+                        var svgChargePos = GetSVGCoordinatesFromReal(new Point(
+                            chargeX * MmToM + Point0X * MmToM,
+                            chargeY * MmToM + Point0Y * MmToM));
+
+                        var chargeValue = charge.Charge ?? 0;
+                        var color = chargeValue > 500 ? "darkred" : chargeValue > 200 ? "darkorange" : "darkgreen";
+                        var loadText = chargeValue.ToString("F1");
+                        var isSelected = charge == SelectedCharge;
+                        var currentCharge = charge; // Capture for closure
+
+                        <g transform="translate(@Fmt(svgChargePos.X), @Fmt(svgChargePos.Y))"
+                           @onclick="@(async () => await HandleChargeClick(currentCharge))"
+                           @onclick:stopPropagation="true"
+                           @onmousedown:stopPropagation="true"
+                           @onmouseup:stopPropagation="true"
+                           style="cursor: @(isSelectingEnabled ? "pointer" : "default");">
+                            <line x1="0" y1="-20" x2="0" y2="-5" stroke="@color" stroke-width="2" />
+                            <polygon points="0,-5 -4,-10 4,-10" fill="@color" stroke="@color" stroke-width="1" />
+                            @if (isSelected)
+                            {
+                                <circle cx="0" cy="0" r="10" fill="none" stroke="yellow" stroke-width="2.5" />
+                            }
+                            <circle cx="0" cy="0" r="6"
+                                    fill="@color"
+                                    stroke="@(isSelected ? "yellow" : "white")"
+                                    stroke-width="@(isSelected ? "2.5" : "1.5")"
+                                    opacity="0.8">
+                                <title>@(charge.Name ?? "Charge"): @chargeValue.ToString("F2") (@palonnier.Name)</title>
+                            </circle>
+                            <text x="8" y="-12" font-size="11" font-weight="bold" fill="@color"
+                                  stroke="white" stroke-width="0.5" paint-order="stroke"
+                                  style="pointer-events: none;">@loadText</text>
+                        </g>
+                    }
+                }
+            }
+
+            </g>
+
+            @foreach (var circle in circles)
+            {
+                <circle cx="@Fmt(GetSVGCoordinatesFromReal(circle.Center).X)" cy="@Fmt(GetSVGCoordinatesFromReal(circle.Center).Y)" r="@circle.Radius" fill="@circle.Color" />
+            }
+
+            @* Sensors rendering *@
+            <g class="dxf-layer-sensors">
+            @if (Sensors != null)
+            {
+                @foreach (var sensor in Sensors)
+                {
+                    var xAttr = sensor.AttributeElements?.FirstOrDefault(ae => ae.AttributeType?.Name == "X");
+                    var yAttr = sensor.AttributeElements?.FirstOrDefault(ae => ae.AttributeType?.Name == "Y");
+                    
+                    if (xAttr != null && yAttr != null && 
+                        double.TryParse(xAttr.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double sensorX) && 
+                        double.TryParse(yAttr.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out double sensorY))
+                    {
+                        var sensorPos = new Point(sensorX, sensorY);
+                        var svgPos = GetSVGCoordinatesFromReal(sensorPos);
+                        var currentSensor = sensor; // Capture for closure
+                        var fillColor = GetSensorColor(sensor);
+                        var strokeColor = GetSensorStrokeColor(sensor);
+                        var hasRatio = SensorChargeRatios != null && SensorChargeRatios.TryGetValue(sensor.ElementId, out double displayRatio);
+                        var ratioText = hasRatio ? $" — Charge: {SensorChargeRatios[sensor.ElementId] * 100:F0}%" : "";
+                        
+                        @if (IsSensorSelectionEnabled)
+                        {
+                            <g transform="translate(@Fmt(svgPos.X), @Fmt(svgPos.Y))" 
+                               class="sensor-marker"
+                               @onclick="@(async () => await HandleSensorClick(currentSensor))"
+                               @onclick:stopPropagation="true"
+                               @onmousedown:stopPropagation="true"
+                               @onmouseup:stopPropagation="true">
+                                <circle r="8" 
+                                        fill="@fillColor" 
+                                        stroke="white" 
+                                        stroke-width="2"
+                                        opacity="0.9"
+                                        style="cursor: pointer;">
+                                    <title>@sensor.Name@ratioText</title>
+                                </circle>
+                                
+                                <circle r="12" 
+                                        fill="none" 
+                                        stroke="@strokeColor" 
+                                        stroke-width="1"
+                                        opacity="0.5" />
+                                
+                                <text x="16" y="5" 
+                                      font-size="11" 
+                                      font-weight="500"
+                                      fill="#333" 
+                                      stroke="white"
+                                      stroke-width="0.5"
+                                      paint-order="stroke"
+                                      style="pointer-events: none;">@sensor.Name</text>
+                            </g>
+                        }
+                        else
+                        {
+                            @* Non-interactive sensor display - allows drawing through sensors *@
+                            <g transform="translate(@Fmt(svgPos.X), @Fmt(svgPos.Y))" 
+                               class="sensor-marker"
+                               style="pointer-events: none;">
+                                <circle r="8" 
+                                        fill="@fillColor" 
+                                        stroke="white" 
+                                        stroke-width="2"
+                                        opacity="0.9"
+                                        style="pointer-events: all;">
+                                    <title>@sensor.Name@ratioText</title>
+                                </circle>
+                                
+                                <circle r="12" 
+                                        fill="none" 
+                                        stroke="@strokeColor" 
+                                        stroke-width="1"
+                                        opacity="0.5" />
+                                
+                                <text x="16" y="5" 
+                                      font-size="11" 
+                                      font-weight="500"
+                                      fill="#333" 
+                                      stroke="white"
+                                      stroke-width="0.5"
+                                      paint-order="stroke">@sensor.Name</text>
+                            </g>
+                        }
+
+                        @* Status overlay (Inactif / Panne) drawn on top of the sensor icon *@
+                        @if (GetStatut(sensor) == "Panne")
+                        {
+                            @* Red warning triangle with "!", centred on the sensor icon *@
+                            <g transform="translate(@Fmt(svgPos.X), @Fmt(svgPos.Y))" style="pointer-events: none;">
+                                <polygon points="0,-9 9,7 -9,7" fill="#e53935" stroke="white" stroke-width="1" />
+                                <text x="0" y="5" font-size="11" font-weight="bold" text-anchor="middle" fill="white">!</text>
+                                <title>@sensor.Name — Panne</title>
+                            </g>
+                        }
+                        else if (GetStatut(sensor) == "Inactif")
+                        {
+                            @* Grey "inactive" slash, centred on the sensor icon (white halo for contrast) *@
+                            <g transform="translate(@Fmt(svgPos.X), @Fmt(svgPos.Y))" style="pointer-events: none;">
+                                <line x1="-7" y1="-7" x2="7" y2="7" stroke="white" stroke-width="4" stroke-linecap="round" />
+                                <line x1="-7" y1="-7" x2="7" y2="7" stroke="#555555" stroke-width="2" stroke-linecap="round" />
+                                <title>@sensor.Name — Inactif</title>
+                            </g>
+                        }
+                    }
+                }
+            }
+            </g>
         </svg>
-        <div style="position: absolute; top: 10px; left: calc(100% + 10px);">
+        @* ── Toolbar ── *@
+        <div style="position: absolute; top: 10px; right: 10px; display: flex; flex-direction: column; gap: 4px; z-index: 10;
+                    background: rgba(255,255,255,0.75); border-radius: 6px; padding: 4px; backdrop-filter: blur(4px);">
             <button class="toolbar-button" @onclick="ZoomToExtent" title="Zoom to Extent">
-                <i class="fas fa-expand-arrows-alt"></i> <!-- FontAwesome icon -->
+                <i class="fas fa-expand-arrows-alt"></i>
             </button>
             <button class="toolbar-button" @onclick="ToggleSnapping" title="Toggle Node Snapping"
                     style="background-color: @(isSnappingEnabled ? "green" : "gray");">
@@ -114,40 +472,167 @@
                     style="background-color: red; color: white;">
                 <i class="fas fa-eraser"></i>
             </button>
+            @* ── DXF export buttons ── *@
+            <button class="toolbar-button" @onclick="OpenDxfSettings" title="DXF Export Settings"
+                    style="background-color: #555; color: white;">
+                <i class="fas fa-cog"></i>
+            </button>
+            <button class="toolbar-button" @onclick="ExportDxf" title="Export to DXF"
+                    style="background-color: #1565C0; color: white;">
+                <i class="fas fa-file-export"></i>
+            </button>
+        </div>
+
+        @* ── DXF Settings Modal ── *@
+        @if (showDxfSettings)
+        {
+            <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+                        background: rgba(0,0,0,0.45); z-index: 100; display: flex; align-items: center; justify-content: center;"
+                 @onclick="CloseDxfSettings">
+                <div id="dxfSettingsPanel"
+                     style="background: white; border-radius: 10px; padding: 24px; min-width: 300px; box-shadow: 0 4px 24px rgba(0,0,0,0.3);"
+                     @onclick:stopPropagation="true">
+                    <h5 id="dxfSettingsHeader" style="margin-bottom: 16px; font-weight: bold;"
+                        title="Glisser pour déplacer">
+                        <i class="fas fa-arrows-alt" style="color:#9aa2b1; margin-right:6px;"></i>
+                        <i class="fas fa-file-export"></i> DXF Export Settings
+                    </h5>
+
+                    @* ── File name ── *@
+                    <div style="margin-bottom: 14px;">
+                        <label style="font-size:13px; font-weight:600; display:block; margin-bottom:4px;">File name</label>
+                        <div style="display:flex; align-items:center; gap:4px;">
+                            <input type="text" @bind="dxfExportFileName"
+                                   style="flex:1; padding:4px 8px; border:1px solid #ccc; border-radius:4px; font-size:13px;"
+                                   placeholder="export" />
+                            <span style="font-size:13px; color:#666;">.dxf</span>
+                        </div>
+                    </div>
+
+                    @* ── Layer selection ── *@
+                    <div style="display: flex; flex-direction: column; gap: 10px; font-size: 14px;">
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                            <input type="checkbox" id="dxfChkMotherGrids" @bind="dxfExportMotherGrid" /> Mother Grids
+                        </label>
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                            <input type="checkbox" id="dxfChkPalonniers" @bind="dxfExportPalonniers" /> Palonniers
+                        </label>
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                            <input type="checkbox" id="dxfChkCharges" @bind="dxfExportCharges" /> Charges Scéniques
+                        </label>
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                            <input type="checkbox" id="dxfChkPalonnierLoads" @bind="dxfExportPalonnierLoads" /> Palonnier Loads
+                        </label>
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                            <input type="checkbox" id="dxfChkIntersections" @bind="dxfExportIntersections" /> Intersection Points
+                        </label>
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                            <input type="checkbox" id="dxfChkSensors" @bind="dxfExportSensors" /> Sensors
+                        </label>
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                            <input type="checkbox" id="dxfChkOrigin" @bind="dxfExportOrigin" /> Origin / Axes
+                        </label>
+                        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"
+                               title="DXF: image linked by path (keep the .jpg next to the .dxf). JPG: drawn into the picture.">
+                            <input type="checkbox" id="dxfChkBackground" @bind="dxfExportBackgroundImage" /> Background Picture
+                        </label>
+                        @if (dxfExportBackgroundImage)
+                        {
+                            <div style="font-size:11px; color:#666; margin:-4px 0 0 26px; line-height:1.4;">
+                                Le DXF référence l'image par son nom : deux fenêtres
+                                « Enregistrer sous » s'ouvrent — le .dxf puis le .jpg, qui se place
+                                par défaut dans le même dossier. Gardez les deux côte à côte.
+                            </div>
+                        }
+                    </div>
+
+                    <div style="display:flex; gap:8px; margin-top: 20px; justify-content: flex-end;">
+                        <button id="dxfCancelBtn" class="btn btn-secondary btn-sm" @onclick="CloseDxfSettings">Cancel</button>
+                        @* Plain onclick: the Save-As picker needs the click's user activation, which a
+                           Blazor server round-trip would expire. Layer choices are read from the DOM. *@
+                        <button type="button" class="btn btn-info btn-sm" style="color:white;"
+                                onclick="exportSvgToJpg('no-scroll-svg', '@(ExportBaseName)')">
+                            <i class="fas fa-image"></i> Export JPG
+                        </button>
+                        <button class="btn btn-primary btn-sm" @onclick="ExportDxfAndClose">
+                            <i class="fas fa-download"></i> Export DXF
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+        <div style="position: absolute; bottom: 10px; left: 10px; z-index: 10;
+            background: rgba(255,255,255,0.75); border-radius: 4px; padding: 2px 8px;
+            font-size: 11px; font-family: monospace; pointer-events: none;">
+            X: @MouseStudy.X.ToString("F2", Fr) m &nbsp; Y: @MouseStudy.Y.ToString("F2", Fr) m
         </div>
     </div>
 }
 
+
 @code {
+    private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
+
+    // Add helper method to format points for SVG
+    private string Fmt(double value) => value.ToString(Inv);
+    private string FmtPoint(Point pt) => $"{pt.X.ToString(Inv)},{pt.Y.ToString(Inv)}";
+
     [Parameter]
     public EventCallback<(double x1, double y1, double x2, double y2)> LineDrawn { get; set; }
 
     [Parameter]
     public EventCallback<MotherGridPalonnier> OnErase { get; set; }
 
-    private double imageScale = 1.0; // Default scale is 100%
+    [Parameter]
+    public EventCallback<MouseEventArgs> SvgClicked { get; set; }
 
-    static int width = 754;
-    static int height = 400;
+    [Parameter]
+    public EventCallback<Element> OnSensorClicked { get; set; }
 
-    double realWidth = 65397 + 3000;
-    double realHeight = 18151 + 18150;
+    // The plan is drawn in the studies' orientation (PlanView): beams horizontal, J at the top, points 1 to 9
+    // from left to right, X to the right and Y up from Point0. The component's "real" coordinates stay in the
+    // grid's axes, absolute millimetres.
 
-    double x = -3000;
-    double y = -18150;
-    Point origPt;
+    // Set once the first view is computed (OnInitializedAsync); nothing is drawn before.
+    private bool planReady;
 
-    int snapDistThreshold = 1000;
+    // The Point0 the view was computed for. The plan is drawn relative to Point0, so when the event's origin
+    // arrives after the first render, or changes, the view is moved with it (OnParametersSet).
+    private double? viewPoint0X, viewPoint0Y;
+
+    private static readonly CultureInfo Fr = CultureInfo.GetCultureInfo("fr-FR");
+
+    // Drawing snaps an end onto a charpente point, a mother end or a palonnier end within this distance. The
+    // snapping compares positions in the component's "real" coordinates - the grid's axes, absolute millimetres -
+    // so it is set in millimetres.
+    private const double SnapDistanceMm = 1000;
+
+    // Hover and selection take the element within this many pixels of the mouse, whatever the zoom: set on the
+    // screen, where people aim, and turned into metres on the plan at the current scale (PickToleranceM). A click
+    // farther than that from every element selects nothing.
+    private const double PickTolerancePx = 8;
+
     private bool isSnappingEnabled = false;
     private bool isMotherGridsSnappingEnabled = false;
     private bool isPalonniersSnappingEnabled = false;
     private bool isSelectingEnabled = false;
 
-    private MotherGridPalonnier selectedPalonnier = null; // Track the selected palonnier
-    private MotherGridPalonnier hoveredPalonnier = null;  // Track the hovered palonnier
+    private MotherGridPalonnier hoveredPalonnier = null;
     private MotherGridPalonnier hoveredMotherGrid = null;
 
-    private string viewBox = string.Empty; // Default viewBox, can be set dynamically
+    [Parameter]
+    public List<Element> Sensors { get; set; }
+    
+    [Parameter]
+    public bool IsPositioningMode { get; set; }
+    
+    [Parameter]
+    public bool IsSensorSelectionEnabled { get; set; } = false;  // NEW: Control sensor click behavior
+    
+    private Element selectedSensor = null;
+    private Element hoveredSensor = null;
+
+    private string viewBox = string.Empty;
     private List<(Point, Point)> lines = new List<(Point, Point)>();
     private List<Circle> circles = new List<Circle>();
 
@@ -157,246 +642,264 @@
     [Parameter]
     public List<MotherGridPalonnier> Palonniers { get; set; }
 
+    [Parameter]
+    public Dictionary<Guid, List<(double X, double Y)>> IntersectionPoints { get; set; } = new Dictionary<Guid, List<(double X, double Y)>>();
 
+    [Parameter]
+    public Dictionary<string, double> CharpenteLoads { get; set; } = new Dictionary<string, double>();
+
+    /// <summary>
+    /// User-placed loads from ChargesSceniques, positioned by real-world X/Y coordinates.
+    /// </summary>
+    [Parameter]
+    public List<ChargesScenique> ChargesSceniques { get; set; }
+
+    //   Ajouter un paramètre pour les charges sur les palonniers
+    [Parameter]
+    public List<ChargeMp> PalonnierLoads { get; set; }
+
+    /// <summary>
+    /// Maps sensor ElementId to its max charge ratio (0.0–1.0+) for color-coding.
+    /// </summary>
+    [Parameter]
+    public Dictionary<Guid, double> SensorChargeRatios { get; set; } = new Dictionary<Guid, double>();
+
+    // Reads a sensor's "Statut" attribute (Actif / Inactif / Panne) for the status overlay.
+    private string GetStatut(Element sensor)
+        => sensor?.AttributeElements?.FirstOrDefault(ae => ae.AttributeType?.Name == "Statut")?.Value;
 
     private bool isDrawing = false;
     private Point startPoint;
     private (Point, Point)? currentLine;
     private bool isPanning = false;
     private bool freeSketch = false;
-    // private Point panStart;
     private Point lastPanPoint;
 
     Dictionary<(string, string), (double, double)> coordinates = new Dictionary<(string, string), (double, double)>();
+
+    private Point mouseRealPos = new Point(0, 0);
+
+    /// <summary>
+    /// Event-level user origin offset. All displayed coordinates are shown relative to this point.
+    /// </summary>
+    [Parameter]
+    public double Point0X { get; set; } = 0;
+
+    [Parameter]
+    public double Point0Y { get; set; } = 0;
+
+    // ── Drawing data, written to the DRAWING_DATA layer of the exported DXF ────────────────
+    [Parameter]
+    public string EventName { get; set; }
+
+    [Parameter]
+    public Guid? EventId { get; set; }
+
+    [Parameter]
+    public string ScenarioName { get; set; }
+
+    [Parameter]
+    public Guid? ScenarioId { get; set; }
+
+    [Parameter]
+    public string StructureName { get; set; }
+
+    /// <summary>Page the export was launched from, recorded in the DXF drawing data.</summary>
+    [Parameter]
+    public string ModuleName { get; set; }
+
+    /// <summary>mm → m conversion factor for user-facing coordinates.</summary>
+    private const double MmToM = 1000.0;
+
+    // Where the mouse is, as the studies give it: metres from Point0, X along the beams towards point 9, Y across
+    // them towards J.
+    private (double X, double Y) MouseStudy => PlanView.StudyMetres(mouseRealPos.X, mouseRealPos.Y, Point0X, Point0Y);
+
+    // A position stored as element ends and loads are - the grid's axes, metres from Point0 - printed in the
+    // studies' axes: "(12,35 ; -4,00)".
+    private static string StudyPair(double gridXm, double gridYm)
+    {
+        var (x, y) = global::Helpers.StudyAxes.ToStudy(gridXm, gridYm);
+        return $"({x.ToString("0.00", Fr)} ; {y.ToString("0.00", Fr)})";
+    }
+
+    // An element's ends in the studies' axes, for its tooltip.
+    private static string Ends(MotherGridPalonnier e) =>
+        e.X1 is { } x1 && e.Y1 is { } y1 && e.X2 is { } x2 && e.Y2 is { } y2
+            ? $"{StudyPair(x1, y1)} → {StudyPair(x2, y2)} m"
+            : "";
+
+    // The element a ChargeMp hangs on: a palonnier, or a mother line it hangs from directly (a motor within
+    // 8 cm of a point line). ChargeMp.X is the distance along either from its (X1, Y1).
+    private MotherGridPalonnier CarrierOf(ChargeMp charge) =>
+        Palonniers?.FirstOrDefault(p => p.MotherGridPalonnierId == charge.MotherGridPalonnierId)
+        ?? MotherGrids?.FirstOrDefault(m => m.MotherGridPalonnierId == charge.MotherGridPalonnierId);
+
+    private DotNetObjectReference<SVGComponent> _selfRef;
+    private IJSObjectReference _resizeObserver;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            // Call the JavaScript function to prevent wheel event propagation
             await js.InvokeVoidAsync("preventWheelPropagation", "no-scroll-svg");
+            await RefreshSvgRect();
+            _selfRef = DotNetObjectReference.Create(this);
+            _resizeObserver = await js.InvokeAsync<IJSObjectReference>(
+                "observeSvgResize", "no-scroll-svg", _selfRef);
         }
+
+        // The DXF dialog is re-created each time it opens, so wire up dragging on its new element.
+        if (showDxfSettings)
+        {
+            await js.InvokeVoidAsync("makeElementDraggable", "dxfSettingsPanel", "dxfSettingsHeader");
+        }
+    }
+
+    [JSInvokable]
+    public void OnSvgResized(double left, double top, double w, double h)
+    {
+        _svgLeft      = left;
+        _svgTop       = top;
+        _svgCssWidth  = w > 0 ? w : _svgCssWidth;
+        _svgCssHeight = h > 0 ? h : _svgCssHeight;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_resizeObserver is not null)
+            await _resizeObserver.InvokeVoidAsync("dispose");
+        _selfRef?.Dispose();
     }
 
     protected override async Task OnInitializedAsync()
     {
-        origPt = new Point(x, y);
-        viewBox = $"{GetSVGCoordinatesFromReal(origPt).X} {GetSVGCoordinatesFromReal(origPt).Y} {width} {height}";
+        FitView();   // seeds the parsed viewBox too
+        planReady = true;
 
-        coordinates.Add(("J", "9"), (0, 15150));
-        coordinates.Add(("I", "9"), (3797, 15150));
-        coordinates.Add(("H", "9"), (10997, 15150));
-        coordinates.Add(("G", "9"), (18697, 15150));
-        coordinates.Add(("F", "9"), (25947, 15150));
-        coordinates.Add(("E", "9"), (33103, 15150));
-        coordinates.Add(("D", "9"), (40247, 15150));
-        coordinates.Add(("C", "9"), (47497, 15150));
-        coordinates.Add(("B", "9"), (55197, 15150));
-        coordinates.Add(("A", "9"), (62397, 15150));
-
-        coordinates.Add(("J", "8"), (0, 11050));
-        coordinates.Add(("I", "8"), (3797, 11050));
-        coordinates.Add(("H", "8"), (10997, 11050));
-        coordinates.Add(("G", "8"), (18697, 11050));
-        coordinates.Add(("F", "8"), (25947, 11050));
-        coordinates.Add(("E", "8"), (33103, 11050));
-        coordinates.Add(("D", "8"), (40247, 11050));
-        coordinates.Add(("C", "8"), (47497, 11050));
-        coordinates.Add(("B", "8"), (55197, 11050));
-        coordinates.Add(("A", "8"), (62397, 11050));
-
-        coordinates.Add(("J", "7"), (0, 7400));
-        coordinates.Add(("I", "7"), (3797, 7400));
-        coordinates.Add(("H", "7"), (10997, 7400));
-        coordinates.Add(("G", "7"), (18697, 7400));
-        coordinates.Add(("F", "7"), (25947, 7400));
-        coordinates.Add(("E", "7"), (33103, 7400));
-        coordinates.Add(("D", "7"), (40247, 7400));
-        coordinates.Add(("C", "7"), (47497, 7400));
-        coordinates.Add(("B", "7"), (55197, 7400));
-        coordinates.Add(("A", "7"), (62397, 7400));
-
-        coordinates.Add(("J", "6"), (0, 3700));
-        coordinates.Add(("I", "6"), (3797, 3700));
-        coordinates.Add(("H", "6"), (10997, 3700));
-        coordinates.Add(("G", "6"), (18697, 3700));
-        coordinates.Add(("F", "6"), (25947, 3700));
-        coordinates.Add(("E", "6"), (33103, 3700));
-        coordinates.Add(("D", "6"), (40247, 3700));
-        coordinates.Add(("C", "6"), (47497, 3700));
-        coordinates.Add(("B", "6"), (55197, 3700));
-        coordinates.Add(("A", "6"), (62397, 3700));
-
-        coordinates.Add(("J", "5"), (0, 0));
-        coordinates.Add(("I", "5"), (3797, 0));
-        coordinates.Add(("H", "5"), (10997, 0));
-        coordinates.Add(("G", "5"), (18697, 0));
-        coordinates.Add(("F", "5"), (25947, 0));
-        coordinates.Add(("E", "5"), (33103, 0));
-        coordinates.Add(("D", "5"), (40247, 0));
-        coordinates.Add(("C", "5"), (47497, 0));
-        coordinates.Add(("B", "5"), (55197, 0));
-        coordinates.Add(("A", "5"), (62397, 0));
-
-        coordinates.Add(("J", "4"), (0, -3700));
-        coordinates.Add(("I", "4"), (3797, -3700));
-        coordinates.Add(("H", "4"), (10997, -3700));
-        coordinates.Add(("G", "4"), (18697, -3700));
-        coordinates.Add(("F", "4"), (25947, -3700));
-        coordinates.Add(("E", "4"), (33103, -3700));
-        coordinates.Add(("D", "4"), (40247, -3700));
-        coordinates.Add(("C", "4"), (47497, -3700));
-        coordinates.Add(("B", "4"), (55197, -3700));
-        coordinates.Add(("A", "4"), (62397, -3700));
-
-        coordinates.Add(("J", "3"), (0, -7450));
-        coordinates.Add(("I", "3"), (3797, -7450));
-        coordinates.Add(("H", "3"), (10997, -7450));
-        coordinates.Add(("G", "3"), (18697, -7450));
-        coordinates.Add(("F", "3"), (25947, -7450));
-        coordinates.Add(("E", "3"), (33103, -7450));
-        coordinates.Add(("D", "3"), (40247, -7450));
-        coordinates.Add(("C", "3"), (47497, -7450));
-        coordinates.Add(("B", "3"), (55197, -7450));
-        coordinates.Add(("A", "3"), (62397, -7450));
-
-        coordinates.Add(("J", "2"), (0, -11050));
-        coordinates.Add(("I", "2"), (3797, -11050));
-        coordinates.Add(("H", "2"), (10997, -11050));
-        coordinates.Add(("G", "2"), (18697, -11050));
-        coordinates.Add(("F", "2"), (25947, -11050));
-        coordinates.Add(("E", "2"), (33103, -11050));
-        coordinates.Add(("D", "2"), (40247, -11050));
-        coordinates.Add(("C", "2"), (47497, -11050));
-        coordinates.Add(("B", "2"), (55197, -11050));
-        coordinates.Add(("A", "2"), (62397, -11050));
-
-        coordinates.Add(("J", "1"), (0, -15151));
-        coordinates.Add(("I", "1"), (3797, -15151));
-        coordinates.Add(("H", "1"), (10997, -15151));
-        coordinates.Add(("G", "1"), (18697, -15151));
-        coordinates.Add(("F", "1"), (25947, -15151));
-        coordinates.Add(("E", "1"), (33103, -15151));
-        coordinates.Add(("D", "1"), (40247, -15151));
-        coordinates.Add(("C", "1"), (47497, -15151));
-        coordinates.Add(("B", "1"), (55197, -15151));
-        coordinates.Add(("A", "1"), (62397, -15151));
-
-        foreach (var cor in coordinates)
-        {
-            circles.Add(new Circle(cor.Value.Item1, -cor.Value.Item2, 5));
-        }
-        // circles.Add(new Circle(-3000, 18151, 5));
+        foreach (var cor in CharpenteCoordinates.Points)
+            circles.Add(new Circle(cor.Value.X * MmToM, cor.Value.Y * MmToM, 5));
     }
 
-    // protected override async Task OnParametersSetAsync()
-    // {
-    //     StateHasChanged();
-
-    // }
-
+    //  Méthode pour rafraîchir la visualisation
+    public async Task RefreshVisualization()
+    {
+        await InvokeAsync(StateHasChanged);
+    }
 
     private async Task OnMouseDown(MouseEventArgs e)
     {
-        if (e.ShiftKey) // Check if Shift key is pressed for panning
+        if (IsPositioningMode) return;
+        await RefreshSvgRect(); // always get fresh rect before any interaction
+
+        if (e.ShiftKey)
         {
             lastPanPoint = new Point(e.ClientX, e.ClientY);
-            //panStart = new Point(e.ClientX, e.ClientY);
             isPanning = true;
         }
-        else // Otherwise, start drawing
+        else if (!isSelectingEnabled)
         {
-            if (!isSelectingEnabled)
-            {
-                await StartDrawing(e);
-            }
+            StartDrawing(e); // now synchronous — same formula as UpdateDrawing
         }
     }
 
-    private async Task OnMouseMove(MouseEventArgs e)
+    private void StartDrawing(MouseEventArgs e)
     {
-        if ((Palonniers != null) && (MotherGrids != null))
+        startPoint = ClientToSvgPoint(e.ClientX, e.ClientY); // same as UpdateDrawing
+        startPoint = GetRealCoordinatesFromSVG(startPoint);
+
+        if (isSnappingEnabled)
         {
-            var hoverPoint = await GetSvgCoordinates(e.ClientX, e.ClientY);
-            hoverPoint = GetRealCoordinatesFromSVG(hoverPoint);
-
-            MotherGridPalonnier nearestPalonnier = null;
-            MotherGridPalonnier nearestMotherGrid = null;
-            double minPerpendicularDistance = double.MaxValue;
-
-            // Check for closest Palonnier
-            foreach (var pal in Palonniers)
-            {
-                var p1 = new Point((double)pal.X1, (double)pal.Y1);
-                var p2 = new Point((double)pal.X2, (double)pal.Y2);
-                double perpendicularDistance = GetPerpendicularDistance(hoverPoint, p1, p2);
-
-                if (perpendicularDistance < minPerpendicularDistance && perpendicularDistance <= snapDistThreshold)
-                {
-                    minPerpendicularDistance = perpendicularDistance;
-                    nearestPalonnier = pal;
-                }
-            }
-        
-        // Check for closest MotherGrid
-
-            foreach (var moth in MotherGrids)
-            {
-                var p1 = new Point((double)moth.X1, (double)moth.Y1);
-                var p2 = new Point((double)moth.X2, (double)moth.Y2);
-                double perpendicularDistance = GetPerpendicularDistance(hoverPoint, p1, p2);
-
-                if (perpendicularDistance < minPerpendicularDistance && perpendicularDistance <= snapDistThreshold)
-                {
-                    minPerpendicularDistance = perpendicularDistance;
-                    nearestMotherGrid = moth;
-                }
-            }
-            // Update hover state
-            hoveredPalonnier = nearestPalonnier;
-            hoveredMotherGrid = nearestMotherGrid;
+            var nearestCircle = FindNearestCircle(startPoint, SnapDistanceMm);
+            if (nearestCircle != null) startPoint = nearestCircle.Center;
+        }
+        if (isMotherGridsSnappingEnabled)
+        {
+            var nearestPoint = FindNearestMotherGrid(startPoint, SnapDistanceMm);
+            if (nearestPoint != null) startPoint = nearestPoint;
+        }
+        if (isPalonniersSnappingEnabled)
+        {
+            var nearestPoint = FindNearestPalonnier(startPoint, SnapDistanceMm);
+            if (nearestPoint != null) startPoint = nearestPoint;
         }
 
-  
+        isDrawing = true;
+        currentLine = (startPoint, startPoint);
+    }
 
-        StateHasChanged(); // Trigger re-render to update hover effect
-        
-        
+    private void OnMouseMove(MouseEventArgs e)
+    {
+        if (IsPositioningMode) return;
+
+        var svgPoint = ClientToSvgPoint(e.ClientX, e.ClientY); // ← synchronous, no JS
+        mouseRealPos = GetRealCoordinatesFromSVG(svgPoint);
+
+        bool stateChanged = false;
+
+        // Highlight what a click here would select (ElementAt), and nothing away from every element.
+        var (hoverPalonnier, hoverMotherGrid) = ElementAt(mouseRealPos);
+        if (hoveredPalonnier != hoverPalonnier || hoveredMotherGrid != hoverMotherGrid)
+        {
+            hoveredPalonnier  = hoverPalonnier;
+            hoveredMotherGrid = hoverMotherGrid;
+            stateChanged = true;
+        }
+
         if (isPanning)
         {
             var dx = e.ClientX - lastPanPoint.X;
             var dy = e.ClientY - lastPanPoint.Y;
-            UpdateViewBox(dx, dy);
+            UpdateViewBox(dx, dy);             // calls StateHasChanged internally
             lastPanPoint = new Point(e.ClientX, e.ClientY);
+            return;
         }
-        else if (isDrawing && !isSelectingEnabled)
+
+        if (isDrawing && !isSelectingEnabled)
         {
-            await Draw(e);
+            UpdateDrawing(e);   // synchronous Draw (renamed below)
+            stateChanged = true;
         }
+
+        if (stateChanged)
+            StateHasChanged();
     }
 
-    private void UpdateViewBox(double dx, double dy)
+    // Renamed from Draw — now fully synchronous, no more async JS call
+    private void UpdateDrawing(MouseEventArgs e)
     {
-        // Parse current viewBox
-        var parts = viewBox.Split(' ');
-        var x = double.Parse(parts[0]);
-        var y = double.Parse(parts[1]);
-        var width = double.Parse(parts[2]);
-        var height = double.Parse(parts[3]);
+        var currentPoint = ClientToSvgPoint(e.ClientX, e.ClientY); // ← synchronous
+        currentPoint = GetRealCoordinatesFromSVG(currentPoint);
 
-        // Update viewBox to new position
-        viewBox = $"{x - dx} {y - dy} {width} {height}";
-        StateHasChanged();
+        if (isSnappingEnabled)
+        {
+            var nearestCircle = FindNearestCircle(currentPoint, SnapDistanceMm);
+            if (nearestCircle != null) currentPoint = nearestCircle.Center;
+        }
+        if (isMotherGridsSnappingEnabled)
+        {
+            var nearestPoint = FindNearestMotherGrid(currentPoint, SnapDistanceMm);
+            if (nearestPoint != null) currentPoint = nearestPoint;
+        }
+        if (isPalonniersSnappingEnabled)
+        {
+            var nearestPoint = FindNearestPalonnier(currentPoint, SnapDistanceMm);
+            if (nearestPoint != null) currentPoint = nearestPoint;
+        }
+
+        if (currentLine.HasValue)
+            currentLine = (startPoint, currentPoint);
     }
 
     private async Task OnMouseUp(MouseEventArgs e)
     {
+        if (IsPositioningMode) return;
+
         if (isPanning)
         {
             isPanning = false;
-            StateHasChanged();
         }
-        else if (isDrawing && !isSelectingEnabled)
+        else
         {
             await EndDrawing(e);
         }
@@ -404,251 +907,137 @@
 
     private async void OnWheel(WheelEventArgs e)
     {
-        const double scaleFactor = 0.1; // How much to zoom in or out
-        var zoom = e.DeltaY > 0 ? (1 - scaleFactor) : (1 + scaleFactor); // Reversing the direction for a more intuitive zoom
+        const double scaleFactor = 0.1;
+        var zoom = e.DeltaY > 0 ? (1 - scaleFactor) : (1 + scaleFactor);
 
-        var parts = viewBox.Split(' ');
-        var x = double.Parse(parts[0]);
-        var y = double.Parse(parts[1]);
-        var width = double.Parse(parts[2]);
-        var height = double.Parse(parts[3]);
+        double mouseX = _vx + _vw / 2;
+        double mouseY = _vy + _vh / 2;
 
+        var newWidth  = _vw * zoom;
+        var newHeight = _vh * zoom;
+        var newX      = _vx + (mouseX - _vx) - (mouseX - _vx) * zoom;
+        var newY      = _vy + (mouseY - _vy) - (mouseY - _vy) * zoom;
 
-        // var mousePoint = await GetSvgCoordinates(e.ClientX, e.ClientY);
-        // var mouseX = mousePoint.X; // These should be SVG coordinates, convert from client if necessary
-        // var mouseY = mousePoint.Y;
-
-        // Simplified: Assume mouse is at the center of the current viewBox
-        double mouseX = x + width / 2;
-        double mouseY = y + height / 2;
-
-        // Calculate new width and height
-        var newWidth = width * zoom;
-        var newHeight = height * zoom;
-
-
-
-
-        // Adjust x and y to keep the zoom centered around the mouse cursor
-        var newX = x + (mouseX - x) - (mouseX - x) * zoom;
-        var newY = y + (mouseY - y) - (mouseY - y) * zoom;
-
-        viewBox = $"{newX} {newY} {newWidth} {newHeight}";
-        imageScale /= zoom;
+        SetViewBox(newX, newY, newWidth, newHeight);
         StateHasChanged();
     }
-    private async Task<MotherGridPalonnier> OnClick(MouseEventArgs e)
+
+    // ── Replace the private field ─────────────────────────────────────────────
+    // REMOVE: private MotherGridPalonnier selectedPalonnier = null;
+    // ADD the six parameters below instead:
+
+    [Parameter] public MotherGridPalonnier SelectedPalonnier { get; set; }
+    [Parameter] public EventCallback<MotherGridPalonnier> SelectedPalonnierChanged { get; set; }
+    [Parameter] public MotherGridPalonnier SelectedMotherGrid { get; set; }
+    [Parameter] public EventCallback<MotherGridPalonnier> SelectedMotherGridChanged { get; set; }
+    [Parameter] public ChargeMp SelectedCharge { get; set; }
+    [Parameter] public EventCallback<ChargeMp> SelectedChargeChanged { get; set; }
+
+    // ── Replace HandleSvgClick ────────────────────────────────────────────────
+    private async Task HandleSvgClick(MouseEventArgs e)
     {
-        MotherGridPalonnier nearestObject = null;
-        double minPerpendicularDistance = double.MaxValue;
-
-        if (isSelectingEnabled)
+        if (!IsPositioningMode && isSelectingEnabled)
         {
-            var clickPoint = await GetSvgCoordinates(e.ClientX, e.ClientY);
-            clickPoint = GetRealCoordinatesFromSVG(clickPoint);
+            // Measured with the element's box as it is now: the page may have scrolled since the box was last read.
+            await RefreshSvgRect();
+            var (palonnier, motherGrid) = ElementAt(GetRealCoordinatesFromSVG(ClientToSvgPoint(e.ClientX, e.ClientY)));
 
-            // Check Palonniers
-            foreach (var pal in Palonniers)
+            if (palonnier != null)
+                await SelectedPalonnierChanged.InvokeAsync(palonnier);
+            else if (motherGrid != null)
+                await SelectedMotherGridChanged.InvokeAsync(motherGrid);
+            else
             {
-                var p1 = new Point((double)pal.X1, (double)pal.Y1);
-                var p2 = new Point((double)pal.X2, (double)pal.Y2);
-
-                // Calculate perpendicular distance from the clickPoint to the line segment defined by p1 and p2
-                double perpendicularDistance = GetPerpendicularDistance(clickPoint, p1, p2);
-
-                // Check if this is the closest object within the snap distance threshold
-                if (perpendicularDistance < minPerpendicularDistance && perpendicularDistance <= snapDistThreshold)
-                {
-                    minPerpendicularDistance = perpendicularDistance;
-                    nearestObject = pal; // Update to the closest palonnier
-                }
+                // Away from every element: nothing stays selected, so "Erase Selected" has nothing to erase.
+                await SelectedPalonnierChanged.InvokeAsync(null);
+                await SelectedMotherGridChanged.InvokeAsync(null);
             }
-
-            // Check MotherGrids
-            foreach (var moth in MotherGrids)
-            {
-                var p1 = new Point((double)moth.X1, (double)moth.Y1);
-                var p2 = new Point((double)moth.X2, (double)moth.Y2);
-
-                // Calculate perpendicular distance from the clickPoint to the line segment defined by p1 and p2
-                double perpendicularDistance = GetPerpendicularDistance(clickPoint, p1, p2);
-
-                // Check if this is the closest object within the snap distance threshold
-                if (perpendicularDistance < minPerpendicularDistance && perpendicularDistance <= snapDistThreshold)
-                {
-                    minPerpendicularDistance = perpendicularDistance;
-                    nearestObject = moth; // Update to the closest mothergrid
-                }
-            }
+            StateHasChanged();
         }
 
-        selectedPalonnier = nearestObject; // Update the selected object
+        await SvgClicked.InvokeAsync(e);
+    }
 
-        // Optionally: Call StateHasChanged() if needed to re-render
+    // The element under the mouse: the palonnier or the mother line within PickTolerancePx of it on the screen -
+    // the nearer of the two, the palonnier on a tie - or neither, away from every element. A click selects it and
+    // hover highlights it, so what lights up under the mouse is what a click takes.
+    private (MotherGridPalonnier Palonnier, MotherGridPalonnier MotherGrid) ElementAt(Point realPt)
+    {
+        // Element ends are stored in metres from Point0, in the grid's axes; realPt is in absolute millimetres, in
+        // the same axes. The plan draws those axes at one scale in every direction (PlanView), so a distance
+        // measured here is the one seen on the screen.
+        var p = new Point(realPt.X / MmToM - Point0X, realPt.Y / MmToM - Point0Y);
+        double tolerance = PickToleranceM;
+
+        (MotherGridPalonnier Element, double Metres) Nearest(List<MotherGridPalonnier> elements)
+        {
+            MotherGridPalonnier nearest = null;
+            double min = double.MaxValue;
+            if (elements == null) return (nearest, min);
+            foreach (var el in elements)
+            {
+                if (el.X1 == null || el.Y1 == null || el.X2 == null || el.Y2 == null) continue;
+                double d = GetPerpendicularDistance(p,
+                    new Point((double)el.X1, (double)el.Y1),
+                    new Point((double)el.X2, (double)el.Y2));
+                if (d < min && d <= tolerance) { min = d; nearest = el; }
+            }
+            return (nearest, min);
+        }
+
+        var palonnier = Nearest(Palonniers);
+        var motherGrid = Nearest(MotherGrids);
+        if (palonnier.Element != null && palonnier.Metres <= motherGrid.Metres)
+            return (palonnier.Element, null);
+        return (null, motherGrid.Element);
+    }
+
+    // PickTolerancePx on the plan, in metres at the current zoom: the unit of the distances ElementAt measures.
+    private double PickToleranceM => PlanView.SvgToMetres(PickTolerancePx / PxPerSvgUnit);
+
+    private async Task EraseSelected()
+    {
+        var toErase = SelectedPalonnier ?? SelectedMotherGrid;
+        if (toErase != null)
+        {
+            await OnErase.InvokeAsync(toErase);
+            if (SelectedPalonnier != null)
+                await SelectedPalonnierChanged.InvokeAsync(null);
+            else
+                await SelectedMotherGridChanged.InvokeAsync(null);
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleChargeClick(ChargeMp charge)
+    {
+        if (!isSelectingEnabled) return;
+        await SelectedChargeChanged.InvokeAsync(charge);
+        await SelectedPalonnierChanged.InvokeAsync(null);
+        await SelectedMotherGridChanged.InvokeAsync(null);
         StateHasChanged();
-
-        return nearestObject;
-    }
-
-
-    // Helper method to calculate the perpendicular distance from a point to a line segment
-    private double GetPerpendicularDistance(Point p, Point p1, Point p2)
-    {
-        // Vector A to B
-        double A = p.X - p1.X;
-        double B = p.Y - p1.Y;
-        double C = p2.X - p1.X;
-        double D = p2.Y - p1.Y;
-
-        // Dot product of vector AB and vector AC
-        double dot = A * C + B * D;
-        double len_sq = C * C + D * D;
-        double param = -1;
-
-        // Avoid division by zero (case when p1 and p2 are the same point)
-        if (len_sq != 0) // if not a zero-length line segment
-        {
-            param = dot / len_sq;
-        }
-
-        double xx, yy;
-
-        if (param < 0)
-        {
-            xx = p1.X;
-            yy = p1.Y;
-        }
-        else if (param > 1)
-        {
-            xx = p2.X;
-            yy = p2.Y;
-        }
-        else
-        {
-            xx = p1.X + param * C;
-            yy = p1.Y + param * D;
-        }
-
-        // Calculate the distance from point p to the nearest point on the line segment
-        double dx = p.X - xx;
-        double dy = p.Y - yy;
-        return Math.Sqrt(dx * dx + dy * dy);
-    }
-
-
-
-
-    private async Task StartDrawing(MouseEventArgs e)
-    {
-        startPoint = await GetSvgCoordinates(e.ClientX, e.ClientY);
-        startPoint = GetRealCoordinatesFromSVG(startPoint);
-
-
-        if (isSnappingEnabled)
-        {
-            var nearestCircle = FindNearestCircle(startPoint, snapDistThreshold); // Adjust the threshold as needed
-            if (nearestCircle != null)
-            {
-                startPoint = nearestCircle.Center; // Snap to the center of the nearest circle
-            }
-        }
-
-        if (isMotherGridsSnappingEnabled)
-        {
-            var nearestPoint = FindNearestMotherGrid(startPoint, snapDistThreshold); // Adjust the threshold as needed
-            if (nearestPoint != null)
-            {
-                startPoint = nearestPoint;
-            }
-        }
-
-        if (isPalonniersSnappingEnabled)
-        {
-            var nearestPoint = FindNearestPalonnier(startPoint, snapDistThreshold); // Adjust the threshold as needed
-            if (nearestPoint != null)
-            {
-                startPoint = nearestPoint;
-            }
-        }
-
-
-        isDrawing = true;
-        currentLine = (startPoint, startPoint);
-    }
-
-    private async Task Draw(MouseEventArgs e)
-    {
-        if (freeSketch)
-        {
-            if (isDrawing)
-            {
-                var currentPoint = await GetSvgCoordinates(e.ClientX, e.ClientY);
-                currentPoint = GetRealCoordinatesFromSVG(currentPoint);
-                lines.Add((startPoint, currentPoint));
-                startPoint = currentPoint;
-                StateHasChanged();
-            }
-        }
-        else
-        {
-            var currentPoint = await GetSvgCoordinates(e.ClientX, e.ClientY);
-            currentPoint = GetRealCoordinatesFromSVG(currentPoint);
-
-            if (isSnappingEnabled)
-            {
-                var nearestCircle = FindNearestCircle(currentPoint, snapDistThreshold); // Adjust the threshold as needed
-                if (nearestCircle != null)
-                {
-                    currentPoint = nearestCircle.Center; // Snap to the center of the nearest circle
-                }
-            }
-
-            if (isMotherGridsSnappingEnabled)
-            {
-                var nearestPoint = FindNearestMotherGrid(currentPoint, snapDistThreshold); // Adjust the threshold as needed
-                if (nearestPoint != null)
-                {
-                    currentPoint = nearestPoint;
-                }
-            }
-
-            if (isPalonniersSnappingEnabled)
-            {
-                var nearestPoint = FindNearestPalonnier(currentPoint, snapDistThreshold); // Adjust the threshold as needed
-                if (nearestPoint != null)
-                {
-                    currentPoint = nearestPoint;
-                }
-            }
-
-
-
-            if (currentLine.HasValue)
-            {
-                currentLine = (startPoint, currentPoint);
-            }
-        }
     }
 
     private async Task EndDrawing(MouseEventArgs e)
     {
         if (isDrawing)
         {
-            var endPoint = await GetSvgCoordinates(e.ClientX, e.ClientY);
-            endPoint = GetRealCoordinatesFromSVG(endPoint);
+            // The same conversion as the start and the rubber band (ClientToSvgPoint), so the line saved is the
+            // line shown. The JS getSvgCoordinates reads the page's first <svg>, which need not be this one.
+            var endPoint = GetRealCoordinatesFromSVG(ClientToSvgPoint(e.ClientX, e.ClientY));
 
             if (isSnappingEnabled)
             {
-                var nearestCircle = FindNearestCircle(endPoint, snapDistThreshold); // Use the same threshold as in Draw
+                var nearestCircle = FindNearestCircle(endPoint, SnapDistanceMm);
                 if (nearestCircle != null)
                 {
-                    endPoint = nearestCircle.Center; // Snap to the center of the nearest circle
+                    endPoint = nearestCircle.Center;
                 }
             }
 
             if (isMotherGridsSnappingEnabled)
             {
-                var nearestPoint = FindNearestMotherGrid(endPoint, snapDistThreshold); // Adjust the threshold as needed
+                var nearestPoint = FindNearestMotherGrid(endPoint, SnapDistanceMm);
                 if (nearestPoint != null)
                 {
                     endPoint = nearestPoint;
@@ -657,23 +1046,23 @@
 
             if (isPalonniersSnappingEnabled)
             {
-                var nearestPoint = FindNearestPalonnier(endPoint, snapDistThreshold); // Adjust the threshold as needed
+                var nearestPoint = FindNearestPalonnier(endPoint, SnapDistanceMm);
                 if (nearestPoint != null)
                 {
                     endPoint = nearestPoint;
                 }
             }
 
-
-
             if (currentLine.HasValue)
             {
                 currentLine = (currentLine.Value.Item1, endPoint);
-                // lines.Add(currentLine.Value);
                 if (Distance(currentLine.Value.Item1, currentLine.Value.Item2) > 500)
                 {
-                    await LineDrawn.InvokeAsync((currentLine.Value.Item1.X,
-       currentLine.Value.Item1.Y, currentLine.Value.Item2.X, currentLine.Value.Item2.Y));
+                    await LineDrawn.InvokeAsync((
+                        currentLine.Value.Item1.X / MmToM - Point0X,
+                        currentLine.Value.Item1.Y / MmToM - Point0Y,
+                        currentLine.Value.Item2.X / MmToM - Point0X,
+                        currentLine.Value.Item2.Y / MmToM - Point0Y));
                 }
 
                 currentLine = null;
@@ -683,31 +1072,40 @@
         }
     }
 
-    private double Distance(Point p1,Point p2)
+    private double Distance(Point p1, Point p2)
     {
         double distance = Math.Sqrt(Math.Pow(p1.X - p2.X, 2) + Math.Pow(p1.Y - p2.Y, 2));
-
         return distance;
     }
 
-    private async Task<Point> GetSvgCoordinates(double clientX, double clientY)
+    /// <summary>
+    /// A point of the page (client pixels) in SVG user units, by the JS getSvgCoordinates. It reads the page's FIRST
+    /// svg element, so the answer is this plan's only while no other svg comes before it on the page. The sensor
+    /// positioning of the Surveillance tab relies on it (RadzenTabs renders only the open tab there); this
+    /// component's own drawing, hover and selection use ClientToSvgPoint.
+    /// </summary>
+    public async Task<Point> GetSvgCoordinates(double clientX, double clientY)
     {
         return await js.InvokeAsync<Point>("getSvgCoordinates", clientX, clientY);
     }
 
-    private Point GetRealCoordinatesFromSVG(Point pt)
+    /// <summary>
+    /// A point of the plan (SVG user units) in the component's "real" coordinates: the grid's axes, absolute
+    /// millimetres. The inverse of GetSVGCoordinatesFromReal.
+    /// </summary>
+    public Point GetRealCoordinatesFromSVG(Point pt)
     {
-        double x = (pt.X / width) * realWidth;
-        double y = (pt.Y / height) * realHeight;
-
+        var (x, y) = PlanView.FromSvg(pt.X, pt.Y, Point0X, Point0Y);
         return new Point(x, y);
     }
 
+    /// <summary>
+    /// A "real" point - the grid's axes, absolute millimetres - on the plan, in the studies' orientation: taken
+    /// relative to Point0, converted to the studies' axes, study X to the right and study Y up (PlanView).
+    /// </summary>
     private Point GetSVGCoordinatesFromReal(Point pt)
     {
-        double x = (pt.X / realWidth) * width;
-        double y = (pt.Y / realHeight) * height;
-
+        var (x, y) = PlanView.ToSvg(pt.X, pt.Y, Point0X, Point0Y);
         return new Point(x, y);
     }
 
@@ -737,13 +1135,21 @@
 
     private Point FindNearestPalonnier(Point pt, double threshold)
     {
+        if (Palonniers == null || Palonniers.Count == 0)
+            return null;
+
         Point nearestPoint = null;
         double minDistance = double.MaxValue;
 
         foreach (var pal in Palonniers)
         {
-            var p1 = new Point((double)pal.X1, (double)pal.Y1);
-            var p2 = new Point((double)pal.X2, (double)pal.Y2);
+            if (pal.X1 == null || pal.Y1 == null || pal.X2 == null || pal.Y2 == null)
+                continue;
+
+            // Element ends are stored in metres from Point0; pt is in absolute millimetres, as the circles are.
+            var p1 = new Point(((double)pal.X1 + Point0X) * MmToM, ((double)pal.Y1 + Point0Y) * MmToM);
+            var p2 = new Point(((double)pal.X2 + Point0X) * MmToM, ((double)pal.Y2 + Point0Y) * MmToM);
+            
             double distance = Math.Sqrt(Math.Pow(p1.X - pt.X, 2) + Math.Pow(p1.Y - pt.Y, 2));
             if (distance < minDistance && distance <= threshold)
             {
@@ -757,7 +1163,6 @@
                 minDistance = distance;
                 nearestPoint = p2;
             }
-
         }
 
         return nearestPoint;
@@ -765,13 +1170,21 @@
 
     private Point FindNearestMotherGrid(Point pt, double threshold)
     {
+        if (MotherGrids == null || MotherGrids.Count == 0)
+            return null;
+
         Point nearestPoint = null;
         double minDistance = double.MaxValue;
 
-        foreach (var pal in MotherGrids)
+        foreach (var moth in MotherGrids)
         {
-            var p1 = new Point((double)pal.X1, (double)pal.Y1);
-            var p2 = new Point((double)pal.X2, (double)pal.Y2);
+            if (moth.X1 == null || moth.Y1 == null || moth.X2 == null || moth.Y2 == null)
+                continue;
+
+            // Element ends are stored in metres from Point0; pt is in absolute millimetres, as the circles are.
+            var p1 = new Point(((double)moth.X1 + Point0X) * MmToM, ((double)moth.Y1 + Point0Y) * MmToM);
+            var p2 = new Point(((double)moth.X2 + Point0X) * MmToM, ((double)moth.Y2 + Point0Y) * MmToM);
+            
             double distance = Math.Sqrt(Math.Pow(p1.X - pt.X, 2) + Math.Pow(p1.Y - pt.Y, 2));
             if (distance < minDistance && distance <= threshold)
             {
@@ -785,7 +1198,6 @@
                 minDistance = distance;
                 nearestPoint = p2;
             }
-
         }
 
         return nearestPoint;
@@ -793,58 +1205,71 @@
 
     private void ZoomToExtent()
     {
-        // Assuming you have predefined extents or you calculate them
-        viewBox = $"{GetSVGCoordinatesFromReal(origPt).X} {GetSVGCoordinatesFromReal(origPt).Y} {width} {height}";
-        imageScale = 1.0; // Reset image scale if necessary
+        FitView();
         StateHasChanged();
+    }
+
+    protected override void OnParametersSet()
+    {
+        // The plan is drawn relative to Point0. When the event's origin arrives after the first render, or
+        // changes, move the view by as much, so it keeps showing the same place of the charpente.
+        if (planReady && viewPoint0X is { } oldX && viewPoint0Y is { } oldY && (oldX != Point0X || oldY != Point0Y))
+        {
+            var before = PlanView.ToSvg(0, 0, oldX, oldY);
+            var after = PlanView.ToSvg(0, 0, Point0X, Point0Y);
+            SetViewBox(_vx + after.X - before.X, _vy + after.Y - before.Y, _vw, _vh);
+        }
+        viewPoint0X = Point0X;
+        viewPoint0Y = Point0Y;
+    }
+
+    // The whole plan: the picture's footprint, which frames the charpente and its labels. The plan is taller
+    // than wide in the studies' orientation; the SVG fits it into its box (xMidYMid meet).
+    private void FitView()
+    {
+        var (x, y, w, h) = PlanView.Extent(Point0X, Point0Y);
+        SetViewBox(x, y, w, h);
+        viewPoint0X = Point0X;
+        viewPoint0Y = Point0Y;
+    }
+
+    private void SetViewBox(double x, double y, double w, double h)
+    {
+        viewBox = $"{Fmt(x)} {Fmt(y)} {Fmt(w)} {Fmt(h)}";
+        ParseViewBox();
     }
 
     private void ToggleSnapping()
     {
         isSnappingEnabled = !isSnappingEnabled;
-        // StateHasChanged(); // Update UI or other elements if needed
     }
 
     private void TogglePSnapping()
     {
         isPalonniersSnappingEnabled = !isPalonniersSnappingEnabled;
-        //  StateHasChanged(); // Update UI or other elements if needed
     }
 
     private void ToggleMSnapping()
     {
         isMotherGridsSnappingEnabled = !isMotherGridsSnappingEnabled;
-        //  StateHasChanged(); // Update UI or other elements if needed
     }
 
     private void ToggleSelecting()
     {
         isSelectingEnabled = !isSelectingEnabled;
-
-      //  StateHasChanged(); // Update UI or other elements if needed
     }
 
-    private async Task EraseSelected()
+
+
+    private MarkupString SvgLabel(double x, double y, string color, string text, double fontSize = 12, string fontWeight = "bold")
     {
-        if (selectedPalonnier != null)
-        {
-            // if (Palonniers.Contains(selectedPalonnier))
-            // {
-            //     Palonniers.Remove(selectedPalonnier);
-            // }
-            // else if (MotherGrids.Contains(selectedPalonnier))
-            // {
-            //     MotherGrids.Remove(selectedPalonnier);
-            // }
-
-            // Invoke the EventCallback to notify any parent components or perform additional actions
-            await OnErase.InvokeAsync(selectedPalonnier);
-
-            selectedPalonnier = null; // Clear the selection after erasing
-            StateHasChanged(); // Trigger a re-render to update the SVG
-        }
+        // Invariant culture to avoid commas in SVG numbers
+        var xi = x.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var yi = y.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        var fsi = fontSize.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        return new MarkupString(
+            $"<text x='{xi}' y='{yi}' font-size='{fsi}' fill='{color}' font-weight='{fontWeight}'>{text}</text>");
     }
-    
 
     public class Point
     {
@@ -862,7 +1287,7 @@
     {
         public Point Center { get; set; }
         public double Radius { get; set; }
-        public string Color { get; set; } = "red"; // Default color is red
+        public string Color { get; set; } = "red";
 
         public Circle(double x, double y, double radius)
         {
@@ -871,4 +1296,391 @@
         }
     }
 
+    private async Task HandleSensorClick(Element sensor)
+    {
+        selectedSensor = sensor;
+        StateHasChanged();
+
+        if (OnSensorClicked.HasDelegate)
+        {
+            await OnSensorClicked.InvokeAsync(sensor);
+        }
+    }   
+
+    /// <summary>
+    /// Returns a color from green → yellow → orange → red based on a 0–1+ charge ratio.
+    /// </summary>
+    private string GetSensorColor(Element sensor)
+    {
+        if (sensor == selectedSensor) return "#ff4444";
+        if (sensor == hoveredSensor) return "#ff8800";
+
+        if (SensorChargeRatios != null && SensorChargeRatios.TryGetValue(sensor.ElementId, out double ratio))
+        {
+            // Clamp to 0–1 for color interpolation
+            double t = Math.Clamp(ratio, 0.0, 1.0);
+            // Green (0%) → Yellow (50%) → Orange (75%) → Red (100%)
+            int r, g;
+            if (t < 0.5)
+            {
+                // Green → Yellow
+                r = (int)(255 * (t / 0.5));
+                g = 255;
+            }
+            else
+            {
+                // Yellow → Red
+                r = 255;
+                g = (int)(255 * (1 - (t - 0.5) / 0.5));
+            }
+            return $"rgb({r},{g},0)";
+        }
+
+        return "#4CAF50"; // default green
+    }
+
+    private string GetSensorStrokeColor(Element sensor)
+    {
+        if (sensor == selectedSensor) return "#ff4444";
+        if (SensorChargeRatios != null && SensorChargeRatios.ContainsKey(sensor.ElementId))
+            return GetSensorColor(sensor);
+        return "#4CAF50";
+    }
+
+    private double GetPerpendicularDistance(Point p, Point p1, Point p2)
+    {
+        double A = p.X - p1.X;
+        double B = p.Y - p1.Y;
+        double C = p2.X - p1.X;
+        double D = p2.Y - p1.Y;
+
+        double dot = A * C + B * D;
+        double len_sq = C * C + D * D;
+        double param = len_sq != 0 ? dot / len_sq : -1;
+
+        double xx, yy;
+        if (param < 0)       { xx = p1.X; yy = p1.Y; }
+        else if (param > 1)  { xx = p2.X; yy = p2.Y; }
+        else                 { xx = p1.X + param * C; yy = p1.Y + param * D; }
+
+        double dx = p.X - xx;
+        double dy = p.Y - yy;
+        return Math.Sqrt(dx * dx + dy * dy);
+    }
+
+    // ── Cached SVG viewport ───────────────────────────────────────────────────
+    private double _svgLeft, _svgTop, _svgCssWidth = 754, _svgCssHeight = 400;
+
+    // ── Cached parsed viewBox (avoids Split+Parse on every mouse move) ────────
+    private double _vx, _vy, _vw = 754, _vh = 400;
+
+    private class SvgRect
+    {
+        public double Left   { get; set; }
+        public double Top    { get; set; }
+        public double Width  { get; set; }
+        public double Height { get; set; }
+    }
+
+    // The element's box, read again on every mouse-down, on a selection click and when the mouse comes onto the
+    // plan (@onpointerenter - @onmouseenter is declared twice in this project, which Razor refuses): a page scrolled
+    // while the mouse was elsewhere moves the box without resizing it, which the resize observer does not see, and
+    // hover and selection work to a few pixels.
+    private async Task RefreshSvgRect()
+    {
+        var r = await js.InvokeAsync<SvgRect>("getSvgBoundingRect", "no-scroll-svg");
+        _svgLeft     = r.Left;
+        _svgTop      = r.Top;
+        _svgCssWidth  = r.Width  > 0 ? r.Width  : 754;
+        _svgCssHeight = r.Height > 0 ? r.Height : 400;
+    }
+
+    /// <summary>Call whenever viewBox string is updated.</summary>
+    private void ParseViewBox()
+    {
+        var p = viewBox.Split(' ');
+        _vx = double.Parse(p[0], Inv);
+        _vy = double.Parse(p[1], Inv);
+        _vw = double.Parse(p[2], Inv);
+        _vh = double.Parse(p[3], Inv);
+    }
+
+    // CSS pixels per SVG unit at the current zoom: xMidYMid meet (the SVG default) fits the viewBox into the
+    // element's box at one scale in both directions, centred.
+    private double PxPerSvgUnit => Math.Min(_svgCssWidth / _vw, _svgCssHeight / _vh);
+
+    /// <summary>Synchronous replacement for the async JS GetSvgCoordinates call.</summary>
+    private Point ClientToSvgPoint(double clientX, double clientY)
+    {
+        double scale  = PxPerSvgUnit;
+        double padX   = (_svgCssWidth  - _vw * scale) / 2.0;
+        double padY   = (_svgCssHeight - _vh * scale) / 2.0;
+        return new Point(
+            _vx + (clientX - _svgLeft - padX) / scale,
+            _vy + (clientY - _svgTop  - padY) / scale
+        );
+    }
+
+    private void UpdateViewBox(double dx, double dy)
+    {
+        // dx/dy are CSS pixels; divide by scale to convert to SVG units
+        double scale = PxPerSvgUnit;
+        viewBox = $"{Fmt(_vx - dx / scale)} {Fmt(_vy - dy / scale)} {Fmt(_vw)} {Fmt(_vh)}";
+        ParseViewBox();
+        StateHasChanged();
+    }
+
+    // ── DXF Export ────────────────────────────────────────────────────────────
+    private bool showDxfSettings = false;
+    private bool dxfExportMotherGrid    = true;
+    private bool dxfExportPalonniers    = true;
+    private bool dxfExportCharges       = true;
+    private bool dxfExportPalonnierLoads = true;
+    private bool dxfExportIntersections = true;
+    private bool dxfExportSensors       = true;
+    private bool dxfExportOrigin        = true;
+    private bool dxfExportBackgroundImage = false;
+
+    // Base file name suggested by the JPG export (the dialog's own file-name box drives the DXF).
+    private string ExportBaseName =>
+        string.IsNullOrWhiteSpace(dxfExportFileName) ? "plan" : dxfExportFileName.Replace("'", "");
+
+    private void OpenDxfSettings()  => showDxfSettings = true;
+    private void CloseDxfSettings() => showDxfSettings = false;
+    private string dxfExportFileName = "export";
+
+    private async Task ExportDxfAndClose()
+    {
+        showDxfSettings = false;
+        await ExportDxf();
+    }
+
+    private async Task ExportDxf()
+    {
+        const string imgFile = PlanView.BackgroundImage;
+
+        // The drawing is written in METRES in the studies' axes - the coordinates the studies print and the
+        // pages show: the origin at Point0 (E5), X along the beams towards point 9, Y across them towards J.
+        // Two conventions feed into it:
+        //   • palonniers / mothergrids / charges / intersections : the grid's axes, METRES from Point0
+        //   • sensors (X/Y attributes)                            : the grid's axes, absolute MILLIMETRES
+        // These helpers bring each into the studies' axes.
+        (double X, double Y) Stored(double gridXm, double gridYm) => global::Helpers.StudyAxes.ToStudy(gridXm, gridYm);
+        (double X, double Y) Absolute(double gridXmm, double gridYmm) => PlanView.StudyMetres(gridXmm, gridYmm, Point0X, Point0Y);
+
+        // The picture, turned as on the screen: where the corner that was its lower left lands, and its width
+        // (running down, towards A) and height (running right, towards point 9), in metres.
+        var (imgX, imgY, imgW, imgH) = PlanView.ImageInStudyMetres(Point0X, Point0Y);
+
+        // netDxf writes the file. Hand-authoring the DXF skeleton (handles, AcDb subclass markers,
+        // symbol tables, block records and the raster-image dictionary chain) proved too easy to get
+        // subtly wrong — the library owns all of that and emits a valid document.
+        var doc = new netDxf.DxfDocument(netDxf.Header.DxfVersion.AutoCad2000);
+        doc.DrawingVariables.InsUnits = netDxf.Units.DrawingUnits.Meters;
+
+        netDxf.Tables.Layer L(string name, short aci)
+        {
+            var layer = new netDxf.Tables.Layer(name) { Color = new netDxf.AciColor(aci) };
+            doc.Layers.Add(layer);
+            return layer;
+        }
+
+        var layBackground    = L("BACKGROUND",    8);
+        var layMotherGrid    = L("MOTHERGRID",    1);
+        var layPalonniers    = L("PALONNIERS",    5);
+        var layCharges       = L("CHARGES",       3);
+        var layPalLoads      = L("PAL_LOADS",     6);
+        var layIntersections = L("INTERSECTIONS", 1);
+        var laySensors       = L("SENSORS",       4);
+        var layOrigin        = L("ORIGIN",        7);
+        var layDrawingData   = L("DRAWING_DATA",  2);
+
+        void AddLine(netDxf.Tables.Layer layer, double x1, double y1, double x2, double y2)
+            => doc.Entities.Add(new netDxf.Entities.Line(
+                   new netDxf.Vector2(x1, y1), new netDxf.Vector2(x2, y2)) { Layer = layer });
+
+        void AddCircle(netDxf.Tables.Layer layer, double cx, double cy, double r)
+            => doc.Entities.Add(new netDxf.Entities.Circle(new netDxf.Vector2(cx, cy), r) { Layer = layer });
+
+        void AddText(netDxf.Tables.Layer layer, double x, double y, double height, string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return;
+            // DXF stores one value per line, so strip newlines out of names.
+            var clean = text.Replace("\r", " ").Replace("\n", " ");
+            doc.Entities.Add(new netDxf.Entities.Text(clean, new netDxf.Vector2(x, y), height) { Layer = layer });
+        }
+
+        // Background raster. DXF cannot embed image data — the entity only stores a path — so the
+        // .jpg is saved next to the .dxf (see downloadDxfWithImage).
+        if (dxfExportBackgroundImage)
+        {
+            // Its true size in pixels, and pixels per centimetre: CAD lays the file's pixels out by these.
+            var imgDef = new netDxf.Objects.ImageDefinition(
+                imgFile, imgFile,
+                PlanView.ImageWidthPx, PlanView.ImageWidthPx / (imgW * 100.0),
+                PlanView.ImageHeightPx, PlanView.ImageHeightPx / (imgH * 100.0),
+                netDxf.Units.ImageResolutionUnits.Centimeters);
+
+            // A quarter turn clockwise, as on the screen: its width runs down towards A and its height right
+            // towards point 9, from the corner that was its lower left.
+            doc.Entities.Add(new netDxf.Entities.Image(imgDef, new netDxf.Vector2(imgX, imgY), imgW, imgH)
+            {
+                Layer = layBackground,
+                Rotation = PlanView.ImageRotationDeg,
+            });
+        }
+
+        // Origin axes
+        if (dxfExportOrigin)
+        {
+            // Point0 is the origin: X along the beams towards point 9, Y across them towards J.
+            AddLine(layOrigin, 0, 0, 2, 0);
+            AddLine(layOrigin, 0, 0, 0, 2);
+            AddText(layOrigin, 2.1,  0,    0.3, "X");
+            AddText(layOrigin, 0,    2.3,  0.3, "Y");
+            AddText(layOrigin, 0.2, -0.5,  0.2, "(0,0)");
+        }
+
+        // Mother Grids
+        if (dxfExportMotherGrid && MotherGrids != null)
+            foreach (var m in MotherGrids)
+            {
+                if (m.X1 == null || m.Y1 == null || m.X2 == null || m.Y2 == null) continue;
+                var (x1, y1) = Stored((double)m.X1, (double)m.Y1);
+                var (x2, y2) = Stored((double)m.X2, (double)m.Y2);
+                AddLine(layMotherGrid, x1, y1, x2, y2);
+                AddText(layMotherGrid, (x1 + x2) / 2, (y1 + y2) / 2, 0.15, m.Name);
+            }
+
+        // Palonniers
+        if (dxfExportPalonniers && Palonniers != null)
+            foreach (var p in Palonniers)
+            {
+                if (p.X1 == null || p.Y1 == null || p.X2 == null || p.Y2 == null) continue;
+                var (x1, y1) = Stored((double)p.X1, (double)p.Y1);
+                var (x2, y2) = Stored((double)p.X2, (double)p.Y2);
+                AddLine(layPalonniers, x1, y1, x2, y2);
+                AddText(layPalonniers, (x1 + x2) / 2, (y1 + y2) / 2, 0.15, p.Name);
+            }
+
+        // Charges Scéniques
+        if (dxfExportCharges && ChargesSceniques != null)
+            foreach (var c in ChargesSceniques)
+            {
+                if (c.X == null || c.Y == null || c.Charge == null) continue;
+                var (cx, cy) = Stored((double)c.X, (double)c.Y);
+                AddCircle(layCharges, cx, cy, 0.1);
+                AddText(layCharges, cx + 0.15, cy, 0.12, $"{c.Name ?? "Charge"}: {c.Charge:F1}");
+            }
+
+        // Palonnier Loads
+        if (dxfExportPalonnierLoads && PalonnierLoads != null)
+            foreach (var charge in PalonnierLoads)
+            {
+                var pal = CarrierOf(charge);   // a palonnier, or a mother line the charge hangs from directly
+                if (pal == null || pal.X1 == null || pal.Y1 == null || pal.X2 == null || pal.Y2 == null || charge.X == null) continue;
+                double lx1 = (double)pal.X1, ly1 = (double)pal.Y1;
+                double lx2 = (double)pal.X2, ly2 = (double)pal.Y2;
+                double len = Math.Sqrt(Math.Pow(lx2 - lx1, 2) + Math.Pow(ly2 - ly1, 2));
+                double ratio = len > 0 ? (charge.X ?? 0) / len : 0;
+                var (cx, cy) = Stored(lx1 + ratio * (lx2 - lx1), ly1 + ratio * (ly2 - ly1));
+                AddCircle(layPalLoads, cx, cy, 0.08);
+                AddText(layPalLoads, cx + 0.12, cy, 0.1, $"{charge.Name ?? "Load"}: {charge.Charge:F1}");
+            }
+
+        // Intersections
+        if (dxfExportIntersections && IntersectionPoints != null)
+            foreach (var kvp in IntersectionPoints)
+                foreach (var pt in kvp.Value)
+                    AddCircle(layIntersections, Stored(pt.X, pt.Y).X, Stored(pt.X, pt.Y).Y, 0.12);
+
+        // Sensors — their X/Y attributes are absolute MILLIMETRES, unlike the event-relative metres
+        // used above, so they need converting.
+        if (dxfExportSensors && Sensors != null)
+            foreach (var sensor in Sensors)
+            {
+                var xAttr = sensor.AttributeElements?.FirstOrDefault(ae => ae.AttributeType?.Name == "X");
+                var yAttr = sensor.AttributeElements?.FirstOrDefault(ae => ae.AttributeType?.Name == "Y");
+                if (xAttr == null || yAttr == null) continue;
+                if (!double.TryParse(xAttr.Value, System.Globalization.NumberStyles.Float, Inv, out double sxMm)) continue;
+                if (!double.TryParse(yAttr.Value, System.Globalization.NumberStyles.Float, Inv, out double syMm)) continue;
+                var (sx, sy) = Absolute(sxMm, syMm);
+                AddCircle(laySensors, sx, sy, 0.1);
+                AddText(laySensors, sx + 0.15, sy, 0.12, sensor.Name ?? "Sensor");
+            }
+
+        // ── Drawing data ──────────────────────────────────────────────────────────────────
+        // A titled block of metadata on its own layer, laid out below the plan so it never
+        // overlaps the geometry. Freeze or turn off DRAWING_DATA in CAD to hide it.
+        {
+            var info = new List<string>();
+            if (!string.IsNullOrWhiteSpace(ModuleName))    info.Add($"Module : {ModuleName}");
+            if (!string.IsNullOrWhiteSpace(StructureName)) info.Add($"Structure : {StructureName}");
+            if (!string.IsNullOrWhiteSpace(EventName))     info.Add($"Événement : {EventName}");
+            if (EventId.HasValue && EventId != Guid.Empty) info.Add($"ID événement : {EventId}");
+            if (!string.IsNullOrWhiteSpace(ScenarioName))  info.Add($"Scénario : {ScenarioName}");
+            if (ScenarioId.HasValue && ScenarioId != Guid.Empty) info.Add($"ID scénario : {ScenarioId}");
+            info.Add($"Date d'export : {DateTime.Now.ToString("dd/MM/yyyy HH:mm", Inv)}");
+            info.Add("Unités : mètres");
+            // The origin is whatever Point0 the calling page passes, so say which one: naming E5
+            // unconditionally told the reader the wrong origin on every page that passes none.
+            info.Add((Point0X == 0 && Point0Y == 0
+                          ? "Axes : ceux des études — aucun Point0 défini, origine au (0,000 ; 0,000) du plan"
+                          : $"Axes : ceux des études — origine au Point0 ({Point0X.ToString("0.000", Fr)} ; "
+                            + $"{Point0Y.ToString("0.000", Fr)})")
+                     + ", X le long des poutres vers le point 9, Y en travers des poutres vers la poutre J");
+
+            var exported = new List<string>();
+            if (dxfExportBackgroundImage)  exported.Add("fond de plan");
+            if (dxfExportMotherGrid)       exported.Add("mothergrids");
+            if (dxfExportPalonniers)       exported.Add("palonniers");
+            if (dxfExportCharges)          exported.Add("charges scéniques");
+            if (dxfExportPalonnierLoads)   exported.Add("charges palonniers");
+            if (dxfExportIntersections)    exported.Add("intersections");
+            if (dxfExportSensors)          exported.Add("capteurs");
+            if (dxfExportOrigin)           exported.Add("origine");
+            if (exported.Count > 0) info.Add($"Calques exportés : {string.Join(", ", exported)}");
+
+            const double titleH = 0.6, lineH = 0.35, gap = 0.55;
+            double tx = imgX;                                // align with the plan's left edge
+            double ty = imgY - imgW - 1.2;                         // start below the drawing
+            AddText(layDrawingData, tx, ty, titleH, "DONNÉES DU DESSIN");
+            ty -= gap;
+            AddLine(layDrawingData, tx, ty + 0.15, tx + 25, ty + 0.15);
+            foreach (var line in info)
+            {
+                ty -= gap;
+                AddText(layDrawingData, tx, ty, lineH, line);
+            }
+        }
+
+        string content;
+        using (var ms = new MemoryStream())
+        {
+            doc.Save(ms);
+            ms.Position = 0;
+            using var reader = new StreamReader(ms);
+            content = reader.ReadToEnd();
+        }
+
+        var fileName = string.IsNullOrWhiteSpace(dxfExportFileName) ? "export" : dxfExportFileName.Trim();
+        if (fileName.EndsWith(".dxf", StringComparison.OrdinalIgnoreCase))
+            fileName = fileName[..^4];
+
+        if (dxfExportBackgroundImage)
+        {
+            // The DXF only references the picture by name, so ship the .jpg alongside it —
+            // otherwise CAD opens the drawing with an empty image frame.
+            await js.InvokeVoidAsync("downloadDxfWithImage", $"{fileName}.dxf", content, imgFile, imgFile);
+        }
+        else
+        {
+            await js.InvokeVoidAsync("downloadTextFile", $"{fileName}.dxf", content);
+        }
+
+        await journal.WriteAsync(JournalCategory.Donnees, "export.dxf", $"{fileName}.dxf",
+            $"Module {ModuleName}, structure {StructureName}, événement {EventName}"
+            + (dxfExportBackgroundImage ? " — avec image de fond" : ""),
+            eventId: EventId);
+    }
 }

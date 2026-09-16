@@ -2,65 +2,95 @@
 
 @using AliantWebS.Data
 @using Models
+@using RiggingOptimizer
 @inject AppData appData;
 @inject EntitiesService entitiesService
 @inject NavigationManager navigationManager
 @inject DialogService dialogService
+@inject ScenarioStorageService scenarioStorage
+@inject IJSRuntime js
+@implements IDisposable
 
 @layout MainLayout
 
 <div class="main-container">
+
+    @if (isGenerating)
+    {
+        <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 9999;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;">
+            <RadzenProgressBarCircular Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate"
+                                       Size="ProgressBarCircularSize.Large" />
+            <span style="color: white; margin-top: 1rem; font-size: 1.1rem;">Generating layout...</span>
+        </div>
+    }
+
     <header>
         <div class="top-row px-4 auth" style="display: flex; align-items: center; position: sticky; top: 0; background-color: #fff; z-index: 1000;">
             <!-- Breadcrumbs -->
             <div style="flex-grow: 1;">
                 <Breadcrumb Mode="BreadcrumbMode.Auto">
                     <BreadcrumbItem Active>
-                        <BreadcrumbLink To="@($"/ChargesSceniques/{appData.EventID.ToString()}")">Charges Scéniques</BreadcrumbLink>
+                        <BreadcrumbLink To="@($"/ChargesSceniques/{selectedScenario?.EventMpscenarioId ?? Guid.Empty}")">Charges Scéniques</BreadcrumbLink>
                     </BreadcrumbItem>
                     <BreadcrumbItem>
                         <BreadcrumbLink To="@($"/MotherGrid/{selectedScenario?.EventMpscenarioId ?? Guid.Empty}")">Mother Grid</BreadcrumbLink>
                     </BreadcrumbItem>
                     <BreadcrumbItem>
-                        <BreadcrumbLink To="@($"/Charpente/{appData.EventID.ToString()}")">Charpente</BreadcrumbLink>
+                        <BreadcrumbLink To="@($"/Charpente/{selectedScenario?.EventMpscenarioId ?? Guid.Empty}")">Charpente</BreadcrumbLink>
+                    </BreadcrumbItem>
+                    <BreadcrumbItem>
+                        <BreadcrumbLink To="@($"/Model3D/{selectedScenario?.EventMpscenarioId ?? Guid.Empty}")">Modèle 3D</BreadcrumbLink>
                     </BreadcrumbItem>
                 </Breadcrumb>
             </div>
-            @if (navigationManager.Uri.Contains("MotherGrid"))
-            {
 
-                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="Radzen.JustifyContent.Center" Gap="0.5rem">
-                    <RadzenLabel id="DropDownEditLabel" Text="Scénario" Component="DropDownEdit" />
-                    <RadzenDropDown @ref=rdzd Change="ScenarioChanged" @bind-Value=@selectedScenario Placeholder="Select a scenario" Data=@Scenarios TextProperty="Name" Style="width: 100%; max-width: 400px;" Name="DropDownEdit">
+            <RadzenButton Icon="grid_on" ButtonStyle="ButtonStyle.Primary" Variant="Variant.Text"
+                          Click="GenerateLayout" title="Generate MotherGrid/Palonnier Layout"
+                          Disabled="@isGenerating"
+                          style="margin-right: 0.25rem;" />
+            <RadzenButton Icon="description" ButtonStyle="ButtonStyle.Info" Variant="Variant.Text"
+                          Click="OpenReportDialog" title="Éditer l'étude d'implantation (Word)"
+                          style="margin-right: 0.25rem;" />
+            <RadzenButton Icon="folder_open" ButtonStyle="ButtonStyle.Secondary" Variant="Variant.Text"
+                          Click="OpenFileManager" title="Gérer les fichiers du scénario (entrées et résultats)"
+                          style="margin-right: 1rem;" />
 
-                    </RadzenDropDown>
-                    <button class="btn-primary" style="width:20em" @onclick="addScenario">Ajouter un scénario</button>
-                    <button class="btn-primary" style="width:20em" @onclick="DeleteScenario">Suprimer le scénario</button>
-                </RadzenStack>
-            }
+            <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="Radzen.JustifyContent.Center" Gap="0.5rem">
+                <RadzenLabel id="DropDownEditLabel" Text="Scénario" Component="DropDownEdit" />
+                <RadzenDropDown @ref=rdzd Change="ScenarioChanged" @bind-Value=@selectedScenario Placeholder="Select a scenario" Data=@Scenarios TextProperty="Name" Style="width: 100%; max-width: 400px;" Name="DropDownEdit" />
+                <RadzenButton Icon="add_circle" ButtonStyle="ButtonStyle.Success" Variant="Variant.Text"
+                              Click="addScenario" title="Ajouter un scénario" />
+                <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Text"
+                              Click="DeleteScenario" title="Suprimer le scénario" />
+            </RadzenStack>
         </div>
     </header>
-
-    @*     <div class="sidebar">
-    <!-- Sidebar content -->
-    </div> *@
 
     <main>
         <CascadingValue Value="this">
             @Body
         </CascadingValue>
     </main>
-
-    @*     <footer>
-    <!-- Footer content -->
-    </footer> *@
 </div>
 
 @code {
     RadzenDropDown<EventMpscenario> rdzd;
 
     private List<EventMpscenario> Scenarios = new List<EventMpscenario>();
-    EventMpscenario selectedScenario;
+    public EventMpscenario selectedScenario { get; set; }
+    public Event selectedEvent { get; set; }
+
+    private bool isGenerating = false;
+
+    // Callback registered by ChargeMPComponent
+    private Func<Task> _calculCharpenteCallback;
+    private IDisposable _locationChangingRegistration;
+
+    public void RegisterCalculCharpente(Func<Task> callback)
+    {
+        _calculCharpenteCallback = callback;
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -71,6 +101,53 @@
 
         Scenarios = await entitiesService.GetFilteredEntitiesAsync<EventMpscenario>(x => x.EventId == appData.EventID);
         selectedScenario = Scenarios.FirstOrDefault();
+        selectedEvent = await entitiesService.GetEntityAsync<Event>(appData.EventID);
+
+        // Resolving a scenario's folders also corrects the name of a folder whose event or scenario was
+        // renamed since it was created, and adopts folders left behind by the old naming scheme.
+        EnsureScenarioFolders();
+
+        // Register navigation interception
+        _locationChangingRegistration = navigationManager.RegisterLocationChangingHandler(OnLocationChanging);
+    }
+
+    private async ValueTask OnLocationChanging(LocationChangingContext context)
+    {
+        // If we are currently on MotherGrid and navigating away from it → trigger CalculCharpente
+        bool leavingMotherGrid = navigationManager.Uri.Contains("MotherGrid")
+                                 && !context.TargetLocation.Contains("MotherGrid");
+
+        if (leavingMotherGrid && _calculCharpenteCallback is not null)
+        {
+            await _calculCharpenteCallback.Invoke();
+        }
+    }
+
+    public void Dispose()
+    {
+        _locationChangingRegistration?.Dispose();
+    }
+
+    // ... all your existing methods unchanged below ...
+
+    private void EnsureScenarioFolders()
+    {
+        if (selectedEvent is null) return;
+
+        foreach (var scenario in Scenarios)
+        {
+            try
+            {
+                scenarioStorage.GetScenarioPaths(selectedEvent, scenario);
+            }
+            catch (Exception ex)
+            {
+                // A locked or unwritable folder must not stop the page from loading; the file manager
+                // and Generate Layout each report the problem where it actually matters.
+                Console.Error.WriteLine(
+                    $"ScenariosData: dossier du scénario '{scenario.Name}' indisponible: {ex.Message}");
+            }
+        }
     }
 
     public async void RequestRedraw()
@@ -79,28 +156,84 @@
         selectedScenario = Scenarios.FirstOrDefault();
     }
 
+    private async Task GenerateLayout()
+    {
+        if (selectedEvent is null || selectedScenario is null)
+        {
+            await js.InvokeVoidAsync("alert", "Sélectionnez un scénario avant de générer l'implantation.");
+            return;
+        }
+
+        // One at a time. The generation no longer holds this circuit's thread (below), so the page stays live
+        // while it runs - and a second click would start a second run replacing the same rows in parallel.
+        if (isGenerating) return;
+
+        isGenerating = true;
+        StateHasChanged();
+        try
+        {
+            var paths = scenarioStorage.GetScenarioPaths(selectedEvent, selectedScenario);
+
+            // Read before leaving the circuit: what the user selects while the run is going must not change
+            // which scenario it writes.
+            var scenarioId = selectedScenario.EventMpscenarioId;
+            var commonDataDir = scenarioStorage.CommonDataDir;
+
+            // OFF THIS CIRCUIT'S THREAD - the fix for the freeze on a second generation, captured on the
+            // database on 2026-09-12 rather than reasoned out:
+            //
+            //   session 59 = this pipeline: an open user transaction, the DELETE of the old layout sent, then
+            //                SLEEPING - no further statement, no COMMIT;
+            //   session 62 = MotherGrid.OnParametersSetAsync's SELECT on MotherGridPalonnier, waiting on
+            //                session 59's lock (LCK_M_S), until the 30 s command timeout killed the circuit.
+            //
+            // The StateHasChanged above queues a render of the page. Awaited here, the pipeline would hand this
+            // thread back at its first await inside the transaction; the render would then run MotherGrid's
+            // reload, whose queries are SYNCHRONOUS (EntitiesService: ToList() behind an async signature), and
+            // block the thread on the lock the transaction holds. The transaction cannot commit either: the rest
+            // of the pipeline is queued to resume on that very thread. Neither side can move.
+            //
+            // It appeared when the pipeline was given a context of its own (EntitiesService.CreateOwnedContext):
+            // on the page's shared connection its locks could never block the page's own reads. And it needs old
+            // rows to delete, which is why the FIRST generation of a scenario went through.
+            //
+            // Nothing in the pipeline is bound to the circuit - no shared context, no JS, no component; its
+            // database access is its own context and AppSettings' factory - so on the thread pool it commits
+            // whatever the page is doing, and the page's read simply waits the few milliseconds until it has.
+            // The optimiser, the PNG and the workbook stop freezing the page while they run, too.
+            await Task.Run(() => Pipeline.GenerateLayout(
+                paths.DataDir, paths.OutputDir, entitiesService, scenarioId, commonDataDir));
+
+            // Back on the circuit - the await above resumes here - for the navigation and the page.
+            await ScenarioChanged();
+        }
+        catch (Exception ex)
+        {
+            // This used to fail silently: the pipeline swallowed the exception, the spinner stopped and
+            // nothing appeared in the output folder, which is indistinguishable from a run that worked.
+            await js.InvokeVoidAsync("alert", $"Génération impossible : {ex.Message}");
+        }
+        finally
+        {
+            isGenerating = false;
+            StateHasChanged();
+        }
+    }
+
     private async Task addScenario()
     {
         EventMpscenario emp = new EventMpscenario();
         emp.EventId = appData.EventID;
-        // emp.Name = DateTime.Now.ToString();
 
         var res = await dialogService.OpenAsync<LoadPages.ScenarioNameDialog>($"Scenario",
                new Dictionary<string, object>() { { "emp", emp } },
-               new DialogOptions()
-                   {
-                       Resizable = true,
-                       Draggable = true,
-                       Width = "400px",
-                       Height = "180px",
-                       Left = null,
-                       Top = null
-                   });
+               new DialogOptions() { Resizable = true, Draggable = true, Width = "400px", Height = "180px" });
 
         if (res == true)
         {
             if ((await entitiesService.InsertEntityAsync(emp)) != null)
             {
+                scenarioStorage.GetScenarioPaths(selectedEvent, emp);
                 Scenarios.Add(emp);
                 selectedScenario = emp;
             }
@@ -110,12 +243,25 @@
 
     private async Task DeleteScenario()
     {
+        if (selectedScenario is null) return;
+
+        var confirmed = await js.InvokeAsync<bool>("confirm",
+            $"Supprimer le scénario « {selectedScenario.Name} » ?\n"
+            + "Ses fichiers seront déplacés dans la corbeille, pas effacés.");
+        if (!confirmed) return;
+
+        // Captured before the delete: the entity is what tells us which folder to move.
+        var eventId = selectedEvent?.EventId ?? appData.EventID;
+        var scenarioId = selectedScenario.EventMpscenarioId;
+
         if (await entitiesService.DeleteEntityAsync(selectedScenario))
         {
+            // Only once the row is gone, so a failed delete cannot strand the folder in the trash.
+            scenarioStorage.TrashScenarioFolder(eventId, scenarioId);
+
             if (Scenarios.Remove(selectedScenario))
             {
                 selectedScenario = null;
-
                 StateHasChanged();
                 await ScenarioChanged();
             }
@@ -124,14 +270,48 @@
 
     private async Task ScenarioChanged()
     {
-        // var v = appData.EventID;
-        //NavigationOptions op = new NavigationOptions();
-        
-        navigationManager.NavigateTo($"MotherGrid/{selectedScenario?.EventMpscenarioId ?? Guid.Empty}");
-      //  appData.EventMpscenarioId = selectedScenario?.EventMpscenarioId ?? Guid.Empty;
+        if (navigationManager.Uri.Contains("ChargesSceniques"))
+            navigationManager.NavigateTo($"ChargesSceniques/{selectedScenario?.EventMpscenarioId ?? Guid.Empty}");
+        if (navigationManager.Uri.Contains("MotherGrid"))
+            navigationManager.NavigateTo($"MotherGrid/{selectedScenario?.EventMpscenarioId ?? Guid.Empty}");
+        if (navigationManager.Uri.Contains("Charpente"))
+            navigationManager.NavigateTo($"Charpente/{selectedScenario?.EventMpscenarioId ?? Guid.Empty}");
+        if (navigationManager.Uri.Contains("Model3D"))
+            navigationManager.NavigateTo($"Model3D/{selectedScenario?.EventMpscenarioId ?? Guid.Empty}");
     }
 
+    private async Task OpenReportDialog()
+    {
+        if (selectedEvent is null || selectedScenario is null)
+        {
+            await js.InvokeVoidAsync("alert", "Sélectionnez un scénario avant d'éditer le rapport.");
+            return;
+        }
 
+        await dialogService.OpenAsync<LoadPages.ReportDialog>(
+            $"Étude d'implantation – {selectedEvent.Name}",
+            new Dictionary<string, object>
+            {
+                { "Event", selectedEvent },
+                { "Scenario", selectedScenario }
+            },
+            new DialogOptions { Resizable = true, Draggable = true, Width = "720px", Height = "560px" });
+    }
+
+    private async Task OpenFileManager()
+    {
+        if (selectedEvent == null || selectedScenario == null) return;
+
+        // Make sure the folders exist (and are correctly named) before the dialog looks them up by id.
+        scenarioStorage.GetScenarioPaths(selectedEvent, selectedScenario);
+
+        await dialogService.OpenAsync<LoadPages.ScenariosDataFileManager>(
+            $"Fichiers – {selectedEvent.Name} / {selectedScenario.Name}",
+            new Dictionary<string, object>
+            {
+                { "EventId",    selectedEvent.EventId },
+                { "ScenarioId", selectedScenario.EventMpscenarioId }
+            },
+            new DialogOptions { Resizable = true, Draggable = true, Width = "760px", Height = "560px" });
+    }
 }
-
-

@@ -7,9 +7,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using System.Numerics;
 using Accord.Math;
-using TorchSharp;
-using TorchSharp.Modules;
-using static TorchSharp.torch;
+
 using System.Text.RegularExpressions;
 using AliantWebS.Models;
 using AliantWebS.Data;
@@ -544,45 +542,7 @@ namespace Helpers
             return (stringOfMaximum, (int)maximum);
         }
 
-        static public (Tensor, Tensor) CSVToArray(string filePath, char SplitChar, bool SkipHeader)
-        {
-
-            string[] lines = System.IO.File.ReadAllLines(filePath);
-
-
-            var valuesTemp = lines[0].Split(SplitChar);
-
-            double[,] a = new double[0, valuesTemp.Length];
-
-
-            int start = 0;
-
-
-            if (SkipHeader)
-            {
-                start = 1;
-            }
-
-            for (int i = start; i < lines.Length; i++)
-            {
-
-                var values = lines[i].Split(SplitChar);
-
-
-
-                a = a.InsertRow(values.Select(x => Convert.ToDouble(x)).ToArray());
-
-            }
-
-            var item1 = a.GetColumn(0);
-            //  var indexes = Enumerable.Range(1, a.Columns() - 1).ToArray();
-            var indexes = Enumerable.Range(1, 2).ToArray();
-            var item2 = a.GetColumns(indexes);
-            //   var item2 = a.GetColumn(1);
-
-
-            return (torch.tensor(item2, ScalarType.Float32), torch.tensor(item1, ScalarType.Float32));
-        }
+    
 
 
         public static IEnumerable Cartesian(this IEnumerable<IEnumerable> items)

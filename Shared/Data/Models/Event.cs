@@ -35,12 +35,6 @@ public partial class Event
     public virtual ICollection<Axe> Axes { get; set; } = new List<Axe>();
 
     [InverseProperty("Event")]
-    public virtual ICollection<ChargesScenique> ChargesSceniques { get; set; } = new List<ChargesScenique>();
-
-    [InverseProperty("Event")]
-    public virtual ICollection<Charpente> Charpentes { get; set; } = new List<Charpente>();
-
-    [InverseProperty("Event")]
     public virtual ICollection<Equipement> Equipements { get; set; } = new List<Equipement>();
 
     [InverseProperty("Event")]

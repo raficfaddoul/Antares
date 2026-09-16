@@ -230,87 +230,9 @@
         present = true;
 
         headers.Add("Date");
-        var stirt = await entitiesService.GetFilteredEntitiesAsync<StructureTypeInspectionResultType>(x => x.StructureTypeId == appData.Structure.StructureTypeId);
-
-        var inspectionResultTypesids = stirt.Select(x => x.InspectionResultTypeId).Distinct();
-
-        foreach (var v in inspectionResultTypesids)
-        {
-            var ress = await entitiesService.GetFilteredEntitiesAsync<StructureInspectionResult>(x => (x.InspectionResultTypeId == v) && (x.StructureId == appData.Structure.StructureId));
-            var resultDictionary = ress.Where(x => x.Date != null && x.ResultNumeric != null)
-        .GroupBy(x => x.Date)
-        .ToDictionary(group => (object)group.Key, group => (double)group.Average(x => x.ResultNumeric));
-            indices.Add(resultDictionary);
-            InspectionResultType irt = await entitiesService.GetEntityAsync<InspectionResultType>(v);
-
-            headers.Add(irt.Name);
-        }
-
-        GetElementsPercentages();// not awaited on purpose so it dosnnt block BIM display
-
-    }
 
 
-    private async Task GetElementsPercentages()
-    {
-        var data = new List<(ElementType, InspectionResultType, double)>();
-        var els = appData.Structure.Elements;
-        entitiesService.LoadCollection(appData.Structure, "Elements");
-        foreach (var e in els)
-        {
-            entitiesService.LoadReference(e, "ElementType");
-            entitiesService.LoadCollection(e, "InspectionResults");
-        }
-
-        //  var elementTypes = els.Where(x => x.ElementType != null)
-        //     .Select(x => x.ElementType).Distinct().ToList();
-
-        //  var inspectionResults = els.SelectMany(x => x.InspectionResults).ToList();
-
-        foreach (var e in els)
-        {
-            var elGuid = e.ElementId;
-            foreach (var ir in e.InspectionResults)
-            {
-                entitiesService.LoadReference(ir, "InspectionResultType");
-            }
-
-            var latestResults = e.InspectionResults
-    .GroupBy(result => result.InspectionResultType) // Group by type
-    .Select(group => group.OrderByDescending(result => result.Date).FirstOrDefault()) // Select the latest result from each group
-    .ToList(); // Convert to list if needed
-
-            foreach (var ir in latestResults)
-            {
-                if (ir.ResultNumeric != null)
-                {
-                    data.Add((e.ElementType, ir.InspectionResultType, (double)ir.ResultNumeric));
-                }
-            }
-        }
-
-        var groupedData = data.GroupBy(x => new { x.Item1, x.Item2 });
-
-        // Calculate percentages
-
-     
-
-        foreach (var group in groupedData)
-        {
-            DataItem[] dataItem = new DataItem[4];
-            double totalCount = group.Count();
-            dataItem[0] = new DataItem() { Quarter = "CS1", Revenue = (group.Count(x => x.Item3 >= 0 && x.Item3 < 25) / totalCount) };
-            dataItem[1] = new DataItem() { Quarter = "CS2", Revenue = (group.Count(x => x.Item3 >= 25 && x.Item3 < 50) / totalCount) };
-            dataItem[2] = new DataItem() { Quarter = "CS3", Revenue = (group.Count(x => x.Item3 >= 50 && x.Item3 < 75) / totalCount) };
-            dataItem[3] = new DataItem() { Quarter = "CS4", Revenue = (group.Count(x => x.Item3 >= 75 && x.Item3 <= 100) / totalCount) };
-
-            string title = group.Key.Item1.Name + "/" + group.Key.Item2.Name;
-            dataItemsLists.Add(title, dataItem);
-
-
-        }
-
-        StateHasChanged();
+ 
 
     }
 

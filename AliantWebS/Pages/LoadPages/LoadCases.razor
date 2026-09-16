@@ -251,309 +251,7 @@
                         </RadzenDataGrid>
                     </RadzenTabsItem>
 
-                    <RadzenTabsItem Text="@L["Dynamic Load"]">
-                        <a class="nav-link" @onclick="@(args => InsertDynamicLoad())" @onclick:preventDefault="true" href="">
-                            <span class="oi oi-plus" aria-hidden="true">@L["Add New"]</span>
-                        </a>
-                        <RadzenDataGrid class="RadzenDataGrid" @ref="dynamicLoadsGrid" AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="PageSize"
-                        Data="@selectedLoadCase.DynamicLoads" TItem="DynamicLoad" RowSelect=@DynamicLoadRowSelect ColumnWidth="150px">
-                            <Columns>
-                                <RadzenDataGridColumn Width="50" TItem="DynamicLoad" Property="Name">
-                                    <HeaderTemplate>
-                                        <span class="gridColumndStyle">@L["Name"]</span>                    <br />
-                                    </HeaderTemplate>
-                                    <EditTemplate Context="dynamicLoad">
-                                        <InputTextArea @bind-Value="dynamicLoad.Name" Style="width:100%" />
-                                    </EditTemplate>
-                                </RadzenDataGridColumn>
-
-                                <RadzenDataGridColumn Width="100px" TItem="DynamicLoad" Property="Dof">
-                                    <HeaderTemplate>
-                                        <span class="gridColumndStyle">@L["DOF"]</span>                    <br />
-                                    </HeaderTemplate>
-                                    <EditTemplate Context="dynamicLoad">
-                                        <RadzenNumeric @bind-Value="dynamicLoad.Dof" Style="width:100%" Name="Dof" />
-                                        <RadzenRequiredValidator Text="DOF is required" Component="Dof" Popup="true" />
-                                    </EditTemplate>
-                                </RadzenDataGridColumn>
-
-                                <RadzenDataGridColumn Width="100px" TItem="DynamicLoad" Property="StartValue">
-                                    <HeaderTemplate>
-                                        <span class="gridColumndStyle">@L["Start Value"]</span>                    <br />
-                                    </HeaderTemplate>
-                                    <EditTemplate Context="dynamicLoad">
-                                        <RadzenNumeric @bind-Value="dynamicLoad.StartValue" Style="width:100%" Name="StartValue" />
-                                        <RadzenRequiredValidator Text="Start value is required" Component="StartValue" Popup="true" />
-                                    </EditTemplate>
-                                </RadzenDataGridColumn>
-
-                                <RadzenDataGridColumn Width="100px" TItem="DynamicLoad" Property="EndValue">
-                                    <HeaderTemplate>
-                                        <span class="gridColumndStyle">@L["End Value"]</span>                    <br />
-                                    </HeaderTemplate>
-                                    <EditTemplate Context="dynamicLoad">
-                                        <RadzenNumeric @bind-Value="dynamicLoad.EndValue" Style="width:100%" Name="EndValue" />
-                                        <RadzenRequiredValidator Text="End value is required" Component="EndValue" Popup="true" />
-                                    </EditTemplate>
-                                </RadzenDataGridColumn>
-
-                                <RadzenDataGridColumn Width="50" TItem="DynamicLoad">
-                                    <HeaderTemplate>
-                                        <span class="gridColumndStyle">@L["Time evolution"]</span>                    <br />
-                                    </HeaderTemplate>
-                                    <Template Context="dynamicLoad">
-                                        <textArea disabled style="width:100%">
-                                            @Converter.DisplayDictionary(Converter.ConvertFromXml(dynamicLoad.TemporalFunc))
-                                        </textArea>
-                                    </Template>
-                                    <EditTemplate Context="dynamicLoad">
-                                        <RadzenTextArea Value="@Converter.DisplayDictionary(Converter.ConvertFromXml(dynamicLoad.TemporalFunc))"
-                                        @oninput="@(e => dynamicLoad.TemporalFunc = Converter.ConvertToXml(dynamicLoad.TemporalFunc,Converter.ParseToDictionary(e.Value.ToString())))"
-                                        ValueExpression="@( () => dynamicLoad.TemporalFunc )" Name="TemporalFunc" Style="width:100%" />
-                                        <RadzenRequiredValidator Text="Temporal function is required" Component="TemporalFunc" Popup="true" />
-
-                                    </EditTemplate>
-                                </RadzenDataGridColumn>
-
-                                <RadzenDataGridColumn Width="50" TItem="DynamicLoad" Title="Action" Filterable="false" Sortable="false">
-                                    <Template Context="data">
-                                        <div style="display:flex">
-                                            <a title="@L["Edit"]" class="nav-link" @onclick="@(args => EditDynamicRow(data))" @onclick:preventDefault="true" href="">
-                                                <span class="oi oi-pencil" aria-hidden="true"></span>
-                                            </a>
-                                            <a title="@L["End Edit"]" class="nav-link" @onclick="@(args => UpdateDynamicRow(data))" @onclick:preventDefault="true" href="">
-                                                <span class="oi oi-check" aria-hidden="true"></span>
-                                            </a>
-                                            <a title="@L["Delete"]" class="nav-link" @onclick="@(() => DeleteDynamicLoad(data))" @onclick:preventDefault="true" href="">
-                                                <span class="oi oi-trash" aria-hidden="true"></span>
-                                            </a>
-                                            <a title="@L["Element Assignement"]" class="nav-link" @onclick="@(() => AssignementDynamicLoad(data))" @onclick:preventDefault="true" href="">
-                                                <i class="material-icons">assignment</i>
-                                            </a>
-                                        </div>
-                                    </Template>
-
-                                </RadzenDataGridColumn>
-
-
-                            </Columns>
-                        </RadzenDataGrid>
-                    </RadzenTabsItem>
-                    <RadzenTabsItem Text="@L["Dynamic Point Load"]">
-                        <a class="nav-link" @onclick="@(args => InsertDynamicPointLoad())" @onclick:preventDefault="true" href="">
-                            <span class="oi oi-plus" aria-hidden="true">@L["Add New"]</span>
-                        </a>
-                        <RadzenDataGrid class="RadzenDataGrid" @ref="dynamicPointLoadsGrid" AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="PageSize"
-                        Data="@selectedLoadCase.DynamicPointLoads" TItem="DynamicPointLoad" RowSelect=@DynamicPointLoadRowSelect ColumnWidth="150px" Style="overflow:auto">
-                            <Columns>
-                                <RadzenDataGridColumn Width="50" TItem="DynamicPointLoad" Property="Name">
-                                    <HeaderTemplate>
-                                        <span class="gridColumndStyle">@L["Name"]</span>                    <br />
-                                    </HeaderTemplate>
-                                    <EditTemplate Context="dynamicPointLoad">
-                                        <InputTextArea @bind-Value="dynamicPointLoad.Name" Style="width:100%" />
-                                    </EditTemplate>
-                                </RadzenDataGridColumn>
-
-                                <RadzenDataGridColumn Width="100px" TItem="DynamicPointLoad" Property="Dof">
-                                    <HeaderTemplate>
-                                        <span class="gridColumndStyle">@L["DOF"]</span>                    <br />
-                                    </HeaderTemplate>
-                                    <EditTemplate Context="dynamicPointLoad">
-                                        <RadzenNumeric @bind-Value="dynamicPointLoad.Dof" Style="width:100%" Name="Dof" />
-                                        <RadzenRequiredValidator Text="DOF is required" Component="Dof" Popup="true" />
-                                    </EditTemplate>
-                                </RadzenDataGridColumn>
-
-
-                                <RadzenDataGridColumn Width="100px" TItem="DynamicPointLoad" Property="Value">
-                                    <HeaderTemplate>
-                                        <span class="gridColumndStyle">@L["Value"]</span>                    <br />
-                                    </HeaderTemplate>
-                                    <EditTemplate Context="dynamicPointLoad">
-                                        <RadzenNumeric @bind-Value="dynamicPointLoad.Value" Style="width:100%" Name="Value" />
-                                        <RadzenRequiredValidator Text="Value is required" Component="Value" Popup="true" />
-                                    </EditTemplate>
-                                </RadzenDataGridColumn>
-
-                                <RadzenDataGridColumn Width="100px" TItem="DynamicPointLoad" Property="ApplicationPointDistance">
-                                    <HeaderTemplate>
-                                        <span class="gridColumndStyle">@L["Application Point Distance"]</span>                    <br />
-                                    </HeaderTemplate>
-                                    <EditTemplate Context="dynamicPointLoad">
-                                        <RadzenNumeric @bind-Value="dynamicPointLoad.ApplicationPointDistance" Name="ApplicationPointDistance" />
-                                        <RadzenRequiredValidator Text="Distance is required" Component="ApplicationPointDistance" Popup="true" />
-                                    </EditTemplate>
-                                </RadzenDataGridColumn>
-
-
-                                <RadzenDataGridColumn Width="50" TItem="DynamicPointLoad" Property="TemporalFunc" Title="TemporalFunc">
-                                    <HeaderTemplate>
-                                        <span class="gridColumndStyle">@L["Time evolution"]</span>                    <br />
-                                    </HeaderTemplate>
-                                    <Template Context="dynamicPointLoad">
-                                        <textArea disabled style="width:100%">
-                                            @Converter.DisplayDictionary(Converter.ConvertFromXml(dynamicPointLoad.TemporalFunc))
-                                        </textArea>
-                                    </Template>
-                                    <EditTemplate Context="dynamicPointLoad">
-                                        <RadzenTextArea Value="@Converter.DisplayDictionary(Converter.ConvertFromXml(dynamicPointLoad.TemporalFunc))"
-                                        @oninput="@(e => dynamicPointLoad.TemporalFunc = Converter.ConvertToXml(dynamicPointLoad.TemporalFunc,Converter.ParseToDictionary(e.Value.ToString())))"
-                                        ValueExpression="@( () => dynamicPointLoad.TemporalFunc )" Name="TemporalFunc" Style="width:100%"/>
-                                        <RadzenRequiredValidator Text="Temporal function is required" Component="TemporalFunc" Popup="true" />
-
-                                    </EditTemplate>
-                                </RadzenDataGridColumn>
-                                <RadzenDataGridColumn Width="50" TItem="DynamicPointLoad" Title="Action" Filterable="false" Sortable="false">
-                                    <Template Context="data">
-                                        <div style="display:flex">
-                                            <a title="@L["Edit"]" class="nav-link" @onclick="@(args => EditDynamicPointRow(data))" @onclick:preventDefault="true" href="">
-                                                <span class="oi oi-pencil" aria-hidden="true"></span>
-                                            </a>
-                                            <a title="@L["End Edit"]" class="nav-link" @onclick="@(args => UpdateDynamicPointRow(data))" @onclick:preventDefault="true" href="">
-                                                <span class="oi oi-check" aria-hidden="true"></span>
-                                            </a>
-                                            <a title="@L["Delete"]" class="nav-link" @onclick="@(() => DeleteDynamicPointLoad(data))" @onclick:preventDefault="true" href="">
-                                                <span class="oi oi-trash" aria-hidden="true"></span>
-                                            </a>
-                                            <a title="@L["Element Assignement"]" class="nav-link" @onclick="@(() => AssignementDynamicPointLoad(data))" @onclick:preventDefault="true" href="">
-                                                <i class="material-icons">assignment</i>
-                                            </a>
-                                        </div>
-                                    </Template>
-
-                                </RadzenDataGridColumn>
-
-
-                            </Columns>
-                        </RadzenDataGrid>
-                    </RadzenTabsItem>
-                    <RadzenTabsItem Text="@L["Mobile Load"]">
-                        <a class="nav-link" @onclick="@(args => InsertMobileLoad())" @onclick:preventDefault="true" href="">
-                            <span class="oi oi-plus" aria-hidden="true">@L["Add New"]</span>
-                        </a>
-                        <RadzenDataGrid class="RadzenDataGrid" @ref="mobileLoadsGrid" AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="PageSize"
-                        Data="@selectedLoadCase.MobileLoads" TItem="MobileLoad" ColumnWidth="150px">
-                            <Columns>
-                                <RadzenDataGridColumn Width="50" TItem="MobileLoad" Property="Name">
-                                    <HeaderTemplate>
-                                        <span class="gridColumndStyle">@L["Name"]</span>                    <br />
-                                    </HeaderTemplate>
-                                    <EditTemplate Context="mobileLoad">
-                                        <InputTextArea @bind-Value="mobileLoad.Name" Style="width:100%" />
-                                    </EditTemplate>
-                                </RadzenDataGridColumn>
-
-                                <RadzenDataGridColumn Width="50" TItem="MobileLoad" Property="ValueVL">
-                                    <HeaderTemplate>
-                                        <span class="gridColumndStyle">@L["ValueVL"]</span>                    <br />
-                                    </HeaderTemplate>
-                                    <EditTemplate Context="mobileLoad">
-                                        <InputNumber @bind-Value="mobileLoad.ValueVl" Style="width:100%" />
-                                    </EditTemplate>
-                                </RadzenDataGridColumn>
-
-                                <RadzenDataGridColumn Width="50" TItem="MobileLoad" Property="ValuePL">
-                                    <HeaderTemplate>
-                                        <span class="gridColumndStyle">@L["ValuePL"]</span>                    <br />
-                                    </HeaderTemplate>
-                                    <EditTemplate Context="mobileLoad">
-                                        <InputNumber @bind-Value="mobileLoad.ValuePl" Style="width:100%" />
-                                    </EditTemplate>
-                                </RadzenDataGridColumn>
-
-                                <RadzenDataGridColumn Width="50" TItem="MobileLoad" Property="ValueVL">
-                                    <HeaderTemplate>
-                                        <span class="gridColumndStyle">@L["ValueVL"]</span>                    <br />
-                                    </HeaderTemplate>
-                                    <EditTemplate Context="mobileLoad">
-                                        <InputNumber @bind-Value="mobileLoad.ValueVl" Style="width:100%" />
-                                    </EditTemplate>
-                                </RadzenDataGridColumn>
-
-                                <RadzenDataGridColumn Width="50" TItem="MobileLoad" Property="ValueConvoi">
-                                    <HeaderTemplate>
-                                        <span class="gridColumndStyle">@L["ValueConvoi"]</span>                    <br />
-                                    </HeaderTemplate>
-                                    <EditTemplate Context="mobileLoad">
-                                        <InputNumber @bind-Value="mobileLoad.ValueConvoi" Style="width:100%" />
-                                    </EditTemplate>
-                                </RadzenDataGridColumn>
-
-                                <RadzenDataGridColumn Width="50" TItem="MobileLoad" Property="SpeedVl">
-                                    <HeaderTemplate>
-                                        <span class="gridColumndStyle">@L["SpeedVl"]</span>                    <br />
-                                    </HeaderTemplate>
-                                    <EditTemplate Context="mobileLoad">
-                                        <InputNumber @bind-Value="mobileLoad.SpeedVl" Style="width:100%" />
-                                    </EditTemplate>
-                                </RadzenDataGridColumn>
-
-                                <RadzenDataGridColumn Width="50" TItem="MobileLoad" Property="SpeedPl">
-                                    <HeaderTemplate>
-                                        <span class="gridColumndStyle">@L["SpeedPl"]</span>                    <br />
-                                    </HeaderTemplate>
-                                    <EditTemplate Context="mobileLoad">
-                                        <InputNumber @bind-Value="mobileLoad.SpeedPl" Style="width:100%" />
-                                    </EditTemplate>
-                                </RadzenDataGridColumn>
-
-                                <RadzenDataGridColumn Width="50" TItem="MobileLoad" Property="AverageHourlyTraffic">
-                                    <HeaderTemplate>
-                                        <span class="gridColumndStyle">@L["AverageHourlyTraffic"]</span>                    <br />
-                                    </HeaderTemplate>
-                                    <EditTemplate Context="mobileLoad">
-                                        <InputNumber @bind-Value="mobileLoad.AverageHourlyTraffic" Style="width:100%" />
-                                    </EditTemplate>
-                                </RadzenDataGridColumn>
-
-                                <RadzenDataGridColumn Width="50" TItem="MobileLoad" Property="PercentagePl">
-                                    <HeaderTemplate>
-                                        <span class="gridColumndStyle">@L["PercentagePl"]</span>                    <br />
-                                    </HeaderTemplate>
-                                    <EditTemplate Context="mobileLoad">
-                                        <InputNumber @bind-Value="mobileLoad.PercentagePl" Style="width:100%" />
-                                    </EditTemplate>
-                                </RadzenDataGridColumn>
-
-                                <RadzenDataGridColumn Width="50" TItem="MobileLoad" Property="LoadUncertainty">
-                                    <HeaderTemplate>
-                                        <span class="gridColumndStyle">@L["LoadUncertainty"]</span>                    <br />
-                                    </HeaderTemplate>
-                                    <EditTemplate Context="mobileLoad">
-                                        <InputNumber @bind-Value="mobileLoad.LoadUncertainty" Style="width:100%" />
-                                    </EditTemplate>
-                                </RadzenDataGridColumn>
-
-                                <RadzenDataGridColumn Width="50" TItem="MobileLoad" Property="SpeedUncertainty">
-                                    <HeaderTemplate>
-                                        <span class="gridColumndStyle">@L["SpeedUncertainty"]</span>                    <br />
-                                    </HeaderTemplate>
-                                    <EditTemplate Context="mobileLoad">
-                                        <InputNumber @bind-Value="mobileLoad.SpeedUncertainty" Style="width:100%" />
-                                    </EditTemplate>
-                                </RadzenDataGridColumn>
-
-                                <RadzenDataGridColumn Width="50" TItem="MobileLoad" Title="Action" Filterable="false" Sortable="false">
-                                    <Template Context="data">
-                                        <div style="display:flex">
-                                            <a title="@L["Edit"]" class="nav-link" @onclick="@(args => EditMobileRow(data))" @onclick:preventDefault="true" href="">
-                                                <span class="oi oi-pencil" aria-hidden="true"></span>
-                                            </a>
-                                            <a title="@L["End Edit"]" class="nav-link" @onclick="@(args => UpdateMobileRow(data))" @onclick:preventDefault="true" href="">
-                                                <span class="oi oi-check" aria-hidden="true"></span>
-                                            </a>
-                                            <a title="@L["Delete"]" class="nav-link" @onclick="@(() => DeleteMobileLoad(data))" @onclick:preventDefault="true" href="">
-                                                <span class="oi oi-trash" aria-hidden="true"></span>
-                                            </a>
-                                        </div>
-                                    </Template>
-
-                                </RadzenDataGridColumn>
-
-                            </Columns>
-                        </RadzenDataGrid>
-                    </RadzenTabsItem>
+ 
                 </Tabs>
             </RadzenTabs>
         }
@@ -577,9 +275,6 @@
 
     RadzenDataGrid<StaticLoad> staticLoadsGrid;
     RadzenDataGrid<StaticPointLoad> staticPointLoadsGrid;
-    RadzenDataGrid<DynamicLoad> dynamicLoadsGrid;
-    RadzenDataGrid<DynamicPointLoad> dynamicPointLoadsGrid;
-    RadzenDataGrid<MobileLoad> mobileLoadsGrid;
 
     protected override async Task OnInitializedAsync()
     {
@@ -655,36 +350,7 @@
 
     }
 
-    async Task AssignementDynamicLoad(DynamicLoad dynamicLoad)
-    {
-        var checkedElements = appData.CheckedNodeObjects.Select(x => (AliantWebS.Models.Element)x).ToList();
-        var v2 = await entitiesService.GetFilteredEntitiesAsync<DynamicLoadElement>(x => x.DynamicLoadId == dynamicLoad.DynamicLoadId);
-        var elementsids = v2.Select(x => x.ElementId);
-        foreach (Element el in checkedElements)
-        {
-            if (!elementsids.Contains(el.ElementId))
-            {
-                DynamicLoadElement elc = new DynamicLoadElement();
-                elc.ElementId = el.ElementId;
-                elc.DynamicLoadId = dynamicLoad.DynamicLoadId;
-                if (await entitiesService.InsertEntityAsync(elc) == null)
-                {
-                    await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
-                }
-            }
-        }
-        foreach (DynamicLoadElement elid in v2)
-        {
-            if (!checkedElements.Select(x => x.ElementId).Contains(elid.ElementId))
-            {
-                await entitiesService.DeleteEntityAsync(elid);
-            }
-        }
-        this.StateHasChanged();
-        await dynamicLoadsGrid.SelectRow(dynamicLoad);
-
-
-    }
+   
 
     async Task AssignementStaticPointLoad(StaticPointLoad staticPointLoad)
     {
@@ -717,37 +383,6 @@
 
     }
 
-    async Task AssignementDynamicPointLoad(DynamicPointLoad dynamicPointLoad)
-    {
-        var checkedElements = appData.CheckedNodeObjects.Select(x => (AliantWebS.Models.Element)x).ToList();
-        var v2 = await entitiesService.GetFilteredEntitiesAsync<DynamicPointLoadElement>(x => x.DynamicPointLoadId == dynamicPointLoad.DynamicPointLoadId);
-        var elementsids = v2.Select(x => x.ElementId);
-        foreach (Element el in checkedElements)
-        {
-            if (!elementsids.Contains(el.ElementId))
-            {
-                DynamicPointLoadElement elc = new DynamicPointLoadElement();
-                elc.ElementId = el.ElementId;
-                elc.DynamicPointLoadId = dynamicPointLoad.DynamicPointLoadId;
-                if (await entitiesService.InsertEntityAsync(elc) == null)
-                {
-                    await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
-                }
-            }
-        }
-        foreach (DynamicPointLoadElement elid in v2)
-        {
-            if (!checkedElements.Select(x => x.ElementId).Contains(elid.ElementId))
-            {
-                await entitiesService.DeleteEntityAsync(elid);
-            }
-        }
-        this.StateHasChanged();
-        await dynamicPointLoadsGrid.SelectRow(dynamicPointLoad);
-
-
-    }
-
     async Task DeleteStaticLoad(StaticLoad loadCase)
     {
 
@@ -776,44 +411,6 @@
         }
     }
 
-    async Task DeleteDynamicLoad(DynamicLoad loadCase)
-    {
-
-        if (await entitiesService.DeleteEntityAsync(loadCase))
-        {
-            //    if (selectedLoadCase.DynamicLoads.Remove(loadCase))
-            //   {
-            await dynamicLoadsGrid.Reload();
-
-            //  }
-        }
-    }
-
-    async Task DeleteDynamicPointLoad(DynamicPointLoad loadCase)
-    {
-
-        if (await entitiesService.DeleteEntityAsync(loadCase))
-        {
-            //    if (selectedLoadCase.DynamicLoads.Remove(loadCase))
-            //   {
-            await dynamicPointLoadsGrid.Reload();
-
-            //  }
-        }
-    }
-
-    async Task DeleteMobileLoad(MobileLoad loadCase)
-    {
-
-        if (await entitiesService.DeleteEntityAsync(loadCase))
-        {
-            //  if (selectedLoadCase.MobileLoads.Remove(loadCase))
-            //  {
-            await mobileLoadsGrid.Reload();
-
-            //  }
-        }
-    }
 
     void EditRow(LoadCase loadCase)
     {
@@ -837,45 +434,25 @@
 
     }
 
-    void EditDynamicRow(DynamicLoad loadCase)
-    {
-
-        dynamicLoadsGrid.EditRow(loadCase);
-
-    }
-
-    void EditDynamicPointRow(DynamicPointLoad loadCase)
-    {
-
-        dynamicPointLoadsGrid.EditRow(loadCase);
-
-    }
-
-    void EditMobileRow(MobileLoad loadCase)
-    {
-
-        mobileLoadsGrid.EditRow(loadCase);
-
-    }
 
     async Task InsertLoadCase()
     {
-   
+
         LoadCase loadCase = new LoadCase();
         loadCase.StructureId = structure.StructureId;
 
         if ((await entitiesService.InsertEntityAsync(loadCase)) != null)
         {
             loadCases.Add(loadCase);
-   
+
             await loadCasesGrid.InsertRow(loadCase);
-         
+
         }
         else
         {
             await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
         }
- 
+
     }
 
     async Task InsertStaticLoad()
@@ -929,71 +506,6 @@
         }
     }
 
-    async Task InsertDynamicLoad()
-    {
-        DynamicLoad dynamicLoad = new DynamicLoad();
-        dynamicLoad.LoadCaseId = selectedLoadCase.LoadCaseId;
-
-        var elements = appData.CheckedNodeObjects.Select(x => (AliantWebS.Models.Element)x).ToList();
-        foreach (Element el in elements)
-        {
-            DynamicLoadElement elc = new DynamicLoadElement();
-            elc.ElementId = el.ElementId;
-            elc.DynamicLoadId = dynamicLoad.DynamicLoadId;
-            dynamicLoad.DynamicLoadElements.Add(elc);
-        }
-
-        if ((await entitiesService.InsertEntityAsync(dynamicLoad)) != null)
-        {
-            // selectedLoadCase.DynamicLoads.Add(dynamicLoad);
-            await dynamicLoadsGrid.InsertRow(dynamicLoad);
-        }
-        else
-        {
-            await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
-        }
-    }
-
-    async Task InsertDynamicPointLoad()
-    {
-        DynamicPointLoad dynamicPointLoad = new DynamicPointLoad();
-        dynamicPointLoad.LoadCaseId = selectedLoadCase.LoadCaseId;
-
-        var elements = appData.CheckedNodeObjects.Select(x => (AliantWebS.Models.Element)x).ToList();
-        foreach (Element el in elements)
-        {
-            DynamicPointLoadElement elc = new DynamicPointLoadElement();
-            elc.ElementId = el.ElementId;
-            elc.DynamicPointLoadId = dynamicPointLoad.DynamicPointLoadId;
-            dynamicPointLoad.DynamicPointLoadElements.Add(elc);
-        }
-
-
-        if ((await entitiesService.InsertEntityAsync(dynamicPointLoad)) != null)
-        {
-            // selectedLoadCase.DynamicLoads.Add(dynamicLoad);
-            await dynamicPointLoadsGrid.InsertRow(dynamicPointLoad);
-        }
-        else
-        {
-            await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
-        }
-    }
-
-    async Task InsertMobileLoad()
-    {
-        MobileLoad mobileLoad = new MobileLoad();
-        mobileLoad.LoadCaseId = selectedLoadCase.LoadCaseId;
-        if ((await entitiesService.InsertEntityAsync(mobileLoad)) != null)
-        {
-            //   selectedLoadCase.MobileLoads.Add(mobileLoad);
-            await mobileLoadsGrid.InsertRow(mobileLoad);
-        }
-        else
-        {
-            await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
-        }
-    }
 
     async Task UpdateRow(LoadCase loadCase)
     {
@@ -1019,43 +531,10 @@
         }
     }
 
-    async Task UpdateDynamicRow(DynamicLoad loadCase)
-    {
-        if (await entitiesService.UpdateEntityAsync(loadCase))
-        {
-            await dynamicLoadsGrid.UpdateRow(loadCase);
-        }
-    }
-
-    async Task UpdateDynamicPointRow(DynamicPointLoad loadCase)
-    {
-        //   return;
-        //   string s = loadCase.TemporalFunc;
-        if (await entitiesService.UpdateEntityAsync(loadCase))
-        {
-            await dynamicPointLoadsGrid.UpdateRow(loadCase);
-        }
-    }
-
-    async Task UpdateMobileRow(MobileLoad loadCase)
-    {
-        if (await entitiesService.UpdateEntityAsync(loadCase))
-        {
-            await mobileLoadsGrid.UpdateRow(loadCase);
-        }
-    }
-
     void RowSelect(LoadCase loadCase)
     {
         selectedLoadCase = loadCase;
-        if (selectedLoadCase.DynamicLoads.Count == 0)
-        {
-            entitiesService.LoadCollection(selectedLoadCase, "DynamicLoads");
-        }
-        if (selectedLoadCase.DynamicPointLoads.Count == 0)
-        {
-            entitiesService.LoadCollection(selectedLoadCase, "DynamicPointLoads");
-        }
+
         if (selectedLoadCase.StaticLoads.Count == 0)
         {
             entitiesService.LoadCollection(selectedLoadCase, "StaticLoads");
@@ -1064,11 +543,9 @@
         {
             entitiesService.LoadCollection(selectedLoadCase, "StaticPointLoads");
         }
-        if (selectedLoadCase.MobileLoads.Count == 0)
-        {
-            entitiesService.LoadCollection(selectedLoadCase, "MobileLoads");
-        }
-         //if (selectedLoadCase.ElementLoadCases.Count == 0)
+
+        appData.CheckedNodeObjects = new List<AliantWebS.Models.Element>();
+        //if (selectedLoadCase.ElementLoadCases.Count == 0)
         // {
         //     entitiesService.LoadCollection(selectedLoadCase, "ElementLoadCases");
         // }
@@ -1096,26 +573,6 @@
         }
         appData.CheckedNodeObjects = staticPointLoad.StaticPointLoadElements.Select(x => x.Element).Where(x => appData.Structure.Elements.Contains(x));
         StateHasChanged();        
-    }
-
-    void DynamicLoadRowSelect(DynamicLoad dynamicLoad)
-    {
-        if (dynamicLoad.DynamicLoadElements.Count == 0)
-        {
-            entitiesService.LoadCollection(dynamicLoad, "DynamicLoadElements");
-        }
-        appData.CheckedNodeObjects = dynamicLoad.DynamicLoadElements.Select(x => x.Element).Where(x => appData.Structure.Elements.Contains(x));
-        StateHasChanged();
-    }
-
-    void DynamicPointLoadRowSelect(DynamicPointLoad dynamicPointLoad)
-    {
-        if (dynamicPointLoad.DynamicPointLoadElements.Count == 0)
-        {
-            entitiesService.LoadCollection(dynamicPointLoad, "DynamicPointLoadElements");
-        }
-        appData.CheckedNodeObjects = dynamicPointLoad.DynamicPointLoadElements.Select(x => x.Element).Where(x => appData.Structure.Elements.Contains(x));
-        StateHasChanged();
     }
 
 

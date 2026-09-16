@@ -22,6 +22,33 @@
 <RadzenContextMenu />
 <RadzenTooltip />
 
+@* Lets the JavaScript-driven JPG exports report a completed save back to the journal. *@
+<JournalExportBridge />
+
+@* An alarm e-mail that never left the building used to be a line in the container log. This makes
+   it visible on every page, because the operators would otherwise assume they had been notified. *@
+@if (ShowEmailFailure)
+{
+    <div style="background:#c53030; color:#fff; padding:10px 18px; display:flex; align-items:center;
+                gap:14px; font-size:14px; font-weight:600; box-shadow:0 2px 8px rgba(0,0,0,.25);
+                position:sticky; top:0; z-index:2000;">
+        <span style="font-size:18px;">✉️⚠️</span>
+        <span style="flex:1;">
+            @L["Les e-mails d'alarme ne partent pas"] — @AppData.EmailFailureMessage
+            <span style="opacity:.85; font-weight:400;">
+                (@AppData.EmailFailureTime.ToString("yyyy-MM-dd HH:mm:ss"))
+            </span>
+        </span>
+        <a href="/alarm-management" style="color:#fff; text-decoration:underline;">@L["Alarm Management"]</a>
+        <button type="button" @onclick="DismissEmailFailure"
+                style="background:transparent; border:1px solid rgba(255,255,255,.6); color:#fff;
+                       border-radius:6px; padding:3px 10px; cursor:pointer;">
+            @L["Masquer"]
+        </button>
+    </div>
+}
+
+
 @*    <div class="page">*@
 @*    <div class="sidebar">*@
 <NavMenu />
@@ -114,7 +141,7 @@
 
 
             <LoginDisplay />
-            <a href="#" target="_blank">@L["About"]</a>
+          
         </div>
 
         <div class="content px-4" >
@@ -216,7 +243,27 @@
         appData.StructureNameChanged -= StructureNameChanged;
         appData.StructureNameChanged += StructureNameChanged;
 
+        AppData.OnEmailStatusChanged -= EmailStatusChanged;
+        AppData.OnEmailStatusChanged += EmailStatusChanged;
+    }
 
+    // ── Alarm e-mail delivery banner ──────────────────────────────────────────────────────────
+    // Dismissing hides the CURRENT failure only: the timestamp is remembered, so a later failure
+    // brings the banner back rather than staying hidden for the rest of the session.
+    private DateTime dismissedEmailFailure = DateTime.MinValue;
+
+    private bool ShowEmailFailure =>
+        AppData.EmailFailureMessage != null && AppData.EmailFailureTime > dismissedEmailFailure;
+
+    private void DismissEmailFailure()
+    {
+        dismissedEmailFailure = AppData.EmailFailureTime;
+        StateHasChanged();
+    }
+
+    private void EmailStatusChanged()
+    {
+        InvokeAsync(StateHasChanged);
     }
 
     private void StructureNameChanged(string s)
@@ -257,6 +304,7 @@
         appData.OnSaveChange -= Change;
         appData.DisplaySubmitButtonChanged -= DisplayChanged;
         appData.StructureNameChanged -= StructureNameChanged;
+        AppData.OnEmailStatusChanged -= EmailStatusChanged;   // static event: a leak here outlives the circuit
     }
 
     void SHMClick(MenuItemEventArgs args)

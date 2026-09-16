@@ -217,14 +217,7 @@ window.waitForGauges = function(maxAttempts = 10, interval = 500) {
 // Auto-test après chargement du DOM
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Dashboard.js loaded');
-    
-    // Essayer immédiatement
-    setTimeout(() => {
-        if (!window.testGauges()) {
-            // Si ça ne marche pas, attendre et réessayer
-            window.waitForGauges();
-        }
-    }, 100);
+    // Gauges are rendered by Blazor via renderChart() — no auto-polling needed
 });
 
 // Export pour que Blazor puisse appeler cette fonction

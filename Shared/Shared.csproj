@@ -18,6 +18,8 @@
   <ItemGroup>
     <PackageReference Include="Accord.Math" Version="3.8.0" />
     <PackageReference Include="Blazored.LocalStorage" Version="4.3.0" />
+    <PackageReference Include="brevo_csharp" Version="1.1.1" />
+    <PackageReference Include="ClosedXML" Version="0.105.0" />
     <PackageReference Include="DocumentFormat.OpenXml" Version="3.3.0" />
     <PackageReference Include="InfluxDB.Client" Version="4.12.0" />
     <PackageReference Include="MathNet.Numerics" Version="5.0.0" />
@@ -37,16 +39,29 @@
     <PackageReference Include="Microsoft.JSInterop" Version="8.0.0" />
     <PackageReference Include="Microsoft.SqlServer.SqlManagementObjects" Version="170.12.0" />
     <PackageReference Include="NetTopologySuite" Version="2.5.0" />
-    <PackageReference Include="OpenAI" Version="2.1.0" />
     <PackageReference Include="Radzen.Blazor" Version="7.0.8" />
+    <PackageReference Include="SkiaSharp" Version="2.88.9" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="2.88.9" />
     <PackageReference Include="System.Drawing.Common" Version="8.0.0" />
     <PackageReference Include="System.Drawing.Primitives" Version="4.3.0" />
     <PackageReference Include="System.Linq.Dynamic.Core" Version="1.6.5" />
-    <PackageReference Include="TorchSharp" Version="0.99.2" />
   </ItemGroup>
 
   <ItemGroup>
     <Folder Include="Controllers\" />
+  </ItemGroup>
+
+  <!-- Fixed report imagery: the company mark and the venue figures. Embedded rather than copied so a
+       deployment cannot lose them, and unpacked on demand by EmbeddedAssets. -->
+  <ItemGroup>
+    <EmbeddedResource Include="ScenarioHelpers\Report\Assets\*.png" />
+    <EmbeddedResource Include="ScenarioHelpers\Report\Assets\*.jpg" />
+  </ItemGroup>
+
+  <!-- The optimiser's manual, as the prose it is. Embedded so the page that shows it and the Word file it
+       exports read the same text, and so a deployment cannot ship the application without its manual. -->
+  <ItemGroup>
+    <EmbeddedResource Include="ScenarioHelpers\Manual\*.md" />
   </ItemGroup>
 
 </Project>

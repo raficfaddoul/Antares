@@ -1,4 +1,4 @@
-﻿@page "/MotherGridComponent/{EventID:guid}"
+@page "/MotherGridComponent/{EventID:guid}"
 @implements IDisposable
 @using AliantWebS.Data
 @inject EntitiesService entitiesService
@@ -22,17 +22,54 @@ else
         <a class="nav-link" @onclick="@(args => Insertmp())" @onclick:preventDefault="true" href="">
             <span class="oi oi-plus" aria-hidden="true">@L["Add New"]</span>
         </a>
-        <div style="margin-left: auto;">
+        <a class="nav-link" @onclick="@(args => DeleteAllMP())" @onclick:preventDefault="true" href="" title="@L["Delete All"]">
+            <span class="oi oi-trash" aria-hidden="true"> @L["Delete All"]</span>
+        </a>
+
+        @* ── Import Excel — must be here inside the toolbar Div ── *@
+        @if (isImporting)
+        {
+            <span class="spinner-border spinner-border-sm text-primary ms-2" role="status"></span>
+            <span class="ms-1">@L["Importing..."]</span>
+        }
+        else
+        {
+            <a class="nav-link" @onclick="TriggerMGExcelImport" @onclick:preventDefault="true" href="" title="@L["Import from Excel"]">
+                <span class="oi oi-data-transfer-upload" aria-hidden="true"> @L["Import Excel"]</span>
+            </a>
+        }
+        <InputFile id="@($"mgImport_{Title}")" OnChange="ImportMGFromExcel" accept=".xlsx" style="display:none" />
+
+        <div style="margin-left: auto; display: flex; align-items: center; gap: 10px;">
             <Label>@L["Page Size"]: &nbsp;&nbsp;</Label>
             <RadzenNumeric @bind-Value="PageSize" Style="width:60px"></RadzenNumeric>
+            <a class="nav-link" title="@L["Display Settings"]" @onclick="() => showDecimalSettings = !showDecimalSettings" @onclick:preventDefault="true" href="">
+                <span class="oi oi-cog" aria-hidden="true"></span>
+            </a>
+            @if (showDecimalSettings)
+            {
+                <div style="display: flex; align-items: center; gap: 6px; background: #f0f4ff; border: 1px solid #667eea; border-radius: 8px; padding: 4px 10px;">
+                    <span style="font-size: 12px; color: #4a5568;">@L["Decimals"]:</span>
+                    <RadzenNumeric @bind-Value="decimalPlaces" Min="0" Max="6" Style="width:55px;" />
+                </div>
+            }
         </div>
     </Div>
 
+    @* A note about the pieces: a proposal the stock could not make, or a caveat about one it made. *@
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <div style="display: flex; align-items: flex-start; gap: 8px; background: #fff4e5; border: 1px solid #f0ad4e; border-radius: 6px; padding: 4px 8px; margin: 4px 0; font-size: 0.85em;">
+            <span style="flex: 1;">@statusMessage</span>
+            <a href="" title="@L["Close"]" @onclick="ClearStatus" @onclick:preventDefault="true">✕</a>
+        </div>
+    }
 
 
-  
+
+
     <EditForm Model="@MPList">
-   
+
         <RadzenDataGrid @ref="MPGrid" AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="PageSize"
                         Data="@MPList" TItem="MotherGridPalonnier"   SelectionMode="DataGridSelectionMode.Single" @bind-Value="@SelectedMPList">
             <Columns>
@@ -50,7 +87,16 @@ else
                         <span class="gridColumndStyle">@L["Element Type"]</span>                    <br />
                     </HeaderTemplate>
                   <Template Context="mp">
-                    @mp.ElementType.Name
+                    @* An exception while rendering takes the whole circuit down, not the cell. A row whose type
+                       cannot be read says so, in the cell, and the page stays usable to fix it. *@
+                    @if (mp.ElementType is { } elementType)
+                    {
+                        @elementType.Name
+                    }
+                    else
+                    {
+                        <span style="color:#c62828;" title="@mp.ElementTypeId">type introuvable</span>
+                    }
                 </Template>
                 <EditTemplate Context="mp">
                     <InputSelect class="form-control" @bind-Value=mp.ElementTypeId>
@@ -62,40 +108,78 @@ else
                     </EditTemplate>
                 </RadzenDataGridColumn>
 
-                <RadzenDataGridColumn Width="6em" TItem="MotherGridPalonnier" Property="X1" TextAlign="TextAlign.Center">
+                @* X1, Y1, X2, Y2 in the studies' axes (StudyX1..StudyY2): metres from Point0 (E5), X along the
+                   beams towards point 9, Y across them towards J. The stored X1..Y2 stay in the grid's axes. *@
+                <RadzenDataGridColumn Width="6em" TItem="MotherGridPalonnier" Property="StudyX1" TextAlign="TextAlign.Center" FormatString="@($"{{{0}:N{decimalPlaces}}}")">
                     <HeaderTemplate>
                         <span class="gridColumndStyle">@L["X1"]</span>   <br />
                     </HeaderTemplate>
                     <EditTemplate Context="mp">
-                        <InputNumber @bind-Value="mp.X1" Style="width:100%" />
+                        <InputNumber @bind-Value="mp.StudyX1" Style="width:100%" />
                     </EditTemplate>
                 </RadzenDataGridColumn>
 
-                <RadzenDataGridColumn Width="6em" TItem="MotherGridPalonnier" Property="Y1" TextAlign="TextAlign.Center">
+                <RadzenDataGridColumn Width="6em" TItem="MotherGridPalonnier" Property="StudyY1" TextAlign="TextAlign.Center" FormatString="@($"{{{0}:N{decimalPlaces}}}")">
                     <HeaderTemplate>
                         <span class="gridColumndStyle">@L["Y1"]</span>   <br />
                     </HeaderTemplate>
                     <EditTemplate Context="mp">
-                        <InputNumber @bind-Value="mp.Y1" Style="width:100%" />
+                        <InputNumber @bind-Value="mp.StudyY1" Style="width:100%" />
                     </EditTemplate>
                 </RadzenDataGridColumn>
 
 
-                <RadzenDataGridColumn Width="6em" TItem="MotherGridPalonnier" Property="X2" TextAlign="TextAlign.Center">
+                <RadzenDataGridColumn Width="6em" TItem="MotherGridPalonnier" Property="StudyX2" TextAlign="TextAlign.Center" FormatString="@($"{{{0}:N{decimalPlaces}}}")">
                     <HeaderTemplate>
                         <span class="gridColumndStyle">@L["X2"]</span>   <br />
                     </HeaderTemplate>
                     <EditTemplate Context="mp">
-                        <InputNumber  @bind-Value="mp.X2" Style="width:100%" />
+                        <InputNumber  @bind-Value="mp.StudyX2" Style="width:100%" />
                     </EditTemplate>
                 </RadzenDataGridColumn>
 
-                <RadzenDataGridColumn Width="6em" TItem="MotherGridPalonnier" Property="Y2" TextAlign="TextAlign.Center">
+                <RadzenDataGridColumn Width="6em" TItem="MotherGridPalonnier" Property="StudyY2" TextAlign="TextAlign.Center" FormatString="@($"{{{0}:N{decimalPlaces}}}")">
                     <HeaderTemplate>
                         <span class="gridColumndStyle">@L["Y2"]</span>   <br />
                     </HeaderTemplate>
                     <EditTemplate Context="mp">
-                        <InputNumber @bind-Value="mp.Y2" Style="width:100%" />
+                        <InputNumber @bind-Value="mp.StudyY2" Style="width:100%" />
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+
+                @* The pieces the truss is assembled from, all of its model: "5,6 + 2,8 m". Typed as "5,6+2,8";
+                   "Proposer" asks the stock (TrussPieces). *@
+                <RadzenDataGridColumn Width="13em" TItem="MotherGridPalonnier" Property="Composition" Sortable="false" Filterable="false">
+                    <HeaderTemplate>
+                        <span class="gridColumndStyle">@L["Pieces"]</span>   <br />
+                    </HeaderTemplate>
+                    <Template Context="mp">
+                        <div style="white-space: normal;">
+                            <span>@TrussPieces.Display(mp)</span>
+                            @if (string.IsNullOrWhiteSpace(mp.Composition))
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-primary" style="padding: 0 6px; margin-left: 6px;"
+                                        title="@L["Propose the pieces the stock can still make"]"
+                                        @onclick="@(() => ProposeAsync(mp))" @onclick:stopPropagation="true">
+                                    @L["Propose"]
+                                </button>
+                            }
+                            @foreach (var warning in WarningsOf(mp))
+                            {
+                                <div style="color: #c0392b; font-size: 0.8em;">⚠ @warning</div>
+                            }
+                        </div>
+                    </Template>
+                    <EditTemplate Context="mp">
+                        <div style="display: flex; gap: 4px; align-items: center;">
+                            <input type="text" class="form-control form-control-sm" style="min-width: 6em;" placeholder="5,6+2,8"
+                                   value="@PiecesTextOf(mp)" @onchange="@(args => SetPiecesText(mp, args))" />
+                            <button type="button" class="btn btn-sm btn-outline-primary" style="padding: 0 6px;"
+                                    title="@L["Propose the pieces the stock can still make"]"
+                                    @onclick="@(() => ProposeIntoTextAsync(mp))">
+                                @L["Propose"]
+                            </button>
+                        </div>
                     </EditTemplate>
                 </RadzenDataGridColumn>
 
@@ -119,17 +203,20 @@ else
         </RadzenDataGrid>
 
 
-     
+
+        <InputFile id="@($"mgImport_{Title}")" OnChange="ImportMGFromExcel" accept=".xlsx" style="display:none" />
 
     </EditForm>
 
-        
+
 }
 
 
 @code {
     int PageSize { get; set; } = 10;
-
+    int decimalPlaces { get; set; } = 3;
+    bool showDecimalSettings = false;
+    bool isImporting = false;
 
     private IList<MotherGridPalonnier> _selectedMPList = new List<MotherGridPalonnier>();
 
@@ -161,6 +248,10 @@ else
             if (!Equals(_selectedMP, value))
             {
                 _selectedMP = value;
+                // Keep the grid's bound list in sync so re-renders don't clear the visual selection
+                _selectedMPList = value != null
+                    ? new List<MotherGridPalonnier> { value }
+                    : new List<MotherGridPalonnier>();
                 SelectedMPChanged.InvokeAsync(_selectedMP);
             }
         }
@@ -194,7 +285,27 @@ else
     [Parameter]
     public List<ElementType> ElementTypesList { get; set; }
 
+    /// <summary>
+    /// The truss inventory (MotherGrill.xlsx and Palonnier.xlsx), read once by the page. The pieces of this
+    /// list's role come from its mothers or its palonniers, as <see cref="Famille"/> says. Null when it could
+    /// not be read; <see cref="InventoryError"/> then says why.
+    /// </summary>
+    [Parameter]
+    public RiggingOptimizer.IO.Inventory? Inventory { get; set; }
+
+    [Parameter]
+    public string? InventoryError { get; set; }
+
     public ElementType lastSelectedElementType = new ElementType();
+
+    // What was typed in the "Pièces" box of a row being edited, until the row is saved.
+    private readonly Dictionary<MotherGridPalonnier, string> piecesText = new();
+
+    // Rows added with "Add New": they have no ends yet, so they get the stock's proposal when first saved
+    // with both ends and no pieces typed.
+    private readonly HashSet<MotherGridPalonnier> proposeOnSave = new();
+
+    private string? statusMessage;
 
     private string GetLegendColor()
     {
@@ -246,6 +357,8 @@ else
     {
         if (await entitiesService.DeleteEntityAsync(mp))
         {
+            piecesText.Remove(mp);
+            proposeOnSave.Remove(mp);
             if (MPList.Remove(mp))
             {
                 await MPGrid.Reload();
@@ -259,7 +372,7 @@ else
 
     async void EditRow(MotherGridPalonnier mp)
     {
-
+        piecesText.Remove(mp);   // the box starts from what is stored
         await MPGrid.EditRow(mp);
         await MotherGridPalonnierListChanged.InvokeAsync(MPList);
 
@@ -267,6 +380,18 @@ else
 
     async Task Insertmp()
     {
+
+        if (EventMpscenarioId == Guid.Empty)
+        {
+            await js.InvokeVoidAsync("alert", $"{L["No scenario selected. Please select a scenario before adding an element."]}");
+            return;
+        }
+        if (ElementTypesList is null || ElementTypesList.Count == 0)
+        {
+            await js.InvokeVoidAsync("alert", $"{L["No element types available. Please define element types for the MotherGridPalonnier category first."]}");
+            return;
+        }
+
         MotherGridPalonnier mp = new MotherGridPalonnier();
         mp.EventMpscenarioId = EventMpscenarioId;
         mp.Famille = Famille;
@@ -283,9 +408,8 @@ else
         if ((await entitiesService.InsertEntityAsync(mp)) != null)
         {
             MPList.Add(mp);
-
+            proposeOnSave.Add(mp);
             await MPGrid.InsertRow(mp);
-
         }
         else
         {
@@ -293,40 +417,92 @@ else
         }
     }
 
-    public async Task Insertmp(double x1, double y1, double x2, double y2)
-    {
-        MotherGridPalonnier mp = new MotherGridPalonnier();
-        mp.EventMpscenarioId = EventMpscenarioId;
-        mp.Famille = Famille;
-        mp.ElementTypeId = lastSelectedElementType.ElementTypeId;
+    // public async Task Insertmp(double x1, double y1, double x2, double y2)
+    // {
+    //     MotherGridPalonnier mp = new MotherGridPalonnier();
+    //     mp.EventMpscenarioId = EventMpscenarioId;
+    //     mp.Famille = Famille;
+    //     mp.ElementTypeId = lastSelectedElementType.ElementTypeId;
 
 
-        mp.X1 = x1;         mp.Y1 = y1;
+    //     mp.X1 = x1;         mp.Y1 = y1;
 
-        mp.X2 = x2;         mp.Y2 = y2;
+    //     mp.X2 = x2;         mp.Y2 = y2;
 
-        if ((await entitiesService.InsertEntityAsync(mp)) != null)
-        {
-            MPList.Add(mp);
+    //     if ((await entitiesService.InsertEntityAsync(mp)) != null)
+    //     {
+    //         MPList.Add(mp);
 
-            await MPGrid.InsertRow(mp);
-            await MPGrid.UpdateRow(mp);
-        }
-        else
-        {
-            await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
-        }
-    }
+    //         await MPGrid.InsertRow(mp);
+    //         await MPGrid.UpdateRow(mp);
+    //     }
+    //     else
+    //     {
+    //         await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
+    //     }
+    // }
 
 
 
     async Task UpdateRow(MotherGridPalonnier mp)
     {
+        await SaveRowAsync(mp);
+    }
+
+    // Saves a row. The pieces typed in its box are read first; text that cannot be read is refused and the row
+    // stays in edit. A row added with "Add New" that now has both ends, and no pieces typed, gets the stock's
+    // proposal. True once saved.
+    private async Task<bool> SaveRowAsync(MotherGridPalonnier mp)
+    {
+        bool typedPieces = piecesText.TryGetValue(mp, out var typed);
+        if (typedPieces)
+        {
+            var (composition, problem) = TrussPieces.FromText(typed);
+            if (problem is not null)
+            {
+                await js.InvokeVoidAsync("alert", problem);
+                return false;
+            }
+            mp.Composition = composition;
+        }
+
+        if (!typedPieces && proposeOnSave.Contains(mp)
+            && string.IsNullOrWhiteSpace(mp.Composition) && TrussPieces.DrawnLengthM(mp) is not null)
+        {
+            proposeOnSave.Remove(mp);
+            var proposal = ProposeFor(mp);
+            mp.Composition = proposal.Composition;
+            statusMessage = proposal.Composition is null
+                ? $"« {mp.Name ?? ModelOf(mp) ?? "Élément"} » : aucune pièce proposée. {proposal.Message}"
+                : proposal.Message;
+        }
+
         if (await entitiesService.UpdateEntityAsync(mp))
         {
+            piecesText.Remove(mp);
             await MPGrid.UpdateRow(mp);
             lastSelectedElementType = mp.ElementType;
+            return true;
         }
+        return false;
+    }
+
+    public async Task DeleteAllMP()
+    {
+        bool confirmed = await js.InvokeAsync<bool>("confirm", L["Are you sure you want to delete all items?"].ToString());
+        if (!confirmed) return;
+
+        var toDelete = MPList.ToList();
+        foreach (var item in toDelete)
+        {
+            await entitiesService.DeleteEntityAsync(item);
+            MPList.Remove(item);
+        }
+        piecesText.Clear();
+        proposeOnSave.Clear();
+
+        await MPGrid.Reload();
+        await MotherGridPalonnierListChanged.InvokeAsync(MPList);
     }
 
     void IDisposable.Dispose()
@@ -334,6 +510,153 @@ else
         //AppData.ScenarioChanged -= zaza;
     }
 
+    public void SelectItem(MotherGridPalonnier item)
+    {
+        _selectedMPList = item != null
+            ? new List<MotherGridPalonnier> { item }
+            : new List<MotherGridPalonnier>();
+        MPGrid?.SelectRow(item);
+        InvokeAsync(StateHasChanged);
+    }
 
+    // ── Pieces ───────────────────────────────────────────────────────────────────────────────────
+
+    // The element's model: its element type, named as the inventory's "Modèle" (Generate Layout creates the
+    // types from those names).
+    private string? ModelOf(MotherGridPalonnier e) =>
+        ElementTypesList?.FirstOrDefault(t => t.ElementTypeId == e.ElementTypeId)?.Name ?? e.ElementType?.Name;
+
+    private List<string> WarningsOf(MotherGridPalonnier e) =>
+        TrussPieces.Warnings(e, ModelOf, MPList ?? new List<MotherGridPalonnier>(), Inventory, Famille);
+
+    private string PiecesTextOf(MotherGridPalonnier e) =>
+        piecesText.TryGetValue(e, out var typed) ? typed : TrussPieces.EditText(e);
+
+    private void SetPiecesText(MotherGridPalonnier e, ChangeEventArgs args) =>
+        piecesText[e] = args.Value?.ToString() ?? "";
+
+    private void ClearStatus() => statusMessage = null;
+
+    /// <summary>
+    /// The pieces the stock can still make for an element of this list's role, counting what the list's other
+    /// elements of its model use. Also for a line drawn on the plan, before it is added.
+    /// </summary>
+    public TrussPieces.Proposal ProposeFor(MotherGridPalonnier e) =>
+        TrussPieces.Propose(e, ModelOf, MPList ?? new List<MotherGridPalonnier>(), Inventory, InventoryError, Famille);
+
+    /// <summary>Shows a note above the grid; null clears it.</summary>
+    public void ShowStatus(string? message)
+    {
+        statusMessage = message;
+        InvokeAsync(StateHasChanged);
+    }
+
+    // "Proposer" on a row that is not being edited: the proposal is saved at once, through the row's save.
+    private async Task ProposeAsync(MotherGridPalonnier mp)
+    {
+        var proposal = ProposeFor(mp);
+        if (proposal.Composition is null)
+        {
+            await js.InvokeVoidAsync("alert",
+                $"Aucune pièce proposée pour « {mp.Name ?? ModelOf(mp) ?? "l’élément"} ». {proposal.Message}");
+            return;
+        }
+
+        var previous = mp.Composition;
+        mp.Composition = proposal.Composition;
+        if (!await SaveRowAsync(mp))
+        {
+            mp.Composition = previous;
+            await js.InvokeVoidAsync("alert", "Les pièces proposées n’ont pas pu être enregistrées.");
+            return;
+        }
+        statusMessage = proposal.Message;
+    }
+
+    // "Proposer" on a row being edited: the proposal goes in the box, saved with the row.
+    private async Task ProposeIntoTextAsync(MotherGridPalonnier mp)
+    {
+        var proposal = ProposeFor(mp);
+        if (proposal.Composition is null)
+        {
+            await js.InvokeVoidAsync("alert", $"Aucune pièce proposée. {proposal.Message}");
+            return;
+        }
+
+        var lengths = global::Helpers.TrussComposition.Parse(proposal.Composition, out _) ?? new List<double>();
+        piecesText[mp] = string.Join("+", lengths.OrderByDescending(l => l).Select(TrussPieces.Metres));
+        statusMessage = proposal.Message;
+    }
+
+    async Task TriggerMGExcelImport()
+    {
+        // As "Add New": with no scenario the rows would be saved against no scenario and the database
+        // would refuse them with an error that says nothing useful.
+        if (EventMpscenarioId == Guid.Empty)
+        {
+            await js.InvokeVoidAsync("alert", $"{L["No scenario selected. Please select a scenario before adding an element."]}");
+            return;
+        }
+        await js.InvokeVoidAsync("eval", $"document.getElementById('mgImport_{Title}').click()");
+    }
+
+    async Task ImportMGFromExcel(InputFileChangeEventArgs e)
+    {
+        isImporting = true;
+        StateHasChanged();
+        try
+        {
+            using var mem = new System.IO.MemoryStream();
+            await e.File.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024).CopyToAsync(mem);
+            mem.Position = 0;
+
+            // ── Directly reuse Pipeline's function ───────────────────
+            var toInsert = await RiggingOptimizer.Pipeline.ImportMotherGridPalonniersFromStream(
+                mem,
+                EventMpscenarioId,
+                Famille,
+                ElementTypesList,
+                MPList.Select(x => x.Name),
+                out var warnings);
+
+            // ── Show what the reader noticed, and the rows left out ───
+            // This list no longer holds unknown-type rows alone: the reader now also says what it made of
+            // the file — a first line taken as a header, or columns read in order for want of one. Naming
+            // the ElementType as the cause of all of it would send people hunting for the wrong mistake.
+            if (warnings.Any())
+            {
+                string msg = string.Join("\n", warnings);
+                await js.InvokeVoidAsync("alert",
+                    $"⚠️ Lecture du fichier :\n\n{msg}\n\nAvailable types:\n{string.Join(", ", ElementTypesList.Select(x => x.Name))}");
+            }
+
+            if (toInsert.Count == 0)
+            {
+                await js.InvokeVoidAsync("alert", "Nothing imported — all items exist or all rows were skipped.");
+                return;
+            }
+
+            if (await entitiesService.InsertEntitiesAsync(toInsert))
+            {
+                MPList.AddRange(toInsert);
+                await MPGrid.Reload();
+                await MotherGridPalonnierListChanged.InvokeAsync(MPList);
+                await js.InvokeVoidAsync("alert", $"{toInsert.Count} item(s) imported successfully.");
+            }
+            else
+            {
+                await js.InvokeVoidAsync("alert", "Import failed.");
+            }
+        }
+        catch (Exception ex)
+        {
+            await js.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+        }
+        finally
+        {
+            isImporting = false;
+            StateHasChanged();
+        }
+    }
 }
 

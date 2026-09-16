@@ -1,0 +1,12 @@
+{
+  "solution": {
+    "path": "AliantWebS.sln",
+    "projects": [
+      "AliantWebS\\AliantWebS.csproj",
+      "Component\\Components.csproj",
+      "Shared\\Shared.csproj",
+      "Structural\\Structural.csproj",
+      "Tests\\Shared.Tests\\Shared.Tests.csproj"
+    ]
+  }
+}

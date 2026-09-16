@@ -10,7 +10,7 @@ namespace AliantWebS.Data
     public class DatabaseManagement
     {
         static public string Detach(string connectString)
-        {
+        { 
 
             SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder(connectString);
             // Retrieve the DataSource property.    
@@ -67,63 +67,47 @@ namespace AliantWebS.Data
         }
 
 
-        static public string BackupDatabase(string connectString,string path)
+        static public string BackupDatabase(string connectString, string path, string fileName = "AliantWeb.bak")
         {
-    
-                SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder(connectString);
-                // Retrieve the DataSource property.    
-                string serverName = builder.DataSource;
+            SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder(connectString);
+            string serverName = builder.DataSource;
+            string databaseName = builder.InitialCatalog;
 
+            // Use SQL auth when not using Windows auth (required for Linux SQL Server containers)
+            Server srv;
+            if (builder.IntegratedSecurity)
+            {
+                srv = new Server(serverName);
+            }
+            else
+            {
+                var conn = new ServerConnection(serverName, builder.UserID, builder.Password);
+                conn.EncryptConnection = false;
+                conn.TrustServerCertificate = true;
+                srv = new Server(conn);
+            }
 
-                Server srv = new Server(serverName);
-                // Reference the AliantWeb database.   
-                Database db = default(Database);
-                db = srv.Databases["AliantWeb"];
+            Database db = srv.Databases[databaseName];
 
-        
+            int recoverymod = (int)db.DatabaseOptions.RecoveryModel;
 
-                // Store the current recovery model in a variable.   
-                int recoverymod;
-                recoverymod = (int)db.DatabaseOptions.RecoveryModel;
+            Backup bk = new Backup();
+            bk.Action = BackupActionType.Database;
+            bk.BackupSetDescription = $"Full backup of {databaseName}";
+            bk.BackupSetName = $"{databaseName} Backup";
+            bk.Database = databaseName;
 
-                // Define a Backup object variable.   
-                Backup bk = new Backup();
+            string destinationPath = System.IO.Path.Combine(path, fileName);
+            BackupDeviceItem bdi = new BackupDeviceItem(destinationPath, DeviceType.File);
+            bk.Devices.Add(bdi);
 
-                // Specify the type of backup, the description, the name, and the database to be backed up.   
-                bk.Action = BackupActionType.Database;
-                bk.BackupSetDescription = "Full backup of AliantWeb";
-                bk.BackupSetName = "AliantWeb Backup";
-                bk.Database = "AliantWeb";
+            bk.Incremental = false;
+            bk.ExpirationDate = new System.DateTime(2030, 10, 5);
 
-                // Declare a BackupDeviceItem by supplying the backup device file name in the constructor, and the type of device is a file.   
-                BackupDeviceItem bdi = default(BackupDeviceItem);
-
-              string destinationPath = System.IO.Path.Combine(path, "AliantWeb.bak");
-            bdi = new BackupDeviceItem(destinationPath, DeviceType.File);
-
-
-
-                // Add the device to the Backup object.   
-                bk.Devices.Add(bdi);
-                // Set the Incremental property to False to specify that this is a full database backup.   
-                bk.Incremental = false;
-
-           // Set the expiration date.   
-                System.DateTime backupdate = new System.DateTime();
-            backupdate = new System.DateTime(2030, 10, 5);
-            bk.ExpirationDate = backupdate;
-
-            // Specify that the log must be truncated after the backup is complete.   
-            //bk.LogTruncation = BackupTruncateLogType.Truncate;
-
-            // Run SqlBackup to perform the full database backup on the instance of SQL Server.   
             bk.SqlBackup(srv);
 
-                // Inform the user that the backup has been completed.   
-                System.Console.WriteLine("Full Backup complete.");
-
-                // Remove the backup device from the Backup object.   
-                bk.Devices.Remove(bdi);
+            Console.WriteLine("Full Backup complete.");
+            bk.Devices.Remove(bdi);
 
             return db.PrimaryFilePath;
 
@@ -134,42 +118,52 @@ namespace AliantWebS.Data
         static public void Restore(string connectString, string destinationPath)
         {
             SqlConnectionStringBuilder builder = new SqlConnectionStringBuilder(connectString);
-            // Retrieve the DataSource property.    
-            string serverName = builder.DataSource;
 
+            // Connect to MASTER — completely separate from the app DB connection pool
+            string masterConnString = new SqlConnectionStringBuilder
+            {
+                DataSource = builder.DataSource,
+                InitialCatalog = "master",           // ← key: not the app DB
+                UserID = builder.UserID,
+                Password = builder.Password,
+                IntegratedSecurity = builder.IntegratedSecurity,
+                TrustServerCertificate = true,
+                Encrypt = false
+            }.ConnectionString;
 
-            Server srv = new Server(serverName);
+            using var con = new SqlConnection(masterConnString);
+            con.Open();
 
+            string dbName = builder.InitialCatalog;
 
-            BackupDeviceItem bdi = default(BackupDeviceItem);
-           // destinationPath = System.IO.Path.Combine(destinationPath, "AliantWeb" + ".bak");
-            bdi = new BackupDeviceItem(destinationPath, DeviceType.File);
-            
+            // ① Drop all active connections to the app DB only
+            using (var cmd = new SqlCommand(
+                $"ALTER DATABASE [{dbName}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE", con))
+                cmd.ExecuteNonQuery();
 
+            try
+            {
+                // ② Restore
+                using var cmd = new SqlCommand(
+                    $@"RESTORE DATABASE [{dbName}]
+               FROM DISK = @path
+               WITH REPLACE, RECOVERY", con);
+                cmd.Parameters.AddWithValue("@path", destinationPath);
+                cmd.CommandTimeout = 300; // 5 minutes for large DBs
+                cmd.ExecuteNonQuery();
+            }
+            finally
+            {
+                // ③ Always restore multi-user even on failure
+                using var cmd = new SqlCommand(
+                    $"ALTER DATABASE [{dbName}] SET MULTI_USER", con);
+                cmd.ExecuteNonQuery();
+            }
 
-            Restore rs = new Restore();
+            // ④ Clear EF Core pool so all contexts get fresh connections
+            SqlConnection.ClearAllPools();
 
-            // Set the NoRecovery property to true, so the transactions are not recovered.   
-            rs.NoRecovery = false;
-
-            // Add the device that contains the full database backup to the Restore object.   
-            rs.Devices.Add(bdi);
-
-            // Specify the database name.   
-            rs.Database = "AliantWeb";
-           
-
-            // Restore the full database backup with no recovery.   
-            rs.SqlRestore(srv);
-
-            rs.Devices.Remove(bdi);
-
-            // Inform the user that the Full Database Restore is complete.   
             Console.WriteLine("Full Database Restore complete.");
-
-
-            return;
-
         }
 
 

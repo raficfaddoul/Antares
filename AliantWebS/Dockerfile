@@ -6,6 +6,23 @@ WORKDIR /app
 EXPOSE 80
 EXPOSE 443
 
+# Real font files under /usr/share/fonts. The plans and the report's figures are drawn with
+# SkiaSharp, whose Linux build here is NativeAssets.Linux.NoDependencies - it scans that
+# directory rather than asking fontconfig.
+#
+# fonts-liberation is not a duplicate of dejavu: Liberation Sans is METRICALLY IDENTICAL to
+# Arial, the family the figures are lettered in. The layout measures every label to place it
+# and to size its halo, and the Word file asks the reader's Word for Arial; a container
+# measuring in DejaVu - whose advances differ by several per cent - would place labels by
+# widths nobody ever draws. With no font at all every label measures 0 wide and the PNGs come
+# out without a word on them.
+# The final stage is FROM base, so what is installed here is what the running image has.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libfontconfig1 \
+    fonts-dejavu-core \
+    fonts-liberation \
+    && rm -rf /var/lib/apt/lists/*
+
 # Add debugging toolsr
 #RUN apt-get update \
     #&& apt-get install -y --no-install-recommends unzip curl \
@@ -20,13 +37,14 @@ EXPOSE 443
     ## Optional: Check node and npm versions during build
 #RUN node -v && npm -v
 
-# This stage is used to build the service project
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+# This stage is used to build the service project. SDK 10, the one Visual Studio builds with, so the image
+# compiles the Razor pages exactly as Visual Studio does (the SDK 8 Razor parser rejected code VS accepted).
+# It still builds a .NET 8 app (net8.0) for the aspnet:8.0 runtime above.
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["AliantWebS/Images", "/app/Images"]
 COPY ["AliantWebS/AliantWebS.csproj", "AliantWebS/"]
-COPY ["AI/AI.csproj", "AI/"]
 COPY ["Structural/Structural.csproj", "Structural/"]
 COPY ["Shared/Shared.csproj", "Shared/"]
 COPY ["Component/Components.csproj", "Component/"]

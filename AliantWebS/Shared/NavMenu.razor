@@ -116,7 +116,7 @@
 
 <nav class="navbar navbar-expand-md navbar-dark bg-dark mb-4 @(AppData.IsAlarmActive ? "alarm-active" : "")">
     <div class="container-fluid">
-        <a class="navbar-brand @(AppData.IsAlarmActive ? "alarm-active" : "")" href="">Aliant</a>
+        <a class="navbar-brand @(AppData.IsAlarmActive ? "alarm-active" : "")" href="">Argos</a>
         <button class="navbar-toggler @NavButtonCssClass" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse"
         aria-controls="navbarCollapse" aria-label="Toggle navigation" @onclick="ToggleNavMenu">
             <span class="navbar-toggler-icon"></span>
@@ -159,22 +159,7 @@
                                     <NavLink  href="ElementsTypes">
                                         <span class="oi oi-list-rich" aria-hidden="true" ></span> @L["Element Types"]
                                     </NavLink>
-                                </li>
-                                <li class="nav-item px-3 ">
-                                    <NavLink  href="flagsTypes">
-                                        <span class="oi oi-list-rich" aria-hidden="true" ></span> @L["Flag Types"]
-                                    </NavLink>
-                                </li>
-                                <li class="nav-item px-3 ">
-                                    <NavLink  href="InspectionResultTypes">
-                                        <span class="oi oi-list-rich" aria-hidden="true" ></span> @L["Condition Types"]
-                                    </NavLink>
-                                </li>
-                                <li class="nav-item px-3 ">
-                                    <NavLink  href="defectsTypes">
-                                        <span class="oi oi-list-rich" aria-hidden="true" ></span> @L["Defect Types"]
-                                    </NavLink>
-                                </li>
+                                </li>            
                                 <li class="nav-item px-3 ">
                                     <NavLink  href="attributeTypes">
                                         <span class="fa fa-tasks" aria-hidden="true" ></span> @L["Attributes Types"]
@@ -212,33 +197,20 @@
                         <span class="oi oi-list-rich" aria-hidden="true"></span> Fetch data
                     </NavLink>
                 </li>*@
+                @if ((appData.GetRole().Result == "Administrator") || (appData.GetRole().Result == "Developer"))
+                {
                 <li class="nav-item px-3">
                     <NavLink class="nav-link" href="Sites">
                         <span class="oi oi-list-rich" aria-hidden="true"></span> @L["Sites"]
                     </NavLink>
                 </li>
-                @*                 <li class="nav-item px-3">
-                    <NavLink class="nav-link" href="Events">
-                        <span class="oi oi-list-rich" aria-hidden="true"></span> @L["Events"]
-                    </NavLink>
-                </li> 
-                <li class="nav-item px-3">
-                    <NavLink class="nav-link" href="Equipements">
-                        <span class="oi oi-list-rich" aria-hidden="true"></span> @L["Equipements"]
-                    </NavLink>
-                </li>*@
+
                 <li class="nav-item px-3">
                     <NavLink class="nav-link" href="Structures">
                         <span class="oi oi-list-rich" aria-hidden="true"></span> @L["Structures"]
                     </NavLink>
                 </li>
-                                <li class="nav-item px-3">
-                    <NavLink class="nav-link" href="TrafficHome">
-                        <span class="oi oi-list-rich" aria-hidden="true"></span> @L["Trafic"]
-                    </NavLink>
-                </li>
-                @if ((appData.GetRole().Result == "Administrator") || (appData.GetRole().Result == "Developer"))
-                {
+
                     @*                                 <li class="nav-item px-3">
                     <NavLink class="nav-link" href="BIMComponent">
                         <span class="oi oi-list-rich" aria-hidden="true"></span> @L["BIM"]

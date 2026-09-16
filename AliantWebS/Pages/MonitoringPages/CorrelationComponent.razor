@@ -21,49 +21,105 @@
         .correlation-table th {
             background-color: #f2f2f2;
             font-weight: bold;
-            font-size: 0.8em; /* Adjust the font size here */
+            font-size: 0.8em;
         }
 
         .correlation-table td {
             color: white;
         }
+    
+    .warning-message {
+        background-color: #fff3cd;
+        border: 1px solid #ffc107;
+        color: #856404;
+        padding: 0.75rem;
+        margin-bottom: 1rem;
+        border-radius: 4px;
+    }
 </style>
 
-@* @if (sensors is null)
-{
-    <p><em>@L["Loading"]... !</em></p>
-}
-else
-{ *@
+<div style="margin-bottom: 1rem; padding: 1rem; background: white; border-radius: 8px;">
+    <div style="display: flex; gap: 1rem; align-items: end;">
+        <div>
+            <label><strong>@L["Date Range"]:</strong></label>
+            <select class="form-control" @bind="selectedDateRange" @bind:after="OnDateRangeChanged">
+                <option value="LastHour">@L["Last Hour"]</option>
+                <option value="LastDay">@L["Last Day"]</option>
+                <option value="LastWeek">@L["Last Week"]</option>
+                <option value="LastMonth">@L["Last Month"]</option>
+                <option value="Custom">@L["Custom"]</option>
+            </select>
+        </div>
+
+        @if (selectedDateRange == "Custom")
+        {
+            <div>
+                <label><strong>@L["Start Date"]:</strong></label>
+                <InputDate Type="InputDateType.DateTimeLocal" @bind-Value="@startDate" />
+            </div>
+            <div>
+                <label><strong>@L["End Date"]:</strong></label>
+                <InputDate Type="InputDateType.DateTimeLocal" @bind-Value="@endDate" />
+            </div>
+        }
+    </div>
+</div>
+
 <RadzenSplitter Orientation="Radzen.Orientation.Horizontal">
     <RadzenSplitterPane>
-
-        <SelecteurDeCapteurComponent Structure=@Structure OnPlotRaised="@(p =>plot(p.Item1,p.Item2,p.Item3,p.Item4,p.Item5))"></SelecteurDeCapteurComponent>
-
+        <SelecteurDeCapteurComponent 
+            Structure=@Structure 
+            StartDate="@startDate"
+            EndDate="@endDate"
+            CheckboxStates="@checkboxStates"
+            OnBatchPlotRaised="@HandleBatchPlot">
+        </SelecteurDeCapteurComponent>
     </RadzenSplitterPane>
+    
     <RadzenSplitterPane>
-        @if (correlationMatrix != null)
+        @if (excludedSensors.Any())
+        {
+            <div class="warning-message">
+                <strong>⚠️ Warning:</strong> The following sensors have no data and were excluded from the correlation matrix:
+                <ul style="margin: 0.5rem 0 0 1.5rem;">
+                    @foreach (var sensor in excludedSensors)
+                    {
+                        <li>@sensor</li>
+                    }
+                </ul>
+            </div>
+        }
+        
+        @if (correlationMatrix != null && correlationMatrix.Any() && headers.Any())
         {
             <table class="correlation-table">
                 <thead>
                     <tr>
                         <th></th>
-                        @for (int i = 0; i < correlationMatrix.Count; i++)
+                        @for (int i = 0; i < headers.Count; i++)
                         {
                             <th>@headers[i]</th>
                         }
                     </tr>
                 </thead>
                 <tbody>
-                    @for (int i = 0; i < correlationMatrix.Count; i++)
+                    @for (int i = 0; i < headers.Count; i++)
                     {
                         <tr>
                             <th>@headers[i]</th>
-                            @for (int j = 0; j < correlationMatrix[i].Count; j++)
+                            @for (int j = 0; j < headers.Count; j++)
                             {
-                                <td style="background-color: @GetColor(correlationMatrix[i][j]);">
-                                    @correlationMatrix[i][j].ToString("0.00")
-                                </td>
+                                @if (correlationMatrix.Count > i && correlationMatrix[i].Count > j)
+                                {
+                                    var cellStyle = $"background-color: {GetColor(correlationMatrix[i][j])};";
+                                    <td style="@cellStyle">
+                                        @correlationMatrix[i][j].ToString("0.00")
+                                    </td>
+                                }
+                                else
+                                {
+                                    <td>N/A</td>
+                                }
                             }
                         </tr>
                     }
@@ -72,163 +128,144 @@ else
         }
         else
         {
-            <p>Loading...</p>
+            <div style="padding: 2rem; text-align: center; color: #666;">
+                <h4>📊 Correlation Matrix</h4>
+                <p>Select at least 2 sensor channels from the left to see correlations</p>
+            </div>
         }
     </RadzenSplitterPane>
 </RadzenSplitter>
-@* } *@
 
 @code {
-
-
-    List<Element> sensors;
-
     [Parameter]
     public Structure Structure { get; set; }
 
-    private IList<Element> selectedSensors { get; set; }
-
+    private DateTime startDate { get; set; } = DateTime.UtcNow.AddDays(-7);
+    private DateTime endDate { get; set; } = DateTime.UtcNow;
+    private Dictionary<string, bool> checkboxStates = new Dictionary<string, bool>();
 
     List<string> headers = new List<string>();
-
-
-
     public List<(string, Dictionary<DateTime, double>)> indices = new List<(string, Dictionary<DateTime, double>)>();
-
     private List<List<double>> correlationMatrix;
+    private List<string> excludedSensors = new List<string>();
+    private string selectedDateRange { get; set; } = "LastWeek";
 
-    protected override async Task OnInitializedAsync()
+    private async Task HandleBatchPlot((List<(Element sensor, ChannelDataType channelDataType)> pairs, DateTime startDate, DateTime endDate) args)
     {
-      //  var correlationCalculator = new AI.CorrelationCalculator();
-          // Assume you have a method to get the indices
-       // var indices = GetIndicesAsync();
-       // correlationMatrix = correlationCalculator.CalculateCorrelationMatrix(indices);
-    
-    }
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-     
-
-    }
-
-    private List<(string, Dictionary<DateTime, double>)> GetIndicesAsync()
-    {
-        var indices = new List<(string, Dictionary<DateTime, double>)>
-{
-    (
-        "Series1",
-        new Dictionary<DateTime, double>
+        var (sensorChannelPairs, receivedStartDate, receivedEndDate) = args;
+        
+        if (!sensorChannelPairs.Any())
         {
-            { new DateTime(2024, 1, 1), 1.0 },
-            { new DateTime(2024, 1, 2), 2.0 },
-            { new DateTime(2024, 1, 3), 3.0 },
-            { new DateTime(2024, 1, 4), 4.0 },
-            { new DateTime(2024, 1, 5), 5.0 }
+            headers.Clear();
+            indices.Clear();
+            correlationMatrix = null;
+            excludedSensors.Clear();
+            StateHasChanged();
+            return;
         }
-    ),
-    (
-        "Series2",
-        new Dictionary<DateTime, double>
-        {
-            { new DateTime(2024, 1, 1), 2.0 },
-            { new DateTime(2024, 1, 2), 4.0 },
-            { new DateTime(2024, 1, 3), 6.0 },
-            { new DateTime(2024, 1, 4), 8.0 },
-            { new DateTime(2024, 1, 5), 10.0 }
-        }
-    ),
-    (
-        "Series3",
-        new Dictionary<DateTime, double>
-        {
-            { new DateTime(2024, 1, 1), 5.0 },
-            { new DateTime(2024, 1, 2), 4.0 },
-            { new DateTime(2024, 1, 3), 3.0 },
-            { new DateTime(2024, 1, 4), 2.0 },
-            { new DateTime(2024, 1, 5), 1.0 }
-        }
-    ),
-    (
-        "Series4",
-        new Dictionary<DateTime, double>
-        {
-            { new DateTime(2024, 1, 1), 1.1 },
-            { new DateTime(2024, 1, 2), 2.1 },
-            { new DateTime(2024, 1, 3), 1.9 },
-            { new DateTime(2024, 1, 4), 2.2 },
-            { new DateTime(2024, 1, 5), 2.0 }
-        }
-    ),
-    (
-        "Series5",
-        new Dictionary<DateTime, double>
-        {
-            { new DateTime(2024, 1, 1), 10.0 },
-            { new DateTime(2024, 1, 2), 9.0 },
-            { new DateTime(2024, 1, 3), 8.0 },
-            { new DateTime(2024, 1, 4), 7.0 },
-            { new DateTime(2024, 1, 5), 6.0 }
-        }
-    )
-};
 
-        return indices;
-    }
+        headers.Clear();
+        indices.Clear();
+        excludedSensors.Clear();
 
-    private async Task plot(bool args, Element sensor, ChannelDataType channelDataType, DateTime startDate, DateTime endDate)
-    {
-        if (args)
+        // Fetch each sensor separately to ensure we get all data
+        foreach (var (sensor, channelDataType) in sensorChannelPairs)
         {
-            Dictionary<DateTime, double> dic = new Dictionary<DateTime, double>();
+            var bucketName = ReportsService.BucketName;
+            var rawData = await InfluxService.GetData(
+                new List<string> { sensor.ElementId.ToString() },
+                new List<string> { channelDataType.ChannelDataTypeId.ToString() },
+                receivedStartDate,
+                receivedEndDate,
+                bucketName,
+                maxDataPoints: 1000
+            );
 
-            List<object[]> la = await GetLa(sensor, channelDataType, startDate, endDate);
-
-            IList<object> X = la.Select(x => x[0]).ToList();
-            IList<object> Y = la.Select(x => x[2]).ToList();
-
-            foreach (var l in la)
+            var dic = new Dictionary<DateTime, double>();
+            foreach (var row in rawData)
             {
-                dic.Add((DateTime)l[0], (double)l[2]);
+                if (row == null || row.Length < 3) continue;
+                var timestamp = (DateTime)row[0];
+                if (row[2] != null)
+                {
+                    dic[timestamp] = Convert.ToDouble(row[2]);
+                }
             }
 
-            headers.Add(sensor.Name + "|" + channelDataType.Name);
-            indices.Add((sensor.ElementId.ToString() + "|" + channelDataType.ChannelDataTypeId.ToString(), dic));
+            var sensorLabel = $"{sensor.Name}|{channelDataType.Name}";
+            
+            if (dic.Any())
+            {
+                headers.Add(sensorLabel);
+                indices.Add(($"{sensor.ElementId}|{channelDataType.ChannelDataTypeId}", dic));
+                Console.WriteLine($"📊 Series {sensorLabel}: {dic.Count} points");
+            }
+            else
+            {
+                excludedSensors.Add(sensorLabel);
+                Console.WriteLine($"⚠️ Series {sensorLabel}: No data - excluded");
+            }
+        }
 
-
-
+        // Calculate correlation if we have at least 2 sensors with data
+        if (indices.Count >= 2)
+        {
             var correlationCalculator = new CorrelationCalculator.CorrelationCalculator();
             correlationMatrix = correlationCalculator.CalculateCorrelationMatrix(indices);
-
-            StateHasChanged();
-
-
+            Console.WriteLine($"✅ Correlation matrix calculated: {correlationMatrix?.Count ?? 0}x{correlationMatrix?.Count ?? 0}");
         }
         else
         {
-            headers.Remove(sensor.Name + "|" + channelDataType.Name);
-            var d = indices.Find(x => x.Item1 == sensor.ElementId.ToString() + "|" + channelDataType.ChannelDataTypeId.ToString());
-            indices.Remove(d);
-            var correlationCalculator = new CorrelationCalculator.CorrelationCalculator();
-            correlationMatrix = correlationCalculator.CalculateCorrelationMatrix(indices);
-
-            StateHasChanged();
+            correlationMatrix = null;
+            Console.WriteLine($"❌ Not enough data: {indices.Count} series with data (need at least 2)");
         }
 
+        StateHasChanged();
     }
 
-    private async Task<List<object[]>> GetLa(Element element, ChannelDataType channelDataType, DateTime startDate, DateTime endDate)
-    {
-        return await InfluxService.GetData(new List<string>() { element.ElementId.ToString() }, new List<string>() { channelDataType.ChannelDataTypeId.ToString() }, startDate, endDate);
-    }
     private string GetColor(double value)
     {
-        // Convert the correlation value to a color
-        int red = (int)((1 - value) * 255);
-        int green = (int)(value * 255);
+        // Handle NaN, infinity, or out-of-range values
+        if (double.IsNaN(value) || double.IsInfinity(value))
+        {
+            return "rgb(128, 128, 128)"; // Gray for invalid values
+        }
+        
+        // Clamp value to [-1, 1] range for correlation coefficients
+        value = Math.Max(-1, Math.Min(1, value));
+        
+        // Normalize to [0, 1] for color calculation
+        double normalized = (value + 1) / 2;
+        
+        int red = (int)((1 - normalized) * 255);
+        int green = (int)(normalized * 255);
         return $"rgb({red}, {green}, 0)";
     }
 
-
-
+    private void OnDateRangeChanged()
+    {
+        var now = DateTime.UtcNow;
+        
+        switch (selectedDateRange)
+        {
+            case "LastHour":
+                startDate = now.AddHours(-1);
+                endDate = now;
+                break;
+            case "LastDay":
+                startDate = now.AddDays(-1);
+                endDate = now;
+                break;
+            case "LastWeek":
+                startDate = now.AddDays(-7);
+                endDate = now;
+                break;
+            case "LastMonth":
+                startDate = now.AddMonths(-1);
+                endDate = now;
+                break;
+        }
+        
+        StateHasChanged();
+    }
 }

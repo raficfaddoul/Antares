@@ -1,0 +1,364 @@
+@using Microsoft.AspNetCore.Components.Forms
+@using AliantWebS.Data
+@using AliantWebS.Controllers
+@inject DialogService dialogService
+@inject IJSRuntime JS
+@inject ScenarioStorageService scenarioStorage
+@inject JournalService journal
+
+<RadzenTabs>
+    <Tabs>
+        <RadzenTabsItem Text="Données">
+            <RadzenStack Gap="1rem">
+                <RadzenText TextStyle="TextStyle.Subtitle2">
+                    Fichiers d'entrée du scénario
+                </RadzenText>
+
+                @if (resolveError != null)
+                {
+                    <RadzenText Style="color: #b00020;">@resolveError</RadzenText>
+                }
+                else if (dataFiles == null)
+                {
+                    <RadzenProgressBarCircular Mode="ProgressBarMode.Indeterminate" />
+                }
+                else if (dataFiles.Count == 0)
+                {
+                    <RadzenText>Aucun fichier. Utilisez le bouton ci-dessous pour en ajouter.</RadzenText>
+                }
+                else
+                {
+                    @FileGrid(dataFiles, ScenarioStorageService.DataFolderName)
+                }
+
+                <RadzenStack Orientation="Radzen.Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem">
+                    <InputFile OnChange="OnFileSelected" style="display:none" id="fileInput" multiple />
+                    <RadzenButton Icon="upload_file" Text="Uploader des fichiers" ButtonStyle="ButtonStyle.Primary"
+                                  Disabled="@(resolveError != null || isUploading)"
+                                  Click="@TriggerFileInput" />
+                    @if (isUploading)
+                    {
+                        <RadzenProgressBarCircular Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Small" />
+                    }
+                    @if (uploadMessage != null)
+                    {
+                        <RadzenText Style="@(uploadFailed ? "color: #b00020;" : "color: green;")">@uploadMessage</RadzenText>
+                    }
+                </RadzenStack>
+
+                <RadzenText TextStyle="TextStyle.Caption">
+                    MotherGrill.xlsx et Palonnier.xlsx absents ici sont lus dans le dossier partagé
+                    <code>@ScenarioStorageService.CommonFolderName/@ScenarioStorageService.DataFolderName</code>.
+                    Les charges scéniques ne sont plus lues dans un fichier : « Générer l'implantation » prend
+                    celles de la page Charges, et Charges.xlsx n'est qu'une source d'import pour cette page.
+                </RadzenText>
+
+                @* Relative paths, no leading slash: the browser resolves them against the application's
+                   base href, so UsePathBase rewrites them when the application is served under a
+                   sub-path — the same reason the download links above are relative. *@
+                <RadzenText TextStyle="TextStyle.Caption">
+                    Exemples de fichiers, au format attendu :
+                    <RadzenLink Path="exemples/Charges.xlsx" Text="Charges.xlsx" />,
+                    <RadzenLink Path="exemples/MotherGrill.xlsx" Text="MotherGrill.xlsx" />,
+                    <RadzenLink Path="exemples/Palonnier.xlsx" Text="Palonnier.xlsx" />,
+                    <RadzenLink Path="exemples/Elements.xlsx" Text="Elements.xlsx" />,
+                    <RadzenLink Path="exemples/LISEZ-MOI.md" Text="LISEZ-MOI.md" />.
+                </RadzenText>
+            </RadzenStack>
+        </RadzenTabsItem>
+
+        <RadzenTabsItem Text="Résultats">
+            <RadzenStack Gap="1rem">
+                <RadzenText TextStyle="TextStyle.Subtitle2">
+                    Fichiers produits par les générateurs
+                </RadzenText>
+
+                @if (resolveError != null)
+                {
+                    <RadzenText Style="color: #b00020;">@resolveError</RadzenText>
+                }
+                else if (outputFiles == null)
+                {
+                    <RadzenProgressBarCircular Mode="ProgressBarMode.Indeterminate" />
+                }
+                else if (outputFiles.Count == 0)
+                {
+                    <RadzenText>Aucun résultat. Lancez « Generate Layout » d'abord.</RadzenText>
+                }
+                else
+                {
+                    @FileGrid(outputFiles, ScenarioStorageService.OutputFolderName)
+                }
+            </RadzenStack>
+        </RadzenTabsItem>
+    </Tabs>
+</RadzenTabs>
+
+@code {
+    // Ids rather than paths: the dialog resolves the folders itself, so a rename between opening the
+    // scenario and opening this dialog cannot leave it pointing at a stale directory.
+    [Parameter] public Guid EventId { get; set; }
+    [Parameter] public Guid ScenarioId { get; set; }
+
+    private const int MaxFilesPerUpload = 50;
+    private const long MaxUploadBytes = 100L * 1024 * 1024;
+
+    private string? dataDir;
+    private string? outputDir;
+    private string? resolveError;
+
+    private List<FileEntry>? dataFiles;
+    private List<FileEntry>? outputFiles;
+
+    private string? uploadMessage;
+    private bool uploadFailed;
+    private bool isUploading;
+
+    protected override void OnInitialized()
+    {
+        var paths = scenarioStorage.FindScenarioPaths(EventId, ScenarioId);
+        if (paths is null)
+        {
+            // Previously a missing folder rendered as "no files found", which reads exactly like an
+            // empty folder and sends people off re-uploading files that were never lost.
+            resolveError = "Dossier du scénario introuvable. Rouvrez le scénario pour le recréer.";
+            return;
+        }
+
+        dataDir = paths.Value.DataDir;
+        outputDir = paths.Value.OutputDir;
+        RefreshAllFiles();
+    }
+
+    private RenderFragment FileGrid(List<FileEntry> files, string folder) => __builder =>
+    {
+        <RadzenDataGrid Data="files" TItem="FileEntry" AllowSorting="true" Style="width:100%">
+            <Columns>
+                <RadzenDataGridColumn TItem="FileEntry" Property="Name" Title="Nom du fichier" />
+                <RadzenDataGridColumn TItem="FileEntry" Property="Size" Title="Taille" Width="110px">
+                    <Template Context="file">@FormatSize(file.Size)</Template>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="FileEntry" Property="Modified" Title="Modifié le" Width="150px">
+                    <Template Context="file">@file.Modified.ToString("dd/MM/yyyy HH:mm")</Template>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="FileEntry" Title="" Width="90px" Sortable="false">
+                    <Template Context="file">
+                        <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.25rem">
+                            @* A plain link to the streaming endpoint. The previous version base64-encoded
+                               the whole file into an eval'd script, which broke on large files and let a
+                               quote in a file name escape into the JavaScript. *@
+                            <RadzenLink Path="@ScenarioFilesController.BuildDownloadUrl(EventId, ScenarioId, folder, file.Name)"
+                                        Icon="download" title="Télécharger" />
+                            <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Text"
+                                          Size="ButtonSize.Small" title="Supprimer"
+                                          Click="@(() => DeleteFile(folder, file.Name))" />
+                        </RadzenStack>
+                    </Template>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+    };
+
+    private void RefreshAllFiles()
+    {
+        dataFiles = LoadFiles(dataDir);
+        outputFiles = LoadFiles(outputDir);
+    }
+
+    private static List<FileEntry> LoadFiles(string? dir)
+    {
+        if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) return new List<FileEntry>();
+
+        return new DirectoryInfo(dir)
+            .GetFiles()
+            // In-flight uploads, and any left behind by a crash, are not files the user put here.
+            .Where(f => !f.Name.EndsWith(".part", StringComparison.OrdinalIgnoreCase))
+            .Select(f => new FileEntry { Name = f.Name, Size = f.Length, Modified = f.LastWriteTime })
+            .OrderBy(f => f.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private string? DirectoryFor(string folder) =>
+        folder == ScenarioStorageService.DataFolderName ? dataDir : outputDir;
+
+    private async Task TriggerFileInput()
+    {
+        await JS.InvokeVoidAsync("eval", "document.getElementById('fileInput').click()");
+    }
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        if (dataDir is null) return;
+
+        uploadMessage = null;
+        uploadFailed = false;
+        isUploading = true;
+        StateHasChanged();
+
+        var saved = 0;
+        var skipped = new List<string>();
+        var rejected = new List<string>();
+
+        try
+        {
+            Directory.CreateDirectory(dataDir);
+
+            IReadOnlyList<IBrowserFile> files;
+            try
+            {
+                files = e.GetMultipleFiles(MaxFilesPerUpload);
+            }
+            catch (InvalidOperationException)
+            {
+                uploadMessage = $"Trop de fichiers : {MaxFilesPerUpload} au maximum par envoi.";
+                uploadFailed = true;
+                return;
+            }
+
+            foreach (var file in files)
+            {
+                // The browser supplies this name. Left unchecked it can contain directory separators,
+                // which the path join would honour and write outside the scenario folder.
+                var safeName = ScenarioStorageService.SanitizeFileName(file.Name);
+                if (safeName is null)
+                {
+                    rejected.Add(file.Name);
+                    continue;
+                }
+
+                // A file already here under the same name in other letter case is the one being replaced,
+                // so it keeps its name. On Linux - the Docker image - the two would otherwise sit side by
+                // side, and the old one would stay the file Generate Layout reads.
+                var sameName = Directory.EnumerateFiles(dataDir)
+                    .Select(f => Path.GetFileName(f))
+                    .FirstOrDefault(n => string.Equals(n, safeName, StringComparison.OrdinalIgnoreCase));
+                if (sameName is not null) safeName = sameName;
+
+                var path = Path.Combine(dataDir, safeName);
+                if (!ScenarioStorageService.IsInside(dataDir, path))
+                {
+                    rejected.Add(file.Name);
+                    continue;
+                }
+
+                var replacing = File.Exists(path);
+                if (replacing)
+                {
+                    var overwrite = await JS.InvokeAsync<bool>("confirm",
+                        $"« {safeName} » existe déjà.\nLe remplacer ? L'ancienne version ira dans la corbeille.");
+                    if (!overwrite)
+                    {
+                        skipped.Add(safeName);
+                        continue;
+                    }
+                }
+
+                // Written to a temporary neighbour first, then promoted. Opening the destination
+                // directly would truncate it before a single byte arrives, so a file that is too large
+                // or a dropped connection would leave an empty file standing in for the real one, with
+                // the previous version already in the trash. An empty spreadsheet also shadows the
+                // shared copy in _common/data, so the next generation run would read nothing.
+                var temp = Path.Combine(dataDir, $".{Guid.NewGuid():N}.part");
+
+                try
+                {
+                    await using (var fs = new FileStream(temp, FileMode.CreateNew))
+                    {
+                        await file.OpenReadStream(MaxUploadBytes).CopyToAsync(fs);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    TryDelete(temp);
+                    rejected.Add($"{safeName} ({ex.Message})");
+                    continue;
+                }
+
+                try
+                {
+                    // The previous version is only displaced once the replacement is safely on disk.
+                    if (replacing) scenarioStorage.TrashFile(path);
+                    File.Move(temp, path, overwrite: true);
+                }
+                catch (Exception ex)
+                {
+                    TryDelete(temp);
+                    rejected.Add($"{safeName} ({ex.Message})");
+                    continue;
+                }
+
+                await journal.WriteAsync(JournalCategory.Donnees, "scenario.file.upload", safeName,
+                    details: dataDir, eventId: EventId);
+                saved++;
+            }
+
+            var parts = new List<string>();
+            if (saved > 0) parts.Add($"{saved} fichier(s) uploadé(s)");
+            if (skipped.Count > 0) parts.Add($"{skipped.Count} conservé(s)");
+            if (rejected.Count > 0) parts.Add($"refusé(s) : {string.Join(", ", rejected)}");
+
+            uploadMessage = parts.Count > 0 ? string.Join(" · ", parts) : "Aucun fichier envoyé.";
+            uploadFailed = rejected.Count > 0;
+        }
+        finally
+        {
+            isUploading = false;
+            RefreshAllFiles();
+            StateHasChanged();
+        }
+    }
+
+    private async Task DeleteFile(string folder, string name)
+    {
+        var dir = DirectoryFor(folder);
+        if (dir is null) return;
+
+        // The old version deleted on a single click, with no confirmation and no way back.
+        var confirmed = await JS.InvokeAsync<bool>("confirm",
+            $"Supprimer « {name} » ?\nLe fichier sera déplacé dans la corbeille, pas effacé.");
+        if (!confirmed) return;
+
+        var safeName = ScenarioStorageService.SanitizeFileName(name);
+        if (safeName is null) return;
+
+        var path = Path.Combine(dir, safeName);
+        if (!ScenarioStorageService.IsInside(dir, path) || !File.Exists(path)) return;
+
+        var moved = scenarioStorage.TrashFile(path);
+
+        // Journalled so a file that disappears can be traced back to who removed it and when.
+        await journal.WriteAsync(JournalCategory.Donnees, "scenario.file.delete", safeName,
+            details: moved ?? path, severity: 1, eventId: EventId);
+
+        if (moved is null)
+        {
+            uploadMessage = $"« {safeName} » n'a pas pu être supprimé (fichier verrouillé ?).";
+            uploadFailed = true;
+        }
+
+        RefreshAllFiles();
+    }
+
+    private static void TryDelete(string path)
+    {
+        try { if (File.Exists(path)) File.Delete(path); } catch { /* best effort cleanup */ }
+    }
+
+    // Plain ifs, not a switch on relational patterns ("< 1024 => ..."): the Razor compiler of the .NET 8
+    // SDK, which the Docker image builds with, reads a line that starts with "<" inside @code as an HTML
+    // tag and loses the rest of the code block. The .NET 10 SDK used by Visual Studio here parses it
+    // correctly, so the page compiled locally and broke the Docker build.
+    private static string FormatSize(long bytes)
+    {
+        if (bytes < 1024) return $"{bytes} o";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:N1} ko";
+        return $"{bytes / (1024.0 * 1024.0):N1} Mo";
+    }
+
+    private class FileEntry
+    {
+        public string Name { get; set; } = string.Empty;
+        public long Size { get; set; }
+        public DateTime Modified { get; set; }
+    }
+}

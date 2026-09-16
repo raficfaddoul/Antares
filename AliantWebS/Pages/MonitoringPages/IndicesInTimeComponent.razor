@@ -19,18 +19,48 @@
         background-color: #101015;
     }
 
-    /* Assurer que le conteneur a une hauteur appropriée pour le zoom slider */
     .chart-container-with-zoom {
+        position: relative;
         height: 100%;
         width: 100%;
+        min-height: 300px;
+    }
+
+    .chart-flex-row {
         display: flex;
-        flex-direction: column;
-        min-height: 350px; /* Espace supplémentaire pour le slider */
+        height: 100%;
+        width: 100%;
+    }
+
+    .dygraph-plot {
+        flex: 1 1 auto;
+        min-width: 0;
+        height: 100%;
+        position: relative;
+    }
+
+    /* Dedicated scrollable legend panel to the right of the plot (dygraph labelsDiv target),
+       so ~30 series (each manille × temperature + weight) no longer overflow/clip the chart. */
+    .dygraph-side-legend {
+        flex: 0 0 210px;
+        height: 100%;
+        overflow-y: auto;
+        overflow-x: hidden;
+        text-align: left;
+        border-left: 1px solid #e2e2e8;
+        background: #fafafb;
+        padding: 8px 10px;
+        font-size: 0.75rem;
+        line-height: 1.5;
+        box-sizing: border-box;
     }
 </style>
 
 <div class="chart-container-with-zoom">
-    <div id="@GraphId" style="height: 100%; width: 100%; min-height: 350px;"></div>
+    <div class="chart-flex-row">
+        <div id="@GraphId" class="dygraph-plot"></div>
+        <div id="@(GraphId)_legend" class="dygraph-side-legend"></div>
+    </div>
 </div>
 
 @code {
@@ -40,10 +70,8 @@
     [Parameter]
     public List<Dictionary<object, double>> Indices { get; set; }
 
-    private List<string> dataPoints = new List<string>();
-
     [Parameter]
-    public List<string> Headers { get; set; } 
+    public List<string> Headers { get; set; }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -54,90 +82,110 @@
         }
     }
 
-    public async Task DisplayData(List<Dictionary<object, double>> Indices, List<string> Headers, DateTime? startDate = null)
+    public async Task DisplayData(
+        List<Dictionary<object, double>> Indices,
+        List<string> Headers,
+        DateTime? startDate = null,
+        Dictionary<string, string> seriesAxisMap = null,
+        string y1Label = null,
+        string y2Label = null)
     {
         try
         {
-            // Si il n'y a pas de données, envoyer CSV minimal
+            // If no data, send minimal CSV
             bool noData = (Indices == null || Indices.Count == 0)
                           || Indices.All(d => d == null || d.Count == 0);
 
             if (noData)
             {
                 string emptyCsv = string.Join(",", Headers) + "\n";
-                await JSRuntime.InvokeVoidAsync("updateDygraph", GraphId, emptyCsv);
-                StateHasChanged();
+                // Clear the data AND the axis labels. updateDygraphFast only updates the data,
+                // so the previous ylabel/y2label lingered when every series was deselected.
+                await JSRuntime.InvokeVoidAsync("updateDygraphWithAxes", GraphId, emptyCsv,
+                    new Dictionary<string, string>(), "", "");
                 return;
             }
 
-            // Traitement normal des données
+            // Determine key type
             var firstNonEmpty = Indices.First(d => d.Count > 0);
             object sampleKey = firstNonEmpty.Keys.First();
             bool isDateTimeKey = sampleKey is DateTime;
 
-            var allKeys = new List<object>();
+            // Use HashSet to collect UNIQUE keys only
+            var uniqueKeys = new HashSet<object>();
             foreach (var dic in Indices)
             {
                 foreach (var key in dic.Keys)
                 {
-                    allKeys.Add(key);
+                    uniqueKeys.Add(key);
                 }
             }
 
+            // Sort the unique keys
             List<object> sortedKeys;
             if (isDateTimeKey)
             {
-                sortedKeys = allKeys.Cast<DateTime>().OrderBy(dt => dt).Cast<object>().ToList();
+                sortedKeys = uniqueKeys.Cast<DateTime>().OrderBy(dt => dt).Cast<object>().ToList();
             }
             else
             {
-                sortedKeys = allKeys
-                    .Select(o => new
-                    {
-                        Original = o,
-                        Num = Convert.ToDouble(o, CultureInfo.InvariantCulture)
-                    })
+                sortedKeys = uniqueKeys
+                    .Select(o => new { Original = o, Num = Convert.ToDouble(o, CultureInfo.InvariantCulture) })
                     .OrderBy(p => p.Num)
                     .Select(p => p.Original)
                     .ToList();
             }
 
-            var sb = new StringBuilder();
+            // Build CSV efficiently
+            int seriesCount = Indices.Count;
+            int estimatedSize = sortedKeys.Count * (seriesCount * 15 + 30);
+            var sb = new StringBuilder(estimatedSize);
+            
+            // Header line
             sb.AppendLine(string.Join(",", Headers));
+
+            // Pre-allocate row buffer
+            var rowBuffer = new string[seriesCount + 1];
 
             foreach (var key in sortedKeys)
             {
-                var rowCells = new List<string>();
-
+                // First column: timestamp/key
                 if (isDateTimeKey)
                 {
-                    var dt = (DateTime)key;
-                    rowCells.Add(dt.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture));
+                    rowBuffer[0] = ((DateTime)key).ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture);
                 }
                 else
                 {
-                    double val = Convert.ToDouble(key, CultureInfo.InvariantCulture);
-                    rowCells.Add(val.ToString(CultureInfo.InvariantCulture));
+                    rowBuffer[0] = Convert.ToDouble(key, CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture);
                 }
 
-                foreach (var dic in Indices)
+                // Value columns
+                for (int i = 0; i < seriesCount; i++)
                 {
-                    if (dic.TryGetValue(key, out double yVal))
-                    {
-                        rowCells.Add(yVal.ToString(CultureInfo.InvariantCulture));
-                    }
-                    else
-                    {
-                        rowCells.Add("");
-                    }
+                    rowBuffer[i + 1] = Indices[i].TryGetValue(key, out double yVal) 
+                        ? yVal.ToString(CultureInfo.InvariantCulture) 
+                        : "";
                 }
 
-                sb.AppendLine(string.Join(",", rowCells));
+                sb.AppendLine(string.Join(",", rowBuffer));
             }
 
             string csvData = sb.ToString();
-            await JSRuntime.InvokeVoidAsync("updateDygraph", GraphId, csvData, startDate?.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture));
-            await InvokeAsync(StateHasChanged);
+
+            // Use axis-aware update when dual axes are needed
+            if (seriesAxisMap != null && seriesAxisMap.Count > 0)
+            {
+                await JSRuntime.InvokeVoidAsync("updateDygraphWithAxes", GraphId, csvData, seriesAxisMap, y1Label ?? "", y2Label ?? "");
+            }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("updateDygraphFast", GraphId, csvData);
+            }
+            
+            Console.WriteLine($"Rendered {sortedKeys.Count:N0} data points for graph '{GraphId}'");
+            
+            // Log CSV preview for debugging
+            Console.WriteLine($"CSV Preview (first 500 chars): {csvData.Substring(0, Math.Min(500, csvData.Length))}");
         }
         catch (Exception ex)
         {
@@ -146,7 +194,7 @@
     }
 
     public async Task RemoveFromJavascript()
-    { 
-        await JSRuntime.InvokeVoidAsync("removeDygraph", GraphId); 
+    {
+        await JSRuntime.InvokeVoidAsync("removeDygraph", GraphId);
     }
 }

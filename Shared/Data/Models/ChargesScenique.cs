@@ -13,8 +13,8 @@ public partial class ChargesScenique
     [Column("ChargesSceniqueID")]
     public Guid ChargesSceniqueId { get; set; }
 
-    [Column("EventID")]
-    public Guid EventId { get; set; }
+    [Column("EventMPScenarioID")]
+    public Guid EventMpscenarioId { get; set; }
 
     [StringLength(50)]
     public string? Name { get; set; }
@@ -27,7 +27,7 @@ public partial class ChargesScenique
 
     public double? Charge { get; set; }
 
-    [ForeignKey("EventId")]
+    [ForeignKey("EventMpscenarioId")]
     [InverseProperty("ChargesSceniques")]
-    public virtual Event Event { get; set; } = null!;
+    public virtual EventMpscenario EventMpscenario { get; set; } = null!;
 }

@@ -1,0 +1,215 @@
+@using AliantWebS.Data
+@using Models
+@using Microsoft.EntityFrameworkCore
+@using System.Text
+@using System.Collections.Concurrent
+@using System.Globalization
+@inject EntitiesService entitiesService
+@inject IDbContextFactory<AliantWebContext> dbContextFactory
+@inject IStringLocalizer<Languages> L
+@inject IJSRuntime js
+@inject Radzen.DialogService dialogService
+@inject JournalService journal
+
+<div style="display: flex; flex-direction: column; height: 100%;">
+    <div style="flex: 1; overflow: auto; margin-bottom: 1rem;">
+        <SelecteurDeCapteurComponent 
+            Structure=@Structure 
+            StartDate="@StartDate"
+            EndDate="@EndDate"
+            CheckboxStates="@exportCheckboxStates"
+            OnBatchPlotRaised="@HandleBatchSelection">
+        </SelecteurDeCapteurComponent>
+    </div>
+
+    @if (isExporting)
+    {
+        <div style="text-align: center; padding: 1rem;">
+            <i class="fas fa-spinner fa-spin" style="font-size: 2rem; color: #667eea;"></i>
+            <div style="margin-top: 0.5rem; font-weight: 600;">@exportMessage</div>
+        </div>
+    }
+
+    <div style="display: flex; gap: 1rem; justify-content: space-between; align-items: center; padding-top: 1rem; border-top: 1px solid #ddd;">
+        <div style="color: #666; font-size: 0.9rem;">
+            <strong>@selectedCount</strong> sensor channel(s) selected for export
+        </div>
+        <div style="display: flex; gap: 1rem;">
+            <RadzenButton 
+                ButtonStyle="ButtonStyle.Secondary" 
+                Text="@L["Cancel"]" 
+                Click="@Cancel"
+                Disabled="@isExporting">
+            </RadzenButton>
+            <RadzenButton 
+                ButtonStyle="ButtonStyle.Success" 
+                Icon="file_download" 
+                Text="@L["Export to CSV"]"
+                Click="@ExportToCSV"
+                Disabled="@(selectedCount == 0 || isExporting)">
+            </RadzenButton>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public Structure Structure { get; set; }
+
+    [Parameter]
+    public DateTime StartDate { get; set; }
+
+    [Parameter]
+    public DateTime EndDate { get; set; }
+
+    private const string CsvSeparator = ",";
+    private const int ChunkSize = 500000; // Characters per chunk for JS interop
+    private Dictionary<string, bool> exportCheckboxStates = new Dictionary<string, bool>();
+    private List<(Element sensor, ChannelDataType channelDataType)> selectedSensorsForExport = new List<(Element, ChannelDataType)>();
+    private bool isExporting = false;
+    private string exportMessage = "";
+    
+    private int selectedCount => selectedSensorsForExport.Count;
+
+    private async Task HandleBatchSelection((List<(Element sensor, ChannelDataType channelDataType)> pairs, DateTime startDate, DateTime endDate) args)
+    {
+        var (sensorChannelPairs, receivedStartDate, receivedEndDate) = args;
+        
+        selectedSensorsForExport.Clear();
+        exportCheckboxStates.Clear();
+        
+        foreach (var (sensor, channelDataType) in sensorChannelPairs)
+        {
+            string checkboxKey = $"{sensor.ElementId}_{channelDataType.ChannelDataTypeId}";
+            exportCheckboxStates[checkboxKey] = true;
+            selectedSensorsForExport.Add((sensor, channelDataType));
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ExportToCSV()
+    {
+        if (selectedCount == 0)
+        {
+            await js.InvokeVoidAsync("alert", "Please select at least one sensor to export.");
+            return;
+        }
+
+        isExporting = true;
+        exportMessage = "Preparing export...";
+        StateHasChanged();
+
+        try
+        {
+            var sensorsList = selectedSensorsForExport.ToList();
+            var bucketName = ReportsService.BucketName;
+
+            var sensorChannelPairs = sensorsList
+                .Select(x => (x.sensor.ElementId.ToString(), x.channelDataType.ChannelDataTypeId.ToString()))
+                .ToList();
+
+            var fileName = $"SensorData_{Structure.Name}_{StartDate:yyyyMMdd}_{EndDate:yyyyMMdd}.csv";
+
+            // Build headers
+            var headers = new List<string> { "Timestamp" };
+            headers.AddRange(sensorsList.Select(x => $"{x.sensor.Name}|{x.channelDataType.Name}"));
+            var headerLine = string.Join(CsvSeparator, headers.Select(h => $"\"{h}\""));
+
+            await js.InvokeVoidAsync("initChunkedDownload", fileName);
+            await js.InvokeVoidAsync("appendChunk", headerLine + "\n");
+
+            // CHUNK BY DAY to avoid memory issues
+            var currentStart = StartDate;
+            int totalRows = 0;
+            
+            while (currentStart < EndDate)
+            {
+                var currentEnd = currentStart.AddDays(1);
+                if (currentEnd > EndDate) currentEnd = EndDate;
+
+                exportMessage = $"Loading {currentStart:dd/MM/yyyy}...";
+                await InvokeAsync(StateHasChanged);
+
+                // Query one day at a time
+                var dayData = await InfluxService.GetDataForExport(
+                    sensorChannelPairs,
+                    currentStart,
+                    currentEnd,
+                    bucketName
+                );
+
+                if (dayData.Count > 0)
+                {
+                    // Write this day's data immediately
+                    var sortedTimestamps = dayData.Keys.OrderBy(k => k).ToList();
+                    var chunk = new StringBuilder();
+
+                    foreach (var timestamp in sortedTimestamps)
+                    {
+                        var row = new List<string> { timestamp.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture) };
+
+                        foreach (var (sensor, channelDataType) in sensorsList)
+                        {
+                            var pairKey = $"{sensor.ElementId.ToString().ToLowerInvariant()}|{channelDataType.ChannelDataTypeId.ToString().ToLowerInvariant()}";
+
+                            if (dayData[timestamp].TryGetValue(pairKey, out var value))
+                                row.Add(value.ToString("F6", CultureInfo.InvariantCulture));
+                            else
+                                row.Add("");
+                        }
+
+                        chunk.AppendLine(string.Join(CsvSeparator, row));
+                        totalRows++;
+
+                        // Write every 500 rows to avoid buffer issues
+                        if (chunk.Length > 50000)
+                        {
+                            await js.InvokeVoidAsync("appendChunk", chunk.ToString());
+                            chunk.Clear();
+                        }
+                    }
+
+                    // Write remaining rows for this day
+                    if (chunk.Length > 0)
+                    {
+                        await js.InvokeVoidAsync("appendChunk", chunk.ToString());
+                    }
+
+                    exportMessage = $"Exported {totalRows:N0} rows through {currentStart:dd/MM/yyyy}";
+                    await InvokeAsync(StateHasChanged);
+                }
+
+                // Move to next day - clear memory
+                dayData.Clear();
+                currentStart = currentEnd;
+            }
+
+            await js.InvokeVoidAsync("finalizeChunkedDownload");
+
+            await journal.WriteAsync(JournalCategory.Donnees, "export.sensordata", fileName,
+                $"{sensorsList.Count} capteur(s)/canal(aux), {totalRows:N0} ligne(s), "
+                + $"du {StartDate:yyyy-MM-dd} au {EndDate:yyyy-MM-dd}",
+                structureId: Structure?.StructureId);
+
+            exportMessage = $"Export complete! {totalRows:N0} rows";
+            await Task.Delay(1000);
+            dialogService.Close(true);
+        }
+        catch (Exception ex)
+        {
+            await js.InvokeVoidAsync("alert", $"Error exporting data: {ex.Message}");
+            Console.WriteLine($"Export error: {ex}");
+        }
+        finally
+        {
+            isExporting = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Cancel()
+    {
+        dialogService.Close(false);
+    }
+}

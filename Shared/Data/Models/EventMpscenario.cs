@@ -23,6 +23,12 @@ public partial class EventMpscenario
 
     public string? Comments { get; set; }
 
+    [InverseProperty("EventMpscenario")]
+    public virtual ICollection<ChargesScenique> ChargesSceniques { get; set; } = new List<ChargesScenique>();
+
+    [InverseProperty("EventMpscenario")]
+    public virtual ICollection<Charpente> Charpentes { get; set; } = new List<Charpente>();
+
     [ForeignKey("EventId")]
     [InverseProperty("EventMpscenarios")]
     public virtual Event Event { get; set; } = null!;

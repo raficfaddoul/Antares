@@ -7,7 +7,6 @@
 @using Microsoft.EntityFrameworkCore
 @using Models
 @using System.Data;
-@using OpenAI.Chat;
 @using System.Text.Json
 @using System.Text.Json.Serialization
 
@@ -56,14 +55,6 @@ else
                         </Template>
                     </RadzenDataGridColumn>
 
-                    @foreach (var attributeName in selectedAttributeNames)
-                    {
-                        <RadzenDataGridColumn TItem="Structure" Title="@attributeName" Filterable="true" Sortable="false">
-                            <Template Context="structure">
-                                @GetAttributeValue(structure, attributeName)
-                            </Template>
-                        </RadzenDataGridColumn>
-                    }
 
 
                     <RadzenDataGridColumn TItem="Structure" Property="Length" Title="@L["Action"]" Filterable="false" Sortable="false" Width="200px">
@@ -143,8 +134,7 @@ else
 
     Dictionary<Guid, List<(string Name, string Description, string Value)>> structureInfo = new();
 
-    // NEW: Store selected attributes for dynamic columns
-    List<string> selectedAttributeNames = new();
+
     Dictionary<Guid, Dictionary<string, string>> structureAttributeValues = new();
 
 
@@ -173,11 +163,7 @@ else
         @* NEW: Load data in separate method *@
         await LoadStructuresData();
 
-        //await jj(structuresList); 
-        await GetAttributesNames(structuresList);
-    
-        // Load attribute values for all structures
-        await LoadAttributeValuesForStructures();
+
     }
 
     @* NEW: Handle parameter changes *@
@@ -286,81 +272,8 @@ else
 
 
 
-    public async Task GetAttributesNames(List<Structure> structures)
-    {
-        ChatClient client = new(model: "gpt-4o", apiKey: "***REMOVED***");
 
 
-        var allStructureAttributes = new HashSet<(string Name, string Description)>();
-
-        foreach (var structure in structures)
-        {
-            var attributes = await AttributeExtractor.ExtractInfoAsync(entitiesService, structure);
-            foreach (var (name, description, value1) in attributes)
-            {
-                allStructureAttributes.Add((name, description));
-            }
-        }
-
-        var predefinedAttributes = allStructureAttributes.Select(x => x.Name).ToArray();
-
-
-        var schemaJson = Helpers.JsonSchemaBuilder
-            .Create("AttributeSelection")
-            .ArrayOfEnumProperty("SelectedAttributes", predefinedAttributes,
-                description: "List of attributes related to the structure")
-            .Build();
-
-        string InputText = "je veux afficher inertie par rapport a x est 323";
-
-        ChatCompletionOptions options = new()
-        {
-            ResponseFormat = ChatResponseFormat.CreateJsonSchemaFormat(
-                    jsonSchemaFormatName: "schemaJson",
-                jsonSchema: BinaryData.FromString(schemaJson),
-                jsonSchemaIsStrict: true),
-        };
-
-        var messages = new List<ChatMessage>
-        {
-            new SystemChatMessage(@"
-                Tu es un asssistant pour extraire les attributs d'interets pour etre affiche dans un tableau de bord.
-                - Ne crée aucune donnée qui n'existe pas explicitement dans le texte fourni.
-                - Si une information n'est pas présente, renvoie une chaîne vide pour ce champ.                
-                - Contenu uniquement – aucun commentaire ou interprétation.
-                Réponds exclusivement au format JSON conforme au schéma."),
-            new UserChatMessage(InputText)
-        };
-
-        ChatCompletion completion = await client.CompleteChatAsync(messages, options);
-        string json = completion.Content[0].Text;
-
-        var jsonOptions = new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            PropertyNameCaseInsensitive = true
-        };
-          
-
-        var result = JsonSerializer.Deserialize<AttributeSelectionResult>(json, jsonOptions)!;
-
-        selectedAttributeNames = result.SelectedAttributes;
-    }
-
-    private async Task LoadAttributeValuesForStructures()
-    {
-        structureAttributeValues.Clear();
-
-        foreach (var structure in structuresList)
-        {
-            var attributes = await AttributeExtractor.ExtractInfoAsync(entitiesService, structure);
-            var attributeDict = attributes.ToDictionary(x => x.Name, x => x.Value);
-            structureAttributeValues[structure.StructureId] = attributeDict;
-        }
-
-        // Force UI update after loading data
-        StateHasChanged();
-    }
 
     private string GetAttributeValue(Structure structure, string attributeName)
     {
@@ -376,111 +289,7 @@ else
         public List<string> SelectedAttributes { get; set; } = new();
     }
 
-    private async Task jj(List<Structure> structures)
-    {
-        var sitesList = await entitiesService.GetAllEntitiesAsync<Site>();
-        var structureTypesList = await Task.Run(() => entitiesService.GetAllEntitiesAsync<StructureType>());
 
-        ChatClient client = new(model: "gpt-4o", apiKey: "***REMOVED***");
-
-        var structureTypes = structureTypesList.Select(x => x.Name);
-        var sites = sitesList.Select(x => x.Name);
-
-        var elementTypes = await entitiesService.GetAllEntitiesAsync<ElementType>();
-        var elementTypesNames = elementTypes.Select(d => d.Name);
-
-        // NEW: Extract attributes from a representative structure or all structures
-       var allStructureAttributes = new HashSet<(string Name, string Description)>();
-        
-        //Option 1: Get attributes from all structures (comprehensive but slower)
-        foreach (var structure in structures)
-        {
-            var attributes = await AttributeExtractor.ExtractInfoAsync(entitiesService, structure);
-            foreach (var (name, description, value1) in attributes)
-            {
-                allStructureAttributes.Add((name, description));
-            }
-        }
-
-
-
-        // Build the schema with dynamic attributes
-        var schemaBuilder = Helpers.JsonSchemaBuilder
-            .Create("Structure")
-            .Property("Name", "string")
-            .Property("ShortDescription", "string")
-            .Property("Length", "number")
-            .PropertyWithPattern("YearBuilt", "string", @"^\d{4}-\d{2}-\d{2}$")
-            .Property("DesignLoad", "number")
-            .Property("Latitude", "number")
-            .Property("Longitude", "number")
-            .EnumProperty("StructureType", structureTypes)
-            .EnumProperty("Site", sites);
-
-        // NEW: Add dynamic attribute properties
-        foreach (var (name, description) in allStructureAttributes)
-        {
-            // Sanitize property name for JSON schema (remove spaces, special chars)
-            var propertyName = SanitizePropertyName(name);
-            
-            // Add property with description as title/description
-            schemaBuilder.Property(propertyName, "string", description: description);
-        }
-
-        // Continue with Elements array
-        schemaBuilder.ArrayProperty("Elements", item => item
-            .Property("Name", "string")
-            .Property("ShortDescription", "string")
-            .EnumProperty("ElementType", elementTypesNames)
-        );
-
-        string schemaJson = schemaBuilder.Build();
-
-        // Rest of your existing code...
-        var structureTypesDict = structureTypesList.ToDictionary(x => x.Name, x => x.StructureTypeId);
-        var sitesDict = sitesList.ToDictionary(x => x.Name, x => x.SiteId);
-        var elementTypesDict = elementTypes.ToDictionary(x => x.Name, x => x.ElementTypeId);
-
-        string InputText = "Le pont lolita est en beton au dessus de la rivière. il a été construit en 1995. Il mesure 150 mètres de long et est situé à Paris. Sa charge de conception est de 500 tonnes. Le pont est un élément clé de l'infrastructure locale. il est compose de deux elements. un noeud 3d and un beam 3d. son inertie par rapport a x est 323";
-        
-        ChatCompletionOptions options = new()
-        {
-            ResponseFormat = ChatResponseFormat.CreateJsonSchemaFormat(
-                    jsonSchemaFormatName: "schemaJson",
-                jsonSchema: BinaryData.FromString(schemaJson),
-                jsonSchemaIsStrict: true),
-        };
-
-        var messages = new List<ChatMessage>
-        {
-            new SystemChatMessage(@"
-                Tu es un moteur d'extraction d'informations d'infrastructure.
-                - Ne crée aucune donnée qui n'existe pas explicitement dans le texte fourni.
-                - Si une information n'est pas présente, renvoie une chaîne vide pour ce champ.
-                - Extrait toutes les informations pertinentes sur la structure, y compris ses attributs techniques.
-                - Contenu uniquement – aucun commentaire ou interprétation.
-                Réponds exclusivement au format JSON conforme au schéma."),
-            new UserChatMessage(InputText)
-        };
-
-        ChatCompletion completion = await client.CompleteChatAsync(messages, options);
-        string json = completion.Content[0].Text;
-
-        var jsonOptions = new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            PropertyNameCaseInsensitive = true
-        };
-
-        var combinedMap = structureTypesDict
-            .Concat(sitesDict)
-            .Concat(elementTypesDict)
-            .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
-
-        jsonOptions.Converters.Add(new Helpers.StringToGuidConverter(combinedMap));
-
-        var value = JsonSerializer.Deserialize<StructureWithAttributes>(json, jsonOptions)!;
-    }
 
     // Helper method to sanitize property names for JSON schema
     private string SanitizePropertyName(string name)

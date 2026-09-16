@@ -113,10 +113,16 @@
 
         var attributeTypesList = atet.Select(x => x.AttributeType);
 
-    
+        // Old data stores some element-type/attribute-type links twice, and one row per link gave
+        // the element two rows for the same attribute: the value went into one, and the empty twin
+        // was then spread to other elements by Paste. So at most one row per attribute type, and
+        // none for a type the element already carries.
+        var attributeTypeIds = element.AttributeElements.Select(x => x.AttributeTypeId).ToHashSet();
 
         foreach (var v in attributeTypesList)
-        {          
+        {
+                if (v is null || !attributeTypeIds.Add(v.AttributeTypeId)) continue;
+
                 AttributeElement ae = new AttributeElement();
                 ae.ElementId = element.ElementId;
                 ae.AttributeTypeId = v.AttributeTypeId;

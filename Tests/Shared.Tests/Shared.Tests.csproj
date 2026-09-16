@@ -1,0 +1,47 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The rules the rigging optimiser and the study are trusted for, enforced by the build.
+       These tests lived outside the repository while the engine was being written, which meant the
+       invariants were only as durable as a temporary folder. They belong here. -->
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <NoWarn>$(NoWarn);CS8618;CS8602;CS8604;CS8625</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <!-- Shared holds the optimiser, the inventory readers, the load table and the study builder: everything
+       these tests are about. The web project is deliberately not referenced - a rule that needs a circuit
+       to be tested is a rule in the wrong place. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\Shared\Shared.csproj" />
+  </ItemGroup>
+
+  <!-- The venue's own workbooks, copied once. The engine's numbers - 24 charges, 18 of them hung straight
+       on their mother line, 7 mother lines - only mean something against real data. -->
+  <ItemGroup>
+    <None Include="Fixtures\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- The workbooks the application publishes as the expected format. Copied beside the test assembly
+       rather than reached for through the source tree: the tests must find them whatever folder the build
+       writes to, and what is tested is then exactly the files that ship. -->
+  <ItemGroup>
+    <None Include="..\..\AliantWebS\wwwroot\exemples\**"
+          Link="Examples\%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

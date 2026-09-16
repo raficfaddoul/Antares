@@ -1,4 +1,7 @@
 ﻿using AliantWebS.Models;
+using DocumentFormat.OpenXml.EMMA;
+using MathNet.Numerics.LinearAlgebra.Factorization;
+using NetTopologySuite.Algorithm;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -199,7 +202,7 @@ namespace Structural
             double xi, yi, zi, xj, yj, zj, b, h;
             int i = elem.Field<int>("Noeudi");
             int j = elem.Field<int>("Noeudj");
-
+  
             xi = noeud[i][0];
             yi = noeud[i][1];
             zi = noeud[i][2];
@@ -210,18 +213,25 @@ namespace Structural
             b = elem.Field<double>("b");
             h = elem.Field<double>("h");
 
-            double E = elem.Field<double>("E");
+            double E = elem.Field<double>("E"); // MPa = MN/m²
             double S = b*h;
             double Iy = b * Math.Pow(h, 3) / 12.0;
             double Iz = h * Math.Pow(b, 3) / 12.0;
             double nu = 0.1;
             double G = E / (2*(1 + nu));
-            double J = (Iy+Iz)/2.0;
+            double J = Iy + Iz;
 
             double L = Math.Sqrt(Math.Pow(xj - xi, 2) + Math.Pow(yj - yi, 2) + Math.Pow(zj - zi, 2));
             double L2 = L * L;
             double L3 = L * L * L;
-            
+
+
+            if (L<0.1 || L>12 || E<1000 || S<1e-5)
+            {
+                int hh = 0;
+
+            }
+
             double[,] Ke =
             {
                 { E*S/L, 0         , 0         , 0       , 0        , 0        ,-E*S/L   , 0         , 0         , 0       , 0        , 0         },
@@ -275,8 +285,24 @@ namespace Structural
                 double[,] Ke = Calcul_Ke_Beam3D(elem, noeud);
                 Ke = Rotation_Beam3D(elem, noeud, Ke);
                 Assemblage_Beam3D(K, Ke, elem);
+
+                for (int i = 0; i < 12; i++)
+                {
+                    if (Math.Abs(Ke[i, i]) < 1e-10)
+                    {
+                        int korp = 0;
+                    }
+                }
             }
 
+
+            for (int i = 0; i < (6*noeud.Count()); i++)
+            {
+                if (Math.Abs(K[i, i]) < 1e-10)
+                {
+                    int korp = 0;
+                }
+            }
 
             return K;
         }
@@ -313,7 +339,7 @@ namespace Structural
             {
                 double P = charge.value;
                 for (int j = 0; j < charge.noeudInd.Count; j++)
-                    F[6 * charge.noeudInd[j] + 1] += P;
+                    F[6 * charge.noeudInd[j] + 1] += P/100;
             }
             return F;
         }
@@ -325,8 +351,7 @@ namespace Structural
             int[] n = new int[2];
             n[0] = elem.Field<int>("Noeudi");
             n[1] = elem.Field<int>("Noeudj");
-            if (n[0] < 0) n[0] = 173;
-            if (n[1] < 0) n[1] = 182;
+  
 
             for (ik = 0; ik < 2; ik++)
                 for (jk = 0; jk < 2; jk++)
@@ -342,7 +367,186 @@ namespace Structural
 
         static public double[,] Matrice_R_Beam3D(DataRow elem, List<double[]> noeud)
         {
-            double xi, yi, zi, xj, yj, zj, b, h;
+            double xi, yi, zi, xj, yj, zj;
+
+            int i = elem.Field<int>("Noeudi");
+            int j = elem.Field<int>("Noeudj");
+
+            xi = noeud[i][0];
+            yi = noeud[i][1];
+            zi = noeud[i][2];
+            xj = noeud[j][0];
+            yj = noeud[j][1];
+            zj = noeud[j][2];
+
+            double dx = (xj - xi);
+            double dy = (yj - yi);
+            double dz = (zj - zi);
+
+            double L = Math.Sqrt(dx * dx + dy * dy + dz * dz);
+
+            double xk,yk, zk;
+            //pente de l'élément dans le plan vertical
+            double Lxy = Math.Sqrt(Math.Pow(xj - xi, 2) + Math.Pow(yj - yi, 2));
+            if (Lxy == 0)
+            {
+                // element vertical =>  point "o" dans le plan (x,z)
+                xk = xi - 10;
+                yk = yi ;
+                zk = zi;
+            }
+            else
+            {
+                // sinon =>  point "o" dans le plan vertical de l'élément
+                double cosX = (xj - xi) / Lxy;
+                double cosY = (yj - yi) / Lxy;
+                double Emme = (zj - zi) / Lxy;
+                zk = zi+ 10;
+                double x1o = -10 * Emme;
+                xk = xi + x1o * cosX;
+                yk = yi + x1o * cosY;
+            }
+
+            // Vecteur e1
+            double[] e1 = new[] { dx / L, dy / L, dz / L };
+
+            //Vecteur u : produit de e1 par "v" 
+            double[] v= new[] { (xk-xi) , (yk - yi), (zk - zi) };
+            double[] u=new double[3];
+            u[0] = e1[1] * v[2] - e1[2] * v[1];
+            u[1] = e1[2] * v[0] - e1[0] * v[2];
+            u[2] = e1[0] * v[1] - e1[1] * v[0];
+
+            //Vecteur e3 : produit de u par e1 
+            double[] e3 = new double[3];
+
+            e3[0] = u[1] * e1[2] - u[2] * e1[1];
+            e3[1] = u[2] * e1[0] - u[0] * e1[2];
+            e3[2] = u[0] * e1[1] - u[1] * e1[0];
+
+            double norme_e3 = Math.Sqrt(e3[0] * e3[0] + e3[1] * e3[1] + e3[2] * e3[2]);
+            e3[0] /= norme_e3;
+            e3[1] /= norme_e3;
+            e3[2] /= norme_e3;
+            
+            //produit de e3 x e1
+            double[] e2 = new double[3];
+            e2[0] = e3[1] * e1[2] - e3[2] * e1[1];
+            e2[1] = e3[2] * e1[0] - e3[0] * e1[2];
+            e2[2] = e3[0] * e1[1] - e3[1] * e1[0];
+
+
+            double[,] lambda = new double[3, 3]
+            {
+                { e1[0], e1[1], e1[2] },
+                { e2[0], e2[1], e2[2] },
+                { e3[0], e3[1], e3[2] }
+            };
+
+      
+            double[,] R = new double[12, 12];
+
+            for (int nd = 0; nd < 4; nd++)
+            {
+                int offset = nd * 3;
+                for (i = 0; i < 3; i++)
+                    for (j = 0; j < 3; j++)
+                        R[offset + i, offset + j] = lambda[i, j];
+            }
+            return R;
+
+        }
+        static public double[,] Matrice_R_Beam3D_WORKING_BUT_TOGENERALIZE(DataRow elem, List<double[]> noeud)
+        {
+            double xi, yi, zi, xj, yj, zj;
+
+            int i = elem.Field<int>("Noeudi");
+            int j = elem.Field<int>("Noeudj");
+
+            xi = noeud[i][0];
+            yi = noeud[i][1];
+            zi = noeud[i][2];
+            xj = noeud[j][0];
+            yj = noeud[j][1];
+            zj = noeud[j][2];
+
+            double dx = (xj - xi);
+            double dy = (yj - yi);
+            double dz = (zj - zi);
+
+            double L = Math.Sqrt(dx * dx + dy * dy + dz * dz);
+            double[] e1 = new[] { dx / L, dy / L, dz / L };
+
+            // --- Étape 2 : Vecteur de référence V ---
+            double[] V = Math.Abs(e1[2]) < 0.9 ?
+                new[] { 0.0, 0.0, -1.0 } :  // Si poutre n'est pas verticale → V = Z
+                new[] { 1.0, 0.0, 0.0 };   // Si poutre est verticale → V = Y
+
+            // --- Étape 3 : e3 = e1 × V (produit vectoriel) ---
+            double[] e2 = new[]
+            {
+        e1[1]*V[2] - e1[2]*V[1],
+        e1[2]*V[0] - e1[0]*V[2],
+        e1[0]*V[1] - e1[1]*V[0]
+            };
+            double norm_e2 = Math.Sqrt(e2[0] * e2[0] + e2[1] * e2[1] + e2[2] * e2[2]);
+
+            // Si e1 et V sont parallèles, norm_e3 ≈ 0 → changer V
+            if (norm_e2 < 0.01)
+            {
+                V = new[] { 0.0, -1.0, 0.0 };
+                e2 = new[] { e1[1] * V[2] - e1[2] * V[1], e1[2] * V[0] - e1[0] * V[2], e1[0] * V[1] - e1[1] * V[0] };
+                norm_e2 = Math.Sqrt(e2[0] * e2[0] + e2[1] * e2[1] + e2[2] * e2[2]);
+            }
+
+            e2[0] /= norm_e2;
+            e2[1] /= norm_e2;
+            e2[2] /= norm_e2;
+
+            // --- Étape 4 : e2 = e3 × e1 ---
+            double[] e3 = new[]
+            {
+        e1[1]*e2[2] - e1[2]*e2[1],
+        e1[2]*e2[0] - e1[0]*e2[2],
+        e1[0]*e2[1] - e1[1]*e2[0]
+    };
+
+
+            // --- Étape 5 : Matrice de cosinus directeurs (3×3) ---
+            double[,] lambda = new double[3, 3]
+            {
+                { e1[0], e1[1], e1[2] },
+                { e2[0], e2[1], e2[2] },
+                { e3[0], e3[1], e3[2] }
+            };
+
+            // --- Étape 6 : Construire T (12×12) ---
+            double[,] R = new double[12, 12];
+
+            // Remplir avec les blocs [λ] pour les 2 nœuds
+            for (int nd = 0; nd < 2; nd++)
+            {
+                int offset = nd * 6;
+
+                // Bloc translations (3×3)
+                for (i = 0; i < 3; i++)
+                    for (j = 0; j < 3; j++)
+                        R[offset + i, nd * 6 + j] = lambda[i, j];
+
+                // Bloc rotations (3×3)
+                for (i = 0; i < 3; i++)
+                    for (j = 0; j < 3; j++)
+                        R[offset + 3 + i, nd * 6 + 3 + j] = lambda[i, j];
+            }
+
+
+
+            return R;
+
+        }
+        static public double[,] Matrice_R_Beam3D_OLD(DataRow elem, List<double[]> noeud)
+        {
+            double xi, yi, zi, xj, yj, zj;
 
             int i = elem.Field<int>("Noeudi");
             int j = elem.Field<int>("Noeudj");
@@ -410,6 +614,8 @@ namespace Structural
 
         }
 
+
+
         static private double[,] Rotation_Beam3D(DataRow elem, List<double[]> noeud, double[,] A)
         {
             double[,] Ag = new double[12, 12];
@@ -435,8 +641,16 @@ namespace Structural
                     Ag[i, j] = u;
                 }
 
+            for (i = 0; i < 12; i++)
+                for (j = 0; j < 12; j++)
+                {
+                    if  (double.IsNaN(Ag[i, j]))
+                        {
+                        int korp = 0;
+                    }
+                }
 
-            return Ag;
+                    return Ag;
         }
 
 
@@ -444,8 +658,7 @@ namespace Structural
         {
             int ni = elem.Field<int>("Noeudi");
             int nj = elem.Field<int>("Noeudj");
-                if (ni < 0) ni = 173;
-                if (nj < 0) nj = 182;
+      
 
             double[] qeG = new double[12]; 
             for (int i = 0; i < 6; i++)
@@ -491,7 +704,7 @@ namespace Structural
             {
                 u = 0;
                 for (j = 0; j < 12; j++)
-                    u += R[j, i] * qeG[j];
+                    u += R[i,j] * qeG[j];
                 qeL[i] = u;
             }
             return qeL;

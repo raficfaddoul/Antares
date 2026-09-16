@@ -50,17 +50,21 @@ namespace AliantWebS
             {
                 options.ChangeTextOnKeyPress = true; // optional
             }).AddBootstrapProviders().AddFontAwesomeIcons();
-           // var s = Configuration.GetConnectionString("DefaultConnection");
-    //        services.AddDbContextFactory<AliantWebContext>(options =>
-    //            options.UseSqlServer(
-    //                Configuration.GetConnectionString("DefaultConnection"), options => options.EnableRetryOnFailure()));
 
-    //        services.AddDbContext<AliantWebContext>(options =>
-    //            options.UseSqlServer(
-    //                Configuration.GetConnectionString("DefaultConnection"), options => options.EnableRetryOnFailure()));
-    //        services.AddDbContext<ApplicationDbContext>(options =>
-    //options.UseSqlServer(
-    //    Configuration.GetConnectionString("DefaultConnection")));
+            // Add TimeProvider for .NET 8 Identity support
+            services.AddSingleton(TimeProvider.System);
+
+            // var s = Configuration.GetConnectionString("DefaultConnection");
+            //        services.AddDbContextFactory<AliantWebContext>(options =>
+            //            options.UseSqlServer(
+            //                Configuration.GetConnectionString("DefaultConnection"), options => options.EnableRetryOnFailure()));
+
+            //        services.AddDbContext<AliantWebContext>(options =>
+            //            options.UseSqlServer(
+            //                Configuration.GetConnectionString("DefaultConnection"), options => options.EnableRetryOnFailure()));
+            //        services.AddDbContext<ApplicationDbContext>(options =>
+            //options.UseSqlServer(
+            //    Configuration.GetConnectionString("DefaultConnection")));
 
             /////////////////////////////////////////////////////////////////////
             var dbHost = Environment.GetEnvironmentVariable("DB_HOST");
@@ -84,12 +88,29 @@ namespace AliantWebS
             ///////////////////////////////////////////////////////////
 
 
-            services.AddDefaultIdentity<IdentityUser>(options => options.SignIn.RequireConfirmedAccount = true)
-                .AddRoles<IdentityRole>() // Ensure roles are enabled
-                .AddEntityFrameworkStores<ApplicationDbContext>();
+
+            services.AddDefaultIdentity<ApplicationUser>(options =>
+{
+    options.SignIn.RequireConfirmedAccount = true;
+    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
+    options.Lockout.MaxFailedAccessAttempts = 5;
+    options.Lockout.AllowedForNewUsers = true;
+})
+    .AddRoles<IdentityRole>() // This enables role-based authorization
+    .AddEntityFrameworkStores<ApplicationDbContext>()
+    .AddDefaultTokenProviders()
+    // Invitation links get their own provider so they can outlive the 24 h that Identity's shared
+    // token lifespan gives password resets and e-mail confirmations.
+    .AddTokenProvider<InvitationTokenProvider<ApplicationUser>>(InvitationTokens.ProviderName);
+
+            services.Configure<InvitationTokenProviderOptions>(options =>
+            {
+                options.TokenLifespan = TimeSpan.FromDays(InvitationTokens.ExpiryDays(Configuration));
+            });
+
             services.AddRazorPages();
             services.AddServerSideBlazor();
-            services.AddScoped<AuthenticationStateProvider, RevalidatingIdentityAuthenticationStateProvider<IdentityUser>>();
+            services.AddScoped<AuthenticationStateProvider, RevalidatingIdentityAuthenticationStateProvider<ApplicationUser>>();
             services.AddDatabaseDeveloperPageExceptionFilter();
             services.AddSingleton<WeatherForecastService>();
             services.AddScoped<EntitiesService>();
@@ -102,8 +123,18 @@ namespace AliantWebS
             services.AddScoped<TooltipService>();
             services.AddScoped<ContextMenuService>();
 
+            // Email sender registration
+            services.AddTransient<IEmailSender<ApplicationUser>, EmailSender>();
+            // Also by concrete type: the invitation e-mail is not part of IEmailSender<T>.
+            services.AddTransient<EmailSender>();
+
             services.AddScoped<Data.AppData>();
             services.AddScoped<Data.DataUpdateService>();
+            services.AddScoped<Data.JournalService>();
+            // Owns every path under ScenariosData. Registered so no page has to build one by hand.
+            services.AddScoped<Data.ScenarioStorageService>();
+            // Produces the Word implantation study for a scenario.
+            services.AddScoped<Reporting.ReportGenerator>();
 
             /// for antares api
             /// 
@@ -126,13 +157,21 @@ namespace AliantWebS
                 options.MultipartBodyLengthLimit = 50 * 1024 * 1024;
             });
             services.AddSignalR(e => {
-                e.MaximumReceiveMessageSize = 40960000;
+                e.MaximumReceiveMessageSize = 1048576;
             });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
+            // Give the sensor calibration (y = C1·x + C0) a DbContext so InfluxService transforms
+            // raw values → reported values on every read (plots, gauges, charge ratios, export).
+            SensorCalibration.DbFactory = app.ApplicationServices.GetRequiredService<IDbContextFactory<AliantWebContext>>();
+            AppSettings.DbFactory = app.ApplicationServices.GetRequiredService<IDbContextFactory<AliantWebContext>>();
+
+            // Journal rows written by the background monitoring loop, which has no user and no scope.
+            JournalWriter.DbFactory = app.ApplicationServices.GetRequiredService<IDbContextFactory<AliantWebContext>>();
+
             var basePath = Environment.GetEnvironmentVariable("BasePath")
                ?? Configuration["BasePath"];
             if (!string.IsNullOrWhiteSpace(basePath))

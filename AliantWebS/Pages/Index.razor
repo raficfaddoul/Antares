@@ -2,13 +2,15 @@
 @using AliantWebS.Data
 @using Microsoft.Extensions.Configuration
 @using Microsoft.AspNetCore.Identity
-@using System.Threading;
+@using System.Threading
+@using Microsoft.Extensions.Localization
 
 @inject AppData appData;
 @inject IJSRuntime js
 @inject Blazored.LocalStorage.ILocalStorageService localStorage
 @inject NavigationManager navigationManager
 @inject RoleManager<IdentityRole> roleManager
+@inject IStringLocalizer<Languages> L
 @attribute [AllowAnonymous]
 @inject ReportsService ReportsService
 @inject HttpClient _httpClient
@@ -30,19 +32,19 @@
                         <img src="img/logo.png" alt="logo">
                     </div>
                     <div class="col-6 align-self-center text-right">
-                        <a href="#" class="text-white lead">About</a>
+                        <a href="#" class="text-white lead">@L["About"]</a>
                     </div>
                 </div>
             </header>
             <h1 data-aos="fade" data-aos-easing="linear" data-aos-duration="1000" data-aos-once="true" class="display-3 text-white font-weight-bold my-5">
-            	Aliant<br>
-            	Asset Management System
+            	@L["Agros"]<br>
+            	@L["Asset Monitoring System"]
             </h1>
 @*            <p data-aos="fade" data-aos-easing="linear" data-aos-duration="1000" data-aos-once="true" class="lead text-white my-4">
                 Lorem ipsum dolor sit amet, id nec enim autem oblique, ei dico mentitum duo.
                 <br> Illum iusto laoreet his te. Lorem partiendo mel ex. Ad vitae admodum voluptatum per.
             </p>*@
-        <a href="Structures" data-aos="fade" data-aos-easing="linear" data-aos-duration="100" data-aos-once="true" class="btn my-4 font-weight-bold atlas-cta cta-green">Get Started</a>
+        <a href="Structures" data-aos="fade" data-aos-easing="linear" data-aos-duration="100" data-aos-once="true" class="btn my-4 font-weight-bold atlas-cta cta-green">@L["Get Started"]</a>
 
         </div>
     </div>
@@ -73,7 +75,7 @@
         //     onNewReports: newReports =>
         //     {
         //         // We must switch to the Blazor UI thread (InvokeAsync) if we want to modify
-        //         // the component’s state from a background thread
+        //         // the component's state from a background thread
         //         InvokeAsync(() =>
         //         {
         //             reportsList.AddRange(newReports);
@@ -85,9 +87,6 @@
         // );
 
       //  List<Report> reports = new();
-
-
-
 
         //long fromTimestamp = 1731577300; // Replace this with your dynamic logic
         //reports = await ReportsService.GetReportsAsync(fromTimestamp, _httpClient);

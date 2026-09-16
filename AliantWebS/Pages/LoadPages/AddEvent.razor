@@ -4,6 +4,7 @@
 @inject EntitiesService entitiesService
 @inject NavigationManager NavigationManager
 @inject AppData appData
+@inject ScenarioStorageService scenarioStorage
 
 <NavigationLock OnBeforeInternalNavigation="appData.OnBeforeInternalNavigation" ConfirmExternalNavigation="appData.SaveConfirmation&& appData.SaveChanges" />
 
@@ -29,10 +30,21 @@
 
     protected async void CreateEvent()
     {
-  
         await entitiesService.InsertEntityAsync(eventt);
+
+        // Create the event's base folder. It carries the event id as well as its name, so renaming the
+        // event later moves this folder instead of stranding it.
+        try
+        {
+            scenarioStorage.GetEventDir(eventt);
+        }
+        catch (Exception ex)
+        {
+            // This method is async void, so a throw here would be unobservable. The event itself is
+            // already saved and the folder is recreated on demand, so a warning is enough.
+            Console.Error.WriteLine($"ScenariosData: création du dossier de l'événement impossible: {ex.Message}");
+        }
 
         NavigationManager.NavigateTo("Events");
     }
-
 }

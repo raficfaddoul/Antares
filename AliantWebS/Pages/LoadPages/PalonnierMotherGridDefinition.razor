@@ -1,0 +1,481 @@
+﻿@page "/PalonnierMotherGridDefinition/{StructureId:guid}"
+
+@using AliantWebS.Data
+@using Models
+@using Microsoft.EntityFrameworkCore
+@inject IStringLocalizer<Languages> L
+@inject IDbContextFactory<AliantWebContext> contextFactory
+@inject AppData appData
+@inject IJSRuntime js
+
+<NavigationLock OnBeforeInternalNavigation="appData.OnBeforeInternalNavigation" ConfirmExternalNavigation="appData.SaveConfirmation && appData.SaveChanges" />
+
+        
+<style>
+    .element-card {
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 15px;
+        background-color: #f9f9f9;
+    }
+
+    .palonnier-card {
+        border-left: 4px solid #28a745;
+    }
+
+    .mothergrid-card {
+        border-left: 4px solid #ffc107;
+    }
+
+    .element-type-badge {
+        background-color: #007bff;
+        color: white;
+        padding: 5px 10px;
+        border-radius: 5px;
+        font-size: 0.9em;
+    }
+
+    .tab-header-button {
+        margin-bottom: 15px;
+    }
+</style>
+
+<h3>@L["Définition des Palonniers et MotherGrids"]</h3>
+
+@if (elements == null)
+{
+    <p><em>@L["Loading"]...</em></p>
+}
+else
+{
+    <RadzenTabs>
+        <Tabs>
+            <RadzenTabsItem Text="@L["Palonniers"]">
+                <div style="margin-top: 20px;">
+                    <button class="btn btn-success tab-header-button" @onclick="AddPalonnier">
+                        <i class="oi oi-plus"></i> @L["Ajouter Palonnier"]
+                    </button>
+
+                    @if (palonnierElements.Count == 0)
+                    {
+                        <p><em>@L["Aucun palonnier défini"]</em></p>
+                    }
+
+                    @foreach (var element in palonnierElements)
+                    {
+                        <div class="element-card palonnier-card">
+                            <EditForm Model="@element">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <label>@L["Nom"]</label>
+                                        <InputText @bind-Value="element.Name" class="form-control" />
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label>@L["Type d'élément"]</label>
+                                        <InputSelect @bind-Value="element.ElementTypeId" class="form-control" 
+                                                   @onchange="@((e) => OnElementTypeChanged(element, e))">
+                                            <option value="@Guid.Empty">@L["Sélectionner..."]</option>
+                                            @foreach (var et in palonnierElementTypes)
+                                            {
+                                                <option value="@et.ElementTypeId">@et.Name</option>
+                                            }
+                                        </InputSelect>
+                                        @if (element.ElementType != null)
+                                        {
+                                            <span class="element-type-badge">@element.ElementType.Name</span>
+                                        }
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label>@L["Longueur (m)"]</label>
+                                        <input type="number" 
+                                               value="@GetLongueurValue(element)" 
+                                               @onchange="@((e) => OnLongueurChanged(element, e))"
+                                               class="form-control" 
+                                               step="0.01" />
+                                    </div>
+                                    <div class="col-md-1">
+                                        <label>&nbsp;</label>
+                                        <div>
+                                            <button type="button" class="btn btn-primary btn-sm" 
+                                                    @onclick="@(() => SaveElement(element))">
+                                                <i class="oi oi-check"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-danger btn-sm" 
+                                                    @onclick="@(() => DeleteElement(element))">
+                                                <i class="oi oi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </EditForm>
+                        </div>
+                    }
+                </div>
+            </RadzenTabsItem>
+
+            <RadzenTabsItem Text="@L["MotherGrids"]">
+                <div style="margin-top: 20px;">
+                    <button class="btn btn-warning tab-header-button" @onclick="AddMotherGrid">
+                        <i class="oi oi-plus"></i> @L["Ajouter MotherGrid"]
+                    </button>
+
+                    @if (motherGridElements.Count == 0)
+                    {
+                        <p><em>@L["Aucun mothergrid défini"]</em></p>
+                    }
+
+                    @foreach (var element in motherGridElements)
+                    {
+                        <div class="element-card mothergrid-card">
+                            <EditForm Model="@element">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <label>@L["Nom"]</label>
+                                        <InputText @bind-Value="element.Name" class="form-control" />
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label>@L["Type d'élément"]</label>
+                                        <InputSelect @bind-Value="element.ElementTypeId" class="form-control"
+                                                   @onchange="@((e) => OnElementTypeChanged(element, e))">
+                                            <option value="@Guid.Empty">@L["Sélectionner..."]</option>
+                                            @foreach (var et in motherGridElementTypes)
+                                            {
+                                                <option value="@et.ElementTypeId">@et.Name</option>
+                                            }
+                                        </InputSelect>
+                                        @if (element.ElementType != null)
+                                        {
+                                            <span class="element-type-badge">@element.ElementType.Name</span>
+                                        }
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label>@L["Longueur (m)"]</label>
+                                        <input type="number" 
+                                               value="@GetLongueurValue(element)" 
+                                               @onchange="@((e) => OnLongueurChanged(element, e))"
+                                               class="form-control" 
+                                               step="0.01" />
+                                    </div>
+                                    <div class="col-md-1">
+                                        <label>&nbsp;</label>
+                                        <div>
+                                            <button type="button" class="btn btn-primary btn-sm" 
+                                                    @onclick="@(() => SaveElement(element))">
+                                                <i class="oi oi-check"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-danger btn-sm" 
+                                                    @onclick="@(() => DeleteElement(element))">
+                                                <i class="oi oi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </EditForm>
+                        </div>
+                    }
+                </div>
+            </RadzenTabsItem>
+        </Tabs>
+    </RadzenTabs>
+}
+
+@code {
+    [Parameter]
+    public Guid StructureId { get; set; }
+
+    private List<Element> elements = new List<Element>();
+    private List<Element> palonnierElements = new List<Element>();
+    private List<Element> motherGridElements = new List<Element>();
+
+    private List<ElementType> palonnierElementTypes = new List<ElementType>();
+    private List<ElementType> motherGridElementTypes = new List<ElementType>();
+
+    private AttributeType longueurAttributeType;
+
+    // Dictionary to store longueur values temporarily
+    private Dictionary<Guid, double> longueurValues = new Dictionary<Guid, double>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        using var context = await contextFactory.CreateDbContextAsync();
+
+        //  Get the "Longueur" AttributeType - Single query
+        longueurAttributeType = await context.AttributeTypes
+            .AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Name == "Longeur");
+
+        if (longueurAttributeType == null)
+        {
+            await js.InvokeVoidAsync("alert", "AttributeType 'Longeur' n'existe pas dans la base de données!");
+            return;
+        }
+
+        //  Load ElementTypes with Category = "MotherGridPalonnier" and include AttributeTypeElementTypes
+        // Filter directly to check if they have the "Longeur" attribute
+        var allElementTypes = await context.ElementTypes
+            .AsNoTracking()
+            .Include(et => et.Category)
+            .Include(et => et.AttributeTypeElementTypes.Where(ate => ate.AttributeTypeId == longueurAttributeType.AttributeTypeId))
+            .Where(et => et.Category.Name == "MotherGridPalonnier" &&
+                        et.AttributeTypeElementTypes.Any(ate => ate.AttributeTypeId == longueurAttributeType.AttributeTypeId))
+            .ToListAsync();
+
+        if (allElementTypes == null || allElementTypes.Count == 0)
+        {
+            await js.InvokeVoidAsync("alert", "Aucun ElementType trouvé pour la catégorie 'MotherGridPalonnier' avec l'attribut 'Longeur'!");
+            return;
+        }
+
+        // Separate into palonniers and mothergrids
+        palonnierElementTypes = allElementTypes
+            .Where(et => et.Description?.ToLower().Contains("palonnier") == true || et.Name?.ToLower().Contains("palonnier") == true)
+            .ToList();
+
+        motherGridElementTypes = allElementTypes
+            .Where(et => et.Description?.ToLower().Contains("mothergrid") == true || et.Name?.ToLower().Contains("mothergrid") == true)
+            .ToList();
+
+        await LoadElements();
+    }
+
+    private async Task LoadElements()
+    {
+        using var context = await contextFactory.CreateDbContextAsync();
+
+        // Get all element type IDs that belong to "MotherGridPalonnier" category
+        var motherGridPalonnierTypeIds = palonnierElementTypes.Select(et => et.ElementTypeId)
+            .Concat(motherGridElementTypes.Select(et => et.ElementTypeId))
+            .Distinct()
+            .ToList();
+
+        //  Optimized: Single query with all includes and filtering done in SQL
+        elements = await context.Elements
+            .AsNoTracking()
+            .Include(e => e.ElementType)
+                .ThenInclude(et => et.Category)
+            .Include(e => e.AttributeElements.Where(ae => ae.AttributeTypeId == longueurAttributeType.AttributeTypeId))
+                .ThenInclude(ae => ae.AttributeType)
+            .Where(e => e.StructureId == StructureId && 
+                       motherGridPalonnierTypeIds.Contains(e.ElementTypeId.Value))
+            .ToListAsync();
+
+        if (elements != null && elements.Count > 0)
+        {
+            // Separate palonniers and mothergrids based on ElementType
+            palonnierElements = elements.Where(e => 
+                palonnierElementTypes.Any(pet => pet.ElementTypeId == e.ElementTypeId)).ToList();
+            
+            motherGridElements = elements.Where(e => 
+                motherGridElementTypes.Any(met => met.ElementTypeId == e.ElementTypeId)).ToList();
+
+            // Load longueur values into dictionary
+            foreach (var element in elements)
+            {
+                var longueurAttr = element.AttributeElements?.FirstOrDefault();
+                
+                if (longueurAttr != null && double.TryParse(longueurAttr.Value, 
+                    System.Globalization.NumberStyles.Any, 
+                    System.Globalization.CultureInfo.InvariantCulture, 
+                    out double longueur))
+                {
+                    longueurValues[element.ElementId] = longueur;
+                }
+            }
+        }
+    }
+
+    private async Task AddPalonnier()
+    {
+        var newElement = new Element
+        {
+            ElementId = Guid.NewGuid(),
+            StructureId = StructureId,
+            Name = $"Palonnier_{palonnierElements.Count + 1}",
+            ElementTypeId = palonnierElementTypes.FirstOrDefault()?.ElementTypeId ?? Guid.Empty,
+            AttributeElements = new List<AttributeElement>()
+        };
+
+        palonnierElements.Add(newElement);
+        longueurValues[newElement.ElementId] = 0;
+        StateHasChanged();
+    }
+
+    private async Task AddMotherGrid()
+    {
+        var newElement = new Element
+        {
+            ElementId = Guid.NewGuid(),
+            StructureId = StructureId,
+            Name = $"MotherGrid_{motherGridElements.Count + 1}",
+            ElementTypeId = motherGridElementTypes.FirstOrDefault()?.ElementTypeId ?? Guid.Empty,
+            AttributeElements = new List<AttributeElement>()
+        };
+
+        motherGridElements.Add(newElement);
+        longueurValues[newElement.ElementId] = 0;
+        StateHasChanged();
+    }
+
+    private double GetLongueurValue(Element element)
+    {
+        if (longueurValues.TryGetValue(element.ElementId, out double value))
+        {
+            return value;
+        }
+        return 0;
+    }
+
+    private void OnLongueurChanged(Element element, ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), 
+            System.Globalization.NumberStyles.Any, 
+            System.Globalization.CultureInfo.InvariantCulture, 
+            out double longueur))
+        {
+            longueurValues[element.ElementId] = longueur;
+        }
+    }
+
+    private async Task OnElementTypeChanged(Element element, ChangeEventArgs e)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out Guid elementTypeId))
+        {
+            element.ElementTypeId = elementTypeId;
+            element.ElementType = palonnierElementTypes.Concat(motherGridElementTypes)
+                .FirstOrDefault(et => et.ElementTypeId == elementTypeId);
+            StateHasChanged();
+        }
+    }
+
+    private async Task SaveElement(Element element)
+    {
+        try
+        {
+            if (element.ElementTypeId == Guid.Empty)
+            {
+                await js.InvokeVoidAsync("alert", "Veuillez sélectionner un type d'élément!");
+                return;
+            }
+
+            try
+            {
+                await WriteElement(element);
+            }
+            catch (DbUpdateException ex) when (EntitiesService.IsUniqueViolation(ex))
+            {
+                // Another save wrote this element or its Longueur between this one's read and its insert (a
+                // second click on the button before the first had finished, or another user), and the key or the
+                // unique index on (ElementID, AttributeTypeID) refused the duplicate. The rows are there now:
+                // read again in a fresh context, which updates them.
+                await WriteElement(element);
+            }
+
+            await js.InvokeVoidAsync("alert", "Élément sauvegardé avec succès!");
+            await LoadElements();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            await js.InvokeVoidAsync("alert", $"Erreur: {ex.Message}");
+        }
+    }
+
+    private async Task WriteElement(Element element)
+    {
+        using var context = await contextFactory.CreateDbContextAsync();
+
+        // Check if element already exists in database
+        var existingElement = await context.Elements.FindAsync(element.ElementId);
+
+        if (existingElement == null)
+        {
+            // Insert new element
+            context.Elements.Add(element);
+        }
+        else
+        {
+            // Update existing element
+            context.Entry(existingElement).CurrentValues.SetValues(element);
+        }
+
+        // Save or update AttributeElement for Longueur
+        await SaveLongueurAttribute(context, element);
+
+        await context.SaveChangesAsync();
+    }
+
+    private async Task SaveLongueurAttribute(AliantWebContext context, Element element)
+    {
+        if (!longueurValues.TryGetValue(element.ElementId, out double longueur))
+        {
+            return;
+        }
+
+        // Find existing AttributeElement for Longueur
+        var existingAttr = await context.AttributeElements
+            .FirstOrDefaultAsync(ae => ae.ElementId == element.ElementId && 
+                                      ae.AttributeTypeId == longueurAttributeType.AttributeTypeId);
+
+        var longueurString = longueur.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        if (existingAttr != null)
+        {
+            // Update existing
+            existingAttr.Value = longueurString;
+            context.Entry(existingAttr).State = EntityState.Modified;
+        }
+        else
+        {
+            // Create new
+            var newAttr = new AttributeElement
+            {
+                AttributeElementId = Guid.NewGuid(),
+                ElementId = element.ElementId,
+                AttributeTypeId = longueurAttributeType.AttributeTypeId,
+                Value = longueurString,
+                Date = DateOnly.FromDateTime(DateTime.Now)
+            };
+            context.AttributeElements.Add(newAttr);
+        }
+    }
+
+    private async Task DeleteElement(Element element)
+    {
+        var confirmed = await js.InvokeAsync<bool>("confirm", "Êtes-vous sûr de vouloir supprimer cet élément?");
+        if (!confirmed) return;
+
+        try
+        {
+            using var context = await contextFactory.CreateDbContextAsync();
+
+            // Delete AttributeElements first
+            var attributes = await context.AttributeElements
+                .Where(ae => ae.ElementId == element.ElementId)
+                .ToListAsync();
+            
+            context.AttributeElements.RemoveRange(attributes);
+
+            // Delete the element
+            var elementToDelete = await context.Elements.FindAsync(element.ElementId);
+            if (elementToDelete != null)
+            {
+                context.Elements.Remove(elementToDelete);
+                await context.SaveChangesAsync();
+
+                palonnierElements.Remove(element);
+                motherGridElements.Remove(element);
+                longueurValues.Remove(element.ElementId);
+                StateHasChanged();
+            }
+            else
+            {
+                await js.InvokeVoidAsync("alert", "Erreur lors de la suppression!");
+            }
+        }
+        catch (Exception ex)
+        {
+            await js.InvokeVoidAsync("alert", $"Erreur: {ex.Message}");
+        }
+    }
+}

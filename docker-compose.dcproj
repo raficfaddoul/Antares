@@ -10,12 +10,18 @@
     <DockerServiceName>aliantwebs</DockerServiceName>
   </PropertyGroup>
   <ItemGroup>
+    <None Include="docker-compose-deprecated.portainer.yml" />
     <None Include="docker-compose.override.yml">
       <DependentUpon>docker-compose.yml</DependentUpon>
     </None>
+    <None Include="docker-compose.portainer.yml" />
     <None Include="docker-compose.yml" />
     <None Include=".dockerignore" />
+    <None Include="Dockerfile" />
+    <None Include="Dockerfile.dbfiles" />
     <None Include="nginx nginx.conf" />
     <None Include="nginx.conf" />
+    <None Include="Pages\AntaresConceptionLayout.razor" />
+    <None Include="Pages\LoadPages\ChargeMPComponent.razor" />
   </ItemGroup>
 </Project>

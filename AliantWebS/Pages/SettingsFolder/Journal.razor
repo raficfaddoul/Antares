@@ -1,0 +1,409 @@
+@page "/settingsFolder/journal"
+@using AliantWebS.Data
+@using AliantWebS.Models
+@using Microsoft.EntityFrameworkCore
+@using System.Text
+@using System.Globalization
+@inject IDbContextFactory<AliantWebContext> dbContextFactory
+@inject JournalService journal
+@inject AppData appData
+@inject NavigationManager navigationManager
+@inject IStringLocalizer<Languages> L
+@inject IJSRuntime js
+
+<style>
+    .jr-container { padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+    .jr-card { background: white; border-radius: 15px; box-shadow: 0 10px 40px rgba(0,0,0,.1); padding: 30px; margin-bottom: 20px; }
+    .jr-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 18px; border-bottom: 3px solid #667eea; }
+    .jr-title { font-size: 30px; font-weight: 700; color: #2d3748; margin: 0; }
+    .jr-sub { color: #718096; font-size: 14px; margin-top: 5px; }
+    .btn-modern { padding: 10px 20px; border: none; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+    .btn-primary-modern { background: linear-gradient(135deg,#667eea,#764ba2); color: #fff; }
+    .btn-secondary-modern { background: #e2e8f0; color: #4a5568; }
+    .btn-danger-modern { background: linear-gradient(135deg,#f56565,#c53030); color: #fff; }
+    .btn-modern:disabled { opacity: .5; cursor: not-allowed; }
+
+    .filters { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end; background: #f7fafc; border-radius: 10px; padding: 16px 18px; margin-bottom: 18px; }
+    .filters .fld { display: flex; flex-direction: column; gap: 4px; }
+    .filters label { font-size: 12px; font-weight: 600; color: #4a5568; text-transform: uppercase; letter-spacing: .3px; }
+    .filters input, .filters select { padding: 7px 10px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 14px; background: #fff; }
+
+    .jr-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .jr-table th { text-align: left; padding: 10px 12px; background: #f7fafc; color: #4a5568; font-weight: 600; border-bottom: 2px solid #e2e8f0; position: sticky; top: 0; }
+    .jr-table td { padding: 8px 12px; border-bottom: 1px solid #edf2f7; vertical-align: top; }
+    .jr-table tr.sev1 td { background: #fffbeb; }
+    .jr-table tr.sev2 td { background: #fff5f5; }
+    .cat { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; background: #edf2f7; color: #2d3748; }
+    .act { font-family: Consolas, monospace; font-size: 12px; color: #4a5568; }
+    .who { font-weight: 600; color: #2d3748; }
+    .who-mail { font-size: 11px; color: #a0aec0; }
+    .details { color: #4a5568; white-space: pre-wrap; word-break: break-word; max-width: 460px; }
+    .pager { display: flex; gap: 10px; align-items: center; justify-content: flex-end; margin-top: 14px; font-size: 14px; color: #4a5568; }
+    .scroll { max-height: 62vh; overflow: auto; border: 1px solid #e2e8f0; border-radius: 10px; }
+</style>
+
+<div class="jr-container">
+    <div class="jr-card">
+        <div class="jr-header">
+            <div>
+                <h1 class="jr-title">@L["Journal des actions"]</h1>
+                <p class="jr-sub">@L["Qui a fait quoi, et quand. Seules les actions volontaires des utilisateurs sont enregistrées."]</p>
+            </div>
+            <button type="button" class="btn-modern btn-secondary-modern" @onclick="Cancel">← @L["Back"]</button>
+        </div>
+
+        <div class="filters">
+            <div class="fld">
+                <label>@L["Du"]</label>
+                <input type="date" @bind="fromDate" />
+            </div>
+            <div class="fld">
+                <label>@L["Au"]</label>
+                <input type="date" @bind="toDate" />
+            </div>
+            <div class="fld">
+                <label>@L["Catégorie"]</label>
+                <select @bind="filterCategory">
+                    <option value="">@L["Toutes"]</option>
+                    @foreach (var c in categories)
+                    {
+                        <option value="@c">@c</option>
+                    }
+                </select>
+            </div>
+            <div class="fld">
+                <label>@L["Utilisateur"]</label>
+                <select @bind="filterUser">
+                    <option value="">@L["Tous"]</option>
+                    @foreach (var u in users)
+                    {
+                        <option value="@u">@u</option>
+                    }
+                </select>
+            </div>
+            <div class="fld">
+                <label>@L["Recherche"]</label>
+                <input type="text" @bind="searchText" @bind:event="oninput" placeholder="@L["action, cible, détails…"]" style="width:220px;" />
+            </div>
+            <div class="fld">
+                <label>@L["Par page"]</label>
+                <select @bind="pageSize">
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                    <option value="250">250</option>
+                </select>
+            </div>
+
+            <button type="button" class="btn-modern btn-primary-modern" @onclick="ApplyFilters" disabled="@isLoading">
+                <span>🔍</span> @L["Filtrer"]
+            </button>
+            <button type="button" class="btn-modern btn-secondary-modern" @onclick="ResetFilters" disabled="@isLoading">
+                @L["Réinitialiser"]
+            </button>
+            <button type="button" class="btn-modern btn-secondary-modern" @onclick="ExportCsv" disabled="@(isLoading || totalCount == 0)">
+                <span>📄</span> @L["Exporter CSV"]
+            </button>
+
+            @if (isAdministrator)
+            {
+                <button type="button" class="btn-modern btn-danger-modern" @onclick="PurgeOld" disabled="@isLoading">
+                    <span>🗑️</span> @L["Purger"]
+                </button>
+                <div class="fld">
+                    <label>@L["Conserver (jours)"]</label>
+                    <input type="number" min="1" @bind="retentionDays" style="width:90px;" />
+                </div>
+            }
+        </div>
+
+        @if (isLoading)
+        {
+            <p><em>@L["Loading..."]</em></p>
+        }
+        else if (rows.Count == 0)
+        {
+            <p style="color:#718096;">@L["Aucune entrée pour ces critères."]</p>
+        }
+        else
+        {
+            <div class="scroll">
+                <table class="jr-table">
+                    <thead>
+                        <tr>
+                            <th style="width:150px;">@L["Date"]</th>
+                            <th style="width:190px;">@L["Utilisateur"]</th>
+                            <th style="width:120px;">@L["Catégorie"]</th>
+                            <th style="width:170px;">@L["Action"]</th>
+                            <th style="width:220px;">@L["Cible"]</th>
+                            <th>@L["Détails"]</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in rows)
+                        {
+                            <tr class="@(r.Severity == 2 ? "sev2" : r.Severity == 1 ? "sev1" : "")">
+                                <td style="white-space:nowrap;">@r.Timestamp.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                <td>
+                                    @if (string.IsNullOrWhiteSpace(r.UserName))
+                                    {
+                                        <span style="color:#a0aec0;">@L["inconnu"]</span>
+                                    }
+                                    else
+                                    {
+                                        <div class="who">@r.UserName</div>
+                                        @if (!string.IsNullOrWhiteSpace(r.UserEmail) && r.UserEmail != r.UserName)
+                                        {
+                                            <div class="who-mail">@r.UserEmail</div>
+                                        }
+                                    }
+                                </td>
+                                <td><span class="cat">@r.Category</span></td>
+                                <td><span class="act">@r.Action</span></td>
+                                <td>@r.Target</td>
+                                <td class="details">@r.Details</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="pager">
+                <span>@L["Entrées"] @(FirstShown)–@(LastShown) / @totalCount</span>
+                <button type="button" class="btn-modern btn-secondary-modern" @onclick="PrevPage" disabled="@(pageIndex == 0)">←</button>
+                <span>@L["Page"] @(pageIndex + 1) / @Math.Max(1, PageCount)</span>
+                <button type="button" class="btn-modern btn-secondary-modern" @onclick="NextPage" disabled="@(pageIndex + 1 >= PageCount)">→</button>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private List<JournalEntry> rows = new();
+    private List<string> categories = new();
+    private List<string> users = new();
+
+    private DateTime? fromDate;
+    private DateTime? toDate;
+    private string filterCategory = "";
+    private string filterUser = "";
+    private string searchText = "";
+
+    private int pageSize = 50;
+    private int pageIndex = 0;
+    private int totalCount = 0;
+
+    private int retentionDays = 365;
+    private bool isAdministrator = false;
+    private bool isLoading = true;
+
+    private int PageCount => (int)Math.Ceiling(totalCount / (double)Math.Max(1, pageSize));
+    private int FirstShown => totalCount == 0 ? 0 : pageIndex * pageSize + 1;
+    private int LastShown => Math.Min(totalCount, (pageIndex + 1) * pageSize);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var role = await appData.GetRole();
+        isAdministrator = role == "Administrator";
+
+        retentionDays = await AppSettings.GetIntAsync("journal.retentionDays", 365);
+
+        // Default window: the last month, so the page never opens on a full-table scan.
+        toDate = DateTime.Today;
+        fromDate = DateTime.Today.AddMonths(-1);
+
+        await LoadLookupsAsync();
+        await LoadAsync();
+    }
+
+    /// <summary>Distinct categories and users, so the dropdowns show what is actually in the table.</summary>
+    private async Task LoadLookupsAsync()
+    {
+        try
+        {
+            using var db = await dbContextFactory.CreateDbContextAsync();
+
+            categories = await db.Journal.Where(j => j.Category != null)
+                .Select(j => j.Category).Distinct().OrderBy(c => c).ToListAsync();
+
+            users = await db.Journal.Where(j => j.UserName != null)
+                .Select(j => j.UserName).Distinct().OrderBy(u => u).ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Journal page] lookups failed: {ex.Message}");
+        }
+    }
+
+    private IQueryable<JournalEntry> Build(AliantWebContext db)
+    {
+        var q = db.Journal.AsNoTracking().AsQueryable();
+
+        if (fromDate.HasValue) q = q.Where(j => j.Timestamp >= fromDate.Value.Date);
+        if (toDate.HasValue) q = q.Where(j => j.Timestamp < toDate.Value.Date.AddDays(1));
+        if (!string.IsNullOrWhiteSpace(filterCategory)) q = q.Where(j => j.Category == filterCategory);
+        if (!string.IsNullOrWhiteSpace(filterUser)) q = q.Where(j => j.UserName == filterUser);
+
+        if (!string.IsNullOrWhiteSpace(searchText))
+        {
+            var s = searchText.Trim();
+            q = q.Where(j => (j.Action != null && EF.Functions.Like(j.Action, $"%{s}%"))
+                          || (j.Target != null && EF.Functions.Like(j.Target, $"%{s}%"))
+                          || (j.Details != null && EF.Functions.Like(j.Details, $"%{s}%")));
+        }
+
+        return q;
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        try
+        {
+            using var db = await dbContextFactory.CreateDbContextAsync();
+            var q = Build(db);
+
+            totalCount = await q.CountAsync();
+
+            // Clamp the page: a filter change can leave the index past the end.
+            if (pageIndex > 0 && pageIndex >= PageCount) pageIndex = Math.Max(0, PageCount - 1);
+
+            rows = await q.OrderByDescending(j => j.Timestamp).ThenByDescending(j => j.JournalId)
+                          .Skip(pageIndex * pageSize).Take(pageSize)
+                          .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            rows = new List<JournalEntry>();
+            totalCount = 0;
+            await js.InvokeVoidAsync("alert", $"Erreur de lecture du journal : {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ApplyFilters()
+    {
+        pageIndex = 0;
+        await LoadAsync();
+    }
+
+    private async Task ResetFilters()
+    {
+        filterCategory = "";
+        filterUser = "";
+        searchText = "";
+        toDate = DateTime.Today;
+        fromDate = DateTime.Today.AddMonths(-1);
+        pageIndex = 0;
+        await LoadAsync();
+    }
+
+    private async Task PrevPage()
+    {
+        if (pageIndex == 0) return;
+        pageIndex--;
+        await LoadAsync();
+    }
+
+    private async Task NextPage()
+    {
+        if (pageIndex + 1 >= PageCount) return;
+        pageIndex++;
+        await LoadAsync();
+    }
+
+    /// <summary>Exports every row matching the current filter, not just the page on screen.</summary>
+    private async Task ExportCsv()
+    {
+        try
+        {
+            using var db = await dbContextFactory.CreateDbContextAsync();
+            var all = await Build(db).OrderByDescending(j => j.Timestamp).ThenByDescending(j => j.JournalId)
+                                     .ToListAsync();
+
+            var sb = new StringBuilder();
+            sb.AppendLine("Date;Utilisateur;Email;Categorie;Action;Cible;Details;Severite");
+
+            foreach (var r in all)
+            {
+                sb.AppendLine(string.Join(';', new[]
+                {
+                    Csv(r.Timestamp.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)),
+                    Csv(r.UserName), Csv(r.UserEmail), Csv(r.Category), Csv(r.Action),
+                    Csv(r.Target), Csv(r.Details), r.Severity.ToString(CultureInfo.InvariantCulture)
+                }));
+            }
+
+            var name = $"journal_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+            await js.InvokeVoidAsync("downloadTextFile", name, sb.ToString());
+
+            await journal.WriteAsync(JournalCategory.Donnees, "journal.export", name,
+                                     $"{all.Count} entrée(s) exportée(s)");
+        }
+        catch (Exception ex)
+        {
+            await js.InvokeVoidAsync("alert", $"Erreur d'export : {ex.Message}");
+        }
+    }
+
+    private static string Csv(string v)
+    {
+        if (string.IsNullOrEmpty(v)) return "";
+        // Semicolon-separated for Excel in a comma-decimal locale; quote anything that could break a row.
+        v = v.Replace("\"", "\"\"").Replace("\r", " ").Replace("\n", " ");
+        return v.Contains(';') || v.Contains('"') ? $"\"{v}\"" : v;
+    }
+
+    private async Task PurgeOld()
+    {
+        if (!isAdministrator) return;
+        if (retentionDays < 1)
+        {
+            await js.InvokeVoidAsync("alert", L["Indiquez un nombre de jours supérieur à 0."].Value);
+            return;
+        }
+
+        var cutoff = DateTime.Now.Date.AddDays(-retentionDays);
+
+        int toDelete;
+        using (var db = await dbContextFactory.CreateDbContextAsync())
+            toDelete = await db.Journal.CountAsync(j => j.Timestamp < cutoff);
+
+        if (toDelete == 0)
+        {
+            await js.InvokeVoidAsync("alert", L["Aucune entrée antérieure à cette date."].Value);
+            return;
+        }
+
+        var ok = await js.InvokeAsync<bool>("confirm",
+            $"{L["Supprimer définitivement"]} {toDelete} {L["entrée(s) antérieure(s) au"]} {cutoff:yyyy-MM-dd} ?");
+        if (!ok) return;
+
+        try
+        {
+            using (var db = await dbContextFactory.CreateDbContextAsync())
+            {
+                await db.Database.ExecuteSqlRawAsync("DELETE FROM Journal WHERE Timestamp < {0}", cutoff);
+            }
+
+            await AppSettings.SetAsync("journal.retentionDays", retentionDays,
+                                       "Rétention du journal des actions, en jours");
+
+            // The purge is journaled itself, so a gap in the history is always accounted for.
+            await journal.WriteAsync(JournalCategory.Configuration, "journal.purge",
+                                     $"< {cutoff:yyyy-MM-dd}", $"{toDelete} entrée(s) supprimée(s)", severity: 1);
+
+            await LoadLookupsAsync();
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            await js.InvokeVoidAsync("alert", $"Erreur de purge : {ex.Message}");
+        }
+    }
+
+    private void Cancel() => navigationManager.NavigateTo("/settings");
+}

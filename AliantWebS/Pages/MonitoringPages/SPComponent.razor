@@ -58,11 +58,7 @@
                                     <Template Context="sourceType">
                                         <Div Style="display: flex">
                                             <Label>@sourceType</Label>
-                                            @if (sourceType == "Simulation")
-                                            {
-                                                <RadzenButton Click=@(args => OnClick("Extra Small button with text and icon")) Size=" ButtonSize.ExtraSmall" Style="margin:10px;">Parameters</RadzenButton>
 
-                                            }
                                             @if (sourceType == "Live")
                                             {
                                                 <Div Style="display: flex; margin-left: auto;">
@@ -1204,18 +1200,7 @@
         appData.OnBeforeInternalNavigation(context);
     }
 
-    private async Task OnClick(string text)
-    {
-        await DialogService.OpenAsync<SimPaComponent>($"Simulation Parameters",
-    new Dictionary<string, object>() { { "simPa", simPa } ,
-    {"LoadCases",loadCases},
-    {"SelectedLoadCases", selectedLoadCases},
-    {"Coeficients", coeficients}
-            },
-       new DialogOptions() { Width = "700px", Height = "570px" });
-        //NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Info, Summary = "Button Clicked", Detail = text });
-        simpaChanged = true;
-    }
+
 
     private void UpdateUI(string chartType, string name)
     {

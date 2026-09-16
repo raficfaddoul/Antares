@@ -2,6 +2,7 @@
 @inject EntitiesService entitiesService
 @using Models
 @inject AliantWebS.Data.AppData AppData
+@implements IDisposable
 
 @typeparam Titem1
 @typeparam Titem2
@@ -24,7 +25,7 @@
 
       
                 <RadzenDataGrid @ref="AttributesGrid" AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="10" RowSelect=@RowSelect
-                            Data="@attributeElementsList" TItem="Titem1" ColumnWidth="90px" AllowColumnResize="true" RowEdit=@RowChanged RowDeselect=@RowDeselect>
+                            Data="@attributeElementsList" TItem="Titem1" ColumnWidth="90px" AllowColumnResize="true" RowEdit=@RowChanged RowDeselect=@RowDeselect RowRender=@RowRender>
                     <Columns>
                         <RadzenDataGridColumn TItem="Titem1" Title="Attribute">
                             <Template Context="attributeElement">
@@ -110,7 +111,19 @@
     IEnumerable<AttributeType> attributeTypesList;
     ICollection<Titem1> attributeElementsList;
 
-   
+    // The attribute types linked to the element's type, and the type they were read for. A row whose
+    // attribute type is not among them is greyed and read-only: the type no longer asks for it, but the
+    // value the row holds is still shown rather than hidden or lost.
+    HashSet<Guid> linkedAttributeTypeIds = new HashSet<Guid>();
+    Guid? linkedAttributeTypesFor;
+
+    object _ensuredForElementId = null;
+
+    // Every placeholder pass takes the next number, so an older pass still awaiting an insert can tell
+    // a newer one has started (A, then B, then A again before the first pass finished) and stop.
+    int _passNumber;
+    bool _disposed;
+
 
     void OnChange(string args, Titem1 attributeElement)
     {
@@ -136,7 +149,13 @@
 
         elementTypeID = (Guid?)reflexion(element, CallerTypeIdName);
 
-        if (elementTypeID is null) return;
+        if (elementTypeID is null)
+        {
+            // No type (cleared in the dropdown): nothing is expected, so the rows still shown are read-only
+            // as well (IsUnlinked).
+            CancelEditOfUnlinkedRows();
+            return;
+        }
 
         somethingToPresent = true;
         entitiesService.LoadCollection(element, JunctionPropName);
@@ -149,25 +168,78 @@
 
         title = CallerTypeName + " " + elementID + " Attributes";
 
+        Guid? requestedTypeId = elementTypeID;
+
         IEnumerable<Titem3> ertet = await entitiesService.GetFilteredEntitiesAsync<Titem3>(a => ((Guid?)reflexion(a, CallerTypeIdName)) == elementTypeID, "AttributeType");
 
         attributeTypesList = ertet.Select(x => (AttributeType)reflexion(x, "AttributeType"));
 
-        //  attributeTypesList = await entitiesService.GetFilteredEntitiesAsync<AttributeType>(a => AttributeTypeIDsList.Contains(a.AttributeTypeId));
+        // Read again on every call, since the user can pick another type in the dropdown at any time, but
+        // only kept if no newer call started while this one awaited: an older type's links would overwrite
+        // the newer ones.
+        if (requestedTypeId == elementTypeID)
+        {
+            linkedAttributeTypeIds = ertet.Select(x => (Guid)reflexion(x, "AttributeTypeId")).ToHashSet();
+            linkedAttributeTypesFor = requestedTypeId;
+            CancelEditOfUnlinkedRows();
+        }
 
-        ///rafic te be reviewd for optimality
-   
-            foreach (var v in attributeTypesList)
+        // Create the attribute rows this element's type expects but doesn't have yet. SetParametersAsync
+        // runs on every render of the parent, so the pass runs once per element; the guard is keyed on
+        // the element rather than a flag because the instance is reused when the user moves to the next
+        // one. A pass must never write a row under any element but the one it started for, so it works
+        // on its own copies of the id, the list and the types, and stops when the user moves on.
+        // This guard is not what keeps duplicates out: for elements the unique index on
+        // (ElementID, AttributeTypeID) is. The duplicates found in 2026-09 came from AddElementComponent
+        // and the TreeView paste, not from here.
+        if (!Equals(_ensuredForElementId, elementID))
+        {
+            _ensuredForElementId = elementID;
+
+            object ownerId = elementID;
+            var ownerAttributes = attributeElementsList;
+            var expectedTypes = attributeTypesList.ToList();
+            int pass = ++_passNumber;
+            bool attempted = false;
+
+            var existing = new HashSet<Guid>(
+                ownerAttributes.Select(x => (Guid)reflexion(x, "AttributeTypeId")));
+
+            // These empty placeholder rows are bookkeeping triggered by merely opening an element,
+            // not something the user chose to do — keep them out of the journal.
+            entitiesService.SuppressJournal = true;
+            try
             {
-                if (!attributeElementsList.Select(x => (Guid)reflexion(x, "AttributeTypeId")).Contains(v.AttributeTypeId))
+                foreach (var v in expectedTypes)
                 {
-                    await InsertAttributeElement(v.AttributeTypeId);
+                    // Each insert awaits, and meanwhile the user may have opened another element or left
+                    // the page. Stopping is safe: coming back to this element runs the pass again, since
+                    // the guard key has moved on with the user.
+                    if (_disposed || pass != _passNumber || !Equals(elementID, ownerId)) break;
 
+                    // Add() is false when the element already has it, and also stops a type that is
+                    // linked twice to the element type from producing two rows.
+                    if (v != null && existing.Add(v.AttributeTypeId))
+                    {
+                        attempted = true;
+                        await InsertAttributeElement(v.AttributeTypeId, ownerId, ownerAttributes);
+                    }
                 }
-                //    entitiesService.LoadReference(v, "AttributeType");
+            }
+            finally
+            {
+                // A newer pass set the flag itself and clears it when it ends.
+                if (pass == _passNumber) entitiesService.SuppressJournal = false;
             }
 
-       
+            // The grid only sees rows added to its collection once reloaded. Before its first render it
+            // is still null, and that first render shows them anyway.
+            if (attempted && !_disposed && AttributesGrid != null)
+            {
+                await AttributesGrid.Reload();
+            }
+        }
+
         StateHasChanged();
     }
 
@@ -182,41 +254,93 @@
 
     void EditRow(Titem1 attributeElement)
     {
+        if (IsUnlinked(attributeElement)) return;
+
         AttributesGrid.EditRow(attributeElement);
     }
 
-    async Task InsertAttributeElement(Guid AttributeTypeID)
+    bool IsUnlinked(Titem1 attributeElement)
+    {
+        // The grid can still hold a row of the element the user just left, selected or in edit mode. It was
+        // judged against its own element's type when it got there, so it carries on as before.
+        if (attributeElementsList is null || !attributeElementsList.Contains(attributeElement)) return false;
+
+        // No type picked, or the links of the one just picked are not read yet: nothing says the row is
+        // expected.
+        if (linkedAttributeTypesFor != elementTypeID) return true;
+
+        return !(reflexion(attributeElement, "AttributeTypeId") is Guid typeId && linkedAttributeTypeIds.Contains(typeId));
+    }
+
+    void RowRender(RowRenderEventArgs<Titem1> args)
+    {
+        if (!IsUnlinked(args.Data)) return;
+
+        // A style rather than a class: the grid puts its own class on the row (selected, in edit mode), and
+        // a class given here would replace it.
+        args.Attributes["style"] = "opacity: 0.5;";
+        args.Attributes["title"] = $"This attribute is no longer expected for the {CallerTypeName?.ToLowerInvariant()} type, so its value is kept read-only.";
+    }
+
+    // A row being edited when its type stops being linked leaves edit mode, or its value box would stay
+    // open on a row that is now read-only. The greying needs no grid Reload: RowRender runs each time the
+    // grid renders its rows, which this component's next render makes it do, and the rows are unchanged.
+    void CancelEditOfUnlinkedRows()
+    {
+        if (_disposed || AttributesGrid is null || attributeElementsList is null) return;
+
+        foreach (var row in attributeElementsList.Where(r => AttributesGrid.IsRowInEditMode(r) && IsUnlinked(r)).ToList())
+        {
+            AttributesGrid.CancelEditRow(row);
+        }
+    }
+
+    // Returns false when the row could not be saved; the pass then goes on with the next type.
+    async Task<bool> InsertAttributeElement(Guid AttributeTypeID, object ownerId, ICollection<Titem1> ownerAttributes)
     {
         Titem1 attributeElement = new Titem1();
 
 
         var v = attributeElement.GetType().GetProperties();
 
-        v.First(x => x.Name == CallerIdName).SetValue(attributeElement, elementID);
+        v.First(x => x.Name == CallerIdName).SetValue(attributeElement, ownerId);
         v.First(x => x.Name == "AttributeTypeId").SetValue(attributeElement, AttributeTypeID);
         //  v.First(x => x.Name == "Date").SetValue(attributeElement, DateTime.Now);
 
-        var rr = await entitiesService.InsertEntityAsync(attributeElement);
-        // if (rr != null)
-        // {
-        //     attributeElementsList.Add(attributeElement);
-        // }
+        if (await entitiesService.InsertEntityAsync(attributeElement) != null) return true;
 
-        //await entitiesService.UpdateEntityAsync(element);
-
-        await AttributesGrid.Reload();
-
-
+        // Most likely the row already exists in the database and this circuit's copy of the element is
+        // stale, so the unique index refused a second one. EF put the new row into the owner's collection
+        // when it was added: take it out again, or the grid would show a row that doesn't exist and the
+        // next save of the owner would try to write it.
+        ownerAttributes.Remove(attributeElement);
+        Console.WriteLine($"[AttributesComponent] could not create attribute {AttributeTypeID} for {CallerTypeName} {ownerId}; skipped.");
+        return false;
     }
 
     async Task UpdateRow(Titem1 attributeElement)
     {
+        // Only a row the grid is editing has a value to save. An unlinked row never gets into edit mode, or
+        // was taken out of it when its type stopped being linked, and is not written from here either way.
+        if (IsUnlinked(attributeElement) || AttributesGrid?.IsRowInEditMode(attributeElement) != true) return;
 
-        if (await entitiesService.UpdateEntityAsync(attributeElement))
+        bool saved;
+        try
+        {
+            saved = await entitiesService.UpdateEntityAsync(attributeElement);
+        }
+        catch (Exception ex)
+        {
+            // UpdateEntityAsync has already dropped the failed row from the circuit's context before
+            // rethrowing. Left uncaught in an event handler it would tear down the whole circuit.
+            Console.WriteLine($"[AttributesComponent] saving attribute value failed: {ex.GetBaseException().Message}");
+            return;
+        }
+
+        if (saved)
         {
             await AttributesGrid.UpdateRow(attributeElement);
         }
-
     }
 
 
@@ -225,13 +349,19 @@
         EditRow(attributeElement);
     }
 
-    void RowDeselect(Titem1 attributeElement)
+    async Task RowDeselect(Titem1 attributeElement)
     {
-        UpdateRow(attributeElement);
+        await UpdateRow(attributeElement);
     }
     void RowChanged(Titem1 attributeElement)
     {
         AppData.SaveChanges = true;
     }
-    
+
+    public void Dispose()
+    {
+        // A placeholder pass still awaiting an insert checks this and stops.
+        _disposed = true;
+    }
+
 }

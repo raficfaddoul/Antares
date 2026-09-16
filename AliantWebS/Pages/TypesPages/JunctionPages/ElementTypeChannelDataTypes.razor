@@ -1,11 +1,76 @@
-﻿@page "/ElementTypeChannelDataTypes/{CallerID:guid}"
+@page "/ElementTypeChannelDataTypes/{CallerID:guid}"
 @using Models
 @using AliantWebS.Data
 @inject AliantWebS.Data.AppData AppData
 @inject EntitiesService entitiesService
 
+<style>
+    .channel-order-card {
+        max-width: 640px;
+        margin: 20px auto;
+        background: #fff;
+        border: 1px solid #e6e6ef;
+        border-radius: 10px;
+        box-shadow: 0 1px 4px rgba(20, 30, 60, .07);
+        overflow: hidden;
+    }
 
+    .channel-order-header {
+        background: linear-gradient(90deg, #2c3e50, #46637f);
+        color: #fff;
+        font-weight: 600;
+        padding: 10px 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
 
+    .channel-order-hint {
+        padding: 8px 16px;
+        font-size: .8rem;
+        color: #777;
+        border-bottom: 1px solid #eee;
+    }
+
+    .channel-order-list {
+        list-style: none;
+        margin: 0;
+        padding: 8px;
+    }
+
+    .channel-order-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        margin: 6px 0;
+        background: #f8f9fb;
+        border: 1px solid #e2e2ea;
+        border-radius: 8px;
+        cursor: grab;
+        user-select: none;
+        transition: box-shadow .15s ease, opacity .15s ease, border-color .15s ease;
+    }
+
+    .channel-order-item:hover { box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+    .channel-order-item.dragging { opacity: .4; }
+    .channel-order-item.drop-target { border-color: #4a6572; box-shadow: 0 0 0 2px rgba(74,101,114,.35); }
+
+    .drag-handle { color: #9aa2b1; font-size: 1.15rem; line-height: 1; }
+    .channel-icon { width: 22px; height: 22px; object-fit: contain; }
+
+    .order-badge {
+        margin-left: auto;
+        min-width: 26px;
+        text-align: center;
+        font-weight: 600;
+        color: #fff;
+        background: #4a6572;
+        border-radius: 12px;
+        padding: 2px 8px;
+        font-size: .8rem;
+    }
+</style>
 
 <AliantWebS.Pages.TypesPages.JunctionsComponent Titre=@titre
                                                 TItem1="ElementType"
@@ -19,7 +84,40 @@
 
 </AliantWebS.Pages.TypesPages.JunctionsComponent>
 
+<div class="channel-order-card">
+    <div class="channel-order-header">↕ Ordre d'affichage des canaux</div>
+    <div class="channel-order-hint">Glissez-déposez pour ordonner les canaux de ce type de capteur (le premier = canal principal).</div>
 
+    @if (associations.Count == 0)
+    {
+        <div style="padding: 16px; color: #888;">Aucun canal associé. Associez des canaux ci-dessus, puis ordonnez-les ici.</div>
+    }
+    else
+    {
+        <ul class="channel-order-list">
+            @for (int i = 0; i < associations.Count; i++)
+            {
+                var index = i;
+                var a = associations[index];
+                <li class="channel-order-item @(dragIndex == index ? "dragging" : "") @(dropTarget == index ? "drop-target" : "")"
+                    draggable="true"
+                    @ondragstart="() => dragIndex = index"
+                    @ondragenter="() => dropTarget = index"
+                    @ondragover:preventDefault="true"
+                    @ondragend="OnDragEnd"
+                    @ondrop="() => OnDrop(index)">
+                    <span class="drag-handle" title="Glisser pour réordonner">⠿</span>
+                    @if (a.ChannelDataType?.Icon != null)
+                    {
+                        <img class="channel-icon" src="@Helpers.Helpers.GetSource(a.ChannelDataType.Icon)" alt="@a.ChannelDataType?.Name" />
+                    }
+                    <span>@a.ChannelDataType?.Name</span>
+                    <span class="order-badge">@index</span>
+                </li>
+            }
+        </ul>
+    }
+</div>
 
 @code {
 
@@ -30,22 +128,71 @@
 
     ElementType elementType;
 
+    private List<ChannelDataTypeElementType> associations = new();
+    private int? dragIndex;
+    private int? dropTarget;
+
     public override async Task SetParametersAsync(ParameterView parameters)
     {
         elementType = (ElementType)AppData.obj1;
-        entitiesService.LoadCollection(elementType, "ChannelDataTypeElementTypes");
+        LoadAssociations();
         await base.SetParametersAsync(parameters);
     }
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
-
         titre = "Data Channel Type \"" + elementType.Name + "\" Element Types Association";
+        RefreshOrderList();
     }
 
+    // Load the join rows + their ChannelDataType (for name/icon) into elementType's tracked collection.
+    private void LoadAssociations()
+    {
+        entitiesService.LoadCollection(elementType, "ChannelDataTypeElementTypes");
+        foreach (var j in elementType.ChannelDataTypeElementTypes)
+            entitiesService.LoadReference(j, "ChannelDataType");
+    }
+
+    private void RefreshOrderList()
+    {
+        associations = elementType.ChannelDataTypeElementTypes
+            .OrderBy(a => a.SortOrder ?? int.MaxValue)
+            .ThenBy(a => a.ChannelDataType?.Name)
+            .ToList();
+    }
+
+    private void OnDragEnd()
+    {
+        dragIndex = null;
+        dropTarget = null;
+    }
+
+    private async Task OnDrop(int targetIndex)
+    {
+        var from = dragIndex;
+        dragIndex = null;
+        dropTarget = null;
+
+        if (from is null || from == targetIndex) return;
+
+        var item = associations[from.Value];
+        associations.RemoveAt(from.Value);
+        associations.Insert(targetIndex, item);
+
+        // Renumber 0..n so the order is explicit and gap-free.
+        for (int i = 0; i < associations.Count; i++)
+            associations[i].SortOrder = i;
+
+        await entitiesService.UpdateEntitesAsync(associations);
+        StateHasChanged();
+    }
+
+    // Called by the junction component after channels are linked/unlinked — reload + reorder list.
     protected async void Update()
     {
         await entitiesService.UpdateEntityAsync(elementType);
+        LoadAssociations();
+        RefreshOrderList();
+        StateHasChanged();
     }
-
 }

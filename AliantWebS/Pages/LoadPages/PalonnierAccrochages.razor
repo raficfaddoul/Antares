@@ -1,0 +1,205 @@
+@using Helpers
+@using Models
+@using AliantWebS.Data
+@inject EntitiesService entitiesService
+@inject IJSRuntime js
+
+@*
+    Where the selected palonnier hangs, crossing by crossing, and a way to change it by hand. By default a
+    palonnier hangs from every mother it crosses, and the optimiser leaves out a mother that would go past
+    its capacity. A choice made here is recorded on the palonnier and takes precedence over both. The loads
+    on the attachment points follow at the next « Calcul Charpente ».
+*@
+
+<style>
+    .accrochages { border: 1px solid #ddd; border-left: 4px solid #28a745; border-radius: 6px; padding: 8px 10px; margin: 8px 0; background: #fafafa; }
+    .accrochages-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+    .accrochages-table { margin-bottom: 6px; font-size: 0.9em; }
+    .accrochages-table td { vertical-align: middle; }
+    .accrochages-off td { background: #fff4e5; }
+    .accrochages-why { color: #555; }
+    .accrochages-note, .accrochages-empty { font-size: 0.85em; color: #666; margin: 0; }
+</style>
+
+@if (Palonnier is not null && !Palonnier.Famille)
+{
+    <div class="accrochages">
+        <div class="accrochages-head">
+            <strong>Accrochages de « @(Palonnier.Name ?? "palonnier") »</strong>
+            @if (hasManual)
+            {
+                <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@saving" @onclick="ResetManualAsync"
+                        title="Supprimer les choix faits à la main et revenir aux décisions de l’optimiseur">
+                    Rétablir
+                </button>
+            }
+        </div>
+
+        @if (resolution is null || resolution.Crossings.Count == 0)
+        {
+            <p class="accrochages-empty">Ce palonnier ne croise aucun mother.</p>
+        }
+        else
+        {
+            <table class="table table-sm accrochages-table">
+                <thead>
+                    <tr><th>Position</th><th>Accroché à</th><th>Décision</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var crossing in resolution.Crossings)
+                    {
+                        <tr @key="@($"{crossing.S:0.000}|{version}")" class="@(crossing.Hooked ? "" : "accrochages-off")">
+                            <td>@Position(crossing)</td>
+                            <td>
+                                <select class="form-select form-select-sm" disabled="@saving"
+                                        @onchange="e => ChangeAsync(crossing, e.Value?.ToString())">
+                                    @foreach (var candidate in crossing.Candidates)
+                                    {
+                                        <option value="@candidate.Mother.MotherGridPalonnierId"
+                                                selected="@(crossing.HungFrom?.Mother.MotherGridPalonnierId == candidate.Mother.MotherGridPalonnierId)">
+                                            @(candidate.Mother.Name ?? "mother")
+                                        </option>
+                                    }
+                                    <option value="@NotHooked" selected="@(!crossing.Hooked)">— non accroché —</option>
+                                </select>
+                            </td>
+                            <td class="accrochages-why">@PalonnierHanging.DescribeDecision(crossing)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+            <p class="accrochages-note">
+                Par défaut, un palonnier est accroché à tous les mothers qu’il croise, et chaque charge va aux deux
+                points d’accroche les plus proches. Les charges aux points d’accroche sont mises à jour par
+                « Calcul Charpente ».
+            </p>
+        }
+    </div>
+}
+
+@code {
+    private const string NotHooked = "none";
+
+    private static readonly System.Globalization.CultureInfo Fr = System.Globalization.CultureInfo.GetCultureInfo("fr-FR");
+
+    /// <summary>The palonnier whose crossings are shown. Nothing is shown for a mother.</summary>
+    [Parameter] public MotherGridPalonnier? Palonnier { get; set; }
+
+    /// <summary>The scenario's mothers.</summary>
+    [Parameter] public List<MotherGridPalonnier>? MotherGrids { get; set; }
+
+    /// <summary>The palonniers the page lists now: a palonnier no longer among them cannot be saved.</summary>
+    [Parameter] public List<MotherGridPalonnier>? Palonniers { get; set; }
+
+    /// <summary>Raised once a change is saved, so the plan can be redrawn.</summary>
+    [Parameter] public EventCallback<MotherGridPalonnier> OnChanged { get; set; }
+
+    private HangingResolution? resolution;
+    private bool hasManual;
+    private bool saving;
+
+    // Bumped when a change is refused, so each select is rebuilt showing what is really recorded
+    // rather than what was just picked.
+    private int version;
+
+    protected override void OnParametersSet() => Refresh();
+
+    private void Refresh()
+    {
+        resolution = Palonnier is null || Palonnier.Famille
+            ? null
+            : PalonnierHanging.Resolve(Palonnier, MotherGrids ?? new List<MotherGridPalonnier>());
+        hasManual = Palonnier is not null && PalonnierHooks.HasManual(Palonnier.Accrochages);
+    }
+
+    private static string Position(HangingCrossing crossing) =>
+        (crossing.End is { } end ? $"extrémité {end}" : "croisement")
+        + $" — {crossing.S.ToString("0.00", Fr)} m";
+
+    private async Task ChangeAsync(HangingCrossing crossing, string? value)
+    {
+        if (Palonnier is null) return;
+
+        Guid? hungFrom = Guid.TryParse(value, out var id) ? id : null;
+        var stored = PalonnierHooks.SetByHand(
+            Palonnier.Accrochages,
+            crossing.Candidates.Select(c => c.Mother.MotherGridPalonnierId),
+            hungFrom);
+
+        await SaveAsync(stored);
+    }
+
+    private async Task ResetManualAsync()
+    {
+        if (Palonnier is null) return;
+        await SaveAsync(PalonnierHooks.ClearManual(Palonnier.Accrochages));
+    }
+
+    private async Task SaveAsync(string? stored)
+    {
+        var palonnier = Palonnier!;
+        var mothers = MotherGrids ?? new List<MotherGridPalonnier>();
+
+        // A palonnier the page no longer lists - Generate Layout replaces them all, a delete removes one -
+        // is gone from the database: saving it would fail. Say so instead.
+        if (Palonniers is not null && !Palonniers.Any(p => ReferenceEquals(p, palonnier)))
+        {
+            version++;
+            await js.InvokeVoidAsync("alert",
+                "Ce palonnier n’existe plus dans le plan (il a peut-être été régénéré) : sélectionnez-le à nouveau.");
+            return;
+        }
+
+        // A palonnier held by fewer than two mothers does not hang: refuse a change that would leave it
+        // so. One that already hangs from fewer, drawn that way, may still be changed.
+        int SupportCount(string? accrochages)
+        {
+            var trial = new MotherGridPalonnier
+            {
+                MotherGridPalonnierId = palonnier.MotherGridPalonnierId,
+                X1 = palonnier.X1, Y1 = palonnier.Y1, X2 = palonnier.X2, Y2 = palonnier.Y2,
+                MotherAId = palonnier.MotherAId, MotherBId = palonnier.MotherBId,
+                Accrochages = accrochages,
+            };
+            return SelfWeightDistribution.DistinctSupports(
+                PalonnierHanging.Resolve(trial, mothers).Supports.Select(s => s.S).ToList());
+        }
+
+        int before = SupportCount(palonnier.Accrochages), after = SupportCount(stored);
+        if (after < 2 && after < before)
+        {
+            version++;
+            await js.InvokeVoidAsync("alert",
+                "Un palonnier doit rester accroché à au moins deux mothers : ce changement n’a pas été enregistré.");
+            return;
+        }
+
+        var previous = palonnier.Accrochages;
+        saving = true;
+        try
+        {
+            palonnier.Accrochages = stored;
+            if (!await entitiesService.UpdateEntityAsync(palonnier))
+            {
+                palonnier.Accrochages = previous;
+                version++;
+                await js.InvokeVoidAsync("alert", "L’accrochage n’a pas pu être enregistré.");
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            palonnier.Accrochages = previous;
+            version++;
+            await js.InvokeVoidAsync("alert", $"L’accrochage n’a pas pu être enregistré : {ex.Message}");
+            return;
+        }
+        finally
+        {
+            saving = false;
+        }
+
+        Refresh();
+        await OnChanged.InvokeAsync(palonnier);
+    }
+}

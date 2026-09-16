@@ -1,16 +1,19 @@
-﻿@page "/ChargeMPComponent/{MotherGridPalonnierID:guid}"
+@page "/ChargeMPComponent/{MotherGridPalonnierID:guid}"
 
 @using AliantWebS.Data
+@using AliantWebS.Reporting
 @inject EntitiesService entitiesService
+@inject ScenarioStorageService scenarioStorage
 @inject NavigationManager navigationManager
 @inject IJSRuntime js
 @inject AliantWebS.Data.AppData AppData
 @using Models
+@using Helpers
 @inject IStringLocalizer<Languages> L
 
 @layout AntaresConceptionLayout
 
-@if (chargeList is null)
+@if (ChargeList is null)
 {
     <p><em>@L["Loading"]... !</em></p>
 }
@@ -18,35 +21,55 @@ else
 {
 <Div Style="display: flex; align-items: center;">
 
-@*     <h3>@L["Charge"]</h3> *@
-        <a class="nav-link" @onclick="@(args => Insertmp())" @onclick:preventDefault="true" href="">
-            <span class="oi oi-plus" aria-hidden="true">@L["Add New"]</span>
-        </a>
+    <a class="nav-link" @onclick="@(args => Insertmp())" @onclick:preventDefault="true" href="">
+        <span class="oi oi-plus" aria-hidden="true">@L["Add New"]</span>
+    </a>
+        @if (isImportingCharges)
+        {
+            <span class="spinner-border spinner-border-sm text-primary ms-2" role="status"></span>
+            <span class="ms-1">@L["Importing..."]</span>
+        }
+        else
+        {
+            <a class="nav-link" @onclick="TriggerChargeExcelImport" @onclick:preventDefault="true" href="" title="@L["Import from Excel"]">
+                <span class="oi oi-data-transfer-upload" aria-hidden="true"> @L["Import Excel"]</span>
+            </a>
+        }
+        <InputFile id="chargeImport" OnChange="ImportChargesFromExcel" accept=".xlsx" style="display:none" />
     <div class="form-group " style="margin-right: 50px;">
         <div>
             <label>@L["Charge Totale"] :</label>
             <div>
                 <InputNumber disabled="true" @bind-Value="@ChargeTotale" />
-                @*   <ValidationMessage For="@(() => Structure.DesignLoad)" /> *@
             </div>
         </div>
     </div>
-    <div style="display: flex; align-items: center;">
-        <Blazorise.Button Color="Blazorise.Color.Primary" Clicked="Calcul">@L["Calcul Charpente"]</Blazorise.Button>
-    </div>
-    <div style="margin-left: auto; ">
-        <Label> @L["Page Size"]: &nbsp;&nbsp;</Label>
+<div style="display: flex; align-items: center;">
+    @* Also runs automatically when leaving /MotherGrid. The button matters because the calculation
+       depends on the truss masses in MotherGrill.xlsx and Palonnier.xlsx: after filling one in there is
+       otherwise no way to ask for a recompute except to navigate away and back. *@
+    <Blazorise.Button Color="Blazorise.Color.Primary" Clicked="CalculCharpente">@L["Calcul Charpente"]</Blazorise.Button>
+</div>
+    <div style="margin-left: auto; display: flex; align-items: center; gap: 10px;">
+        <Label>@L["Page Size"]: &nbsp;&nbsp;</Label>
         <RadzenNumeric @bind-Value="PageSize" Style="width:60px"></RadzenNumeric>
+        <a class="nav-link" title="@L["Display Settings"]" @onclick="() => showDecimalSettings = !showDecimalSettings" @onclick:preventDefault="true" href="">
+            <span class="oi oi-cog" aria-hidden="true"></span>
+        </a>
+        @if (showDecimalSettings)
+        {
+            <div style="display: flex; align-items: center; gap: 6px; background: #f0f4ff; border: 1px solid #667eea; border-radius: 8px; padding: 4px 10px;">
+                <span style="font-size: 12px; color: #4a5568;">@L["Decimals"]:</span>
+                <RadzenNumeric @bind-Value="decimalPlaces" Min="0" Max="6" Style="width:55px;" />
+            </div>
+        }
     </div>
 
 </Div>
 
-
-
-
-    <EditForm Model="@chargeList">
+    <EditForm Model="@ChargeList">
         <RadzenDataGrid @ref="chargeGrid" AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="PageSize"
-                        Data="@chargeList" TItem="ChargeMp" ColumnWidth="150px" SelectionMode="DataGridSelectionMode.Single" @bind-Value="@SelectedMPList">
+                        Data="@ChargeList" TItem="ChargeMp" ColumnWidth="150px" SelectionMode="DataGridSelectionMode.Single" @bind-Value="@SelectedMPList">
             <Columns>
 
                 <RadzenDataGridColumn Width="50" TItem="ChargeMp" Property="Name">
@@ -57,28 +80,20 @@ else
                         <InputTextArea @bind-Value="mp.Name" Style="width:100%" />
                     </EditTemplate>
                 </RadzenDataGridColumn>
-@*                 <RadzenDataGridColumn Width="50" TItem="ChargeMp" Property="Numero" TextAlign="TextAlign.Center">
-                    <HeaderTemplate>
-                        <span class="gridColumndStyle">@L["Numéro"]</span>                    <br />
-                    </HeaderTemplate>
-                    <EditTemplate Context="mp">
-                        <InputNumber @bind-Value="mp.Numero" TValue="int?" Style="width:100%" />
-                    </EditTemplate>
-                </RadzenDataGridColumn> *@
 
-                <RadzenDataGridColumn Width="50" TItem="ChargeMp" Property="MotherGridPalonnierID" TextAlign="TextAlign.Center">
+                <RadzenDataGridColumn Width="50" TItem="ChargeMp" Property="MotherGridPalonnierId" TextAlign="TextAlign.Center">
                     <HeaderTemplate>
-                        <span class="gridColumndStyle">@L["MotherGrid/Palonnier"]</span>                    <br />
+                        <span class="gridColumndStyle">@L["MotherGrid/Palonnier"]</span><br />
                     </HeaderTemplate>
                     <EditTemplate Context="mp">
-                        @mp.MotherGridPalonnier.Name
+                        @((mp?.MotherGridPalonnier?.Name) ?? "-")
                     </EditTemplate>
                     <Template Context="mpp">
-                        @mpp.MotherGridPalonnier.Name
+                        @((mpp?.MotherGridPalonnier?.Name) ?? "-")
                     </Template>
                 </RadzenDataGridColumn>
 
-                <RadzenDataGridColumn Width="50" TItem="ChargeMp" Property="X" TextAlign="TextAlign.Center">
+                <RadzenDataGridColumn Width="50" TItem="ChargeMp" Property="X" TextAlign="TextAlign.Center" FormatString="@($"{{0:N{decimalPlaces}}}")">
                     <HeaderTemplate>
                         <span class="gridColumndStyle">@L["X"]</span>   <br />
                     </HeaderTemplate>
@@ -87,7 +102,7 @@ else
                     </EditTemplate>
                 </RadzenDataGridColumn>
 
-                <RadzenDataGridColumn Width="50" TItem="ChargeMp" Property="Charge" TextAlign="TextAlign.Center">
+                <RadzenDataGridColumn Width="50" TItem="ChargeMp" Property="Charge" TextAlign="TextAlign.Center" FormatString="@($"{{0:N{decimalPlaces}}}")">
                     <HeaderTemplate>
                         <span class="gridColumndStyle">@L["Charge"]</span>   <br />
                     </HeaderTemplate>
@@ -117,46 +132,43 @@ else
             </Columns>
         </RadzenDataGrid>
 
-
-
-
     </EditForm>
-
-
 }
 
 
 @code {
     int PageSize { get; set; } = 10;
 
-
     private IList<ChargeMp> _selectedChargeList = new List<ChargeMp>();
-
 
     public IList<ChargeMp> SelectedMPList
     {
-        get
-        {
-            // You can add logic here to filter or sort items when accessed.
-            return _selectedChargeList;
-        }
+        get { return _selectedChargeList; }
         set
         {
-            // Validate input before setting.
             if (value == null) throw new ArgumentNullException(nameof(value));
             _selectedChargeList = value;
-            selectedChargeMP = _selectedChargeList.FirstOrDefault();
+            var selected = _selectedChargeList.FirstOrDefault();
+            if (!Equals(selectedChargeMP, selected))
+            {
+                selectedChargeMP = selected;
+                selectedChargeMPChanged.InvokeAsync(selectedChargeMP);
+            }
         }
     }
 
     [Parameter]
     public ChargeMp selectedChargeMP { get; set; }
 
+    [Parameter]
+    public EventCallback<ChargeMp> selectedChargeMPChanged { get; set; }
+
+    [Parameter]
+    public List<ChargeMp> ChargeList { get; set; }
 
     RadzenDataGrid<ChargeMp> chargeGrid;
 
 
-    List<ChargeMp> chargeList;
 
     [Parameter]
     public Guid? MotherGridPalonnierID { get; set; }
@@ -164,61 +176,88 @@ else
     [Parameter]
     public Guid EventMpscenarioId { get; set; }
 
+    // [Parameter]
+    // public EventCallback<LoadTransmissionResult> OnCalculCharpente { get; set; }
+
+    [Parameter]
+    public EventCallback ChargeListChanged { get; set; }
+
+    [CascadingParameter]
+    public AntaresConceptionLayout Layout { get; set; }
+
     double ChargeTotale { get; set; }
 
-    protected override async Task OnInitializedAsync()
+    private int decimalPlaces = 3;
+private bool showDecimalSettings = false;
+bool isImportingCharges = false;
+
+    protected override void OnInitialized()
     {
-
-
+        Layout?.RegisterCalculCharpente(CalculCharpente);
     }
+
     protected override async Task OnParametersSetAsync()
     {
-        chargeList = await entitiesService.GetFilteredEntitiesAsync<ChargeMp>(x => ((x.MotherGridPalonnier.EventMpscenarioId == EventMpscenarioId)), "MotherGridPalonnier");
-        CalculateChargeTotale();
+        if (ChargeList == null)
+        {
+        ChargeList = await entitiesService.GetFilteredEntitiesAsync<ChargeMp>(
+            x => ((x.MotherGridPalonnier.EventMpscenarioId == EventMpscenarioId)), 
+            "MotherGridPalonnier");
+        }
+         CalculateChargeTotale();
     }
-
 
     async Task DeleteMP(ChargeMp mp)
     {
         if (await entitiesService.DeleteEntityAsync(mp))
         {
-            if (chargeList.Remove(mp))
+            if (ChargeList.Remove(mp))
             {
                 await chargeGrid.Reload();
-
             }
         }
         CalculateChargeTotale();
+        
+        //  Notify parent that charges have changed
+        if (ChargeListChanged.HasDelegate)
+        {
+            await ChargeListChanged.InvokeAsync();
+        }
     }
 
     void EditRow(ChargeMp mp)
     {
-
         chargeGrid.EditRow(mp);
         CalculateChargeTotale();
     }
 
     async Task Insertmp()
     {
-        if (MotherGridPalonnierID == null) return;
+        if (MotherGridPalonnierID == null)
+        {
+            await js.InvokeVoidAsync("alert", $"{L["No MotherGrid/Palonnier selected. Please select one before adding a charge."]}");
+            return;
+        }
         ChargeMp mp = new ChargeMp();
         mp.MotherGridPalonnierId = (Guid)MotherGridPalonnierID;
 
         if ((await entitiesService.InsertEntityAsync(mp)) != null)
         {
-            chargeList.Add(mp);
-
+            ChargeList.Add(mp);
             await chargeGrid.InsertRow(mp);
-
         }
         else
         {
             await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
         }
         CalculateChargeTotale();
+        
+        //  Notify parent that charges have changed
+        if (ChargeListChanged.HasDelegate)
+        {
+            await ChargeListChanged.InvokeAsync();
+        }
     }
-
-
 
     async Task UpdateRow(ChargeMp mp)
     {
@@ -227,67 +266,240 @@ else
             await chargeGrid.UpdateRow(mp);
         }
         CalculateChargeTotale();
+        
+        // Notify parent that charges have changed
+        if (ChargeListChanged.HasDelegate)
+        {
+            await ChargeListChanged.InvokeAsync();
+        }
     }
 
     private void CalculateChargeTotale()
     {
         ChargeTotale = 0;
-        foreach (var v in chargeList)
+        foreach (var v in ChargeList)
         {
-
             ChargeTotale += v.Charge ?? 0;
         }
     }
 
-    private async void Calcul()
+    // Ajouter une liste pour stocker les messages d'alerte
+    private List<string> alertMessages = new List<string>();
+
+    private async Task CalculCharpente()
     {
-        foreach(var charge in chargeList)
+        try
         {
-            double x = charge.X ?? 0;
-            MotherGridPalonnier MP = charge.MotherGridPalonnier;
-            bool isMotherGrid = charge.MotherGridPalonnier.Famille;
+            // Vider les anciennes alertes
+            alertMessages.Clear();
+            
+            // Récupérer tous les mothergrids et palonniers du scénario
+            var allMotherGridsAndPalonniers = await entitiesService.GetFilteredEntitiesAsync<MotherGridPalonnier>(
+                x => x.EventMpscenarioId == EventMpscenarioId);
 
-            double x1MP = charge.MotherGridPalonnier.X1 ?? 0;
-            double y1MP = charge.MotherGridPalonnier.Y1 ?? 0;
-            double x2MP = charge.MotherGridPalonnier.X2 ?? 0;
-            double y2MP = charge.MotherGridPalonnier.Y2 ?? 0;
-        }
+            // Récupérer toutes les charges
+            var allCharges = await entitiesService.GetFilteredEntitiesAsync<ChargeMp>(
+                x => x.MotherGridPalonnier.EventMpscenarioId == EventMpscenarioId,
+                "MotherGridPalonnier");
 
+            // // Récupérer ou créer la charpente
+            // var scenario = await entitiesService.GetFilteredFirstEntityAsync<EventMpscenario>(
+            //     x => x.EventMpscenarioId == EventMpscenarioId);
 
-
-
-        // sortie des resultats
-        var scenario = (await entitiesService.GetFilteredEntitiesAsync<EventMpscenario>(x => (x.EventMpscenarioId == EventMpscenarioId))).FirstOrDefault();
-
-
-        //Example applle aux valeurs calcules pour la charpenmte
-        Models.Charpente charpente = await entitiesService.GetFilteredFirstEntityAsync<Models.Charpente>(x => (x.EventId == scenario.EventId));
-        if (charpente == null)
-        {
-            charpente = new Models.Charpente();
-            charpente.EventId = (Guid)scenario.EventId;
-            charpente = await entitiesService.InsertEntityAsync(charpente);
-            if (charpente != null)
+            Models.Charpente charpente = await entitiesService.GetFilteredFirstEntityAsync<Models.Charpente>(
+                x => x.EventMpscenarioId == Layout.selectedScenario.EventMpscenarioId);
+            
+            if (charpente == null)
             {
+                charpente = new Models.Charpente();
+                charpente.EventMpscenarioId = Layout.selectedScenario.EventMpscenarioId;
+                charpente = await entitiesService.InsertEntityAsync(charpente);
+                
+                if (charpente == null)
+                {
+                    await js.InvokeVoidAsync("alert", "Erreur lors de la création de la charpente!");
+                    return;
+                }
+            }
+
+            // The trusses carry themselves. Their masses come from the inventory, MotherGrill.xlsx and
+            // Palonnier.xlsx, the scenario's copies first - the same lookup the report uses, so the
+            // study and the calculation can never disagree about what a truss weighs.
+            var paths = scenarioStorage.GetScenarioPaths(
+                Layout.selectedEvent, Layout.selectedScenario, create: false);
+            var catalog = RiggingOptimizer.IO.InventoryFiles.Load(paths.DataDir, scenarioStorage.CommonDataDir).Catalog;
+
+            var elementTypes = await entitiesService.GetAllEntitiesAsync<ElementType>();
+            var typeNames = elementTypes.ToDictionary(t => t.ElementTypeId, t => t.Name ?? "");
+
+            // Créer le helper et configurer les alertes
+            var helper = new LoadTransmissionHelper();
+
+            // The same mass source the report uses, so the stored loads and the study can never
+            // disagree about what a truss weighs. See ReportDataBuilder.MassSource.
+            helper.TrussMassOf = ReportDataBuilder.MassSource(catalog, typeNames);
+            // Event-dependent origin: palonnier/charge coords are stored relative to Point0.
+            helper.Point0X = Layout?.selectedEvent?.Point0X ?? 0;
+            helper.Point0Y = Layout?.selectedEvent?.Point0Y ?? 0;
+            helper.AlertAction = (message) => 
+            {
+                Console.WriteLine(message);
+                alertMessages.Add(message);
+                StateHasChanged(); // Forcer le rafraîchissement de l'UI
+                return Task.CompletedTask;
+            };
+
+            // Calculer avec détails pour la visualisation
+            var (motherGridLoads, charpenteLoads) = helper.CalculateCompleteLoadTransmissionWithDetails(
+                allCharges,
+                allMotherGridsAndPalonniers);
+
+            // Appliquer les charges à la charpente
+            helper.ApplyLoadsToCharpente(charpente, charpenteLoads);
+
+            // Sauvegarder la charpente
+            await entitiesService.UpdateEntityAsync(charpente);
+
+            // Créer le résultat pour la visualisation
+            var result = new LoadTransmissionResult
+            {
+                MotherGridLoads = motherGridLoads,
+                CharpenteLoads = charpenteLoads,
+                Charpente = charpente
+            };
+
+            // Notifier le composant parent
+           // await OnCalculCharpente.InvokeAsync(result);
+
+            // Afficher toutes les alertes à la fin si il y en a
+            // All calc messages concatenated — set a breakpoint on the next line to copy
+            // the value, or read it from the container/console output.
+            string messagesDeCalcul = string.Join("\n", alertMessages);
+            Console.WriteLine("===== Messages de calcul =====\n" + messagesDeCalcul);
+
+            // Anything the run could not transmit has to reach the person who pressed calculate.
+            // Every one of these makes the stored table read LOWER than the truth, and until now
+            // they only ever went to a console nobody watches.
+            var reserves = helper.Account.Describe().ToList();
+
+            double transmitted = charpenteLoads.Values.Sum();
+            double expected = helper.Account.ScenicTransmittedKg + helper.Account.SelfWeightTransmittedKg;
+
+            if (Math.Abs(transmitted - expected) > 1e-6 * Math.Max(1.0, Math.Abs(expected)))
+            {
+                // Necessary, not sufficient: this balance is invariant to WHERE a load lands, so it
+                // catches a leak rather than a misplacement. A failure still means the table is wrong.
+                reserves.Add($"Contrôle d'équilibre échoué : {transmitted:N0} daN répartis sur la charpente "
+                           + $"pour {expected:N0} daN transmis. Le tableau des charges est incomplet.");
+            }
+
+            if (reserves.Count > 0)
+            {
+                await js.InvokeVoidAsync("alert",
+                    $"Calcul charpente terminé : {helper.Account.ScenicTransmittedKg:N0} daN de charges "
+                    + $"scéniques et {helper.Account.SelfWeightTransmittedKg:N0} daN de poids propre des ponts.\n\n"
+                    + "Réserves :\n• " + string.Join("\n• ", reserves));
+            }
+        }
+        catch (Exception ex)
+        {
+            await js.InvokeVoidAsync("alert", $"❌ ERREUR lors du calcul:\n{ex.Message}");
+            Console.WriteLine($"Erreur détaillée: {ex}");
+        }
+    }
+
+    // Classe pour transmettre les résultats
+    public class LoadTransmissionResult
+    {
+        public Dictionary<Guid, (double Load, List<(double X, double Y)> IntersectionPoints)> MotherGridLoads { get; set; }
+        public Dictionary<string, double> CharpenteLoads { get; set; }
+        public Models.Charpente Charpente { get; set; }
+    }
+
+    public void SelectItem(ChargeMp item)
+    {
+        _selectedChargeList = item != null
+            ? new List<ChargeMp> { item }
+            : new List<ChargeMp>();
+        chargeGrid?.SelectRow(item);
+        InvokeAsync(StateHasChanged);
+    }
+
+    async Task TriggerChargeExcelImport()
+    {
+        if (MotherGridPalonnierID == null)
+        {
+            await js.InvokeVoidAsync("alert", L["No MotherGrid/Palonnier selected. Please select one before importing."].ToString());
+            return;
+        }
+        await js.InvokeVoidAsync("eval", "document.getElementById('chargeImport').click()");
+    }
+
+    async Task ImportChargesFromExcel(InputFileChangeEventArgs e)
+    {
+        isImportingCharges = true;
+        StateHasChanged();
+        try
+        {
+            using var mem = new System.IO.MemoryStream();
+            await e.File.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024).CopyToAsync(mem);
+            mem.Position = 0;
+
+            var palonnier = await entitiesService.GetEntityAsync<MotherGridPalonnier>((Guid)MotherGridPalonnierID);
+
+            if (palonnier == null)
+            {
+                await js.InvokeVoidAsync("alert", "Selected palonnier not found in database.");
+                return;
+            }
+
+            var toInsert = await RiggingOptimizer.Pipeline.ImportChargeMpsFromStream(
+                mem,
+                palonnier,
+                ChargeList.Select(x => x.Name),
+                out var warnings,
+                startNumero: ChargeList.Count + 1);
+
+            // ── Show what the reader noticed, and the rows left out ───
+            // This list no longer holds skipped rows alone: the reader now also says what it made of the
+            // file — a first line taken as a header, or columns read in order for want of one. Announcing
+            // all of it as skipped rows would say something the person cannot check against the file.
+            if (warnings.Any())
+            {
+                string msg = string.Join("\n", warnings);
+                await js.InvokeVoidAsync("alert",
+                    $"⚠️ Lecture du fichier :\n\n{msg}\n\nPalonnier: '{palonnier.Name}' length={Math.Sqrt(Math.Pow((palonnier.X2??0)-(palonnier.X1??0),2)+Math.Pow((palonnier.Y2??0)-(palonnier.Y1??0),2)):F2}m");
+            }
+
+            if (toInsert.Count == 0)
+            {
+                await js.InvokeVoidAsync("alert", "Nothing imported — all charges exist or all rows were skipped.");
+                return;
+            }
+
+            if (await entitiesService.InsertEntitiesAsync(toInsert))
+            {
+                ChargeList.AddRange(toInsert);
+                await chargeGrid.Reload();
+                CalculateChargeTotale();
+                if (ChargeListChanged.HasDelegate)
+                    await ChargeListChanged.InvokeAsync();
+                await js.InvokeVoidAsync("alert", $"{toInsert.Count} charge(s) imported successfully.");
             }
             else
             {
-                await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
+                await js.InvokeVoidAsync("alert", "Import failed.");
             }
         }
-
-
-
-        charpente.A4 = 43;
-        charpente.B7 = 50;
-        //etc/
-
-
-        await entitiesService.UpdateEntityAsync(charpente);
-
+        catch (Exception ex)
+        {
+            await js.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+        }
+        finally
+        {
+            isImportingCharges = false;
+            StateHasChanged();
+        }
     }
-
-
-
 }
 

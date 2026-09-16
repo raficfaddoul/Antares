@@ -297,6 +297,13 @@ else
     [Parameter]
     public List<EquipementType> EquipementTypes { get; set; } = new List<EquipementType>();
 
+    [Parameter]
+    public Dictionary<int, (List<long> EntityIds, (int R, int G, int B) Color)> ColorMapping { get; set; }
+
+    // BimId → value (e.g. taux de travail) shown as a hover tooltip in the 3D viewer.
+    [Parameter]
+    public Dictionary<long, double> TauxMap { get; set; }
+    
     string fileName;// = @"C:\Users\rafic\Desktop\AliantWebS\AliantWebS\AliantWebS\wwwroot\data\BasicWallCopy.ifc";
 
     bool bimPresent = true;
@@ -326,7 +333,14 @@ else
                 await Task.Delay(2000);
                 await VisualizeDefects(Rigidities);
             }
-
+            if (ColorMapping != null && ColorMapping.Count > 0)
+            {
+                await Task.Delay(2000);
+                await ColorElements();
+            }
+            // Always push the taux map — an empty map clears any tooltip data left in the
+            // browser-global window._tauxMap by a previous page (it survives SPA navigation).
+            await js.InvokeVoidAsync("SetTauxMap", TauxMap ?? new Dictionary<long, double>());
         }
     }
 
@@ -1566,6 +1580,7 @@ else
     //                    var fourthPoint = model.Instances.New<IfcCartesianPoint>();
     //        fourthPoint.SetXY(0, 100);
 
+
     //                                var fourthPoint = model.Instances.New<IfcCartesianPoint>();
     //        fourthPoint.SetXY(0, 100);
 
@@ -1585,19 +1600,73 @@ else
     //    return profile;
     //}
 
-    IEnumerable<InspectionResultType> InspectionResultTypesList;
-
     private async Task Expand(int index)
     {
 
         if (index == 1)
         {
             List<Guid> elementTypesIds = Structure.Elements.Where(x => x.ElementTypeId.HasValue).Select(x => x.ElementTypeId.Value).ToList();
-            IEnumerable<InspectionResultTypeElementType> ertet = await entitiesService.GetFilteredEntitiesAsync<InspectionResultTypeElementType>(a => elementTypesIds.Contains(a.ElementTypeId), "InspectionResultType");
-            InspectionResultTypesList = ertet.Select(x => x.InspectionResultType);
+
         }
     }
 
 
 
-}
+    private async Task ColorElements()
+    {
+        if (ColorMapping == null || ColorMapping.Count == 0) return;
+
+        try
+        {
+            // Prepare arrays matching the JS function signature
+            var styleNums = ColorMapping.Keys.ToArray();
+
+            var styleToEntities = ColorMapping.ToDictionary(
+                kvp => kvp.Key.ToString(),
+                kvp => kvp.Value.EntityIds.ToArray()
+            );
+
+            var rgbValues = ColorMapping.Values
+                .Select(v => new int[] { v.Color.R, v.Color.G, v.Color.B })
+                .ToArray();
+
+            await js.InvokeVoidAsync("ColorElements", styleNums, styleToEntities, rgbValues);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"ColorElements error: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Re-apply a colour map + taux tooltip map to the already-loaded model. Call this (via @ref)
+    /// after recomputing taux at runtime — colours are otherwise only applied on firstRender.
+    /// Self-contained: takes the maps as arguments so it doesn't depend on parameter re-binding.
+    /// </summary>
+    public async Task ApplyColorsAsync(
+        Dictionary<int, (List<long> EntityIds, (int R, int G, int B) Color)> colorMapping,
+        Dictionary<long, double> tauxMap)
+    {
+        try
+        {
+            if (colorMapping != null && colorMapping.Count > 0)
+            {
+                var styleNums = colorMapping.Keys.ToArray();
+                var styleToEntities = colorMapping.ToDictionary(
+                    kvp => kvp.Key.ToString(),
+                    kvp => kvp.Value.EntityIds.ToArray());
+                var rgbValues = colorMapping.Values
+                    .Select(v => new int[] { v.Color.R, v.Color.G, v.Color.B })
+                    .ToArray();
+                await js.InvokeVoidAsync("ColorElements", styleNums, styleToEntities, rgbValues);
+            }
+
+            if (tauxMap != null && tauxMap.Count > 0)
+                await js.InvokeVoidAsync("SetTauxMap", tauxMap);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"ApplyColorsAsync error: {ex.Message}");
+        }
+    }
+    }

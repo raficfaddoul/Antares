@@ -1,13 +1,18 @@
 ﻿@page
+@using AliantWebS.Data
 @using Microsoft.AspNetCore.Identity
 @attribute [IgnoreAntiforgeryToken]
-@inject SignInManager<IdentityUser> SignInManager
+@inject SignInManager<ApplicationUser> SignInManager
+@inject JournalService Journal
 @functions {
     public async Task<IActionResult> OnPost()
     {
         if (SignInManager.IsSignedIn(User))
         {
+            // Read the identity BEFORE signing out — afterwards User is anonymous.
+            var name = User.Identity?.Name;
             await SignInManager.SignOutAsync();
+            await Journal.WriteAsAsync(name, name, JournalCategory.Session, "session.logout");
         }
 
         return Redirect("~/");

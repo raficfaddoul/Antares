@@ -1,0 +1,44 @@
+@using AliantWebS.Data
+@implements IDisposable
+@inject JournalService journal
+@inject IJSRuntime js
+
+@code {
+    // Receives the "a file was actually written" callbacks from the JPG export handlers, which run
+    // as plain JavaScript so the Save As picker keeps the click's user activation. Lives in the
+    // layout so any page's export can reach it, and resolves the user server-side — the browser
+    // only reports what was saved, never who saved it.
+
+    private DotNetObjectReference<JournalExportBridge> selfRef;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        selfRef = DotNetObjectReference.Create(this);
+        try
+        {
+            await js.InvokeVoidAsync("registerJournalRef", selfRef);
+        }
+        catch (Exception ex)
+        {
+            // Prerendering, or the script not yet loaded — the export simply goes unjournaled.
+            Console.WriteLine($"[Journal] export bridge not registered: {ex.Message}");
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnClientExport(string action, string fileName, string details)
+    {
+        if (string.IsNullOrWhiteSpace(action)) return;
+
+        // The action is a fixed tag chosen by our own export handlers; anything else is ignored so
+        // a stray script cannot write arbitrary rows.
+        if (action != "export.jpg.plot" && action != "export.jpg.plan") return;
+
+        await journal.WriteAsync(JournalCategory.Donnees, action, fileName,
+                                 string.IsNullOrWhiteSpace(details) ? null : details);
+    }
+
+    public void Dispose() => selfRef?.Dispose();
+}

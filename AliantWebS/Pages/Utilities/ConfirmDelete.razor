@@ -42,7 +42,7 @@
 
 @code {
     public bool IsVisible { get; set; }
-    private string Password { get; set; }
+    private string Password { get; set; } = string.Empty;
 
     public void Show() => IsVisible = true;
     public void Hide() => IsVisible = false;

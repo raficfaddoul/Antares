@@ -1,83 +1,126 @@
 ﻿@page "/DashBoard2/"
+@implements IDisposable
 @using AliantWebS.Data
 @using AliantWebS.Models
 @using System.Text.Json;
+@using Microsoft.EntityFrameworkCore
 @inject EntitiesService entitiesService
 @inject NavigationManager navigationManager
 @inject AppData appData
 @inject IStringLocalizer<Languages> L
 @inject IJSRuntime js
+@inject IDbContextFactory<AliantWebContext> dbContextFactory
 
 <style>
     .chart-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 10px;
-    padding: 10px;
-    width: 100%;
-    height: auto;
-    overflow: auto;
-    max-height: 600px;
-    min-width: 100%;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 10px;
+        padding: 10px;
+        width: 100%;
+        height: auto;
+        overflow: auto;
+        max-height: 600px;
+        min-width: 100%;
     }
 
 
 
     .radzen-chart {
-    height: 300px; /* Fixed height for each chart */
-    width: 100%; /* Chart width is responsive to the grid column width */
+        height: 300px; /* Fixed height for each chart */
+        width: 100%; /* Chart width is responsive to the grid column width */
     }
 
     .chart-container {
-    text-align: center; /* Centers the label and chart within the container */
-    margin: 10px; /* Optional: Adds some space around each chart container */
+        text-align: center; /* Centers the label and chart within the container */
+        margin: 10px; /* Optional: Adds some space around each chart container */
     }
 
     .chart-label {
-    margin-bottom: 5px; /* Spacing between the label and the chart */
+        margin-bottom: 5px; /* Spacing between the label and the chart */
+    }
+
+    .svg-container {
+        position: relative;
+        height: 100%;
+        background: #f8f9fa;
+        border-radius: 8px;
+        overflow: hidden;
     }
 
 </style>
 
-<NavigationLock OnBeforeInternalNavigation="appData.OnBeforeInternalNavigation" ConfirmExternalNavigation="appData.SaveConfirmation&& appData.SaveChanges" />
+<NavigationLock OnBeforeInternalNavigation="appData.OnBeforeInternalNavigation" ConfirmExternalNavigation="appData.SaveConfirmation && appData.SaveChanges" />
 
 
 
+<div style="position: relative; height: 80vh;">
+    @if (!dataLoaded)
+    {
+        <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(248,249,250,0.85); z-index:1000;">
+            <div class="spinner-border text-primary" style="width:3rem; height:3rem;" role="status"></div>
+            <span style="margin-top:14px; color:#555; font-weight:500;">@L["Loading"]…</span>
+        </div>
+    }
 <RadzenSplitter Orientation="Radzen.Orientation.Horizontal" style="height: 80vh; border: 1px solid rgba(0,0,0,.08);">
     <RadzenSplitterPane Size="50%">
 
         <RadzenSplitter Orientation="Radzen.Orientation.Vertical" style="height: 100%; border: 1px solid rgba(0,0,0,.08);">
-            <RadzenSplitterPane Size="25%">
+            <RadzenSplitterPane Size="30%">
+                <div style="display: flex; flex-direction: column; height: 100%;">
+                    <div style="display: flex; align-items: center; gap: 10px; padding: 5px 10px; flex-shrink: 0; flex-wrap: wrap;">
+                        <Label style="font-weight: 600;">Période de référence :</Label>
+                        <RadzenDropDown TValue="string" Data="@refPeriodOptions" TextProperty="Text" ValueProperty="Value"
+                                        @bind-Value="@selectedRefPeriod" Change="@OnRefPeriodChanged"
+                                        Style="width: 200px;" />
+                        <Label style="font-weight: 600; margin-left: 10px;">Type de capteur :</Label>
+                        <RadzenDropDown TValue="Guid?" Data="@sensorTypeOptions" TextProperty="Text" ValueProperty="Value"
+                                        @bind-Value="@selectedSensorTypeId" Change="@OnSensorTypeChanged"
+                                        Style="width: 220px;" />
+                    </div>
+                    <RadzenSplitter Orientation="Radzen.Orientation.Horizontal" style="flex: 1; border: 1px solid rgba(0,0,0,.08);">
+                        <RadzenSplitterPane Size="33%">
+                            <div style="display: flex; flex-direction: column; align-items: center; width: 100%; height: 100%;">
+                                <div id="chart1" style="margin-top:15px; width:100%;"></div>
+                                <Label>Taux de travail moyen</Label>
+                            </div>
+                        </RadzenSplitterPane>
+                        <RadzenSplitterPane Size="33%">
+                            <div style="display: flex; flex-direction: column; align-items: center; width: 100%; height: 100%;">
 
-                <RadzenSplitter Orientation="Radzen.Orientation.Horizontal" style="height: 100%; border: 1px solid rgba(0,0,0,.08);">
-                    <RadzenSplitterPane Size="33%">
-                        <div style="display: flex; flex-direction: column; align-items: center; width: 100%; height: 100%;">
-                            <div id="chart1" style="margin-top:15px; width:100%;"></div>
-                            <Label>Taux de travail moyen</Label>
-                        </div>
-                    </RadzenSplitterPane>
-                    <RadzenSplitterPane Size="33%">
-                        <div style="display: flex; flex-direction: column; align-items: center; width: 100%; height: 100%;">
+                                <div id="chart2" style="margin-top:15px; width:100%"></div>
+                                <Label>Taux de travail maximum</Label>
+                            </div>
+                        </RadzenSplitterPane>
+                        <RadzenSplitterPane Size="33%">
+                            <div style="display: flex; flex-direction: column; align-items: center; width: 100%; height: 100%;">
 
-                            <div id="chart2" style="margin-top:15px; width:100%"></div>
-                            <Label>Taux de travail maximal</Label>
-                        </div>
-                    </RadzenSplitterPane>
-                    <RadzenSplitterPane Size="33%">
-                        <div style="display: flex; flex-direction: column; align-items: center; width: 100%; height: 100%;">
-
-                            <div id="chart3" style="margin-top:15px; width:100%"></div>
-                            <Label>Pourcentage d'éléments critiques </Label>
-                        </div>
-                    </RadzenSplitterPane>
-                </RadzenSplitter>
-
+                                <div id="chart3" style="margin-top:15px, width:100%"></div>
+                                <Label>Pourcentage d'éléments critiques</Label>
+                            </div>
+                        </RadzenSplitterPane>
+                    </RadzenSplitter>
+                </div>
 
             </RadzenSplitterPane>
 
-            <RadzenSplitterPane Size="75%">
-                <AliantWebS.Pages.InventoryElementPages.BIMComponent Rigidities="rigidities" Structure="appData.Structure"></AliantWebS.Pages.InventoryElementPages.BIMComponent>
+            <RadzenSplitterPane Size="70%">
+                <div class="svg-container" style="height: 100%;">
 
+                    <AliantWebS.Pages.CADPages.SVGComponent
+                        @ref="svgComponent"
+             
+                        Point0X="@(selectedEvent?.Point0X ?? 0)"
+                        Point0Y="@(selectedEvent?.Point0Y ?? 0)"
+                        EventName="@selectedEvent?.Name"
+                        EventId="@selectedEvent?.EventId"
+                        Sensors="filteredSensors"
+                        SensorChargeRatios="sensorChargeRatios"
+                        StructureName="@appData.Structure?.Name"
+                        ModuleName="Tableau de bord">
+                    </AliantWebS.Pages.CADPages.SVGComponent>
+
+                </div>
             </RadzenSplitterPane>
 
             @*                <RadzenSplitterPane Size="33%">
@@ -91,62 +134,79 @@
     <RadzenSplitterPane Size="50%">
 
         <RadzenSplitter Orientation="Radzen.Orientation.Vertical" style="height: 100%; border: 1px solid rgba(0,0,0,.08);">
-            <RadzenSplitterPane Size="50%">
-                @*                 @if (@present)
-                {
-
-                <h4>Rigidités des elements structuraux</h4>
-                <RadzenChart style="height: 600px; width:600px">
-                <RadzenBarSeries Data="@revenue2020" CategoryProperty="Quarter" Title="Rigidité" LineType="LineType.Dashed" ValueProperty="Revenue">
-                <RadzenSeriesDataLabels Visible="@showDataLabels" />
-                </RadzenBarSeries>
-
-                <RadzenValueAxis>
-                <RadzenGridLines Visible="true" />
-                <RadzenAxisTitle Text="Rigidité" />
-                </RadzenValueAxis>
-                <RadzenBarOptions Radius="5" />
-                </RadzenChart>
-
-                } *@
-                <IndicesInTimeComponent GraphId="g2" Headers="headers" Indices="indices"></IndicesInTimeComponent>
+            <RadzenSplitterPane Size="50%" Style="overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column;">
+                <div style="display: flex; align-items: center; gap: 10px; padding: 5px 10px; flex-shrink: 0;">
+                    <Label style="font-weight: 600;">Période :</Label>
+                    <RadzenDropDown TValue="string" Data="@timeRangeOptions" TextProperty="Text" ValueProperty="Value"
+                                    @bind-Value="@selectedTimeRange" Change="@OnTimeRangeChanged"
+                                    Style="width: 200px;" />
+                </div>
+                <div style="flex: 1; min-height: 320px; position: relative;">
+                    <IndicesInTimeComponent GraphId="g2" @ref="iitc" Headers="headers" Indices="indices"></IndicesInTimeComponent>
+                </div>
             </RadzenSplitterPane>
 
-            <RadzenSplitterPane Size="50%">
-                @* <ModalShapesComponent structure="appData.Structure"></ModalShapesComponent> *@
-                @* <ModalShapesDygraphsComponent structure="appData.Structure"></ModalShapesDygraphsComponent> *@
-
-                <div class="chart-grid">
-                    @foreach (var d in dataItemsLists)
-                    {
-                        <div class="chart-container">
-                            <div class="chart-label">
-                                <Label>@d.Key</Label>
-                            </div>
-                            <RadzenChart class="radzen-chart">
-                                <RadzenPieSeries TItem="DataItem" Data="@d.Value" CategoryProperty="Quarter" Title="@d.Key" ValueProperty="Revenue">
-                                    <RadzenSeriesDataLabels Visible="@showDataLabels" />
-                                </RadzenPieSeries>
-                            </RadzenChart>
-                        </div>
-                    }
+            <RadzenSplitterPane Size="50%" Style="overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column;">
+                <div style="display: flex; align-items: center; gap: 10px; padding: 5px 10px; flex-shrink: 0; flex-wrap: wrap;">
+                    <Label style="font-weight: 600;">Inclinaison maximum / 0.10°</Label>
+                    <Label style="font-weight: 600; margin-left: 10px;">Type de capteur :</Label>
+                    <RadzenDropDown TValue="Guid?" Data="@sensorTypeOptions" TextProperty="Text" ValueProperty="Value"
+                                    @bind-Value="@selectedInclinoTypeId" Change="@OnInclinoTypeChanged"
+                                    Style="width: 220px;" />
+                </div>
+                <div style="flex: 1; min-height: 320px; position: relative;">
+                    <IndicesInTimeComponent GraphId="g3" @ref="iitc2" Headers="headers2" Indices="indices2"></IndicesInTimeComponent>
                 </div>
             </RadzenSplitterPane>
 
         </RadzenSplitter>
     </RadzenSplitterPane>
 </RadzenSplitter>
+</div>
 
 @code {
+    // Manille rated load in kg. Loaded from AppSetting on first render, falling back to the
+    // compiled-in default, so it can be changed without a rebuild.
+
+    private bool dataLoaded = false;
+    private bool gaugesRendered = false;
 
     private int value1;
     private int value2;
     private int value3;
 
+    IndicesInTimeComponent iitc;
+    IndicesInTimeComponent iitc2;
 
+    // SVG component reference and data
+    AliantWebS.Pages.CADPages.SVGComponent svgComponent;
+    List<Element> allSensors = new List<Element>();
+    List<Element> filteredSensors = new List<Element>();
+    List<MotherGridPalonnier> palonniers = new List<MotherGridPalonnier>();
+    List<MotherGridPalonnier> motherGrids = new List<MotherGridPalonnier>();
+
+    // The event in hand, for the plan's origin (Point0) and the DXF drawing data. This page is not under
+    // AntaresConceptionLayout, so there is no cascaded event to read: it comes from appData.EventID, the way
+    // the rest of the application identifies the current event. Null is normal — see LoadEventAsync.
+    // Written out in full: this namespace has an Event of its own (Accelerometer.cs), and a type declared
+    // here wins over one reached by a using directive.
+    AliantWebS.Models.Event selectedEvent;
+
+    // Sensor type filter
+    Guid? selectedSensorTypeId = null;
+    Guid? selectedInclinoTypeId = null;
+    List<SensorTypeOption> sensorTypeOptions = new List<SensorTypeOption>();
+
+    class SensorTypeOption
+    {
+        public string Text { get; set; }
+        public Guid? Value { get; set; }
+    }
 
     List<Dictionary<object, double>> indices = new List<Dictionary<object, double>>();
+    List<Dictionary<object, double>> indices2 = new List<Dictionary<object, double>>();
 
+    List<string> headers2 = new List<string>();
 
     //string jsonlistIDs;
 
@@ -157,115 +217,591 @@
         public double Revenue { get; set; }
     }
 
+    class TimeRangeOption
+    {
+        public string Text { get; set; }
+        public string Value { get; set; }
+    }
+
+    List<TimeRangeOption> timeRangeOptions = new List<TimeRangeOption>
+    {
+        new TimeRangeOption { Text = "Dernier mois", Value = "1m" },
+        new TimeRangeOption { Text = "3 mois", Value = "3m" },
+        new TimeRangeOption { Text = "6 mois", Value = "6m" },
+        new TimeRangeOption { Text = "1 an", Value = "1y" },
+        new TimeRangeOption { Text = "Tout", Value = "all" }
+    };
+
+    // Reference period options for gauge indicators (chart1/2/3)
+    List<TimeRangeOption> refPeriodOptions = new List<TimeRangeOption>
+    {
+        new TimeRangeOption { Text = "1 semaine", Value = "1w" },
+        new TimeRangeOption { Text = "1 mois", Value = "1m" },
+        new TimeRangeOption { Text = "3 mois", Value = "3m" },
+        new TimeRangeOption { Text = "6 mois", Value = "6m" },
+        new TimeRangeOption { Text = "1 an", Value = "1y" },
+        new TimeRangeOption { Text = "5 ans", Value = "5y" },
+        new TimeRangeOption { Text = "10 ans", Value = "10y" }
+    };
+
+    // Default to one month: "all" scanned the whole history on every load (a very heavy Influx read).
+    string selectedTimeRange = "1m";
+    string selectedRefPeriod = "1y";
 
     bool present = false;
 
-    Dictionary<Guid, double> rigidities = null; //new List<double>() { 1.0075, 0.9982, 0.9747, 0.9801, 1.0098, 1.0015, 0.9829, 0.9749, 0.9731, 0.9753, 0.9907, 0.9983, 1.014, 0.9677, 0.9569, 1.013, 0.9965, 1, 1.0004, 0.9945, 0.989, 0.9908, 0.9991, 0.9966, 0.9873, 0.991, 1.0008, 0.9973 };
-
     List<string> headers = new List<string>();
-    // {
-    //     "Date","Index1","Index2","Index3" };
 
     Dictionary<string, DataItem[]> dataItemsLists = new Dictionary<string, DataItem[]>();
     Structural.IdentificationResult ir = new Structural.IdentificationResult();
-    protected override async Task OnInitializedAsync()
+
+    // All shackle sensors (unfiltered originals)
+    List<Element> allShackleSensors = new List<Element>();
+
+    // Filtered subsets used for computations
+    List<Element> shackleSensors = new List<Element>();
+    ChannelDataType weightChannelDataType = null;
+
+    List<Element> inclinometerSensors = new List<Element>();
+    ChannelDataType xAxisChannelDataType = null;
+    ChannelDataType yAxisChannelDataType = null;
+
+    // Color-coding map: ElementId → max charge ratio for the reference period
+    Dictionary<Guid, double> sensorChargeRatios = new Dictionary<Guid, double>();
+
+    /// <summary>
+    /// Computes per-sensor max charge ratio over the selected reference period
+    /// for color-coding manilles in the SVG.
+    /// </summary>
+    private async Task ComputeSensorChargeRatios()
     {
-        //// exemple de save
-        // Structural.IdentificationResult ir = new Structural.IdentificationResult();
-        // ir.Kpi1 = 76;
-        // ir.Kpi2 = 85;
-        // ir.Kpi3 = 58;
-        // Dictionary<Guid, double> d = new Dictionary<Guid, double>();
+        // Fixed reference period (e.g. 1y) → "worst case" colour. See SensorChargeRatioHelper.
+        sensorChargeRatios = await SensorChargeRatioHelper.ComputeAsync(
+            dbContextFactory, shackleSensors, weightChannelDataType,
+            GetStartDateFromRange(selectedRefPeriod), DateTime.UtcNow, _cts.Token);
+    }
 
-        // var eles = await entitiesService.GetFilteredEntitiesAsync<Element>(x => (x.StructureId == appData.Structure.StructureId) && (x.ElementType?.Name == "Beam2d"), "ElementType");
-        // var ll = new List<double>() { 1.0075, 0.9982, 0.9747, 0.9801, 1.0098, 1.0015, 0.9829, 0.9749, 0.9731, 0.9753, 0.9907, 0.9983, 1.014, 0.9677, 0.9569, 1.013, 0.9965, 1, 1.0004, 0.9945, 0.989, 0.9908, 0.9991, 0.9966, 0.9873, 0.991, 1.0008, 0.9973 };
-        // int j = 0;
-        // foreach(var e in eles)
-        // {
-        //     d.Add(e.ElementId, ll[j]);
-        //     j++;
-        // }
+    // Heavy data load — invoked from OnAfterRenderAsync(firstRender), NOT OnInitializedAsync, because
+    // the app is ServerPrerendered: work in OnInitializedAsync blocks the initial HTML, so the page
+    // would stay blank until every Influx/DB query below finished. OnAfterRender runs only in the
+    // interactive circuit, so the dashboard paints immediately (spinner) and fills in afterwards.
+    // Cancelled when the component is disposed (navigating away / switching tab), so the sequential
+    // Influx queries below stop instead of running on — each one otherwise costs up to the 60s
+    // HttpClient timeout on a full-year, all-sensor scan for a page nobody is looking at.
+    private readonly System.Threading.CancellationTokenSource _cts = new();
 
-        // ir.Rigidités = d;
+    public void Dispose()
+    {
+        try { _cts.Cancel(); } catch { }
+        _cts.Dispose();
+    }
 
-
-        // await ir.Save(appData.Structure);
-
+    private async Task LoadAllDataAsync()
+    {
         if (appData.Structure == null)
         {
             navigationManager.NavigateTo(@"/Structures");
+            return;
         }
-
 
         try
         {
             ir = await ir.Load(appData.Structure);
-
-            if (ir != null)
-            {
-                value1 = (int)(ir.TauxMoyen * 100);
-                value2 = (int)(ir.TauxMaximal * 100 * 0.93);
-                value3 = (int)(ir.Ptaux75_100 * 100);
-
-                //    rigidities = ir.TauxDetravail;
-            }
         }
         catch (Exception ex)
         {
             await js.InvokeVoidAsync("alert", ex.Message + " Most likely Identification was not done");
-            return;
         }
-
-
-
-
-
-
-
-        // indices.Add(series1);
-        // indices.Add(series2);
-        // indices.Add(series3);
 
         present = true;
 
-        if ((appData.Structure.Events is null) || (appData.Structure.Events.Count == 0))
-        {
-            entitiesService.LoadCollection(appData.Structure, "Events");
-        }
-        Dictionary<object, double> tauxDic = new Dictionary<object, double>();
-        foreach(var ev in appData.Structure.Events)
-        {
-            if ((ev.StartDate != null) && (ev.TauxMoyen != null))
-            {
-                tauxDic.Add((DateTime)ev.StartDate, (double)ev.TauxMoyen);
-            }
-        }
 
+        var ct = _cts.Token;
 
+        // Before the Influx work below: the event carries Point0, and without it the plan's origin marker,
+        // the coordinate readout and every exported DXF coordinate sit on the wrong origin.
+        await LoadEventAsync();
+        if (ct.IsCancellationRequested) return;
+
+        // Load SVG component data first (needed for graph3 generic channel discovery)
+        await LoadSvgData();
+        if (ct.IsCancellationRequested) return;
+
+        // Load shackle (manille) sensors of type weight_scale
+        await LoadShackleSensors();
+        allShackleSensors = shackleSensors.ToList();
+        if (ct.IsCancellationRequested) return;
+
+        // Compute gauge indicators from InfluxDB shackle data
+        await ComputeGaugeIndicators();
+        if (ct.IsCancellationRequested) return;
+
+        await ComputeSensorChargeRatios();
+        if (ct.IsCancellationRequested) return;
 
         headers.Add("Date");
-        indices.Add(tauxDic);
-        headers.Add("Taux d'utilisation Moyen");
-        // indices.Add(tauxDic);
-        // headers.Add("Taux d'utilisation Moyen");
-        // indices.Add(tauxDic);
-        // headers.Add("Taux d'utilisation Moyen");
-        await GetElementsPercentages();// not awaited on purpose so it dosnnt block BIM display
+        await LoadWeeklyMaxCharge();
+        if (ct.IsCancellationRequested) return;
 
+        headers2.Add("Date");
+        await LoadGraph3Data();
+        if (ct.IsCancellationRequested) return;
 
+        await GetElementsPercentages();
 
+        dataLoaded = true;
     }
 
+    /// <summary>
+    /// Loads the current event, whose Point0 is the origin the SVG draws and exports against.
+    /// </summary>
+    private async Task LoadEventAsync()
+    {
+        // Landing straight on the dashboard without having opened an event is legitimate: leave the event
+        // null and the SVG keeps its 0/0 default, exactly as the "?? 0" of the other call sites does.
+        if (appData.EventID == Guid.Empty) return;
+
+        try
+        {
+            selectedEvent = await entitiesService.GetEntityAsync<AliantWebS.Models.Event>(appData.EventID);
+        }
+        catch (Exception ex)
+        {
+            // A monitoring page must keep drawing: a failed lookup costs the origin, not the plan.
+            Console.WriteLine($"[Dashboard] Could not load event {appData.EventID}: {ex.Message}");
+        }
+    }
+
+    private async Task LoadSvgData()
+    {
+        if (appData.Structure == null) return;
+
+        using var context = await dbContextFactory.CreateDbContextAsync();
+
+        allSensors = await context.Elements
+            .Include(e => e.ElementType)
+                .ThenInclude(et => et.Category)
+            .Include(e => e.ElementType)
+                .ThenInclude(et => et.ChannelDataTypeElementTypes)
+                    .ThenInclude(cdtet => cdtet.ChannelDataType)
+            .Include(e => e.AttributeElements)
+                .ThenInclude(ae => ae.AttributeType)
+            .Where(e => e.StructureId == appData.Structure.StructureId
+                     && e.ElementType != null
+                     && e.ElementType.Category != null
+                     && e.ElementType.Category.Name == "sensing device")
+            .AsNoTracking()
+            .ToListAsync();
+
+        // Build sensor type dropdown options from distinct element types
+        sensorTypeOptions = allSensors
+            .Where(s => s.ElementType != null)
+            .Select(s => s.ElementType)
+            .DistinctBy(et => et.ElementTypeId)
+            .OrderBy(et => et.Name)
+            .Select(et => new SensorTypeOption { Text = et.Name, Value = et.ElementTypeId })
+            .ToList();
+
+        // Add "Tous" as the first option so it is always available
+        sensorTypeOptions.Insert(0, new SensorTypeOption { Text = "Tous", Value = Guid.Empty });
+
+        // Default main dropdown to Manille
+        var manilleOption = sensorTypeOptions.FirstOrDefault(o => o.Text.Contains("Manille", StringComparison.OrdinalIgnoreCase));
+        if (manilleOption != null)
+            selectedSensorTypeId = manilleOption.Value;
+        else if (sensorTypeOptions.Count > 0)
+            selectedSensorTypeId = sensorTypeOptions[0].Value;
+
+        // Default inclination dropdown to Inclinomètre
+        var inclinoOption = sensorTypeOptions.FirstOrDefault(o => o.Text.Contains("Inclin", StringComparison.OrdinalIgnoreCase));
+        if (inclinoOption != null)
+            selectedInclinoTypeId = inclinoOption.Value;
+        else if (sensorTypeOptions.Count > 0)
+            selectedInclinoTypeId = sensorTypeOptions[0].Value;
+
+        // Apply initial SVG filter (show only Manille sensors by default)
+        filteredSensors = selectedSensorTypeId != null && selectedSensorTypeId != Guid.Empty
+            ? allSensors.Where(s => s.ElementTypeId == selectedSensorTypeId).ToList()
+            : allSensors.ToList();
+
+        palonniers = await context.Set<MotherGridPalonnier>()
+            .Where(x => x.Famille == false)
+            .AsNoTracking()
+            .ToListAsync();
+
+        motherGrids = await context.Set<MotherGridPalonnier>()
+            .Where(x => x.Famille == true)
+            .AsNoTracking()
+            .ToListAsync();
+    }
+
+    /// <summary>
+    /// Called when the sensor type dropdown changes — refilters SVG, recomputes gauges and charts.
+    /// </summary>
+    private async Task OnSensorTypeChanged()
+    {
+        // Filter SVG sensors
+        filteredSensors = selectedSensorTypeId != null && selectedSensorTypeId != Guid.Empty
+            ? allSensors.Where(s => s.ElementTypeId == selectedSensorTypeId).ToList()
+            : allSensors.ToList();
+
+        // Filter shackle sensors for gauges and charge chart
+        shackleSensors = selectedSensorTypeId != null && selectedSensorTypeId != Guid.Empty
+            ? allShackleSensors.Where(s => s.ElementTypeId == selectedSensorTypeId).ToList()
+            : allShackleSensors.ToList();
+
+        // Recompute gauges and color map
+        await ComputeGaugeIndicators();
+        await ComputeSensorChargeRatios();
+        gaugesRendered = false;
+
+        // Recompute charge chart
+        await LoadWeeklyMaxCharge();
+        if (iitc != null)
+            await iitc.DisplayData(indices, headers);
+
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// Called when the inclination sensor type dropdown changes — recomputes inclination chart.
+    /// </summary>
+    private async Task OnInclinoTypeChanged()
+    {
+        await LoadGraph3Data();
+        if (iitc2 != null)
+            await iitc2.DisplayData(indices2, headers2);
+
+        StateHasChanged();
+    }
+
+    private async Task LoadShackleSensors()
+    {
+        var (sensors, weightChannel) =
+            await SensorChargeRatioHelper.LoadShackleSensorsAsync(dbContextFactory, appData.Structure);
+        shackleSensors = sensors;
+        weightChannelDataType = weightChannel;
+    }
+
+    // private async Task LoadInclinometerSensors()
+    // {
+    //     if (appData.Structure == null) return;
+
+    //     // Get inclinometer element types under "sensing device" category
+    //     var inclinometerTypes = await entitiesService.GetFilteredEntitiesAsync<ElementType>(
+    //         x => x.Category != null && x.Category.Name.ToLower() == "sensing device"
+    //              && (x.Name.ToLower().Contains("inclin")),
+    //         "Category");
+
+    //     foreach (var it in inclinometerTypes)
+    //     {
+    //         entitiesService.LoadCollection(it, "ChannelDataTypeElementTypes");
+    //         foreach (var cdtet in it.ChannelDataTypeElementTypes)
+    //         {
+    //             entitiesService.LoadReference(cdtet, "ChannelDataType");
+    //         }
+    //     }
+
+    //     // Find the x_axis and y_axis channel data types
+    //     var allChannels = inclinometerTypes
+    //         .SelectMany(it => it.ChannelDataTypeElementTypes)
+    //         .Select(cdtet => cdtet.ChannelDataType)
+    //         .ToList();
+
+    //     xAxisChannelDataType = allChannels.FirstOrDefault(cdt => cdt.Name == "x_axis");
+    //     yAxisChannelDataType = allChannels.FirstOrDefault(cdt => cdt.Name == "y_axis");
+
+    //     var inclinometerTypeIds = inclinometerTypes.Select(x => x.ElementTypeId).ToList();
+
+    //     inclinometerSensors = await entitiesService.GetFilteredEntitiesAsync<Element>(
+    //         x => x.StructureId == appData.Structure.StructureId && inclinometerTypeIds.Contains(x.ElementTypeId ?? Guid.Empty));
+    // }
+
+    private DateTime GetStartDateFromRange(string range)
+    {
+        return range switch
+        {
+            "1w" => DateTime.UtcNow.AddDays(-7),
+            "1m" => DateTime.UtcNow.AddMonths(-1),
+            "3m" => DateTime.UtcNow.AddMonths(-3),
+            "6m" => DateTime.UtcNow.AddMonths(-6),
+            "1y" => DateTime.UtcNow.AddYears(-1),
+            "5y" => DateTime.UtcNow.AddYears(-5),
+            "10y" => DateTime.UtcNow.AddYears(-10),
+            _ => new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc) // "all"
+        };
+    }
+
+    /// <summary>
+    /// Computes gauge indicator values (chart1/2/3) from InfluxDB shackle sensor data
+    /// over the selected reference period.
+    /// </summary>
+    private async Task ComputeGaugeIndicators()
+    {
+        if (shackleSensors.Count == 0 || weightChannelDataType == null)
+        {
+            value1 = 0; value2 = 0; value3 = 0;
+            return;
+        }
+
+        DateTime startDate = GetStartDateFromRange(selectedRefPeriod);
+        DateTime endDate = DateTime.UtcNow;
+
+        var sensorIds = shackleSensors.Select(s => s.ElementId.ToString()).ToList();
+        var channelIds = new List<string> { weightChannelDataType.ChannelDataTypeId.ToString() };
+
+        try
+        {
+            var bucketName = ReportsService.BucketName;
+
+            // Query per-sensor mean weight over the reference period (one row per sensor)
+            var meanData = await InfluxService.GetData(sensorIds, channelIds, startDate, endDate, bucketName,
+                aggregateWindowDuration: "36500d", aggregateFn: "mean", cancellationToken: _cts.Token);
+
+            // Query per-sensor max weight over the reference period (one row per sensor)
+            var maxData = await InfluxService.GetData(sensorIds, channelIds, startDate, endDate, bucketName,
+                aggregateWindowDuration: "36500d", aggregateFn: "max", cancellationToken: _cts.Token);
+
+            // Each sensor is rated against its OWN alarm threshold, so the gauges aggregate
+            // per-sensor RATIOS instead of dividing a shared total by one rated load. Sensors with
+            // no threshold for this channel are left out entirely — nothing is assumed for them.
+            var thresholds = await SensorChargeRatioHelper.LoadThresholdsAsync(
+                dbContextFactory, shackleSensors, weightChannelDataType?.Name);
+
+            double? RatioFor(string sensorId, double value)
+                => Guid.TryParse(sensorId, out var id) && thresholds.TryGetValue(id, out var t) && t != 0
+                    ? value / t
+                    : (double?)null;
+
+            // value1: Taux de travail moyen = average of per-sensor (mean / its own threshold)
+            if (meanData != null && meanData.Count > 0)
+            {
+                var meanRatios = meanData
+                    .Where(r => r[2] != null)
+                    .GroupBy(r => (string)r[1])
+                    .Select(g => RatioFor(g.Key, g.Average(r => (double)r[2])))
+                    .Where(x => x.HasValue)
+                    .Select(x => x.Value)
+                    .ToList();
+
+                value1 = meanRatios.Count > 0
+                    ? Math.Clamp((int)(meanRatios.Average() * 100), 0, 100)
+                    : 0;
+            }
+            else
+            {
+                value1 = 0;
+            }
+
+            // value2 & value3 from per-sensor max ratios
+            if (maxData != null && maxData.Count > 0)
+            {
+                var perSensorMax = maxData
+                    .Where(r => r[2] != null)
+                    .GroupBy(r => (string)r[1])
+                    .ToDictionary(g => g.Key, g => g.Max(r => (double)r[2]));
+
+                var maxRatios = new List<double>();
+                foreach (var kvp in perSensorMax)
+                {
+                    var ratio = RatioFor(kvp.Key, kvp.Value);
+                    if (ratio.HasValue) maxRatios.Add(ratio.Value);
+                }
+
+                if (perSensorMax.Count != maxRatios.Count)
+                    Console.WriteLine($"[Dashboard] {perSensorMax.Count - maxRatios.Count} sensor(s) "
+                                    + "excluded from the gauges: no alarm threshold for this channel.");
+
+                // Taux de travail maximum = the highest ratio across all sensors
+                value2 = maxRatios.Count > 0
+                    ? Math.Clamp((int)(maxRatios.Max() * 100), 0, 100)
+                    : 0;
+
+                // Pourcentage d'éléments critiques = share of sensors above 80% of their threshold
+                int criticalCount = maxRatios.Count(v => v > 0.80);
+                value3 = maxRatios.Count > 0
+                    ? Math.Clamp((int)((double)criticalCount / maxRatios.Count * 100), 0, 100)
+                    : 0;
+            }
+            else
+            {
+                value2 = 0;
+                value3 = 0;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error computing gauge indicators: {ex.Message}");
+            value1 = 0; value2 = 0; value3 = 0;
+        }
+    }
+
+    /// <summary>
+    /// Called when the reference period dropdown changes — recomputes gauges and re-renders charts.
+    /// </summary>
+    private async Task OnRefPeriodChanged()
+    {
+        await ComputeGaugeIndicators();
+        await ComputeSensorChargeRatios();
+        await js.InvokeVoidAsync("renderChart", value1, value2, value3);
+        StateHasChanged();
+    }
+
+    private async Task LoadWeeklyMaxCharge()
+    {
+        indices.Clear();
+        if (headers.Count > 1)
+            headers.RemoveRange(1, headers.Count - 1);
+
+        if (shackleSensors.Count == 0 || weightChannelDataType == null) return;
+
+        DateTime startDate = GetStartDateFromRange(selectedTimeRange);
+        DateTime endDate = DateTime.UtcNow;
+
+        var sensorIds = shackleSensors.Select(s => s.ElementId.ToString()).ToList();
+        var channelIds = new List<string> { weightChannelDataType.ChannelDataTypeId.ToString() };
+
+        List<object[]> rawData;
+        try
+        {
+            var bucketName = ReportsService.BucketName;
+            rawData = await InfluxService.GetData(sensorIds, channelIds, startDate, endDate, bucketName,
+                aggregateWindowDuration: "1w", aggregateFn: "max", cancellationToken: _cts.Token);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error querying InfluxDB for shackle data: {ex.Message}");
+            return;
+        }
+
+        if (rawData == null || rawData.Count == 0) return;
+
+        Dictionary<object, double> weeklyMaxCharge = new Dictionary<object, double>();
+
+        var grouped = rawData
+            .Where(r => r[0] is DateTime && r[2] != null)
+            .GroupBy(r =>
+            {
+                var dt = (DateTime)r[0];
+                int diff = (7 + (dt.DayOfWeek - DayOfWeek.Monday)) % 7;
+                return dt.Date.AddDays(-diff);
+            })
+            .OrderBy(g => g.Key);
+
+        // Each reading is rated against its own sensor's threshold before taking the weekly peak,
+        // so the curve is "worst utilisation that week" rather than raw kilograms.
+        var weekThresholds = await SensorChargeRatioHelper.LoadThresholdsAsync(
+            dbContextFactory, shackleSensors, weightChannelDataType?.Name);
+
+        foreach (var weekGroup in grouped)
+        {
+            double? weekMaxRatio = null;
+            foreach (var r in weekGroup)
+            {
+                if (!Guid.TryParse((string)r[1], out var sid)) continue;
+                if (!weekThresholds.TryGetValue(sid, out var t) || t == 0) continue;
+
+                double ratio = (double)r[2] / t;
+                if (!weekMaxRatio.HasValue || ratio > weekMaxRatio.Value) weekMaxRatio = ratio;
+            }
+
+            if (weekMaxRatio.HasValue)
+                weeklyMaxCharge.Add(weekGroup.Key, Math.Round(weekMaxRatio.Value, 4));
+        }
+
+        if (weeklyMaxCharge.Count == 0) return;   // no sensor had a threshold — nothing to plot
+
+        indices.Add(weeklyMaxCharge);
+        headers.Add("Charge max manilles / seuil d'alarme");
+    }
+
+    private async Task LoadWeeklyMaxInclination()
+    {
+        indices2.Clear();
+        if (headers2.Count > 1)
+            headers2.RemoveRange(1, headers2.Count - 1);
+
+        if (inclinometerSensors.Count == 0 || xAxisChannelDataType == null || yAxisChannelDataType == null) return;
+
+        DateTime startDate = GetStartDateFromRange(selectedTimeRange);
+        DateTime endDate = DateTime.UtcNow;
+
+        var sensorIds = inclinometerSensors.Select(s => s.ElementId.ToString()).ToList();
+        // Query both x_axis and y_axis — weekly max computed server-side by InfluxDB
+        var channelIds = new List<string>
+        {
+            xAxisChannelDataType.ChannelDataTypeId.ToString(),
+            yAxisChannelDataType.ChannelDataTypeId.ToString()
+        };
+
+        List<object[]> rawData;
+        try
+        {
+            var bucketName = ReportsService.BucketName;
+            rawData = await InfluxService.GetData(sensorIds, channelIds, startDate, endDate, bucketName,
+                aggregateWindowDuration: "1w", aggregateFn: "max", cancellationToken: _cts.Token);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error querying InfluxDB for inclinometer data: {ex.Message}");
+            return;
+        }
+
+        if (rawData == null || rawData.Count == 0) return;
+
+        // rawData layout: [0]=DateTime, [1]=sensorId, [2]=x_axis, [3]=y_axis
+        // Compute inclination magnitude = sqrt(x² + y²) per row,
+        // then group by week across all sensors and take the max, divided by 0.10°.
+        Dictionary<object, double> weeklyMaxInclination = new Dictionary<object, double>();
+
+        var grouped = rawData
+            .Where(r => r[0] is DateTime && r[2] != null && r[3] != null)
+            .GroupBy(r =>
+            {
+                var dt = (DateTime)r[0];
+                int diff = (7 + (dt.DayOfWeek - DayOfWeek.Monday)) % 7;
+                return dt.Date.AddDays(-diff);
+            })
+            .OrderBy(g => g.Key);
+
+        foreach (var weekGroup in grouped)
+        {
+            double maxMagnitude = weekGroup.Max(r =>
+            {
+                double x = (double)r[2];
+                double y = (double)r[3];
+                return Math.Sqrt(x * x + y * y);
+            });
+            double normalized = maxMagnitude / 0.10;
+            weeklyMaxInclination.Add(weekGroup.Key, Math.Round(normalized, 4));
+        }
+
+        indices2.Add(weeklyMaxInclination);
+        headers2.Add("Inclinaison max / 0.10°");
+    }
+
+    private async Task OnTimeRangeChanged()
+    {
+        await LoadWeeklyMaxCharge();
+        await LoadGraph3Data();
+
+        if (iitc != null)
+        {
+            await iitc.DisplayData(indices, headers);
+        }
+        if (iitc2 != null)
+        {
+            await iitc2.DisplayData(indices2, headers2);
+        }
+        StateHasChanged();
+    }
 
     private async Task GetElementsPercentages()
     {
-
-
         DataItem[] dataItem = new DataItem[4];
 
         if (ir != null)
         {
-
             dataItem[0] = new DataItem() { Quarter = "0-25%", Revenue = (int)(ir.Ptaux0_25 * 100) };
             dataItem[1] = new DataItem() { Quarter = "25-50%", Revenue = (int)(ir.Ptaux25_50 * 100) };
             dataItem[2] = new DataItem() { Quarter = "50-75%", Revenue = (int)(ir.Ptaux50_75 * 100) };
@@ -273,44 +809,130 @@
 
             string title = "Taux de travail";
             dataItemsLists.Add(title, dataItem);
-
         }
 
-
         StateHasChanged();
-
     }
-
-
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            await js.InvokeVoidAsync("renderChart", value1, value2, value3);
-            List<Element> els = await entitiesService.GetFilteredEntitiesAsync<Element>(x => x.StructureId == appData.Structure.StructureId && x.ElementType != null && x.ElementType.Name == "Beam3d", "ElementType");
-            Dictionary<long, Guid> instanceIdsList = els
-                .Where(x => x.BimId.HasValue)
-                .ToDictionary(x => x.BimId.Value, x => x.ElementId);
-
-            var colors = AliantWebS.Pages.InventoryElementPages.BIMComponent.GenerateBlueToRedColors(101);
-
-            if (ir != null)
+            // Deferred heavy load (see LoadAllDataAsync). Paints the shell first, then fills in.
+            try
             {
-                int i = 0;
-                foreach (var inst in instanceIdsList)
-                //for (int i =0; i<l.Count; i++)
-                {
-                    if (!ir.TauxDetravail.Keys.Contains(inst.Value)) continue;
-                    var tt = (int)ir.TauxDetravail[inst.Value] * 100;
-
-                    List<long> ins = new List<long>() { inst.Key };
-
-                    await js.InvokeVoidAsync("ColorElement", tt, ins.ToArray(), colors[tt].r, colors[tt].g, colors[tt].b);
-                    i++;
-                }
+                await LoadAllDataAsync();
             }
-            this.StateHasChanged();
+            catch (OperationCanceledException)
+            {
+                return;   // component disposed mid-load (navigated away) — nothing to render
+            }
+            StateHasChanged();
+            return;
+        }
+
+        // Render gauges once data is loaded and DOM is ready
+        if (dataLoaded && !gaugesRendered)
+        {
+            gaugesRendered = true;
+            await js.InvokeVoidAsync("renderChart", value1, value2, value3);
+        }
+
+        // Update charts after components are rendered and data is loaded
+        if (dataLoaded)
+        {
+            if (iitc != null && indices.Count > 0)
+            {
+                await iitc.DisplayData(indices, headers);
+            }
+
+            if (iitc2 != null && indices2.Count > 0)
+            {
+                await iitc2.DisplayData(indices2, headers2);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Loads weekly max data for graph3 based on whatever sensor type is selected
+    /// in the inclination dropdown. Discovers channels dynamically from the loaded sensor metadata.
+    /// </summary>
+    private async Task LoadGraph3Data()
+    {
+        indices2.Clear();
+        if (headers2.Count > 1)
+            headers2.RemoveRange(1, headers2.Count - 1);
+
+        // Get sensors for the selected type from allSensors (which has ElementType + channels loaded)
+        List<Element> graph3Sensors;
+        if (selectedInclinoTypeId == null || selectedInclinoTypeId == Guid.Empty)
+            graph3Sensors = allSensors.ToList();
+        else
+            graph3Sensors = allSensors.Where(s => s.ElementTypeId == selectedInclinoTypeId).ToList();
+
+        if (graph3Sensors.Count == 0) return;
+
+        // Get distinct channel data types for these sensors
+        var channelDataTypes = graph3Sensors
+            .Where(s => s.ElementType?.ChannelDataTypeElementTypes != null)
+            .SelectMany(s => s.ElementType.ChannelDataTypeElementTypes)
+            .Where(cdtet => cdtet.ChannelDataType != null)
+            .Select(cdtet => cdtet.ChannelDataType)
+            .DistinctBy(cdt => cdt.ChannelDataTypeId)
+            .ToList();
+
+        if (channelDataTypes.Count == 0) return;
+
+        var sensorIds = graph3Sensors.Select(s => s.ElementId.ToString()).ToList();
+        var channelIds = channelDataTypes.Select(cdt => cdt.ChannelDataTypeId.ToString()).ToList();
+
+        DateTime startDate = GetStartDateFromRange(selectedTimeRange);
+        DateTime endDate = DateTime.UtcNow;
+
+        List<object[]> rawData;
+        try
+        {
+            var bucketName = ReportsService.BucketName;
+            rawData = await InfluxService.GetData(sensorIds, channelIds, startDate, endDate, bucketName,
+                aggregateWindowDuration: "1w", aggregateFn: "max", cancellationToken: _cts.Token);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error querying InfluxDB for graph3 data: {ex.Message}");
+            return;
+        }
+
+        if (rawData == null || rawData.Count == 0) return;
+
+        // For each channel, group by week and compute weekly max across all sensors
+        // rawData layout: [0]=DateTime, [1]=sensorId, [2]=channel1, [3]=channel2, ...
+        for (int ch = 0; ch < channelDataTypes.Count; ch++)
+        {
+            int dataIndex = ch + 2;
+
+            var weeklyMax = new Dictionary<object, double>();
+
+            var grouped = rawData
+                .Where(r => r[0] is DateTime && r.Length > dataIndex && r[dataIndex] != null)
+                .GroupBy(r =>
+                {
+                    var dt = (DateTime)r[0];
+                    int diff = (7 + (dt.DayOfWeek - DayOfWeek.Monday)) % 7;
+                    return dt.Date.AddDays(-diff);
+                })
+                .OrderBy(g => g.Key);
+
+            foreach (var weekGroup in grouped)
+            {
+                double maxVal = weekGroup.Max(r => (double)r[dataIndex]);
+                weeklyMax.Add(weekGroup.Key, Math.Round(maxVal, 4));
+            }
+
+            if (weeklyMax.Count > 0)
+            {
+                indices2.Add(weeklyMax);
+                headers2.Add(channelDataTypes[ch].Name);
+            }
         }
     }
 }

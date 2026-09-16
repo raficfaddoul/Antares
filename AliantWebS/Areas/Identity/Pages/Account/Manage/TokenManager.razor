@@ -153,7 +153,36 @@ else
         //await Task.WhenAll(entitiesService.tasksList);
         tokenList = await entitiesService.GetAllEntitiesAsync<Token>("TokenAspNetRoles.AspNetRoles");
 
-        rolesList = await entitiesService.GetAllEntitiesAsync<AspNetRole>();        
+        rolesList = await entitiesService.GetAllEntitiesAsync<AspNetRole>();  
+
+        if (rolesList.Contains(rolesList.FirstOrDefault(r => r.Name == "Administrator")) == false)
+        {
+            var adminRole = new IdentityRole("Administrator");
+            await roleManager.CreateAsync(adminRole);
+            rolesList = await entitiesService.GetAllEntitiesAsync<AspNetRole>();
+        }
+
+        if (rolesList.Contains(rolesList.FirstOrDefault(r => r.Name == "Developer")) == false)
+        {
+            var developerRole = new IdentityRole("Developer");
+            await roleManager.CreateAsync(developerRole);
+            rolesList = await entitiesService.GetAllEntitiesAsync<AspNetRole>();
+        }
+
+        if (rolesList.Contains(rolesList.FirstOrDefault(r => r.Name == "AlarmRecipient")) == false)
+        {
+            var alarmRecipientRole = new IdentityRole("AlarmRecipient");
+            await roleManager.CreateAsync(alarmRecipientRole);
+            rolesList = await entitiesService.GetAllEntitiesAsync<AspNetRole>();
+        }
+
+        if (rolesList.Contains(rolesList.FirstOrDefault(r => r.Name == "User")) == false)
+        {
+            var userRole = new IdentityRole("User");
+            await roleManager.CreateAsync(userRole);
+            rolesList = await entitiesService.GetAllEntitiesAsync<AspNetRole>();
+        }
+               
 
     }
 

@@ -1,0 +1,1055 @@
+﻿@page "/settingsFolder/charpente-mapping"
+@using AliantWebS.Data
+@using AliantWebS.Models
+@using System.Reflection
+@using Microsoft.EntityFrameworkCore
+@inject EntitiesService entitiesService
+@inject NavigationManager navigationManager
+@inject IStringLocalizer<Languages> L
+@inject IJSRuntime js
+@inject JournalService journal
+
+<style>
+    .charpente-container {
+        padding: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+    }
+
+    .charpente-card {
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        padding: 30px;
+        margin-bottom: 20px;
+    }
+
+    .charpente-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        padding-bottom: 20px;
+        border-bottom: 3px solid #667eea;
+    }
+
+    .charpente-title {
+        font-size: 32px;
+        font-weight: 700;
+        color: #2d3748;
+        margin: 0;
+    }
+
+    .charpente-subtitle {
+        color: #718096;
+        font-size: 14px;
+        margin-top: 5px;
+    }
+
+    .button-group {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .btn-modern {
+        padding: 12px 24px;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .btn-primary-modern {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-primary-modern:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+    }
+
+    .btn-success-modern {
+        background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(72, 187, 120, 0.4);
+    }
+
+    .btn-success-modern:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(72, 187, 120, 0.6);
+    }
+
+    .btn-secondary-modern {
+        background: #e2e8f0;
+        color: #4a5568;
+    }
+
+    .btn-secondary-modern:hover {
+        background: #cbd5e0;
+        transform: translateY(-2px);
+    }
+
+    .mapping-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        margin-top: 20px;
+        overflow: hidden;
+        border-radius: 8px;
+    }
+
+    .mapping-table thead {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+
+    .mapping-table th {
+        padding: 15px;
+        text-align: left;
+        font-weight: 600;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .mapping-table th:first-child {
+        border-top-left-radius: 8px;
+    }
+
+    .mapping-table th:last-child {
+        border-top-right-radius: 8px;
+    }
+
+    .mapping-table tbody tr {
+        background: white;
+        transition: all 0.3s ease;
+    }
+
+    .mapping-table tbody tr:nth-child(even) {
+        background: #f7fafc;
+    }
+
+    .mapping-table tbody tr:hover {
+        background: #edf2f7;
+        transform: scale(1.01);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .mapping-table td {
+        padding: 15px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .column-badge {
+        display: inline-block;
+        padding: 6px 12px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 6px;
+        font-weight: 700;
+        font-size: 14px;
+        min-width: 50px;
+        text-align: center;
+    }
+
+    .form-control-modern {
+        width: 100%;
+        padding: 10px 15px;
+        border: 2px solid #e2e8f0;
+        border-radius: 8px;
+        font-size: 14px;
+        transition: all 0.3s ease;
+        background: white;
+    }
+
+    .form-control-modern:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .select-modern {
+        width: 100%;
+        padding: 10px 15px;
+        border: 2px solid #e2e8f0;
+        border-radius: 8px;
+        font-size: 14px;
+        transition: all 0.3s ease;
+        background: white;
+        cursor: pointer;
+    }
+
+    .select-modern:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .mapped-indicator {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        margin-right: 8px;
+    }
+
+    .mapped-yes {
+        background: #48bb78;
+    }
+
+    .mapped-no {
+        background: #f56565;
+    }
+
+    .loading-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 400px;
+    }
+
+    .spinner {
+        width: 50px;
+        height: 50px;
+        border: 4px solid #e2e8f0;
+        border-top: 4px solid #667eea;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @@keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+        margin-top: 20px;
+        color: #4a5568;
+        font-size: 16px;
+        font-weight: 600;
+    }
+
+    .stats-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+
+    .stat-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+
+    .stat-number {
+        font-size: 36px;
+        font-weight: 700;
+        margin-bottom: 5px;
+    }
+
+    .stat-label {
+        font-size: 14px;
+        opacity: 0.9;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .search-box {
+        margin-bottom: 20px;
+    }
+
+    .search-input {
+        width: 100%;
+        padding: 12px 20px;
+        border: 2px solid #e2e8f0;
+        border-radius: 25px;
+        font-size: 14px;
+        transition: all 0.3s ease;
+    }
+
+    .search-input:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .status-mapped {
+        background: #c6f6d5;
+        color: #22543d;
+    }
+
+    .status-unmapped {
+        background: #fed7d7;
+        color: #742a2a;
+    }
+</style>
+
+
+<div class="charpente-container">
+    <div class="charpente-card">
+        @if (isLoading)
+        {
+            <div class="loading-container">
+                <div class="spinner"></div>
+                <div class="loading-text">@L["Loading..."]</div>
+            </div>
+        }
+        else
+        {
+            <div class="charpente-header">
+                <div>
+                    <h1 class="charpente-title">@L["Charpente Element Mapping"]</h1>
+                    <p class="charpente-subtitle">@L["Configure element mappings for Antares structure"]</p>
+                </div>
+                <div class="button-group">
+                    <button type="button" class="btn-modern btn-secondary-modern" @onclick="Cancel">
+                        <span>←</span> @L["Back"]
+                    </button>
+                </div>
+            </div>
+
+            <div class="stats-container">
+                <div class="stat-card">
+                    <div class="stat-number">@totalColumns</div>
+                    <div class="stat-label">@L["Total Columns"]</div>
+                </div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);">
+                    <div class="stat-number">@mappedCount</div>
+                    <div class="stat-label">@L["Mapped Elements"]</div>
+                </div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);">
+                    <div class="stat-number">@unmappedCount</div>
+                    <div class="stat-label">@L["Unmapped Elements"]</div>
+                </div>
+            </div>
+
+            <EditForm Model="tcharpente" OnValidSubmit="SaveMapping">
+                <div class="button-group" style="margin-bottom: 20px;">
+                    <button type="button" class="btn-modern btn-primary-modern" @onclick="AutoMapElements">
+                        <span>⚡</span> @L["Auto-Map Elements"]
+                    </button>
+                    <button type="submit" class="btn-modern btn-success-modern">
+                        <span>💾</span> @L["Save Mapping"]
+                    </button>
+                </div>
+
+                <div class="search-box">
+                    <input type="text" 
+                           class="search-input" 
+                           placeholder="@L["Search columns (e.g., A2, B5)..."]"
+                           @bind="searchTerm"
+                           @bind:event="oninput" />
+                </div>
+
+                <div style="overflow-x: auto;">
+                    <table class="mapping-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 100px;">@L["Column"]</th>
+                                <th style="width: 150px;">@L["Charge critique"]</th>
+                                <th>@L["Mapped Element"]</th>
+                                <th style="width: 230px;">@L["Capteurs / seuils d'alarme"]</th>
+                                <th style="width: 150px;">@L["Status"]</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var column in columns)
+                            {
+                                @foreach (var row in rows)
+                                {
+                                    var key = $"{column}{row}";
+                                    if (string.IsNullOrEmpty(searchTerm) || key.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        var isMapped = GetMapProperty(key) != null && GetMapProperty(key) != Guid.Empty;
+                                        <tr>
+                                            <td>
+                                                <span class="column-badge">@key</span>
+                                            </td>
+                                            <td>
+                                                <input type="number" 
+                                                       class="form-control-modern" 
+                                                       value="@GetValueProperty(key)" 
+                                                       @onchange="@(e => SetValueProperty(key, e.Value?.ToString()))"
+                                                       step="0.01" />
+                                            </td>
+                                            <td>
+                                                <select class="select-modern" 
+                                                        value="@GetMapProperty(key)" 
+                                                        @onchange="@(e => SetMapProperty(key, e.Value?.ToString()))">
+                                                    <option value="">-- @L["Select Element"] --</option>
+                                                    @foreach (var element in elements)
+                                                    {
+                                                        <option value="@element.ElementId">@element.Name</option>
+                                                    }
+                                                </select>
+                                            </td>
+                                            <td>
+                                                @{
+                                                    var sensorList = SensorsFor(key);
+                                                    var expanded = expandedKeys.Contains(key);
+                                                }
+                                                @if (sensorList == null || sensorList.Count == 0)
+                                                {
+                                                    <span style="color:#aaa;">—</span>
+                                                }
+                                                else
+                                                {
+                                                    <span style="cursor:pointer; user-select:none; color:#4a5568; display:inline-flex; align-items:center; gap:6px;"
+                                                          @onclick="() => ToggleExpanded(key)">
+                                                        <span style="font-size:11px;">@(expanded ? "▼" : "▶")</span>
+                                                        @sensorList.Count @(sensorList.Count > 1 ? L["capteurs"] : L["capteur"])
+                                                        · @sensorList.Sum(s => s.Channels.Count) @L["canaux"]
+                                                    </span>
+                                                }
+                                            </td>
+                                            <td>
+                                                <span class="status-badge @(isMapped ? "status-mapped" : "status-unmapped")">
+                                                    <span class="mapped-indicator @(isMapped ? "mapped-yes" : "mapped-no")"></span>
+                                                    @(isMapped ? L["Mapped"] : L["Not Mapped"])
+                                                </span>
+                                            </td>
+                                        </tr>
+
+                                        @if (expandedKeys.Contains(key))
+                                        {
+                                            var expandedSensors = SensorsFor(key);
+                                            if (expandedSensors != null)
+                                            {
+                                                <tr>
+                                                    <td colspan="5" style="background:#fafbff; padding:0 15px 14px 15px;">
+                                                        @foreach (var st in expandedSensors)
+                                                        {
+                                                            <div style="border-left:3px solid #667eea; padding:10px 0 6px 14px; margin:10px 0 0 10px;">
+                                                                <div style="font-weight:600; color:#2d3748; margin-bottom:8px;">
+                                                                    @st.Sensor.Name
+                                                                    <span style="font-weight:400; font-size:12px; color:#888; margin-left:8px;">
+                                                                        @st.Sensor.ElementType?.Name — @L["seuil d'alarme par canal"]
+                                                                    </span>
+                                                                </div>
+                                                                <table style="border-collapse:collapse; font-size:13px;">
+                                                                    <thead>
+                                                                        <tr style="color:#718096;">
+                                                                            <th style="text-align:left; padding:2px 14px 6px 0; font-weight:600;">@L["Canal"]</th>
+                                                                            <th style="text-align:left; padding:2px 14px 6px 0; font-weight:600;">@L["Seuil d'alarme"]</th>
+                                                                            <th style="text-align:left; padding:2px 14px 6px 0; font-weight:600;" title="y = C1·x + C0">C1</th>
+                                                                            <th style="text-align:left; padding:2px 0 6px 0; font-weight:600;" title="y = C1·x + C0">C0</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        @foreach (var ch in st.Channels)
+                                                                        {
+                                                                            <tr>
+                                                                                <td style="padding:3px 14px 3px 0; color:#4a5568;">@ch</td>
+                                                                                <td style="padding:3px 14px 3px 0;">
+                                                                                    @if (st.ThresholdAttributeTypeId == Guid.Empty)
+                                                                                    {
+                                                                                        <span style="color:#c08a00;" title="@L["Aucun attribut mappé sur le tag « seuil_alarme » pour ce type de capteur"]">—</span>
+                                                                                    }
+                                                                                    else
+                                                                                    {
+                                                                                        <input type="number" step="0.01" style="width:105px;" class="form-control-modern"
+                                                                                               value="@(st.Values.TryGetValue(ch, out var tv) && tv.HasValue ? tv.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "")"
+                                                                                               @onchange="@(e => SetThreshold(st, ch, e.Value?.ToString()))" />
+                                                                                    }
+                                                                                </td>
+                                                                                <td style="padding:3px 14px 3px 0;">
+                                                                                    @if (st.C1TypeIds.TryGetValue(ch, out var c1t) && c1t != Guid.Empty)
+                                                                                    {
+                                                                                        <input type="number" step="any" style="width:95px;" class="form-control-modern"
+                                                                                               placeholder="1"
+                                                                                               value="@(st.C1Values.TryGetValue(ch, out var c1v) && c1v.HasValue ? c1v.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "")"
+                                                                                               @onchange="@(e => SetCalib(st, ch, true, e.Value?.ToString()))" />
+                                                                                    }
+                                                                                    else
+                                                                                    {
+                                                                                        <span style="color:#bbb;" title="@($"Pas d'attribut C1_{ch} sur ce type")">—</span>
+                                                                                    }
+                                                                                </td>
+                                                                                <td style="padding:3px 0;">
+                                                                                    @if (st.C0TypeIds.TryGetValue(ch, out var c0t) && c0t != Guid.Empty)
+                                                                                    {
+                                                                                        <input type="number" step="any" style="width:95px;" class="form-control-modern"
+                                                                                               placeholder="0"
+                                                                                               value="@(st.C0Values.TryGetValue(ch, out var c0v) && c0v.HasValue ? c0v.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "")"
+                                                                                               @onchange="@(e => SetCalib(st, ch, false, e.Value?.ToString()))" />
+                                                                                    }
+                                                                                    else
+                                                                                    {
+                                                                                        <span style="color:#bbb;" title="@($"Pas d'attribut C0_{ch} sur ce type")">—</span>
+                                                                                    }
+                                                                                </td>
+                                                                            </tr>
+                                                                        }
+                                                                    </tbody>
+                                                                </table>
+                                                                @if (st.ThresholdAttributeTypeId == Guid.Empty)
+                                                                {
+                                                                    <div style="font-size:12px; color:#a05a00; background:#fff3cd;
+                                                                                border:1px solid #ffe08a; border-radius:6px; padding:6px 10px; margin-top:8px;">
+                                                                        @L["Seuil non modifiable"] :
+                                                                        @L["aucun attribut du type"] « @st.Sensor.ElementType?.Name »
+                                                                        @L["n'est mappé sur le tag"] « seuil_alarme ».
+                                                                    </div>
+                                                                }
+                                                            </div>
+                                                        }
+                                                    </td>
+                                                </tr>
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </EditForm>
+        }
+    </div>
+</div>
+
+@code {
+    private Tcharpente tcharpente;
+    private List<Element> elements;
+    private readonly Guid targetStructureId = Guid.Parse("84028ce7-6e17-ef11-ab4f-3c557678c0f7");
+    private bool isLoading = true;
+    private string searchTerm = "";
+
+    private readonly string[] columns = { "A", "B", "C", "D", "E", "F", "G", "H", "I", "J" };
+    private readonly string[] rows = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "10" };
+
+    private int totalColumns => columns.Length * rows.Length;
+    private int mappedCount => GetMappedCount();
+    private int unmappedCount => totalColumns - mappedCount;
+
+    // ── Sensing devices under each mapped element, with their alarm thresholds ─────────────
+    // Sensors are children of the structural node (Element.ParentId). The threshold lives in a
+    // single attribute per sensor, packed as "weight:2000;temperature:60" — one entry per channel
+    // — so editing one channel means re-packing the whole string on save.
+    private class SensorThresholds
+    {
+        public Element Sensor { get; set; }
+        public Guid ThresholdAttributeTypeId { get; set; }
+        public AttributeElement ThresholdAttribute { get; set; }   // null until first saved
+        public List<string> Channels { get; set; } = new();
+        public Dictionary<string, double?> Values { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+        public bool Dirty { get; set; }
+
+        // Calibration y = C1·x + C0. Unlike the threshold (one packed attribute for all channels),
+        // these are one attribute PER channel, named "<prefix>_<channel>" — e.g. C1_weight.
+        public Dictionary<string, Guid> C1TypeIds { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, Guid> C0TypeIds { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, AttributeElement> C1Attrs { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, AttributeElement> C0Attrs { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, double?> C1Values { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, double?> C0Values { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public HashSet<string> CalibDirty { get; } = new(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static double? ParseNumber(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+        raw = raw.Trim();
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        if (double.TryParse(raw, System.Globalization.NumberStyles.Float, inv, out var v)) return v;
+        if (double.TryParse(raw.Replace(',', '.'), System.Globalization.NumberStyles.Float, inv, out v)) return v;
+        return null;
+    }
+
+    private void SetCalib(SensorThresholds st, string channel, bool isC1, string raw)
+    {
+        var target = isC1 ? st.C1Values : st.C0Values;
+        target[channel] = string.IsNullOrWhiteSpace(raw) ? null : ParseNumber(raw);
+        st.CalibDirty.Add((isC1 ? "C1:" : "C0:") + channel);
+    }
+
+    private Dictionary<Guid, List<SensorThresholds>> sensorsByParent = new();
+    private readonly HashSet<string> expandedKeys = new();
+
+    private List<SensorThresholds> SensorsFor(string key)
+    {
+        var id = GetMapProperty(key);
+        if (id == null || id == Guid.Empty) return null;
+        return sensorsByParent.TryGetValue(id.Value, out var list) ? list : null;
+    }
+
+    private void ToggleExpanded(string key)
+    {
+        if (!expandedKeys.Remove(key)) expandedKeys.Add(key);
+    }
+
+    private void SetThreshold(SensorThresholds st, string channel, string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+            st.Values[channel] = null;
+        else if (double.TryParse(raw, System.Globalization.NumberStyles.Float,
+                                 System.Globalization.CultureInfo.InvariantCulture, out var v))
+            st.Values[channel] = v;
+        else
+            return;
+
+        st.Dirty = true;
+    }
+
+    // A database that has not yet been through the startup cleanup can hold two rows for one sensor and
+    // attribute type: the valued one and an empty twin. Show and edit the valued one; editing the twin
+    // would leave the old value standing beside the new one.
+    private static AttributeElement PickAttribute(IEnumerable<AttributeElement> rows, Guid attributeTypeId) =>
+        rows.Where(a => a.AttributeTypeId == attributeTypeId)
+            .OrderBy(a => string.IsNullOrWhiteSpace(a.Value) ? 1 : 0)
+            .FirstOrDefault();
+
+    // The row as the database has it now, tracked by the circuit's context, with the value it holds there.
+    // The query runs in a context of its own because it has to filter in SQL: GetFilteredFirstEntityAsync
+    // takes a Func, so it would read the whole AttributeElement table through the shared context and track
+    // every row it passed. The row is then fetched by key through EntitiesService, so the update that follows
+    // goes through the same context and the same journaling as every other save on this page.
+    private async Task<(AttributeElement Row, string Value)> FindStoredAttributeAsync(Guid elementId, Guid attributeTypeId)
+    {
+        using var db = entitiesService.CreateOwnedContext();
+        var stored = await db.AttributeElements
+            .Where(a => a.ElementId == elementId && a.AttributeTypeId == attributeTypeId)
+            .OrderBy(a => string.IsNullOrWhiteSpace(a.Value) ? 1 : 0)
+            .Select(a => new { a.AttributeElementId, a.Value })
+            .FirstOrDefaultAsync();
+        if (stored == null) return (null, null);
+
+        var row = await entitiesService.GetEntityAsync<AttributeElement>(stored.AttributeElementId);
+        return (row, stored.Value);
+    }
+
+    // Writes one attribute value of a sensor. 'known' is the row from the page-load snapshot, null when the
+    // snapshot had none. Returns the row now holding the value and the value it replaced; Saved is null when
+    // nothing was written.
+    //
+    // A missing row in the snapshot does not mean a missing row in the database: LoadCollection does nothing
+    // once the collection is loaded in this circuit, and another page or another user may have created the
+    // row since. (ElementID, AttributeTypeID) is unique, so inserting it again would only fail — ask the
+    // database first, and update what it has.
+    private async Task<(AttributeElement Saved, string Previous)> SaveAttributeValueAsync(
+        AttributeElement known, Guid elementId, Guid attributeTypeId, string value)
+    {
+        if (known != null)
+        {
+            string previous = known.Value;
+            known.Value = value;
+            await entitiesService.UpdateEntityAsync(known);
+            return (known, previous);
+        }
+
+        var stored = await FindStoredAttributeAsync(elementId, attributeTypeId);
+        if (stored.Row == null)
+        {
+            var created = await entitiesService.InsertEntityAsync(new AttributeElement
+            {
+                ElementId = elementId,
+                AttributeTypeId = attributeTypeId,
+                Value = value
+            });
+            if (created != null) return (created, null);
+
+            // InsertEntityAsync says only that it failed. The likely cause is a save elsewhere creating the
+            // row between the lookup and the insert, so look once more before giving up.
+            stored = await FindStoredAttributeAsync(elementId, attributeTypeId);
+            if (stored.Row == null)
+            {
+                Console.WriteLine($"[CharpenteMapping] Could not save attribute type {attributeTypeId} on element {elementId}: the insert failed and no row exists.");
+                return (null, null);
+            }
+        }
+
+        stored.Row.Value = value;
+        await entitiesService.UpdateEntityAsync(stored.Row);
+        return (stored.Row, stored.Value);
+    }
+
+    private async Task LoadSensorThresholdsAsync()
+    {
+        sensorsByParent = new Dictionary<Guid, List<SensorThresholds>>();
+
+        // Which attribute names carry a threshold — resolved through the tag mapping, exactly as
+        // ReportsService does when it evaluates alarms.
+        var mappings = await entitiesService.GetFilteredEntitiesAsync<TagMappingTable>(
+            t => t.CodeTag == "seuil_alarme");
+        var thresholdNames = TagMappingResolver.AcceptedNames(mappings, "seuil_alarme");
+
+        // Calibration prefixes, resolved the same way SensorCalibration does.
+        var calibMappings = await entitiesService.GetFilteredEntitiesAsync<TagMappingTable>(
+            t => t.CodeTag == "C1" || t.CodeTag == "C0");
+        var c1Prefixes = TagMappingResolver.AcceptedNames(calibMappings, "C1");
+        var c0Prefixes = TagMappingResolver.AcceptedNames(calibMappings, "C0");
+
+        // Every sensing device of this structure, in one query. The includes are essential: this
+        // overload takes a Func<T,bool> and filters IN MEMORY, so ElementType/Category are null
+        // unless eagerly loaded — and the predicate would then match nothing.
+        var sensors = await entitiesService.GetFilteredEntitiesAsync<Element>(
+            e => e.StructureId == targetStructureId
+              && e.ParentId != null
+              && e.ElementType != null
+              && e.ElementType.Category != null
+              && e.ElementType.Category.Name != null
+              && e.ElementType.Category.Name.Equals("sensing device", StringComparison.OrdinalIgnoreCase),
+            "ElementType", "ElementType.Category");
+
+        Console.WriteLine($"[CharpenteMapping] {sensors?.Count ?? 0} sensing device(s) with a parent found.");
+
+        foreach (var sensor in sensors ?? new List<Element>())
+        {
+            if (sensor.ParentId == null) continue;
+
+            entitiesService.LoadReference(sensor, "ElementType");
+            entitiesService.LoadCollection(sensor, "AttributeElements");
+            foreach (var ae in sensor.AttributeElements) entitiesService.LoadReference(ae, "AttributeType");
+
+            var et = sensor.ElementType;
+            if (et == null) continue;
+            entitiesService.LoadCollection(et, "ChannelDataTypeElementTypes");
+            entitiesService.LoadCollection(et, "AttributeTypeElementTypes");
+            foreach (var c in et.ChannelDataTypeElementTypes) entitiesService.LoadReference(c, "ChannelDataType");
+            foreach (var a in et.AttributeTypeElementTypes) entitiesService.LoadReference(a, "AttributeType");
+
+            // Channels, in the order configured on the element type.
+            var channels = et.ChannelDataTypeElementTypes
+                .OrderBy(x => x.SortOrder ?? int.MaxValue)
+                .Select(x => x.ChannelDataType?.Name)
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .ToList();
+            if (channels.Count == 0) continue;
+
+            // A sensor whose type has no threshold attribute is still LISTED — it just cannot be
+            // edited. Skipping it silently would make the cell look empty and hide the real cause.
+            var thresholdType = et.AttributeTypeElementTypes
+                .FirstOrDefault(a => a.AttributeType != null
+                                  && TagMappingResolver.Matches(thresholdNames, a.AttributeType.Name));
+
+            var attr = thresholdType == null ? null : PickAttribute(sensor.AttributeElements, thresholdType.AttributeTypeId);
+
+            var st = new SensorThresholds
+            {
+                Sensor = sensor,
+                ThresholdAttributeTypeId = thresholdType?.AttributeTypeId ?? Guid.Empty,
+                ThresholdAttribute = attr,
+                Channels = channels
+            };
+
+            // Per-channel calibration attributes, if the element type declares them.
+            foreach (var ch in channels)
+            {
+                Guid FindType(HashSet<string> prefixes) =>
+                    et.AttributeTypeElementTypes.FirstOrDefault(a => a.AttributeType != null
+                        && prefixes.Any(p => string.Equals(a.AttributeType.Name?.Trim(), $"{p}_{ch}",
+                                                           StringComparison.OrdinalIgnoreCase)))
+                        ?.AttributeTypeId ?? Guid.Empty;
+
+                var c1Type = FindType(c1Prefixes);
+                var c0Type = FindType(c0Prefixes);
+                st.C1TypeIds[ch] = c1Type;
+                st.C0TypeIds[ch] = c0Type;
+
+                if (c1Type != Guid.Empty)
+                {
+                    var a = PickAttribute(sensor.AttributeElements, c1Type);
+                    st.C1Attrs[ch] = a;
+                    st.C1Values[ch] = ParseNumber(a?.Value);
+                }
+                if (c0Type != Guid.Empty)
+                {
+                    var a = PickAttribute(sensor.AttributeElements, c0Type);
+                    st.C0Attrs[ch] = a;
+                    st.C0Values[ch] = ParseNumber(a?.Value);
+                }
+            }
+
+            foreach (var ch in channels) st.Values[ch] = null;
+            foreach (var pair in (attr?.Value ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var kv = pair.Split(':');
+                if (kv.Length == 2 && double.TryParse(kv[1], System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out var v))
+                    st.Values[kv[0].Trim()] = v;
+            }
+
+            if (!sensorsByParent.TryGetValue(sensor.ParentId.Value, out var list))
+                sensorsByParent[sensor.ParentId.Value] = list = new List<SensorThresholds>();
+            list.Add(st);
+        }
+
+        // How many of those parents are actually mapped to a charpente cell — if this is 0 while
+        // sensors were found, the mapping points at elements that are not the sensors' parents.
+        var mappedIds = new HashSet<Guid>();
+        foreach (var c in columns)
+            foreach (var r in rows)
+            {
+                var id = GetMapProperty($"{c}{r}");
+                if (id.HasValue && id != Guid.Empty) mappedIds.Add(id.Value);
+            }
+
+        Console.WriteLine($"[CharpenteMapping] {sensorsByParent.Count} parent element(s) carry sensors; "
+                        + $"{mappedIds.Count} cell(s) mapped; "
+                        + $"{sensorsByParent.Keys.Count(mappedIds.Contains)} match.");
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // Load Tcharpente
+            var tcharpentes = await entitiesService.GetAllEntitiesAsync<Tcharpente>();
+            tcharpente = tcharpentes?.FirstOrDefault();
+            
+            if (tcharpente == null)
+            {
+                tcharpente = new Tcharpente();
+                await entitiesService.InsertEntityAsync(tcharpente);
+            }
+
+            // Load Elements for the specific structure
+            elements = await entitiesService.GetFilteredEntitiesAsync<Element>(
+                x => x.StructureId == targetStructureId
+            );
+
+            if (elements == null)
+            {
+                elements = new List<Element>();
+            }
+
+            await LoadSensorThresholdsAsync();
+
+            isLoading = false;
+        }
+        catch (Exception ex)
+        {
+            await js.InvokeVoidAsync("alert", $"Error loading data: {ex.Message}");
+            isLoading = false;
+        }
+    }
+
+    private double GetValueProperty(string key)
+    {
+        var property = typeof(Tcharpente).GetProperty(key);
+        if (property != null)
+        {
+            var value = property.GetValue(tcharpente);
+            return value != null ? (double)value : 0.0;
+        }
+        return 0.0;
+    }
+
+    private void SetValueProperty(string key, string value)
+    {
+        var property = typeof(Tcharpente).GetProperty(key);
+        if (property != null && double.TryParse(value, out double doubleValue))
+        {
+            property.SetValue(tcharpente, doubleValue);
+            StateHasChanged();
+        }
+    }
+
+    private Guid? GetMapProperty(string key)
+    {
+        var property = typeof(Tcharpente).GetProperty($"{key}map", BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+        if (property != null)
+        {
+            return (Guid?)property.GetValue(tcharpente);
+        }
+        return null;
+    }
+
+    private void SetMapProperty(string key, string value)
+    {
+        var property = typeof(Tcharpente).GetProperty($"{key}map", BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+        if (property != null)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                property.SetValue(tcharpente, null);
+            }
+            else if (Guid.TryParse(value, out Guid guidValue))
+            {
+                property.SetValue(tcharpente, guidValue);
+            }
+            StateHasChanged();
+        }
+    }
+
+    private int GetMappedCount()
+    {
+        int count = 0;
+        foreach (var column in columns)
+        {
+            foreach (var row in rows)
+            {
+                var key = $"{column}{row}";
+                var mapValue = GetMapProperty(key);
+                if (mapValue != null && mapValue != Guid.Empty)
+                {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    private async Task AutoMapElements()
+    {
+        int mappedSuccessfully = 0;
+        
+        foreach (var column in columns)
+        {
+            foreach (var row in rows)
+            {
+                var key = $"{column}{row}";
+                var nodeName = $"Noeud {key}";
+                
+                var matchingElement = elements.FirstOrDefault(e => 
+                    e.Name != null && e.Name.Equals(nodeName, StringComparison.OrdinalIgnoreCase)
+                );
+
+                if (matchingElement != null)
+                {
+                    SetMapProperty(key, matchingElement.ElementId.ToString());
+                    mappedSuccessfully++;
+                }
+            }
+        }
+
+        await js.InvokeVoidAsync("alert", $"Auto-mapping completed! {mappedSuccessfully} elements mapped successfully.");
+        StateHasChanged();
+    }
+
+    private async Task SaveMapping()
+    {
+        try
+        {
+            // Mapping + critical loads live on Tcharpente; the alarm thresholds are attributes on
+            // the sensors. One Save writes both, so a half-finished edit can simply be abandoned.
+            await entitiesService.UpdateEntityAsync(tcharpente);
+
+            int thresholdsSaved = 0;
+            int notSaved = 0;
+            foreach (var st in sensorsByParent.Values.SelectMany(v => v)
+                         .Where(s => s.Dirty && s.ThresholdAttributeTypeId != Guid.Empty))
+            {
+                // Re-pack every channel that has a value: "weight:2000;temperature:60".
+                var packed = string.Join(";", st.Channels
+                    .Where(ch => st.Values.TryGetValue(ch, out var v) && v.HasValue)
+                    .Select(ch => $"{ch}:{st.Values[ch].Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}"));
+
+                var (saved, previous) = await SaveAttributeValueAsync(
+                    st.ThresholdAttribute, st.Sensor.ElementId, st.ThresholdAttributeTypeId, packed);
+
+                // Nothing written: no journal row for a change that did not happen, and the edit stays
+                // pending so the next Save tries again.
+                if (saved == null)
+                {
+                    notSaved++;
+                    continue;
+                }
+                st.ThresholdAttribute = saved;
+
+                // A threshold decides when an alarm fires — record the before/after, not just "saved".
+                await journal.WriteAsync(JournalCategory.Alarme, "threshold.save",
+                    target: st.Sensor?.Name,
+                    details: $"{(string.IsNullOrWhiteSpace(previous) ? "(vide)" : previous)} → {(string.IsNullOrWhiteSpace(packed) ? "(vide)" : packed)}",
+                    severity: 1);
+
+                st.Dirty = false;
+                thresholdsSaved++;
+            }
+
+            // Calibration coefficients — one attribute per channel, so each is written separately.
+            int calibSaved = 0;
+            foreach (var st in sensorsByParent.Values.SelectMany(v => v).Where(s => s.CalibDirty.Count > 0))
+            {
+                var calibChanges = new List<string>();
+
+                foreach (var marker in st.CalibDirty.ToList())
+                {
+                    bool isC1 = marker.StartsWith("C1:", StringComparison.Ordinal);
+                    string ch = marker.Substring(3);
+
+                    var typeIds = isC1 ? st.C1TypeIds : st.C0TypeIds;
+                    var attrs   = isC1 ? st.C1Attrs   : st.C0Attrs;
+                    var values  = isC1 ? st.C1Values  : st.C0Values;
+
+                    if (!typeIds.TryGetValue(ch, out var typeId) || typeId == Guid.Empty)
+                    {
+                        // No attribute to write it to, now or on a later Save.
+                        st.CalibDirty.Remove(marker);
+                        continue;
+                    }
+
+                    var text = values.TryGetValue(ch, out var v) && v.HasValue
+                        ? v.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                        : "";
+
+                    attrs.TryGetValue(ch, out var existing);
+                    var (saved, previous) = await SaveAttributeValueAsync(existing, st.Sensor.ElementId, typeId, text);
+
+                    // Not written: the marker stays, so the next Save retries this coefficient.
+                    if (saved == null)
+                    {
+                        notSaved++;
+                        continue;
+                    }
+                    attrs[ch] = saved;
+                    st.CalibDirty.Remove(marker);
+
+                    calibChanges.Add($"{(isC1 ? "C1" : "C0")}_{ch}: " +
+                        $"{(string.IsNullOrWhiteSpace(previous) ? "(vide)" : previous)} → {(string.IsNullOrWhiteSpace(text) ? "(vide)" : text)}");
+
+                    calibSaved++;
+                }
+
+                // C1/C0 rewrite every reported value for that sensor, retroactively — worth its own row.
+                if (calibChanges.Count > 0)
+                    await journal.WriteAsync(JournalCategory.Calibration, "calibration.save",
+                        target: st.Sensor?.Name, details: string.Join("\n", calibChanges), severity: 1);
+            }
+
+            // The calibration is cached for 60s in SensorCalibration — drop it so edits take effect
+            // on the next chart refresh instead of a minute later.
+            if (calibSaved > 0) SensorCalibration.Invalidate();
+
+            var parts = new List<string>();
+            if (thresholdsSaved > 0) parts.Add($"{thresholdsSaved} seuil(s)");
+            if (calibSaved > 0) parts.Add($"{calibSaved} coefficient(s) C1/C0");
+            var message = parts.Count > 0
+                ? $"Mapping enregistré — {string.Join(", ", parts)} mis à jour."
+                : "Mapping saved successfully!";
+            if (notSaved > 0)
+                message += $"\n{notSaved} valeur(s) de capteur non enregistrée(s) — elles restent en attente, enregistrez à nouveau.";
+            await js.InvokeVoidAsync("alert", message);
+        }
+        catch (Exception ex)
+        {
+            await js.InvokeVoidAsync("alert", $"Error saving mapping: {ex.Message}");
+        }
+    }
+
+    private void Cancel()
+    {
+        navigationManager.NavigateTo("/settings");
+    }
+}

@@ -1,106 +1,1070 @@
 ﻿@using AliantWebS.Data
 @using Models
+@using Microsoft.EntityFrameworkCore
+@using System.Globalization
 @inject AppData appData;
 @inject EntitiesService entitiesService
+@inject IDbContextFactory<AliantWebContext> dbContextFactory
 @inject NavigationManager navigationManager
 @inject IStringLocalizer<Languages> L
+@inject IJSRuntime js
+@inject Radzen.DialogService dialogService
 
+<style>
+    .page-container {
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
 
+    .page-header {
+        background: rgba(255, 255, 255, 0.95);
+        padding: 1rem 2rem;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        border-bottom: 3px solid #667eea;
+    }
 
-@* @if (sensors is null)
-{
-    <p><em>@L["Loading"]... !</em></p>
-}
-else
-{ *@
-    <RadzenSplitter Orientation="Radzen.Orientation.Horizontal">
-        <RadzenSplitterPane>
+    .page-title {
+        margin: 0;
+        color: #333;
+        font-size: 1.8rem;
+        font-weight: 600;
+    }
 
-        <SelecteurDeCapteurComponent Structure=@Structure OnPlotRaised="@(p =>plot(p.Item1,p.Item2,p.Item3,p.Item4,p.Item5))"></SelecteurDeCapteurComponent>
+    .content-wrapper {
+        flex: 1;
+        padding: 1rem;
+        overflow: hidden;
+    }
 
-        </RadzenSplitterPane>
-        <RadzenSplitterPane>
-            <RadzenSplitter Orientation="Radzen.Orientation.Vertical">
-                <RadzenSplitterPane>
-                <IndicesInTimeComponent GraphId="g3" @ref="iitc" Headers="headers" Indices="indices.Select(x => x.Item2).ToList()"></IndicesInTimeComponent>
+    .splitter-content {
+        height: 100%;
+        background: white;
+        border-radius: 8px;
+        padding: 1rem;
+        overflow: auto;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
 
-                    </RadzenSplitterPane>
-            <RadzenSplitterPane>
-                <AliantWebS.Pages.CADPages.SVGComponent></AliantWebS.Pages.CADPages.SVGComponent>
+    .graph-date-layout {
+        display: flex;
+        gap: 1rem;
+        height: 100%;
+    }
 
+    .graph-section {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .date-pickers-section {
+        min-width: 250px;
+        max-width: 300px;
+    }
+
+    .date-picker-container {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        padding: 1rem;
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .date-picker-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .date-picker-group label {
+        font-weight: 600;
+        color: #333;
+    }
+
+    .export-button {
+        margin-top: 1rem;
+    }
+
+    .svg-container {
+        position: relative;
+        height: 100%;
+        background: #f8f9fa;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .positioning-mode-indicator {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: rgba(102, 126, 234, 0.9);
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-weight: 600;
+        z-index: 1000;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .positioning-mode-indicator.active {
+        background: rgba(76, 175, 80, 0.9);
+        animation: pulse 2s infinite;
+    }
+
+    @@keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+    }
+
+    .loading-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.95);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+        border-radius: 8px;
+    }
+
+    .spinner {
+        width: 60px;
+        height: 60px;
+        border: 5px solid #f3f3f3;
+        border-top: 5px solid #667eea;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @@keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+        margin-top: 1.5rem;
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #667eea;
+    }
+
+    .loading-subtext {
+        margin-top: 0.5rem;
+        font-size: 0.9rem;
+        color: #666;
+    }
+</style>
+
+<div class="page-container">
+    <div class="page-header">
+        <h1 class="page-title">📊 @L["SensorMonitoring"] - @(Structure?.Name ?? "")</h1>
+        
+        @if (sensorToPosition != null)
+        {
+            <button class="btn btn-danger" @onclick="CancelPositioning">
+                ❌ Cancel Positioning
+            </button>
+        }
+    </div>
+
+    <div class="content-wrapper">
+        <RadzenSplitter Orientation="Radzen.Orientation.Vertical" style="height: 100%;">
+            @* Top Pane: Time Series Graph + Date Pickers *@
+            <RadzenSplitterPane Size="50%" Min="30%" Max="70%">
+                <div class="splitter-content">
+                    <div class="graph-date-layout">
+                        <div class="graph-section">
+                            @if (isLoadingData)
+                            {
+                                <div class="loading-overlay">
+                                    <div class="spinner"></div>
+                                    <div class="loading-text">@L["Loading Data"]...</div>
+                                    <div class="loading-subtext">@loadingMessage</div>
+                                </div>
+                            }
+                            <IndicesInTimeComponent 
+                                GraphId="g3" 
+                                @ref="iitc" 
+                                Headers="headers" 
+                                Indices="indices.Select(x => x.Item2).ToList()">
+                            </IndicesInTimeComponent>
+                        </div>
+                        
+                        <div class="date-pickers-section">
+                            <div class="date-picker-container">
+                                <div class="date-picker-group">
+                                    <label>Plage de dates :</label>
+                                    <select class="form-control" @bind="selectedDateRange" @bind:after="OnDateRangeChanged">
+                                        <option value="LastHour">Dernière heure</option>
+                                        <option value="LastDay">Dernier jour</option>
+                                        <option value="LastWeek">Dernière semaine</option>
+                                        <option value="LastMonth">Dernier mois</option>
+                                        <option value="LastYear">Dernière année</option>
+                                        <option value="Custom">Personnalisé</option>
+                                    </select>
+                                </div>
+
+                                @if (selectedDateRange == "Custom")
+                                {
+                                    <div class="date-picker-group">
+                                        <label>@L["Start Date"]:</label>
+                                        <InputDate Type="InputDateType.DateTimeLocal"
+                                                   @bind-Value="@startDate"
+                                                   @bind-Value:after="RefreshChart"
+                                                   @bind-Value:culture="@CultureInfo.InvariantCulture" />
+                                    </div>
+                                    <div class="date-picker-group">
+                                        <label>@L["End Date"]:</label>
+                                        <InputDate Type="InputDateType.DateTimeLocal"
+                                                   @bind-Value="@endDate"
+                                                   @bind-Value:after="RefreshChart"
+                                                   @bind-Value:culture="@CultureInfo.InvariantCulture" />
+                                    </div>
+                                }
+                            </div>
+
+                            <div class="export-button">
+                                <RadzenButton
+                                    ButtonStyle="ButtonStyle.Success"
+                                    Icon="file_download"
+                                    Text="@L["Export to CSV"]"
+                                    Click="@OpenExportDialog"
+                                    Style="width: 100%;">
+                                </RadzenButton>
+                            </div>
+
+                            @* Plain onclick (not @@onclick): the Save-As picker needs the browser's
+                               user activation, which a Blazor server round-trip would expire. *@
+                            <div class="export-button" style="margin-top: 0.5rem;">
+                                <button type="button" class="rz-button rz-button-md rz-variant-filled rz-info rz-shade-default"
+                                        style="width: 100%; justify-content: center;"
+                                        onclick="exportDygraphToJpg('g3', '@(Structure?.Name ?? "graphique")')">
+                                    <i class="rzi">image</i>
+                                    <span class="rz-button-text">@L["Exporter le graphique (JPG)"]</span>
+                                </button>
+                            </div>
+
+                            <div class="date-picker-container" style="margin-top: 1rem;">
+                                <div class="date-picker-group">
+                                    <label>@L["Max Data Points"]:</label>
+                                    <RadzenNumeric 
+                                        @bind-Value="@maxDataPoints"           
+                                        Change="@(async (int value) => await OnMaxDataPointsChanged())"
+                                                   Min="100"
+                                        Max="100000" 
+                                        Step="1000"
+                                        ShowUpDown="true"
+                                        Style="width: 100%;">
+                                    </RadzenNumeric>
+                                    <small class="text-muted">@L["Higher values may impact performance"]</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </RadzenSplitterPane>
-            </RadzenSplitter>
 
-        </RadzenSplitterPane>
-    </RadzenSplitter>
-@* } *@
+            @* Bottom Pane: Sensor Selector (Left) + SVG Map (Right) *@
+            <RadzenSplitterPane Size="50%">
+                <RadzenSplitter Orientation="Radzen.Orientation.Horizontal" style="height: 100%;">
+                    @* Left: Sensor Selector *@
+                    <RadzenSplitterPane Size="50%" Min="30%" Max="70%">
+                        <div class="splitter-content">
+                            <SelecteurDeCapteurComponent
+    @ref="sensorSelector"
+    Structure="@Structure"
+    StartDate="@startDate"
+    EndDate="@endDate"
+    OnBatchPlotRaised="@HandleBatchPlot"
+    OnPositionRequested="@EnableSensorPositioning"
+    OnPositionCancelled="@CancelPositioning"
+    CheckboxStates="@checkboxStates"
+    PositioningSensorId="@positioningSensorId"
+    PositioningSensorIdChanged="@((id) => { positioningSensorId = id; StateHasChanged(); })"
+    PositionedSensorIds="@positionedSensorIds" />
+                        </div>
+                    </RadzenSplitterPane>
+
+                    @* Right: SVG Map *@
+                    <RadzenSplitterPane Size="50%">
+                        <div class="splitter-content">
+                            <div class="svg-container">
+                                <div style="display:flex; align-items:center; gap:8px; padding:6px 10px; flex-wrap:wrap;">
+                                    <label style="font-weight:600; margin:0;">@L["Catégorie de capteurs"] :</label>
+                                    <RadzenDropDown TValue="Guid?" Data="svgSensorTypeOptions"
+                                                    TextProperty="Text" ValueProperty="Value"
+                                                    @bind-Value="selectedSvgSensorTypeId" Change="OnSvgSensorTypeChanged"
+                                                    Style="width:220px;" />
+                                </div>
+                                @if (isPositioningMode)
+                                {
+                                    <div class="positioning-mode-indicator active">
+                                        🎯 Click on SVG to position sensor
+                                    </div>
+                                }
+                                <AliantWebS.Pages.CADPages.SVGComponent
+                                    @ref="svgComponent"
+                                    SvgClicked="@HandleSvgClick"
+                                    OnSensorClicked="@HandleSensorClickedFromSvg"
+
+                                    Point0X="@(selectedEvent?.Point0X ?? 0)"
+                                    Point0Y="@(selectedEvent?.Point0Y ?? 0)"
+                                    EventName="@selectedEvent?.Name"
+                                    EventId="@selectedEvent?.EventId"
+                                    Sensors="svgSensors"
+                                    SensorChargeRatios="sensorChargeRatios"
+                                    IsPositioningMode="isPositioningMode"
+                                    StructureName="@Structure?.Name"
+                                    ModuleName="Surveillance des capteurs"
+                                    IsSensorSelectionEnabled="true">
+                                </AliantWebS.Pages.CADPages.SVGComponent>
+                            </div>
+                        </div>
+                    </RadzenSplitterPane>
+                </RadzenSplitter>
+            </RadzenSplitterPane>
+        </RadzenSplitter>
+    </div>
+</div>
 
 @code {
     IndicesInTimeComponent iitc;
-
-
+    AliantWebS.Pages.CADPages.SVGComponent svgComponent;
+    SelecteurDeCapteurComponent sensorSelector;  // Add this line
 
     List<Element> sensors;
+
+    // SVG-only "sensor category" filter (does not affect the plots or the charge computation).
+    private List<Element> svgSensors = new List<Element>();
+    private List<SensorTypeOption> svgSensorTypeOptions = new List<SensorTypeOption>();
+    private Guid? selectedSvgSensorTypeId = Guid.Empty;
+
+    private class SensorTypeOption
+    {
+        public string Text { get; set; }
+        public Guid? Value { get; set; }
+    }
+
+    List<MotherGridPalonnier> palonniers = new List<MotherGridPalonnier>();
+    List<MotherGridPalonnier> motherGrids = new List<MotherGridPalonnier>();
+
+    // The event in hand, for the plan's origin (Point0) and the DXF drawing data. This page is not under
+    // AntaresConceptionLayout, so there is no cascaded event to read: it comes from appData.EventID, the way
+    // the rest of the application identifies the current event. Null is normal — see LoadEventAsync.
+    // Written out in full: this namespace has an Event of its own (Accelerometer.cs), and a type declared
+    // here wins over one reached by a using directive.
+    AliantWebS.Models.Event selectedEvent;
+
+    // Manille (shackle) charge-ratio colour map for the SVG — follows the selected date range.
+    List<Element> shackleSensors = new List<Element>();
+    ChannelDataType weightChannelDataType;
+    Dictionary<Guid, double> sensorChargeRatios = new Dictionary<Guid, double>();
 
     [Parameter]
     public Structure Structure { get; set; }
 
-    private IList<Element> selectedSensors {get; set;}
+    private IList<Element> selectedSensors { get; set; }
+    private Element sensorToPosition { get; set; }
+    private bool isPositioningMode = false;
 
- 
-    List<string> headers = new List<string>()
-     {
-         "Date" };
-    List<(string,Dictionary<object, double>)> indices = new List<(string,Dictionary<object, double>)>();
+    // Track checkbox states to preserve during re-renders
+    private Dictionary<string, bool> checkboxStates = new Dictionary<string, bool>();
 
+    private string selectedDateRange { get; set; } = "LastDay";
+    private bool isLoadingData = false;
+    private string loadingMessage = "";
+    private int maxDataPoints { get; set; } = 1000;
 
+    DateTime startDate { get; set; } = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+    DateTime endDate { get; set; } = DateTime.UtcNow;
+
+    List<string> headers = new List<string>() { "Date" };
+    List<(string, Dictionary<object, double>)> indices = new List<(string, Dictionary<object, double>)>();
+
+    private CultureInfo invariantCulture = CultureInfo.InvariantCulture;
+
+    private Guid? positioningSensorId = null;
+    private HashSet<Guid> positionedSensorIds = new();
 
     protected override async Task OnInitializedAsync()
     {
+        System.Threading.Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
+        System.Threading.Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture;
+
+        // Set date range first (no DB call)
+        var now = DateTime.UtcNow;
+        startDate = now.AddDays(-1);
+        endDate = now;
         
+        await LoadSensorsAsync();
+
+        // The event carries Point0, the origin the plan is drawn against and the one written into any DXF
+        // exported from here.
+        await LoadEventAsync();
+
+        // Load shackle (manille) sensors + weight channel, then compute the charge-ratio map.
+        var (sh, wc) = await SensorChargeRatioHelper.LoadShackleSensorsAsync(dbContextFactory, Structure);
+        shackleSensors = sh;
+        weightChannelDataType = wc;
+        await ComputeChargeRatios();
+
+        // Build initial set of positioned sensor IDs. A sensor counts as positioned when both rows hold a
+        // number the plan can draw, which is the test SVGComponent uses to place it: the mere presence of the
+        // rows says nothing, since an element is given an empty row for every attribute type its element type
+        // expects, and X and Y are now among those types for the sensor types that carry positions.
+        if (sensors != null)
+        {
+            foreach (var sensor in sensors)
+            {
+                var xAttr = sensor.AttributeElements?.FirstOrDefault(ae => ae.AttributeType?.Name == "X");
+                var yAttr = sensor.AttributeElements?.FirstOrDefault(ae => ae.AttributeType?.Name == "Y");
+                if (double.TryParse(xAttr?.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out _) &&
+                    double.TryParse(yAttr?.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+                {
+                    positionedSensorIds.Add(sensor.ElementId);
+                }
+            }
+        }
+        
+        if (Structure != null)
+        {
+            // Use factory to create dedicated context - avoids concurrent access issues
+            using var context = await dbContextFactory.CreateDbContextAsync();
+            
+            palonniers = await context.Set<MotherGridPalonnier>()
+                .Where(x => x.Famille == false)
+                .AsNoTracking()
+                .ToListAsync();
+
+            motherGrids = await context.Set<MotherGridPalonnier>()
+                .Where(x => x.Famille == true)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+        base.OnInitialized();
     }
 
-    private async Task plot(bool args, Element sensor, ChannelDataType channelDataType, DateTime startDate, DateTime endDate)
+    // Recompute the manille charge-ratio colour map over the page's current date range.
+    private async Task ComputeChargeRatios()
     {
-        if (args)
+        sensorChargeRatios = await SensorChargeRatioHelper.ComputeAsync(
+            dbContextFactory, shackleSensors, weightChannelDataType, startDate, endDate);
+        StateHasChanged();                                  // parent re-renders → SVG gets new ratios
+        if (svgComponent != null)
+            await svgComponent.RefreshVisualization();      // force the SVG to repaint the colours
+    }
+
+    // Filter which sensors are drawn on the SVG plan by category — SVG only, no effect on plots/charge.
+    private void ApplySvgSensorFilter()
+    {
+        svgSensors = (selectedSvgSensorTypeId != null && selectedSvgSensorTypeId != Guid.Empty)
+            ? (sensors ?? new List<Element>()).Where(s => s.ElementTypeId == selectedSvgSensorTypeId).ToList()
+            : (sensors ?? new List<Element>()).ToList();
+    }
+
+    private async Task OnSvgSensorTypeChanged()
+    {
+        ApplySvgSensorFilter();
+        StateHasChanged();
+        if (svgComponent != null)
+            await svgComponent.RefreshVisualization();
+    }
+
+    private async Task OnDateRangeChanged()
+    {
+        var now = DateTime.UtcNow;
+        
+        switch (selectedDateRange)
         {
-            Dictionary<object, double> dic = new Dictionary<object, double>();
+            case "LastHour":
+                startDate = now.AddHours(-1);
+                endDate = now;
+                break;
+            case "LastDay":
+                startDate = now.AddDays(-1);
+                endDate = now;
+                break;
+            case "LastWeek":
+                startDate = now.AddDays(-7);
+                endDate = now;
+                break;
+            case "LastMonth":
+                startDate = now.AddMonths(-1);
+                endDate = now;
+                break;
+            case "LastYear":
+                startDate = now.AddYears(-1);
+                endDate = now;
+                break;
+            case "Custom":
+                // Keep existing startDate and endDate values
+                return; // Don't refresh when switching to custom mode
+        }
 
-            List<object[]> la = await GetLa(sensor, channelDataType,startDate,endDate);
+        // Refresh the chart with new date range
+        await RefreshChart();
+    }
 
-            IList<object> X = la.Select(x => x[0]).ToList();
-            IList<object> Y = la.Select(x => x[2]).ToList();
+    private async Task RefreshChart()
+    {
+        // Charge-ratio colouring follows the selected date range.
+        await ComputeChargeRatios();
 
-            foreach (var l in la)
+        // Keep the export header's period in step even when no series is re-plotted.
+        await PushGraphExportMetaAsync();
+
+        if (!indices.Any()) return;
+
+        isLoadingData = true;
+        loadingMessage = $"Fetching data from {startDate:MMM dd} to {endDate:MMM dd}";
+        StateHasChanged();
+
+        try
+        {
+            // Get the list of currently plotted sensors
+            var plottedKeys = indices.Select(x => x.Item1).ToList();
+            
+            // Rebuild sensor/channel pairs from the keys
+            var sensorChannelPairs = new List<(Element sensor, ChannelDataType channelDataType)>();
+            
+            using var context = await dbContextFactory.CreateDbContextAsync();
+            
+            foreach (var key in plottedKeys)
             {
-                dic.Add((DateTime)l[0], (double)l[2]);
+                var parts = key.Split('|');
+                if (parts.Length == 2 && Guid.TryParse(parts[0], out var elementId) && Guid.TryParse(parts[1], out var channelDataTypeId))
+                {
+                    var sensor = sensors?.FirstOrDefault(s => s.ElementId == elementId);
+                    var channelDataType = await context.ChannelDataTypes
+                        .FirstOrDefaultAsync(c => c.ChannelDataTypeId == channelDataTypeId);
+
+                    if (sensor != null && channelDataType != null)
+                    {
+                        sensorChannelPairs.Add((sensor, channelDataType));
+                    }
+                }
             }
 
-            headers.Add(sensor.Name + "|" + channelDataType.Name);
-            indices.Add((sensor.ElementId.ToString() + "|" + channelDataType.ChannelDataTypeId.ToString(), dic));
-           // iitc.Indices = indices.Select(x => x.Item2).ToList();
-            await iitc.DisplayData(indices.Select(x => x.Item2).ToList(),headers);
-            StateHasChanged();
-
-            
+            if (sensorChannelPairs.Any())
+            {
+                // Use the batch method to reload all data in ONE call
+                await HandleBatchPlot((sensorChannelPairs, startDate, endDate));
+            }
         }
-        else
+        finally
         {
-            headers.Remove(sensor.Name + "|" + channelDataType.Name);
-            var d = indices.Find(x => x.Item1 == sensor.ElementId.ToString() + "|" + channelDataType.ChannelDataTypeId.ToString());
-            indices.Remove(d);
-            await iitc.DisplayData(indices.Select(x => x.Item2).ToList(),headers);
+            isLoadingData = false;
             StateHasChanged();
         }
-
     }
 
-    private async Task<List<object[]>> GetLa(Element element, ChannelDataType channelDataType, DateTime startDate, DateTime endDate)
+    private async Task LoadSensorsAsync()
     {
-        return await InfluxService.GetData(new List<string>() { element.ElementId.ToString() }, new List<string>() { channelDataType.ChannelDataTypeId.ToString() }, startDate, endDate);
+        if (Structure != null)
+        {
+            using var context = await dbContextFactory.CreateDbContextAsync();
+            sensors = await context.Elements
+                .Include(e => e.ElementType)
+                    .ThenInclude(et => et.Category)
+                .Include(e => e.ElementType)
+                    .ThenInclude(et => et.ChannelDataTypeElementTypes)
+                        .ThenInclude(cdtet => cdtet.ChannelDataType)
+                .Include(e => e.AttributeElements)
+                    .ThenInclude(ae => ae.AttributeType)
+                .Where(e => e.StructureId == Structure.StructureId 
+                         && e.ElementType != null 
+                         && e.ElementType.Category != null 
+                         && e.ElementType.Category.Name == "sensing device")
+                .AsNoTracking()
+                .ToListAsync();
+
+            // "Sensor category" options for the SVG-only filter (built from the loaded sensors).
+            svgSensorTypeOptions = sensors
+                .Where(s => s.ElementType != null)
+                .Select(s => s.ElementType)
+                .DistinctBy(et => et.ElementTypeId)
+                .OrderBy(et => et.Name)
+                .Select(et => new SensorTypeOption { Text = et.Name, Value = et.ElementTypeId })
+                .ToList();
+            svgSensorTypeOptions.Insert(0, new SensorTypeOption { Text = "Tous", Value = Guid.Empty });
+
+            selectedSvgSensorTypeId = Guid.Empty;   // show all on the plan by default
+            ApplySvgSensorFilter();
+        }
     }
 
+    // Loads the current event, whose Point0 is the origin the SVG draws and exports against.
+    private async Task LoadEventAsync()
+    {
+        // Landing straight on /SurveillanceAntares without having opened an event is legitimate: leave the
+        // event null and the SVG keeps its 0/0 default, exactly as the "?? 0" of the other call sites does.
+        if (appData.EventID == Guid.Empty) return;
 
- 
+        try
+        {
+            selectedEvent = await entitiesService.GetEntityAsync<AliantWebS.Models.Event>(appData.EventID);
+        }
+        catch (Exception ex)
+        {
+            // A monitoring page must keep drawing: a failed lookup costs the origin, not the plan.
+            Console.WriteLine($"[SurveillanceCapteurs] Could not load event {appData.EventID}: {ex.Message}");
+        }
+    }
 
+    // private async Task plot(bool args, Element sensor, ChannelDataType channelDataType, DateTime startDate, DateTime endDate)
+    // {
+    //     // Track checkbox state
+    //     string checkboxKey = $"{sensor.ElementId}_{channelDataType.ChannelDataTypeId}";
+    //     checkboxStates[checkboxKey] = args;
+
+    //     if (args)
+    //     {
+    //         isLoadingData = true;
+    //         loadingMessage = $"Loading {sensor.Name}...";
+    //         StateHasChanged();
+
+    //         try
+    //         {
+    //             Dictionary<object, double> dic = new Dictionary<object, double>();
+    //             List<object[]> la = await GetLa(sensor, channelDataType, startDate, endDate);
+
+    //             foreach (var l in la)
+    //             {
+    //                 dic.Add((DateTime)l[0], (double)l[2]);
+    //             }
+
+    //             headers.Add(sensor.Name + "|" + channelDataType.Name);
+    //             indices.Add((sensor.ElementId.ToString() + "|" + channelDataType.ChannelDataTypeId.ToString(), dic));
+
+    //             await iitc.DisplayData(indices.Select(x => x.Item2).ToList(), headers);
+    //         }
+    //         finally
+    //         {
+    //             isLoadingData = false;
+    //             StateHasChanged();
+    //         }
+    //     }
+    //     else
+    //     {
+    //         headers.Remove(sensor.Name + "|" + channelDataType.Name);
+    //         var d = indices.Find(x => x.Item1 == sensor.ElementId.ToString() + "|" + channelDataType.ChannelDataTypeId.ToString());
+    //         indices.Remove(d);
+
+    //         await iitc.DisplayData(indices.Select(x => x.Item2).ToList(), headers);
+    //     }
+    // }
+
+    // private async Task<List<object[]>> GetLa(Element element, ChannelDataType channelDataType, DateTime startDate, DateTime endDate)
+    // {
+    //     var bucketName = ReportsService.BucketName;
+    //     return await InfluxService.GetData(
+    //         new List<string>() { element.ElementId.ToString() }, 
+    //         new List<string>() { channelDataType.ChannelDataTypeId.ToString() }, 
+    //         startDate, 
+    //         endDate, bucketName);
+    // }
+
+    public async Task EnableSensorPositioning(Element sensor)
+    {
+        sensorToPosition = sensor;
+        positioningSensorId = sensor.ElementId;
+        isPositioningMode = true;
+        StateHasChanged();
+    }
+
+    private async Task HandleSvgClick(MouseEventArgs e)
+    {
+        if (isPositioningMode && sensorToPosition != null)
+        {
+            var currentSensor = sensorToPosition;
+            
+            var clickPoint = await svgComponent.GetSvgCoordinates(e.ClientX, e.ClientY);
+            var realPoint = svgComponent.GetRealCoordinatesFromSVG(clickPoint);
+
+            await SaveSensorPosition(currentSensor, realPoint.X, realPoint.Y);
+            
+            // Add to positioned set
+            positionedSensorIds.Add(currentSensor.ElementId);
+            
+            await LoadSensorsAsync();
+
+            isPositioningMode = false;
+            sensorToPosition = null;
+            positioningSensorId = null;  // Reset the positioning ID
+            StateHasChanged();
+        }
+    }
+
+    private async Task SaveSensorPosition(Element sensor, double x, double y)
+    {
+        if (sensor == null)
+        {
+            await js.InvokeVoidAsync("alert", "Sensor positioning was cancelled.");
+            return;
+        }
+
+        // Use a fresh context to avoid tracking conflicts
+        using var context = await dbContextFactory.CreateDbContextAsync();
+
+        // Get attribute types directly from fresh context
+        var xAttrType = await context.Set<AttributeType>()
+            .FirstOrDefaultAsync(at => at.Name == "X");
+        var yAttrType = await context.Set<AttributeType>()
+            .FirstOrDefaultAsync(at => at.Name == "Y");
+
+        if (xAttrType == null || yAttrType == null)
+        {
+            await js.InvokeVoidAsync("alert", "X or Y AttributeType not found in the database!");
+            return;
+        }
+
+        try
+        {
+            await WritePosition(context);
+        }
+        catch (DbUpdateException ex) when (EntitiesService.IsUniqueViolation(ex))
+        {
+            // Another save inserted X or Y, or linked them to the sensor's type, between this one's read and its
+            // insert (a second click on the plan before the first had finished, another user placing the same
+            // sensor or another sensor of the same type), and the unique index on (ElementID, AttributeTypeID)
+            // or on (ElementTypeID, AttributeTypeID) refused the duplicate. Whatever was refused is there now:
+            // read again in a clean context, which finds it and only updates the values. Letting the exception
+            // out of the click handler would end the circuit.
+            using var retryContext = await dbContextFactory.CreateDbContextAsync();
+            await WritePosition(retryContext);
+        }
+
+        async Task WritePosition(AliantWebContext db)
+        {
+            // A position is two attribute rows of types X and Y. EditElement shows the rows of an attribute type
+            // the element's type is not linked to greyed and read-only, so a sensor whose type lacks the link
+            // gets it with its position. The type is read here rather than taken from the list the page loaded,
+            // so that the link goes to the type the sensor has now.
+            var elementTypeId = await db.Set<Element>()
+                .Where(e => e.ElementId == sensor.ElementId)
+                .Select(e => e.ElementTypeId)
+                .FirstOrDefaultAsync();
+
+            var newLinks = new List<string>();
+            if (elementTypeId is Guid typeId)
+            {
+                var linkedIds = await db.Set<AttributeTypeElementType>()
+                    .Where(l => l.ElementTypeId == typeId &&
+                               (l.AttributeTypeId == xAttrType.AttributeTypeId ||
+                                l.AttributeTypeId == yAttrType.AttributeTypeId))
+                    .Select(l => l.AttributeTypeId)
+                    .ToListAsync();
+
+                foreach (var attrType in new[] { xAttrType, yAttrType })
+                {
+                    if (linkedIds.Contains(attrType.AttributeTypeId)) continue;
+
+                    db.Set<AttributeTypeElementType>().Add(new AttributeTypeElementType
+                    {
+                        ElementTypeId = typeId,
+                        AttributeTypeId = attrType.AttributeTypeId
+                    });
+                    newLinks.Add(attrType.Name);
+                }
+            }
+
+            // Get existing attribute elements for this sensor
+            var existingAttributes = await db.Set<AttributeElement>()
+                .Where(ae => ae.ElementId == sensor.ElementId &&
+                            (ae.AttributeTypeId == xAttrType.AttributeTypeId ||
+                             ae.AttributeTypeId == yAttrType.AttributeTypeId))
+                .ToListAsync();
+
+            var xAttribute = existingAttributes.FirstOrDefault(ae => ae.AttributeTypeId == xAttrType.AttributeTypeId);
+            var yAttribute = existingAttributes.FirstOrDefault(ae => ae.AttributeTypeId == yAttrType.AttributeTypeId);
+
+            // Handle X attribute
+            if (xAttribute == null)
+            {
+                xAttribute = new AttributeElement
+                {
+                    AttributeElementId = Guid.NewGuid(),
+                    ElementId = sensor.ElementId,
+                    AttributeTypeId = xAttrType.AttributeTypeId,
+                    Value = x.ToString("F2", CultureInfo.InvariantCulture)
+                };
+                db.Set<AttributeElement>().Add(xAttribute);
+            }
+            else
+            {
+                xAttribute.Value = x.ToString("F2", CultureInfo.InvariantCulture);
+                db.Set<AttributeElement>().Update(xAttribute);
+            }
+
+            // Handle Y attribute
+            if (yAttribute == null)
+            {
+                yAttribute = new AttributeElement
+                {
+                    AttributeElementId = Guid.NewGuid(),
+                    ElementId = sensor.ElementId,
+                    AttributeTypeId = yAttrType.AttributeTypeId,
+                    Value = y.ToString("F2", CultureInfo.InvariantCulture)
+                };
+                db.Set<AttributeElement>().Add(yAttribute);
+            }
+            else
+            {
+                yAttribute.Value = y.ToString("F2", CultureInfo.InvariantCulture);
+                db.Set<AttributeElement>().Update(yAttribute);
+            }
+
+            await db.SaveChangesAsync();
+
+            if (newLinks.Count > 0)
+                Console.WriteLine($"[SurveillanceCapteurs] linked attribute type(s) {string.Join(", ", newLinks)} to element type {elementTypeId}, saving the position of sensor {sensor.Name} ({sensor.ElementId}).");
+        }
+    }
+
+    private void CancelPositioning()
+    {
+        sensorToPosition = null;
+        positioningSensorId = null;
+        isPositioningMode = false;
+        StateHasChanged();
+    }
+
+    private async Task HandleBatchPlot((List<(Element sensor, ChannelDataType channelDataType)> pairs, DateTime startDate, DateTime endDate) args)
+    {
+        var (sensorChannelPairs, receivedStartDate, receivedEndDate) = args;
+        
+        if (!sensorChannelPairs.Any())
+        {
+            headers.Clear();
+            headers.Add("Date");
+            indices.Clear();
+            checkboxStates.Clear();
+            
+            if (iitc != null)
+            {
+                await iitc.DisplayData(new List<Dictionary<object, double>>(), headers);
+            }
+            return;
+        }
+
+        isLoadingData = true;
+        loadingMessage = $"Loading {sensorChannelPairs.Count} sensor channels...";
+        StateHasChanged();
+
+        try
+        {
+            headers.Clear();
+            headers.Add("Date");
+            indices.Clear();
+            checkboxStates.Clear();
+
+            var uniqueSensorIds = sensorChannelPairs.Select(x => x.sensor.ElementId.ToString()).Distinct().ToList();
+            var uniqueChannelIds = sensorChannelPairs.Select(x => x.channelDataType.ChannelDataTypeId.ToString()).Distinct().ToList();
+
+            loadingMessage = $"Fetching data for {sensorChannelPairs.Count} sensor channels...";
+            StateHasChanged();
+
+            var bucketName = ReportsService.BucketName;
+            var allRawData = await InfluxService.GetData(
+                uniqueSensorIds,
+                uniqueChannelIds,
+                receivedStartDate,
+                receivedEndDate,
+                bucketName,
+                maxDataPoints
+            );
+
+            loadingMessage = $"Processing {allRawData.Count} data points...";
+            StateHasChanged();
+
+            var dataDictionaries = new Dictionary<string, Dictionary<object, double>>();
+            foreach (var (sensor, channelDataType) in sensorChannelPairs)
+            {
+                var key = $"{sensor.ElementId}|{channelDataType.ChannelDataTypeId}";
+                dataDictionaries[key] = new Dictionary<object, double>();
+            }
+
+            foreach (var row in allRawData)
+            {
+                if (row == null || row.Length < 2) continue;
+                if (row[0] == null) continue;
+                
+                var timestamp = (DateTime)row[0];
+                var sensorId = row[1]?.ToString();
+                
+                if (string.IsNullOrEmpty(sensorId)) continue;
+
+                for (int i = 0; i < uniqueChannelIds.Count; i++)
+                {
+                    var channelId = uniqueChannelIds[i];
+                    var valueIndex = i + 2;
+
+                    if (valueIndex >= row.Length || row[valueIndex] == null)
+                        continue;
+
+                    var key = $"{sensorId}|{channelId}";
+                    
+                    if (!dataDictionaries.ContainsKey(key))
+                        continue;
+
+                    var value = Convert.ToDouble(row[valueIndex], CultureInfo.InvariantCulture);
+
+                    if (!dataDictionaries[key].ContainsKey(timestamp))
+                    {
+                        dataDictionaries[key][timestamp] = value;
+                    }
+                }
+            }
+
+            foreach (var (sensor, channelDataType) in sensorChannelPairs)
+            {
+                var key = $"{sensor.ElementId}|{channelDataType.ChannelDataTypeId}";
+                var dic = dataDictionaries[key];
+
+                string checkboxKey = $"{sensor.ElementId}_{channelDataType.ChannelDataTypeId}";
+                checkboxStates[checkboxKey] = true;
+
+                headers.Add($"{sensor.Name}|{channelDataType.Name}");
+                indices.Add((key, dic));
+            }
+
+            loadingMessage = "Rendering chart...";
+            StateHasChanged();
+
+            // Assign series to the two Y axes by CHANNEL TYPE, in a stable (sorted) order so the
+            // left/right axes don't depend on the order sensors were selected. The map + labels are
+            // rebuilt on every plot — including when a series is deselected and only one type is
+            // left — so a stale axis/label can't linger (e.g. select A, select B, deselect A).
+            var distinctChannelTypeNames = sensorChannelPairs
+                .Select(x => x.channelDataType.Name)
+                .Distinct()
+                .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            string y1Label = distinctChannelTypeNames.ElementAtOrDefault(0) ?? "";
+            string y2Label = distinctChannelTypeNames.Count > 1 ? distinctChannelTypeNames[1] : "";
+
+            var seriesAxisMap = new Dictionary<string, string>();
+            foreach (var (sensor, channelDataType) in sensorChannelPairs)
+            {
+                var headerName = $"{sensor.Name}|{channelDataType.Name}";
+                // 2nd distinct type → right axis (y2); 1st type (and any 3rd+) → left axis (y).
+                seriesAxisMap[headerName] = (y2Label != "" && channelDataType.Name == y2Label) ? "y2" : "y";
+            }
+
+            if (iitc != null)
+            {
+                await iitc.DisplayData(indices.Select(x => x.Item2).ToList(), headers, null, seriesAxisMap, y1Label, y2Label);
+            }
+
+            await PushGraphExportMetaAsync();
+        }
+        catch (Exception ex)
+        {
+            await js.InvokeVoidAsync("alert", $"Error loading data: {ex.Message}\n\n{ex.StackTrace}");
+        }
+        finally
+        {
+            isLoadingData = false;
+            StateHasChanged();
+        }
+    }
+
+    // Metadata drawn into the header of the exported JPG. Pushed to a JS global (rather than passed
+    // at click time) so the export button can call JS directly and keep the user activation the
+    // Save-As picker requires.
+    private async Task PushGraphExportMetaAsync()
+    {
+        try
+        {
+            await js.InvokeVoidAsync("setGraphExportMeta", new
+            {
+                structure = Structure?.Name ?? "",
+                start = startDate.ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture) + " UTC",
+                end = endDate.ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture) + " UTC",
+                series = headers.Skip(1).ToList()   // headers[0] is "Date"
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"setGraphExportMeta failed: {ex.Message}");
+        }
+    }
+
+    private async Task OpenExportDialog()
+    {
+        var result = await dialogService.OpenAsync<ExportSensorDataDialog>(
+            $"{L["Export Sensor Data"]}",
+            new Dictionary<string, object>
+            {
+                { "Structure", Structure },
+                { "StartDate", startDate },
+                { "EndDate", endDate }
+            },
+            new Radzen.DialogOptions
+            {
+                Width = "800px",
+                Height = "600px",
+                Resizable = true,
+                Draggable = true
+            }
+        );
+    }
+
+    private async Task OnMaxDataPointsChanged()
+    {
+        await RefreshChart();
+    }
+
+    private async Task HandleSensorClickedFromSvg(Element sensor)
+    {
+        if (sensor?.ElementType?.ChannelDataTypeElementTypes == null)
+        {
+            // Need to reload sensor with channel data types
+            using var context = await dbContextFactory.CreateDbContextAsync();
+            sensor = await context.Elements
+                .Include(e => e.ElementType)
+                    .ThenInclude(et => et.ChannelDataTypeElementTypes)
+                    .ThenInclude(cdtet => cdtet.ChannelDataType)
+                .FirstOrDefaultAsync(e => e.ElementId == sensor.ElementId);
+        }
+        
+        if (sensor?.ElementType?.ChannelDataTypeElementTypes == null || !sensor.ElementType.ChannelDataTypeElementTypes.Any())
+        {
+            await js.InvokeVoidAsync("alert", $"Sensor '{sensor?.Name}' has no channel data types configured.");
+            return;
+        }
+        
+        // Build list of sensor/channel pairs for this sensor
+        var sensorChannelPairs = new List<(Element sensor, ChannelDataType channelDataType)>();
+        
+        foreach (var cdtet in sensor.ElementType.ChannelDataTypeElementTypes.OrderBy(x => x.SortOrder ?? int.MaxValue))
+        {
+            var channelDataType = cdtet.ChannelDataType;
+            if (channelDataType != null)
+            {
+                sensorChannelPairs.Add((sensor, channelDataType));
+                
+                // Update checkbox states
+                var checkboxKey = $"{sensor.ElementId}_{channelDataType.ChannelDataTypeId}";
+                checkboxStates[checkboxKey] = true;
+            }
+        }
+        
+        if (sensorChannelPairs.Any())
+        {
+            // Trigger the chart update
+            await HandleBatchPlot((sensorChannelPairs, startDate, endDate));
+            
+            // Notify the child component to refresh
+            StateHasChanged();
+        }
+    }
 }

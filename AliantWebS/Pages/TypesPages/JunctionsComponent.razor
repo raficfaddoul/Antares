@@ -1,6 +1,7 @@
 ﻿@implements IDisposable
 @using AliantWebS.Data
 @using Models
+@using Microsoft.EntityFrameworkCore
 @inject AliantWebS.Data.AppData appData
 @inject EntitiesService entitiesService
 @inject IStringLocalizer<Languages> L
@@ -130,14 +131,21 @@ else
         }
     }
 
-    void OnChange(bool args, TItem2 inspectionResultType)
+    // Ids whose unlinking is still being saved. Checking the same row again before that delete has
+    // finished must not queue a second link next to the one being deleted: the check is ignored, and
+    // the checkbox shows unchecked when the delete ends.
+    readonly HashSet<Guid> removing = new HashSet<Guid>();
+
+    async Task OnChange(bool args, TItem2 inspectionResultType)
     {
-        if (args && !GetValue(inspectionResultType))
+        Guid id = (Guid)reflexion(inspectionResultType, TItem2IdName);
+
+        if (args && !GetValue(inspectionResultType) && !removing.Contains(id))
         {
 
             TItem3 inspectionResultTypeElementType = new TItem3();
 
-            typeof(TItem3).GetProperties().First(x => x.Name == TItem2IdName).SetValue(inspectionResultTypeElementType, reflexion(inspectionResultType, TItem2IdName));
+            typeof(TItem3).GetProperties().First(x => x.Name == TItem2IdName).SetValue(inspectionResultTypeElementType, id);
             typeof(TItem3).GetProperties().First(x => x.Name == TItem1IdName).SetValue(inspectionResultTypeElementType, CallerID);
 
 
@@ -148,11 +156,64 @@ else
 
         if (!args && GetValue(inspectionResultType))
         {
+            // Every entry for this id, not only the first: rows saved before the unique indexes existed
+            // can hold two links to the same type, and unchecking must leave none behind.
+            var links = InspectionResultTypeElementTypesCollection.Where(x => ((Guid)reflexion(x, TItem2IdName)) == id).ToList();
+            var toDelete = new List<TItem3>();
 
+            removing.Add(id);
+            try
+            {
+                foreach (var link in links)
+                {
+                    // Read, and its state set, while the link is still in the list. Entry() also detects changes
+                    // on the parent the list belongs to, and a saved link already gone from it is a severed
+                    // required relationship: where that relationship is not Cascade (channel data types,
+                    // structure types) EF throws instead of deleting it, and the circuit ends.
+                    var entry = entitiesService._appDBContext.Entry((object)link);
 
-            entitiesService.DeleteEntityAsync(InspectionResultTypeElementTypesCollection.First(x => ((Guid)reflexion(x, TItem2IdName)) == ((Guid)reflexion(inspectionResultType, TItem2IdName))));
-            InspectionResultTypeElementTypesCollection.Remove(InspectionResultTypeElementTypesCollection.First(x => ((Guid)reflexion(x, TItem2IdName)) == ((Guid)reflexion(inspectionResultType, TItem2IdName))));
+                    if (entry.State == EntityState.Added)
+                    {
+                        // Checked in this session and never saved: there is no row to delete. Handing it to
+                        // DeleteEntityAsync is how the duplicate links were made - EF attached the entity as
+                        // Added, then refused to mark it Deleted because its key was only a temporary value;
+                        // the error alert showed, the entity stayed Added though it was no longer in the list,
+                        // and the next Save inserted it next to the one checked again. Forget it instead.
+                        entry.State = EntityState.Detached;
+                    }
+                    else if (entry.State != EntityState.Detached || entry.IsKeySet)
+                    {
+                        // A saved row (a detached entry with a key came from the database too).
+                        entry.State = EntityState.Deleted;
+                        toDelete.Add(link);
+                    }
+                    // Otherwise Detached with no key: never tracked, never saved; leaving the list is enough.
 
+                    // Out of the list before anything is awaited, so a second Change event arriving
+                    // meanwhile finds nothing left to remove.
+                    InspectionResultTypeElementTypesCollection.Remove(link);
+                }
+
+                foreach (var link in toDelete)
+                {
+                    var entry = entitiesService._appDBContext.Entry((object)link);
+                    // Already deleted by a save that ran meanwhile - the one for an earlier link of this id, or
+                    // another page's.
+                    if (entry.State != EntityState.Deleted) continue;
+
+                    if (!await entitiesService.DeleteEntityAsync(link))
+                    {
+                        // DeleteEntityAsync has alerted the user. A delete left queued in the circuit's
+                        // shared context would be sent again, and fail again, by every later save.
+                        Console.WriteLine($"JunctionsComponent: deleting the {typeof(TItem3).Name} link to {id} failed.");
+                        entry.State = EntityState.Detached;
+                    }
+                }
+            }
+            finally
+            {
+                removing.Remove(id);
+            }
         }
         appData.SaveChanges = true;
     }

@@ -15,7 +15,7 @@ using MathNetVectorDouble = MathNet.Numerics.LinearAlgebra.Vector<double>;
 using MathNetVectorComplex = MathNet.Numerics.LinearAlgebra.Vector<System.Numerics.Complex>;
 using MathNet.Numerics.Statistics;
 using static System.Runtime.InteropServices.JavaScript.JSType;
-using static TorchSharp.torch.utils;
+
 
 namespace Structural
 {

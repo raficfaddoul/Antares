@@ -1,0 +1,40 @@
+@page "/Model3D/{EventMpscenarioId:guid}"
+
+@using AliantWebS.Data
+@using Models
+@using AliantWebS.Pages.InventoryElementPages
+@inject AppData appData
+@inject EntitiesService entitiesService
+
+@layout AntaresConceptionLayout
+
+@if (appData.Structure is null)
+{
+    <p><em>Chargement...</em></p>
+}
+else
+{
+    <BIMComponent Structure="appData.Structure"
+                  ColorMapping="@colorMapping"
+                  TauxMap="@appData.CharpenteTauxByBimId"></BIMComponent>
+}
+
+@code {
+    // Kept for breadcrumb/scenario-nav uniformity; the 3D model is structure-based.
+    [Parameter]
+    public Guid EventMpscenarioId { get; set; }
+
+    private Dictionary<int, (List<long> EntityIds, (int R, int G, int B) Color)> colorMapping = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (appData.Structure == null)
+        {
+            appData.Structure = await entitiesService.GetFilteredFirstEntityAsync<Structure>(
+                x => x.StructureId.ToString() == "84028ce7-6e17-ef11-ab4f-3c557678c0f7");
+        }
+
+        // Derive the colour map (BimIds grouped by colour) from the single taux source.
+        colorMapping = TauxColor.BuildColorMapping(appData.CharpenteTauxByBimId);
+    }
+}

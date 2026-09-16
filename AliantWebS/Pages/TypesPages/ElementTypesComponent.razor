@@ -163,75 +163,59 @@ else
     public IList<ElementType> SelectedElementTypes { get; set; }
 
     RadzenDataGrid<ElementType> ElementTypeDataGrid;
-  
-
-
-
-    //      List<ElementType> elementTypesList = new List<ElementType>();
 
     List<Category> categoriesList = new List<Category>();
 
+    private static readonly Guid NullCategoryId = Guid.Empty;
 
     Guid CategoryID { get; set; }
     Category selectedCategory { get; set; }
 
-
-    //  IEnumerable<SideEffect> sideEffectsList;
-
     protected override async Task OnInitializedAsync()
     {
-
         await Task.WhenAll(entitiesService.tasksList);
 
         categoriesList = await entitiesService.GetAllEntitiesAsync<Category>("ElementTypes");
+
+        // Load ElementTypes that have no category assigned
+        var nullCategoryElements = await entitiesService.GetFilteredEntitiesAsync<ElementType>(
+            x => x.CategoryId == null);
+
+        if (nullCategoryElements.Any())
+        {
+            var nullCategory = new Category
+            {
+                CategoryId = NullCategoryId,
+                Name = $"[ {L["No Category"]} ]",
+                ElementTypes = nullCategoryElements
+            };
+            categoriesList.Add(nullCategory);
+        }
+
         if (categoriesList.Count > 0)
         {
             selectedCategory = categoriesList[0];
             CategoryID = selectedCategory.CategoryId;
-
         }
-        //    elementTypesList = await Task.Run(() => entitiesService.GetAllEntitiesAsync<ElementType>());
-
     }
-
 
     protected async void CategoryClicked()
     {
-
-        //    int categoryID = Int32.Parse(categoryEvent.Value.ToString());
-
         selectedCategory = categoriesList.Find(x => x.CategoryId == CategoryID);
-
-        //  elementTypesList = await Task.Run(() => entitiesService.GetFilteredEntitiesAsync<ElementType>(a => a.CategoryId == categoryID));
-
-
         this.StateHasChanged();
     }
-
 
     async Task DeleteElementType(ElementType elementType)
     {
         if (await entitiesService.DeleteEntityAsync(elementType))
         {
-            //   if (selectedCategory.ElementTypes.Remove(elementType))
-            //  {
             await ElementTypeDataGrid.Reload();
-
-            //  }
         }
-
-
-        //    await js.InvokeVoidAsync("alert", $"Updated Successfully!");
-        //    sideEffectsList = await httpClient.GetFromJsonAsync<SideEffect[]>($"api/sideEffect/4/{EvaluationID}");
-        // uriHelper.NavigateTo("/patient/evaluations/" + PatientID);
-
     }
 
     void EditRow(ElementType elementType)
     {
-
         ElementTypeDataGrid.EditRow(elementType);
-
     }
 
     async Task InsertElementType()
@@ -241,16 +225,12 @@ else
         if ((await entitiesService.InsertEntityAsync(elementType)) != null)
         {
             selectedCategory.ElementTypes.Add(elementType);
-
             await ElementTypeDataGrid.InsertRow(elementType);
-
         }
         else
         {
             await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
         }
-
-
     }
 
     async Task UpdateRow(ElementType elementType)
@@ -259,55 +239,40 @@ else
         {
             await ElementTypeDataGrid.UpdateRow(elementType);
         }
-
-
     }
-
 
     async Task InspectionResultTypes(ElementType elementType)
     {
-
         AppData.obj1 = elementType;
-
         navigationManager.NavigateTo("/ElementTypeInspectionResultTypes/" + elementType.ElementTypeId);
     }
 
     async Task DefectsTypes(ElementType elementType)
     {
         AppData.obj1 = elementType;
-
         navigationManager.NavigateTo("/ElementTypeDefectTypes/" + elementType.ElementTypeId);
-
     }
 
     async Task FlagsTypes(ElementType elementType)
     {
         AppData.obj1 = elementType;
-
         navigationManager.NavigateTo("/ElementTypeFlagTypes/" + elementType.ElementTypeId);
     }
 
     async Task AttributesTypes(ElementType elementType)
     {
         AppData.obj1 = elementType;
-
         navigationManager.NavigateTo("/ElementTypeAttributeTypes/" + elementType.ElementTypeId);
     }
 
     async Task ChannelDataTypes(ElementType elementType)
     {
         AppData.obj1 = elementType;
-
         navigationManager.NavigateTo("/ElementTypeChannelDataTypes/" + elementType.ElementTypeId);
     }
 
     async Task OnChange()
     {
-
         await SelectedElementTypesChanged.InvokeAsync(SelectedElementTypes);
-
-
     }
-
-
 }

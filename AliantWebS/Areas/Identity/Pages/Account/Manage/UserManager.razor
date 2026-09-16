@@ -12,6 +12,14 @@
 
 @inject IStringLocalizer<Languages> L
 @inject RoleManager<IdentityRole> roleManager
+@inject UserManager<ApplicationUser> userManager
+@inject EmailSender emailSender
+@inject JournalService journal
+@inject IConfiguration configuration
+@using Microsoft.Extensions.Configuration
+@using Microsoft.AspNetCore.WebUtilities
+@using System.Text
+@using System.Text.Encodings.Web
 
 
 
@@ -30,9 +38,67 @@
 }
 else
 {
-    <a class="nav-link" @onclick="@(args => InsertUser())" @onclick:preventDefault="true" href="/nothing">
-        <span class="oi oi-plus" aria-hidden="true">@L["Add New"]</span>
+    <a class="nav-link" @onclick="@(args => OpenInvite())" @onclick:preventDefault="true" href="/nothing">
+        <span class="oi oi-plus" aria-hidden="true">@L["Inviter un utilisateur"]</span>
     </a>
+
+    @* Invitation dialog: address AND roles up front, so the invitee can do something the moment
+       they log in instead of waiting for a second admin action. *@
+    @if (showInvite)
+    {
+        <div style="position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1500;
+                    display:flex; align-items:center; justify-content:center;"
+             @onclick="CloseInvite">
+            <div style="background:#fff; border-radius:14px; padding:26px 30px; width:min(520px, 92vw);
+                        box-shadow:0 20px 60px rgba(0,0,0,.3);"
+                 @onclick:stopPropagation="true">
+
+                <h4 style="margin:0 0 4px 0; color:#2d3748;">@L["Inviter un utilisateur"]</h4>
+                <p style="color:#718096; font-size:13px; margin-bottom:18px;">
+                    @L["Un e-mail d'invitation sera envoyé. Le destinataire choisira son mot de passe et sera actif immédiatement."]
+                </p>
+
+                <label style="font-size:12px; font-weight:700; color:#4a5568; text-transform:uppercase;">
+                    @L["Adresse e-mail"]
+                </label>
+                <input type="email" @bind="inviteEmail" @bind:event="oninput" disabled="@isInviting"
+                       placeholder="prenom.nom@exemple.fr"
+                       style="width:100%; padding:9px 11px; border:1px solid #cbd5e0; border-radius:6px;
+                              font-size:14px; margin:5px 0 18px 0;" />
+
+                <label style="font-size:12px; font-weight:700; color:#4a5568; text-transform:uppercase;">
+                    @L["Rôles"]
+                </label>
+                <div style="display:flex; flex-wrap:wrap; gap:10px 18px; margin:8px 0 6px 0;">
+                    @foreach (var role in (rolesList ?? new List<AspNetRole>())
+                                          .Where(r => !string.IsNullOrWhiteSpace(r.Name)))
+                    {
+                        <label style="display:flex; align-items:center; gap:6px; font-size:14px; cursor:pointer;">
+                            <input type="checkbox" disabled="@isInviting"
+                                   checked="@inviteRoles.Contains(role.Name)"
+                                   @onchange="@(e => ToggleInviteRole(role.Name, e.Value is bool b && b))" />
+                            @role.Name
+                        </label>
+                    }
+                </div>
+                @if (inviteRoles.Count == 0)
+                {
+                    <div style="font-size:12px; color:#c05621; margin-bottom:12px;">
+                        @L["Sans rôle, l'utilisateur pourra se connecter mais ne verra presque rien."]
+                    </div>
+                }
+
+                <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:18px;">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseInvite" disabled="@isInviting">
+                        @L["Cancel"]
+                    </button>
+                    <button type="button" class="btn btn-primary" @onclick="SendInvite" disabled="@isInviting">
+                        @(isInviting ? L["Envoi…"] : L["Envoyer l'invitation"])
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
     <RadzenDataGrid TItem="AspNetUser" @ref="userGrid" Data="@userList" @bind-Value="@SelectedUsers"
                     AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="PageSize">
         <Columns>
@@ -76,6 +142,20 @@ else
                         <a title="@L["Delete"]" class="nav-link" @onclick="@(() => DeleteUser(data))" @onclick:preventDefault="true" href="/nothing">
                             <span class="oi oi-trash" aria-hidden="true"></span>
                         </a>
+                        @* Only for accounts that never completed their invitation: an expired link
+                           previously meant deleting and recreating the user. Copying the link serves
+                           invitees whose mail server drops the automated invitation. *@
+                        @if (!data.EmailConfirmed)
+                        {
+                            <a title="@L["Renvoyer l'invitation"]" class="nav-link"
+                               @onclick="@(() => ResendInvite(data))" @onclick:preventDefault="true" href="/nothing">
+                                <span class="oi oi-envelope-closed" aria-hidden="true"></span>
+                            </a>
+                            <a title="@L["Copier le lien d'invitation"]" class="nav-link"
+                               @onclick="@(() => CopyInvitationLink(data))" @onclick:preventDefault="true" href="/nothing">
+                                <span class="oi oi-link-intact" aria-hidden="true"></span>
+                            </a>
+                        }
                     </div>
                 </Template>
 
@@ -163,8 +243,12 @@ else
 
         if (v.Email == selectedUser.Email) return;
 
+        var deletedEmail = selectedUser.Email;
+
         if (await entitiesService.DeleteEntityAsync(selectedUser))
         {
+            await journal.WriteAsync(JournalCategory.Configuration, "user.delete", deletedEmail,
+                null, severity: 2);
 
             if (userList.Remove(selectedUser))
             {
@@ -187,22 +271,272 @@ else
 
     }
 
-    async Task InsertUser()
+    // ── Invitation ────────────────────────────────────────────────────────────────────────────
+    private bool showInvite;
+    private bool isInviting;
+    private string inviteEmail = "";
+    private readonly HashSet<string> inviteRoles = new(StringComparer.OrdinalIgnoreCase);
+
+    private void OpenInvite()
     {
-        AspNetUser user = new AspNetUser();
+        inviteEmail = "";
+        inviteRoles.Clear();
+        showInvite = true;
+    }
 
-        
+    private void CloseInvite()
+    {
+        if (isInviting) return;      // don't drop the dialog mid-send
+        showInvite = false;
+    }
 
-        if ((await entitiesService.InsertEntityAsync(user)) != null)
+    private void ToggleInviteRole(string role, bool selected)
+    {
+        if (selected) inviteRoles.Add(role);
+        else inviteRoles.Remove(role);
+    }
+
+    /// <summary>
+    /// Creates a user through Identity rather than by inserting an AspNetUsers row.
+    ///
+    /// The old version did `new AspNetUser()` + InsertEntityAsync: Id is NOT NULL in the table and
+    /// the model defaults it to null, so every insert failed and the swallowed exception surfaced
+    /// as "Update Unsuccessfull!". Even with an Id it would have produced an unusable account —
+    /// Identity looks users up by NormalizedUserName/NormalizedEmail and needs a SecurityStamp to
+    /// issue tokens, none of which a raw insert sets.
+    /// </summary>
+    async Task SendInvite()
+    {
+        var email = (inviteEmail ?? "").Trim();
+
+        if (!email.Contains('@') || email.Contains(' '))
         {
-            userList.Add(user);
+            await js.InvokeVoidAsync("alert", L["Adresse e-mail invalide."].Value);
+            return;
+        }
 
-            await userGrid.InsertRow(user);
+        if (await userManager.FindByEmailAsync(email) != null)
+        {
+            await js.InvokeVoidAsync("alert", $"{L["Un compte existe déjà pour"]} {email}.");
+            return;
+        }
 
+        isInviting = true;
+        try
+        {
+            var appUser = new ApplicationUser { UserName = email, Email = email };
+
+            // No password: the invitation link is what sets the first one.
+            var result = await userManager.CreateAsync(appUser);
+            if (!result.Succeeded)
+            {
+                await js.InvokeVoidAsync("alert",
+                    $"{L["Création impossible"]} : {string.Join(" / ", result.Errors.Select(e => e.Description))}");
+                return;
+            }
+
+            // Roles now rather than in a second step, so the invitee sees a usable application on
+            // their first login instead of an empty one.
+            var roles = inviteRoles.ToList();
+            if (roles.Count > 0)
+            {
+                var roleResult = await userManager.AddToRolesAsync(appUser, roles);
+                if (!roleResult.Succeeded)
+                {
+                    // Razor's tokenizer chokes on an apostrophe inside L["…"] nested in an
+                    // interpolated string, so the text is pulled out first.
+                    var roleWarning = L["Compte créé, mais les rôles n'ont pas pu être attribués"].Value;
+                    await js.InvokeVoidAsync("alert",
+                        roleWarning + " : " + string.Join(" / ", roleResult.Errors.Select(e => e.Description)));
+                }
+            }
+
+            string mailStatus = await SendInvitationMailAsync(appUser, roles, isReminder: false);
+
+            await journal.WriteAsync(JournalCategory.Configuration, "user.invite", email,
+                $"Rôles : {(roles.Count == 0 ? "aucun" : string.Join(", ", roles))} — {mailStatus}",
+                severity: 1);
+
+            showInvite = false;
+            userList = await entitiesService.GetAllEntitiesAsync<AspNetUser>("Roles");
+            await userGrid.Reload();
+
+            await js.InvokeVoidAsync("alert", $"{email} : {mailStatus}");
+        }
+        finally
+        {
+            isInviting = false;
+        }
+    }
+
+    /// <summary>
+    /// Re-issues an invitation for an account that never activated. The token is single-use and
+    /// time limited, so a link that expired in an inbox no longer means deleting the user and
+    /// starting again. The new link cancels every earlier one (see BuildInvitationLinkAsync).
+    /// </summary>
+    async Task ResendInvite(AspNetUser row)
+    {
+        var appUser = await userManager.FindByIdAsync(row.Id);
+        if (appUser == null)
+        {
+            await js.InvokeVoidAsync("alert", L["Utilisateur introuvable."].Value);
+            return;
+        }
+
+        // Asked before anything changes: Cancel leaves the link the invitee may already hold working.
+        var question = "⚠️ " + string.Format(L["Renvoyer une invitation à {0} désactive le lien de l'invitation déjà envoyée."].Value, appUser.Email)
+                     + "\n\n" + string.Format(L["Si {0} a bien reçu l'invitation, annulez : son lien continuera de fonctionner."].Value, appUser.Email);
+        var confirmed = await js.InvokeAsync<bool>("confirm", question);
+        if (!confirmed) return;
+
+        var roles = (await userManager.GetRolesAsync(appUser)).ToList();
+        string mailStatus = await SendInvitationMailAsync(appUser, roles, isReminder: true);
+
+        await journal.WriteAsync(JournalCategory.Configuration, "user.invite.resend", appUser.Email,
+            mailStatus, severity: 1);
+
+        await js.InvokeVoidAsync("alert", $"{appUser.Email} : {mailStatus}");
+    }
+
+    /// <summary>
+    /// Builds the single-use invitation link and sends it. Returns what to tell the administrator —
+    /// a mail failure must not read as "the account was not created", because it was.
+    /// </summary>
+    async Task<string> SendInvitationMailAsync(ApplicationUser appUser, List<string> roles, bool isReminder)
+    {
+        try
+        {
+            var callbackUrl = await BuildInvitationLinkAsync(appUser);
+
+            // Who is inviting, so the message does not read like phishing.
+            var me = await appData.GetCurrentUserAsync();
+            var inviter = string.IsNullOrWhiteSpace(me?.FirstName) && string.IsNullOrWhiteSpace(me?.LastName)
+                ? me?.Email
+                : $"{me?.FirstName} {me?.LastName}".Trim() + $" ({me?.Email})";
+
+            await emailSender.SendInvitationAsync(appUser.Email, callbackUrl, inviter,
+                                                  navigationManager.BaseUri, roles,
+                                                  InvitationTokens.ExpiryDays(configuration), isReminder);
+
+            return string.Format(L["Invitation envoyée (lien valable {0} jour(s))."].Value,
+                                 InvitationTokens.ExpiryDays(configuration));
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[UserManager] invitation e-mail failed for {appUser.Email}: {ex.Message}");
+            var warning = L["Le compte existe mais l'invitation n'a pas pu être envoyée"].Value;
+            return "⚠️ " + warning + " (" + ex.Message + ").";
+        }
+    }
+
+    /// <summary>
+    /// Mints an invitation token and turns it into the absolute AcceptInvitation URL. One token for
+    /// both jobs: redeeming it sets the password AND confirms the address.
+    ///
+    /// Only the newest link works. Invitation tokens are stored nowhere: each one carries the
+    /// account's security stamp and is checked against it, so rotating the stamp first voids every
+    /// link issued before, mailed or copied. That is what lets Resend or Copy cancel a link that
+    /// reached the wrong person. It voids any other outstanding token on the account too, which is
+    /// harmless here: an account that was never activated cannot sign in, and the new invitation
+    /// supersedes whatever it was sent before.
+    ///
+    /// The host is whatever address the administrator's browser is on (Blazor Server takes BaseUri
+    /// from the client), so a link issued while browsing Argos through a LAN address carries it.
+    /// </summary>
+    async Task<string> BuildInvitationLinkAsync(ApplicationUser appUser)
+    {
+        // The circuit's DbContext can still hold this user as it was first loaded. If the account
+        // changed since (typically: the invitee has just activated it), this write fails on the
+        // concurrency stamp. Issuing a token anyway would embed a stamp the database never received,
+        // so the link would be dead on arrival.
+        var rotated = await userManager.UpdateSecurityStampAsync(appUser);
+        if (!rotated.Succeeded)
+            throw new InvalidOperationException("impossible d'annuler les liens précédents ("
+                + string.Join(" / ", rotated.Errors.Select(e => e.Description))
+                + "). Rechargez la page puis réessayez.");
+
+        var code = await userManager.GenerateUserTokenAsync(
+            appUser, InvitationTokens.ProviderName, InvitationTokens.Purpose);
+        code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
+
+        return navigationManager.ToAbsoluteUri(
+            $"Identity/Account/AcceptInvitation?userId={Uri.EscapeDataString(appUser.Id)}&code={code}").ToString();
+    }
+
+    /// <summary>
+    /// Puts a fresh invitation link on the clipboard, for invitees whose mail server drops the
+    /// automated invitation (strict university gateways, typically). A short message from the
+    /// administrator's own mailbox, or a Teams chat, gets through where the mail did not.
+    ///
+    /// The link is as powerful as the mailed one: whoever submits it first chooses the password and
+    /// is signed in as this account. Hence the warning shown with it, and a journal entry that
+    /// records the copy but never the link. Issuing it cancels every earlier link, the mailed one
+    /// included, so the administrator confirms first.
+    /// </summary>
+    async Task CopyInvitationLink(AspNetUser row)
+    {
+        var appUser = await userManager.FindByIdAsync(row.Id);
+        if (appUser == null)
+        {
+            await js.InvokeVoidAsync("alert", L["Utilisateur introuvable."].Value);
+            return;
+        }
+
+        // The button only renders for unactivated rows, but the grid can be stale. On an active
+        // account an invitation link would work as a password reset: AcceptInvitation replaces an
+        // existing password.
+        if (appUser.EmailConfirmed)
+        {
+            await js.InvokeVoidAsync("alert", L["Ce compte est déjà activé."].Value);
+            return;
+        }
+
+        // Asked before anything changes: Cancel leaves the link the invitee may already hold working.
+        var question = "⚠️ " + string.Format(L["Créer un nouveau lien pour {0} désactive le lien de l'invitation déjà envoyée."].Value, appUser.Email)
+                     + "\n\n" + string.Format(L["Si {0} a bien reçu l'invitation, annulez : son lien continuera de fonctionner."].Value, appUser.Email);
+        var confirmed = await js.InvokeAsync<bool>("confirm", question);
+        if (!confirmed) return;
+
+        string link;
+        try
+        {
+            link = await BuildInvitationLinkAsync(appUser);
+        }
+        catch (InvalidOperationException ex)
+        {
+            await js.InvokeVoidAsync("alert", L["Lien non créé"].Value + " : " + ex.Message);
+            return;
+        }
+        int days = InvitationTokens.ExpiryDays(configuration);
+
+        bool copied;
+        try
+        {
+            await js.InvokeVoidAsync("navigator.clipboard.writeText", link);
+            copied = true;
+        }
+        catch (JSException)
+        {
+            // No clipboard: a page not served over HTTPS, or a browser that no longer counts the
+            // click as a user gesture after the confirmation and the round trip to the server
+            // (Safari; Firefox too if the confirmation took more than a few seconds).
+            copied = false;
+        }
+
+        await journal.WriteAsync(JournalCategory.Configuration, "user.invite.link", appUser.Email,
+            "Lien d'invitation copié (valable " + days + " jour(s))", severity: 1);
+
+        var warning = L["Envoyez-le uniquement à cette personne : il permet de choisir le mot de passe du compte et de s'y connecter."].Value;
+        if (copied)
+        {
+            var done = string.Format(L["Lien d'invitation pour {0} copié (valable {1} jour(s))."].Value, appUser.Email, days);
+            await js.InvokeVoidAsync("alert", done + "\n\n" + warning);
         }
         else
         {
-            await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
+            // prompt() shows the link pre-selected, ready for Ctrl+C.
+            var manual = string.Format(L["Copiez le lien d'invitation pour {0} (Ctrl+C)."].Value, appUser.Email);
+            await js.InvokeAsync<string>("prompt", manual + " " + warning, link);
         }
     }
 
@@ -210,9 +544,24 @@ else
 
     async Task UpdateRow(AspNetUser user)
     {
+        // Identity resolves a login through NormalizedUserName / NormalizedEmail, never through
+        // Email. Editing the address in the grid without refreshing those columns leaves an account
+        // that looks right here and cannot sign in. ToUpperInvariant is what Identity's default
+        // lookup normalizer does.
+        if (!string.IsNullOrWhiteSpace(user.Email))
+        {
+            user.UserName = user.Email;
+            user.NormalizedEmail = user.Email.ToUpperInvariant();
+            user.NormalizedUserName = user.Email.ToUpperInvariant();
+        }
+
         if (await entitiesService.UpdateEntityAsync(user))
         {
             await userGrid.UpdateRow(user);
+
+            await journal.WriteAsync(JournalCategory.Configuration, "user.update", user.Email,
+                $"Rôles : {string.Join(", ", user.Roles.Select(r => r?.Name).Where(n => n != null))}",
+                severity: 1);
         }
     }
 

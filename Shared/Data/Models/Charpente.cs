@@ -13,8 +13,8 @@ public partial class Charpente
     [Column("CharpenteID")]
     public Guid CharpenteId { get; set; }
 
-    [Column("EventID")]
-    public Guid EventId { get; set; }
+    [Column("EventMPScenarioID")]
+    public Guid EventMpscenarioId { get; set; }
 
     public double? A1 { get; set; }
 
@@ -216,7 +216,7 @@ public partial class Charpente
 
     public double? J10 { get; set; }
 
-    [ForeignKey("EventId")]
+    [ForeignKey("EventMpscenarioId")]
     [InverseProperty("Charpentes")]
-    public virtual Event Event { get; set; } = null!;
+    public virtual EventMpscenario EventMpscenario { get; set; } = null!;
 }

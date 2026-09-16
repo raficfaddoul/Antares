@@ -1,4 +1,4 @@
-﻿@page "/Charpente/{EventID:guid}"
+﻿@page "/Charpente/{EventMpscenarioId:guid}"
 
 @using AliantWebS.Data
 @using Models
@@ -78,10 +78,12 @@
 
     .white-background {
     background-color: #ffffff; /* White */
+    border: 1px solid #aaaaaa;
     }
 
     .faint-magenta-background {
     background-color: #fde4f9; /* Faint magenta */
+    border: 1px solid #aaaaaa;
     }
 
     .legend-text {
@@ -127,7 +129,82 @@
     }
 
     .tooltip-text::before {
-    display: none;   
+    display: none;
+    }
+
+    /* ---- Compte rendu + datagrid cards ---- */
+    .cr-card, .grid-card {
+        background: #fff;
+        border: 1px solid #e6e6ef;
+        border-radius: 10px;
+        box-shadow: 0 1px 4px rgba(20, 30, 60, 0.07);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        margin: 6px;
+    }
+
+    .grid-card {
+        height: auto;
+        margin-top: 16px;
+    }
+
+    .cr-card-header, .grid-card-header {
+        background: linear-gradient(90deg, #2c3e50, #46637f);
+        color: #fff;
+        font-weight: 600;
+        font-size: 0.95rem;
+        letter-spacing: 0.2px;
+        padding: 9px 14px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .cr-icon { font-size: 1.05rem; line-height: 1; }
+
+    .cr-textarea {
+        flex: 1 1 auto;
+        width: 100%;
+        min-height: 200px;
+        border: none;
+        resize: none;
+        padding: 12px 14px;
+        font-family: 'Consolas', 'Courier New', monospace;
+        font-size: 0.85rem;
+        line-height: 1.55;
+        color: #2c3e50;
+        background: #fbfbfd;
+        outline: none;
+    }
+
+    .taux-bar-wrap {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .taux-bar-track {
+        flex: 1;
+        height: 14px;
+        background: #ecedf3;
+        border-radius: 7px;
+        overflow: hidden;
+    }
+
+    .taux-bar-fill {
+        height: 100%;
+        border-radius: 7px;
+        transition: width 0.3s ease;
+    }
+
+    .taux-pct {
+        min-width: 56px;
+        text-align: right;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+        color: #2c3e50;
     }
 </style>
 
@@ -136,21 +213,44 @@
 
 <RadzenSplitter>
     <RadzenSplitterPane>
-        <AliantWebS.Pages.CADPages.SVGComponent></AliantWebS.Pages.CADPages.SVGComponent>
+        <RadzenSplitter Orientation="Radzen.Orientation.Vertical">
+            <RadzenSplitterPane>
+                <AliantWebS.Pages.CADPages.SVGComponent Point0X="@(Layout?.selectedEvent?.Point0X ?? 0)"
+                                                        Point0Y="@(Layout?.selectedEvent?.Point0Y ?? 0)"
+                                                        EventName="@Layout?.selectedEvent?.Name"
+                                                        EventId="@Layout?.selectedEvent?.EventId"
+                                                        ScenarioName="@Layout?.selectedScenario?.Name"
+                                                        ScenarioId="@Layout?.selectedScenario?.EventMpscenarioId"
+                                                        StructureName="@appData.Structure?.Name"
+                                                        ModuleName="Charpente"></AliantWebS.Pages.CADPages.SVGComponent>
+            </RadzenSplitterPane>
+             <RadzenSplitterPane>
+                <div class="cr-card">
+                    <div class="cr-card-header">
+                        <span class="cr-icon">📋</span> @L["Compte Rendu"]
+                    </div>
+                    <InputTextArea @bind-Value="compteRendu" class="cr-textarea"></InputTextArea>
+                </div>
+             </RadzenSplitterPane>
+        </RadzenSplitter>
     </RadzenSplitterPane>
     <RadzenSplitterPane>
         <div class="form-group">
             <div class="controls-container">
                 <!-- Buttons Container -->
                 <div class="buttons-container">
-                    <button type="button" class="btn btn-success" @onclick="Calcul">
+                    <button type="button" class="btn btn-success" @onclick="Calcul" disabled="@isCalculating">
                         @if (isCalculating)
                         {
-                            <i class="fas fa-spinner fa-spin"></i>
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                            <span>@L["Calcul en cours..."]</span>
                         }
-                        @L["Calcul Charpente"]
+                        else
+                        {
+                            @L["Calcul Charpente"]
+                        }
                     </button>
-                    @if ((appData.GetRole().Result == "Administrator") || (appData.GetRole().Result == "Developer"))
+                    @if (canEditLimits)
                     {
                         <button type="button" class="btn btn-success" @onclick="saveLimitstodatabase" style="margin-left: 10px;">
                             @L["Save Critical Loads"]
@@ -158,14 +258,18 @@
                     }
                 </div>
                 <!-- Legend Container -->
+                @* Listed in the order the two inputs appear inside each cell: the white box on top is
+                   the load computed by Calcul Charpente, the magenta box below it is the capacity from
+                   the venue load book. The two labels were the wrong way round, which made the whole
+                   grid read backwards. *@
                 <div class="legend-container">
                     <div>
-                        <span class="legend-box faint-magenta-background"></span>
-                        <span class="legend-text">Calculated Values</span>
+                        <span class="legend-box white-background"></span>
+                        <span class="legend-text">@L["Calculated Values"]</span>
                     </div>
                     <div>
-                        <span class="legend-box white-background"></span>
-                        <span class="legend-text">Limit values</span>
+                        <span class="legend-box faint-magenta-background"></span>
+                        <span class="legend-text">@L["Limit values"]</span>
                     </div>
                 </div>
             </div>
@@ -192,36 +296,82 @@
                         {
                             <td class="small-cell">
                                 <div class ="tooltip-container">
-                                    <span class="tooltip-text" style="@GetTooltipStyle(CalculateRatio(row, col))">@($"Taux de charge: {CalculateRatio(row, col):F2}")</span>
-                                    <input type="number" class="form-control small-input center-text" value="@GetCellValue(row, col)" @onchange="e => UpdateCellValue(row, col, e)"
-                                    style="background-color: #ffffff;" />
-                                    <input type="number"
+                                    <span class="tooltip-text" style="@RatioStyle(CalculateRatio(row, col))">@TauxText("Taux de charge", CalculateRatio(row, col))</span>
+                                    @* The calculated cell carries the same colour as its tooltip, so the
+                                       whole grid can be read at a glance without hovering ninety cells. *@
+                                    <input type="number" step="any" class="form-control small-input center-text" value="@(GetCellValue(row, col).ToString(System.Globalization.CultureInfo.InvariantCulture))" @onchange="e => UpdateCellValue(row, col, e)"
+                                    style="@RatioStyle(CalculateRatio(row, col))" />
+                                    <input type="number" step="any"
                                     class="form-control small-input center-text"
-                                    value="@GetCellValue(row, col, false)"
+                                    value="@(GetCellValue(row, col, false).ToString(System.Globalization.CultureInfo.InvariantCulture))"
                                     @onchange="e => UpdateCellValue(row, col, e, false)"
-                                    disabled="@(appData.GetRole().Result != "Administrator" && appData.GetRole().Result != "Developer")"
+                                    disabled="@(!canEditLimits)"
                                     style="background-color: #fde4f9;" />
                                 </div>
                             </td>
                         }
                     </tr>
                 }
+                @* Total row: the summed load on a beam over that beam's own capacity.
+                   The beam limit is NOT the sum of its nine point limits — it is considerably lower,
+                   and it is usually the constraint that actually binds — so it is entered here rather
+                   than derived. It lives in row 10 of TCharpente, which the grid above does not show. *@
                 <tr>
                     <th class="small-cell">Total</th>
                     @foreach (var col in columns)
                     {
                         <td class="small-cell">
-                            <input type="number" class="form-control small-input center-text" value="@GetSumValue(col)" />
+                            <div class="tooltip-container">
+                                <span class="tooltip-text" style="@RatioStyle(CalculateBeamRatio(col))">
+                                    @TauxText("Taux de charge poutre", CalculateBeamRatio(col))
+                                </span>
+                                @* Read-only: this is a computed sum. It was rendered as an editable
+                                   input with no change handler, so anything typed in was discarded. *@
+                                <input type="number" step="any" class="form-control small-input center-text" readonly
+                                       value="@(GetSumValue(col).ToString(System.Globalization.CultureInfo.InvariantCulture))"
+                                       style="@RatioStyle(CalculateBeamRatio(col))" />
+                                <input type="number" step="any"
+                                       class="form-control small-input center-text"
+                                       value="@(GetCellValue(BeamCapacityRow, col, false).ToString(System.Globalization.CultureInfo.InvariantCulture))"
+                                       @onchange="e => UpdateCellValue(BeamCapacityRow, col, e, false)"
+                                       disabled="@(!canEditLimits)"
+                                       style="background-color: #fde4f9;" />
+                            </div>
                         </td>
                     }
                 </tr>
             </tbody>
         </table>
         <Label>Charge Totale</Label>
-        <input disabled value="@GetGrandSumValue()" />
-        <div>
-            <Label>Compte Rendu</Label>
-            <InputTextArea @bind-Value=compteRendu style="width:100%"></InputTextArea>
+        <input disabled value="@(GetGrandSumValue().ToString(System.Globalization.CultureInfo.InvariantCulture))" />
+        <div class="grid-card">
+            <div class="grid-card-header">
+                <span class="cr-icon">📊</span> @L["Taux de travail par élément"]
+            </div>
+            <RadzenDataGrid Data="@elementsSortedByTaux" TItem="Element"
+                            AllowSorting="true" AllowPaging="true" PageSize="10"
+                            AllowColumnResize="true">
+                <Columns>
+                    <RadzenDataGridColumn TItem="Element" Property="Name" Title="@L["Nom de l'élément"]" />
+                    <RadzenDataGridColumn TItem="Element" Title="@L["Taux de travail"]" Width="240px" Sortable="false">
+                        <Template Context="element">
+                            @{
+                                var _t = GetTauxTravail(element.ElementId);
+                                var _pct = _t * 100;
+                                var _c = TauxColor.ToColor(_t);
+                                var _w = (int)Math.Round(Math.Clamp(_pct, 0, 100));
+                                var _rgb = $"rgb({_c.R},{_c.G},{_c.B})";
+                            }
+                            <div class="taux-bar-wrap">
+                                <div class="taux-bar-track">
+                                    <div class="taux-bar-fill" style="width:@(_w)%; background:@_rgb;"></div>
+                                </div>
+                                <span class="taux-pct">@_pct.ToString("F1") %</span>
+                            </div>
+                        </Template>
+                    </RadzenDataGridColumn>
+                </Columns>
+            </RadzenDataGrid>
         </div>
     </RadzenSplitterPane>
 </RadzenSplitter>
@@ -231,10 +381,21 @@
 @code {
 
     [Parameter]
-    public Guid EventID { get; set; }
-    // Define the columns and rows
-    private readonly string[] columns = { "A", "B", "C", "D", "E", "F", "G", "H", "I", "J" };
-    private readonly string[] rows = { "1", "2", "3", "4", "5", "6", "7", "8", "9" };
+    public Guid EventMpscenarioId { get; set; }
+
+    [CascadingParameter]
+    public AntaresConceptionLayout Layout { get; set; }
+
+    // Define the columns and rows — display order: columns J→A (left→right), rows 9→1 (top→bottom).
+    private readonly string[] columns = { "J", "I", "H", "G", "F", "E", "D", "C", "B", "A" };
+    private readonly string[] rows = { "9", "8", "7", "6", "5", "4", "3", "2", "1" };
+
+    // Row 10 is not an attachment point: it holds each beam's own capacity, shown on the Total row.
+    private const string BeamCapacityRow = "10";
+
+    // Resolved once per parameter set. The limit inputs used to call appData.GetRole().Result inline,
+    // which blocks the circuit's thread ninety times per render just to decide a disabled attribute.
+    private bool canEditLimits;
 
     // Dictionary to store cell values
     private Dictionary<(string, string), double> tableData = new Dictionary<(string, string), double>();
@@ -247,18 +408,34 @@
 
     string compteRendu = "epsom loren";
 
-    protected override async Task OnInitializedAsync()
+    // Store tauxTravail at class level for grid access
+    private Dictionary<Guid, double> tauxTravail = new Dictionary<Guid, double>();
+
+    // Elements sorted by taux de travail (descending)
+    private List<Element> elementsSortedByTaux = new List<Element>();
+
+    // Helper method to get taux de travail for an element
+    private double GetTauxTravail(Guid elementId)
     {
-        charpente = await entitiesService.GetFilteredFirstEntityAsync<Models.Charpente>(x => (x.EventId == EventID));
+        return tauxTravail.TryGetValue(elementId, out double value) ? value : 0;
+    }
+
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var role = await appData.GetRole();
+        canEditLimits = role is "Administrator" or "Developer";
+
+        charpente = await entitiesService.GetFilteredFirstEntityAsync<Models.Charpente>(x => (x.EventMpscenarioId == Layout.selectedScenario.EventMpscenarioId));
         if (charpente == null)
         {
             charpente = new Models.Charpente();
-            charpente.EventId = EventID;
+            charpente.EventMpscenarioId = Layout.selectedScenario.EventMpscenarioId;
         }
-        else
-        {
-            tableData = ReadCharpenteData(charpente);
-        }
+
+
+        tableData = ReadCharpenteData(charpente);
+
 
         var tcharpentes = await entitiesService.GetAllEntitiesAsync<Models.Tcharpente>();
         tcharpente = tcharpentes?.FirstOrDefault();
@@ -275,24 +452,28 @@
     // Method to update cell values
     private void UpdateCellValue(string row, string column, ChangeEventArgs e, bool Calculated = true)
     {
+        // Parsed as a double, invariant, to match how the cells are rendered. int.TryParse used to
+        // reject every calculated value, which are decimals like 54.8139, so editing one silently
+        // discarded the entry and left the old number on screen.
+        if (!double.TryParse(
+                e.Value?.ToString(),
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out double value))
+        {
+            return;
+        }
+
         if (Calculated)
         {
-            if (int.TryParse(e.Value.ToString(), out int value))
-            {
-                tableData[(row, column)] = value;
-            }
+            tableData[(row, column)] = value;
         }
         else
         {
-            if (int.TryParse(e.Value.ToString(), out int value))
-            {
-                ttableData[(row, column)] = value;
-            }
-
+            ttableData[(row, column)] = value;
         }
     }
 
-    // Method to get cell value
     private double GetCellValue(string row, string column, bool Calculated = true)
     {
         if (Calculated)
@@ -672,31 +853,104 @@
 
 
     }
-    private string GetTooltipStyle(double ratio)
+    /// <summary>
+    /// Blue through red by load ratio, solid red above 1, grey when no capacity is on record.
+    /// Used by both the tooltip and the calculated cell behind it so the two can never disagree.
+    /// </summary>
+    private static string RatioStyle(double? ratio)
     {
-        if (ratio > 1)
+        // No capacity on record. Grey, because this is "unknown", not "lightly loaded" — the old code
+        // returned 0 here and painted it the same blue as a genuinely unloaded point.
+        if (ratio is not { } r)
+            return "background-color: #757575; color: white;";
+
+        if (r > 1)
             return "background-color: red; color: white;";
 
         // Calculate color gradient from blue to red
-        int red = (int)(255 * ratio); // Increases as ratio approaches 1
+        int red = (int)(255 * r); // Increases as ratio approaches 1
         int blue = 255 - red; // Decreases as ratio approaches 1
         return $"background-color: rgb({red}, 0, {blue}); color: white;";
     }
 
-    private double CalculateRatio(string row, string col)
+    /// <summary>Tooltip text for a ratio, distinguishing an unknown capacity from a zero load.</summary>
+    private static string TauxText(string label, double? ratio) =>
+        ratio is { } r ? $"{label} : {r:F2}" : $"{label} : capacité non renseignée";
+
+    /// <summary>
+    /// Load over capacity for one attachment point, or null when the cahier des charges has no
+    /// capacity for it. Null rather than 0: a missing limit is not a comfortable one.
+    /// </summary>
+    private double? CalculateRatio(string row, string col)
     {
-        double numerator = GetCellValue(row, col);
-        double denominator = GetCellValue(row, col, false);
+        double capacity = GetCellValue(row, col, false);
+        if (capacity == 0) return null;
 
-        if (denominator == 0) return 0; // Prevent division by zero
+        return GetCellValue(row, col) / capacity;
+    }
 
-        return numerator / denominator;
+    /// <summary>
+    /// How hard a whole beam is working: its summed load against its own capacity from row 10. Kept
+    /// separate from CalculateRatio because the numerator is a sum, not a stored cell.
+    /// </summary>
+    private double? CalculateBeamRatio(string col)
+    {
+        double capacity = GetCellValue(BeamCapacityRow, col, false);
+        if (capacity == 0) return null;
+
+        return GetSumValue(col) / capacity;
+    }
+
+    private Dictionary<Guid, (int dof, double value)> GetChargeNodale(AliantWebS.Models.Charpente charpente, Tcharpente tCharpente)
+    {
+        // Load chargeNodale using Tcharpente mappings and Charpente values
+        var chargeNodale = new Dictionary<Guid, (int dof, double value)>();
+
+        Models.Charpente charpente1 = new Models.Charpente();
+        
+
+        // Use reflection to iterate through all properties
+        var charpenteProperties = typeof(Models.Charpente).GetProperties()
+            .Where(p => p.PropertyType == typeof(double?) && Regex.IsMatch(p.Name, @"^[A-J]\d+$"))
+            .ToList();
+
+        foreach (var charpenteProp in charpenteProperties)
+        {
+            // Get the value from Charpente
+            var chargeValue = charpenteProp.GetValue(charpente) as double?;
+
+            if (chargeValue.HasValue && chargeValue.Value != 0)
+            {
+                // Get the corresponding map property from Tcharpente (e.g., "A1" -> "A1map")
+                var mapPropertyName = $"{charpenteProp.Name}map";
+                var mapProperty = typeof(Models.Tcharpente).GetProperty(
+                    mapPropertyName,
+                    BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase
+                );
+
+                if (mapProperty != null)
+                {
+                    var elementGuid = mapProperty.GetValue(tCharpente) as Guid?;
+
+                    // If mapping exists and is not empty, add to chargeNodale
+                    if (elementGuid.HasValue && elementGuid.Value != Guid.Empty)
+                    {
+                        // dof = 2 for vertical load (Z-axis in 3D), adjust as needed
+                        chargeNodale[elementGuid.Value] = (dof: 2, value: chargeValue.Value);
+                    }
+                }
+            }
+        }
+
+        return chargeNodale;
+
     }
 
     private async void Calcul()
     {
         isCalculating = true;
         StateHasChanged();
+        await Task.Yield(); // let the spinner paint before the (heavy, synchronous) FE solve
         if (appData.Structure == null)
         {
             Structure structure = await entitiesService.GetFilteredFirstEntityAsync<Structure>(x => x.StructureId.ToString() == "84028ce7-6e17-ef11-ab4f-3c557678c0f7");
@@ -708,84 +962,43 @@
         List<LoadCase> loadCases = await entitiesService.GetFilteredEntitiesAsync<LoadCase>(x => x.StructureId == appData.Structure.StructureId);
 
         selectedLoadCases = loadCases.ToDictionary(lc => lc, lc => 1.0); // Assuming all load cases are selected with a factor of 1.0
-        
-        Structural.Structure CharpenteAntares = Structural.Simulation.CreateStructure3D(appData.Structure, selectedLoadCases, null, entitiesService);
-
-        // int i = -1, j = -1;
-        // foreach (System.Data.DataRow elem in CharpenteAntares.element.Rows)
-        // {
-        //     i++;
-        //     double mat = elem.Field<double>("E");
-        //     double b = elem.Field<double>("b");
-        //     double h = elem.Field<double>("h");
-
-        //     int ni = elem.Field<int>("Noeudi");
-        //     int nj = elem.Field<int>("Noeudj");
-
-        //     j = 0;
-        // }
 
 
+        var chargeNodale = GetChargeNodale(charpente, tcharpente);
 
-        List<Element> elements;
-        List<Element> nodes;
-        nodes = entitiesService.GetFilteredEntitiesAsync<Element>(a => ((a.StructureId == appData.Structure.StructureId) && (a.ElementType?.Name == "Noeud3d"))).Result;
-        elements = entitiesService.GetFilteredEntitiesAsync<Element>(a => ((a.StructureId == appData.Structure.StructureId) && (a.ElementType?.Name == "Beam3d"))).Result;
+        // FE solve (extracted to CharpenteFEHelper so SurveillanceAntares runs the SAME solve
+        // with measured loads). Here the loads are the calculated ones (chargeNodale above).
+        var beamTaux = await CharpenteFEHelper.ComputeAsync(appData.Structure, selectedLoadCases, chargeNodale, entitiesService);
 
-        // foreach (Element el in elements)
-        // {
-        //     i++;
-        //     string mat = el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name == "Matériau").Value;
-        //     double b = double.Parse(el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name == "b").Value, System.Globalization.CultureInfo.InvariantCulture);
-        //     double h = double.Parse(el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name == "h").Value, System.Globalization.CultureInfo.InvariantCulture);
-        //     string n1Name = el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name == "Noeud1").Value;
-        //     string n2Name = el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name == "Noeud2").Value;
-        //     var n1 = nodes.Find(x => x.Name == n1Name);
-        //     var n2 = nodes.Find(x => x.Name == n2Name);
+        // Beam3d elements (for the datagrid sort + the 3D BimId map below).
+        List<Element> elements = await entitiesService.GetFilteredEntitiesAsync<Element>(
+            a => a.StructureId == appData.Structure.StructureId && a.ElementType != null && a.ElementType.Name == "Beam3d");
 
-        //     string nom = el.Name;
-
-        //     j = 0;
-        // }
-
-
-        // // Example of load fetching
-        // double chargeA5 = charpente.A5 ?? 0;
-        // chargeA5 = 1233;
-        // int nb = CharpenteAntares.ChargesStatiquePonctuelles.Count();
-        // //        elem.Field<int>("Noeudi");   = chargeA5;
-        // int nbNoeud = -1;
-        // foreach (var node in appData.Structure.Elements)
-        // {
-        //     if (node.ElementType?.Name == "Noeud3d")
-        //     {
-        //         nbNoeud++;
-        //         CharpenteAntares.ChargesStatiquePonctuelles.Add((node.ElementId, new List<int>() { nbNoeud }, chargeA5, 0));
-        //     }
-        // }
-
-        // nb = CharpenteAntares.ChargesStatiquePonctuelles.Count();
-        double[] q = new double[6 * nodes.Count()];
-        double[] Fe = new double[6 * elements.Count()];
-
-         Structural.StructuralStatic.StructureVerification(CharpenteAntares, q, Fe);
-
-        int nbelem = -1;
-
-        double[] tauxTravail = new double[CharpenteAntares.element.Rows.Count];
-        foreach (System.Data.DataRow elem in CharpenteAntares.element.Rows)
+        compteRendu = "";
+        tauxTravail.Clear();
+        foreach (var bt in beamTaux)
         {
-            nbelem++;
-            double b = elem.Field<double>("b");
-            double h = elem.Field<double>("h");
-
-            double sigma = Fe[0 + 6 * nbelem] / (b * h) + 6 * Fe[3 + 6 * nbelem] / (b * h * h) + 6 * Fe[4 + 6 * nbelem] / (h * b * b);
-            double taux = 1.5 * Fe[1 + 6 * nbelem] / (b * h) + 1.5 * Fe[2 + 6 * nbelem] / (b * h);
-
-            tauxTravail[nbelem] = Math.Max(sigma / 20, taux / 15);
+            tauxTravail[bt.ElementId] = bt.Taux;
+            compteRendu += bt.Name + " : Sigma = " + bt.Sigma.ToString("N2") + " : Tau = " + bt.Tau.ToString("N2") + "\n";
         }
 
 
+        //TauxGroupe[]={Nom,charge totale, tauxTravail max,  Effortcritique}
+        // Message : état de la structure "Charges validées", Charges inadmissible, diminuer les charges sur poutre E
+        // Flag du message : rouge, orange, vert
+        // Compte rendu
+
+        // Sort elements by taux de travail descending
+        elementsSortedByTaux = elements
+            .Where(e => tauxTravail.ContainsKey(e.ElementId))
+            .OrderByDescending(e => tauxTravail[e.ElementId])
+            .ToList();
+
+        // Per-BimId taux for the 3D model (the Modèle 3D page derives colours + tooltip from it).
+        appData.CharpenteTauxByBimId = elements
+            .Where(e => e.BimId.HasValue && tauxTravail.ContainsKey(e.ElementId))
+            .GroupBy(e => e.BimId.Value)
+            .ToDictionary(g => g.Key, g => tauxTravail[g.First().ElementId]);
 
         await savetodatabase();
 

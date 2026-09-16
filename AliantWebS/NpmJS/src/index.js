@@ -242,6 +242,38 @@ window.ColorElement = (styleNum, entityId, red, green, blue) => {
     viewer.setStyle(styleNum, entityId);
 };
 
+window.ColorElements = (styleNums, styleToEntities, rgbValues) => {
+    // styleNums: array of style numbers [0, 1, 2, ...]
+    // styleToEntities: object mapping styleNum to array of entityIds { "0": [1,2,3], "1": [4,5,6] }
+    // rgbValues: array of [r, g, b] arrays [[255,0,0], [0,255,0], ...]
+
+    // Fresh full scheme: wipe any styles a previous viewer/page left applied, and reset the
+    // browser-global definedStyles list so style numbers can be (re)defined with the new colours.
+    // The viewer is recreated per page but window.definedStyles survives SPA navigation, so without
+    // this defineStyle is wrongly skipped and the colours from a previously-coloured 3D page leak in.
+    try { if (globalViewer) globalViewer.resetStyles(); } catch (e) { }
+    window.definedStyles = [];
+
+    for (let i = 0; i < styleNums.length; i++) {
+        const styleNum = styleNums[i];
+        const rgb = rgbValues[i];
+        const entityIds = styleToEntities[styleNum.toString()];
+
+        if (!entityIds || entityIds.length === 0) continue;
+
+        const colour = [rgb[0], rgb[1], rgb[2], 255];
+
+        // Define style if not already defined
+        if (!window.definedStyles.includes(styleNum)) {
+            viewer.defineStyle(styleNum, colour);
+            window.definedStyles.push(styleNum);
+        }
+
+        // Apply style to all entities
+        viewer.setStyle(styleNum, entityIds);
+    }
+};
+
 window.ResetStates = () => {
 
     if (!globalViewer) return;
@@ -355,6 +387,30 @@ window.requestAnimationFrame(updateTags);
 
 
 
+
+// ── Taux de travail tooltip (Charpente) ───────────────────────────────
+// C# pushes a { BimId: taux } map via SetTauxMap; the hoverpick handler shows it
+// as a small tooltip that follows the cursor.
+window.SetTauxMap = function (m) { window._tauxMap = m || {}; };
+
+function _getTauxTooltip() {
+    var tip = document.getElementById('tauxTooltip');
+    if (!tip) {
+        tip = document.createElement('div');
+        tip.id = 'tauxTooltip';
+        tip.style.cssText = 'position:fixed; pointer-events:none; z-index:100000;' +
+            'background:rgba(0,0,0,0.82); color:#fff; padding:4px 8px; border-radius:4px;' +
+            'font:12px sans-serif; display:none; white-space:nowrap;';
+        document.body.appendChild(tip);
+        document.addEventListener('mousemove', function (e) {
+            if (tip.style.display !== 'none') {
+                tip.style.left = (e.clientX + 14) + 'px';
+                tip.style.top = (e.clientY + 14) + 'px';
+            }
+        });
+    }
+    return tip;
+}
 
 window.rafic = function (objRef, fileName) {
     GlobalObjRef = objRef;
@@ -493,6 +549,7 @@ window.rafic = function (objRef, fileName) {
 
     viewer.on("hoverpick", function (arg) {
         var span = document.getElementById("hoverid");
+        var tip = _getTauxTooltip();
 
         if (arg && arg.id) {
             span.innerHTML = `Product id: ${arg.id}, model: ${arg.model}`;
@@ -501,8 +558,17 @@ window.rafic = function (objRef, fileName) {
                 const c = arg.xyz;
                 span.innerHTML = `[${c[0].toFixed(2)}, ${c[1].toFixed(2)}, ${c[2].toFixed(2)}]`;
             }
+            // Taux de travail tooltip — data pushed from C# via SetTauxMap.
+            var t = window._tauxMap ? window._tauxMap[arg.id] : undefined;
+            if (t !== undefined && t !== null) {
+                tip.textContent = `Taux de travail : ${(t * 100).toFixed(0)}%`;
+                tip.style.display = 'block';
+            } else {
+                tip.style.display = 'none';
+            }
         } else {
             span.innerHTML = "";
+            tip.style.display = 'none';
         }
     });
     viewer.on("dblclick", (arg) => {

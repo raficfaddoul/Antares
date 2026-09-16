@@ -5,11 +5,13 @@
 @inject NavigationManager navigationManager
 @inject AppData appData
 @inject IJSRuntime js
+@inject ScenarioStorageService scenarioStorage
+@inject IStringLocalizer<Languages> L
 
 
 <NavigationLock OnBeforeInternalNavigation="appData.OnBeforeInternalNavigation" ConfirmExternalNavigation="appData.SaveConfirmation&& appData.SaveChanges" />
 
-<h2>Edit Event</h2>
+<h2>@L["Edit Event"]</h2>
 <hr />
 <EventForm EditContext="@EditContext" ButtonText=@buttonText Eventt="@eventt"
                    OnValidSubmit="@UpdateEvent" />
@@ -19,7 +21,7 @@
 
 
 @code {
-    string buttonText = "Updated";
+    string buttonText => L["Updated"];
 
     [Parameter]
     public EditContext EditContext { get; set; }
@@ -42,6 +44,17 @@
     protected async void UpdateEvent()
     {
         await entitiesService.UpdateEntityAsync(eventt);
+
+        // Follow the rename through to disk. Without this the uploaded files stay under the old folder
+        // name and the app quietly creates a fresh empty folder beside them on the next visit.
+        try
+        {
+            scenarioStorage.GetEventDir(eventt);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"ScenariosData: renommage du dossier de l'événement impossible: {ex.Message}");
+        }
         //navigationManager.NavigateTo("Structures");
     }
 

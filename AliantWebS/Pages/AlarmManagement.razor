@@ -1,0 +1,808 @@
+﻿@page "/alarm-management"
+@using AliantWebS.Data
+@using System.Text
+@inject IJSRuntime js
+@inject IStringLocalizer<Languages> L
+@inject AppData appData
+@inject JournalService journal
+@attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Administrator,Developer,AlarmRecipient")]
+
+<style>
+    .alarm-container {
+        padding: 20px;
+        background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+        min-height: 100vh;
+    }
+
+    .alarm-card {
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        padding: 30px;
+        margin-bottom: 20px;
+        max-width: 1400px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .alarm-header {
+        margin-bottom: 40px;
+        padding-bottom: 20px;
+        border-bottom: 3px solid #ff6b6b;
+    }
+
+    .alarm-title {
+        font-size: 36px;
+        font-weight: 700;
+        color: #2d3748;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+
+    .alarm-subtitle {
+        color: #718096;
+        font-size: 16px;
+        margin-top: 10px;
+    }
+
+    .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 14px;
+        animation: pulse 2s infinite;
+    }
+
+    .status-active {
+        background: #fee;
+        color: #c53030;
+        border: 2px solid #fc8181;
+    }
+
+    .status-normal {
+        background: #f0fff4;
+        color: #22543d;
+        border: 2px solid #68d391;
+    }
+
+    @@keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+    }
+
+    .alarm-item {
+        background: #fff;
+        border: 2px solid #fed7d7;
+        border-left: 6px solid #f56565;
+        padding: 20px;
+        margin-bottom: 15px;
+        border-radius: 12px;
+        transition: all 0.3s ease;
+    }
+
+    .alarm-item:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(245, 101, 101, 0.2);
+    }
+
+    .alarm-info-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-bottom: 15px;
+    }
+
+    .info-item {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .info-label {
+        font-size: 12px;
+        color: #718096;
+        font-weight: 600;
+        margin-bottom: 5px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .info-value {
+        font-size: 16px;
+        color: #2d3748;
+        font-weight: 600;
+    }
+
+    .value-danger {
+        color: #c53030;
+    }
+
+    .value-warning {
+        color: #dd6b20;
+    }
+
+    .alarm-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .btn-modern {
+        padding: 10px 20px;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .btn-danger {
+        background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(245, 101, 101, 0.4);
+    }
+
+    .btn-danger:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(245, 101, 101, 0.6);
+    }
+
+    .btn-warning {
+        background: linear-gradient(135deg, #ed8936 0%, #dd6b20 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(237, 137, 54, 0.4);
+    }
+
+    .btn-warning:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(237, 137, 54, 0.6);
+    }
+
+    .btn-success {
+        background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(72, 187, 120, 0.4);
+    }
+
+    .btn-success:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(72, 187, 120, 0.6);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+    }
+
+    .empty-icon {
+        font-size: 80px;
+        margin-bottom: 20px;
+    }
+
+    .empty-title {
+        font-size: 24px;
+        font-weight: 700;
+        color: #2d3748;
+        margin-bottom: 10px;
+    }
+
+    .empty-description {
+        font-size: 16px;
+        color: #718096;
+    }
+
+    .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+
+    .summary-card {
+        background: linear-gradient(135deg, #fff 0%, #f7fafc 100%);
+        border: 2px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 20px;
+        text-align: center;
+    }
+
+    .summary-value {
+        font-size: 48px;
+        font-weight: 700;
+        color: #2d3748;
+        margin-bottom: 10px;
+    }
+
+    .summary-label {
+        font-size: 14px;
+        color: #718096;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    /* ── Alarm levels ─────────────────────────────────────────────────────── */
+    .levels-panel {
+        background: #f7fafc;
+        border: 2px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 20px 24px;
+        margin-bottom: 30px;
+    }
+
+    .levels-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: #2d3748;
+        margin: 0 0 6px 0;
+    }
+
+    .levels-hint {
+        font-size: 13px;
+        color: #718096;
+        margin-bottom: 18px;
+    }
+
+    .levels-row {
+        display: flex;
+        gap: 22px;
+        flex-wrap: wrap;
+        align-items: flex-end;
+    }
+
+    .levels-row .fld {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .levels-row label {
+        font-size: 12px;
+        font-weight: 700;
+        color: #4a5568;
+        text-transform: uppercase;
+        letter-spacing: .4px;
+    }
+
+    .levels-row input, .levels-row select {
+        padding: 8px 10px;
+        border: 1px solid #cbd5e0;
+        border-radius: 6px;
+        font-size: 14px;
+        background: #fff;
+        min-width: 110px;
+    }
+
+    .lvl-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 700;
+    }
+
+    .lvl-1 { background: #fefcbf; color: #744210; border: 2px solid #f6e05e; }
+    .lvl-2 { background: #feebc8; color: #7b341e; border: 2px solid #f6ad55; }
+    .lvl-3 { background: #fed7d7; color: #822727; border: 2px solid #fc8181; }
+
+    .alarm-item.level-1 { border-color: #f6e05e; border-left-color: #d69e2e; }
+    .alarm-item.level-2 { border-color: #f6ad55; border-left-color: #dd6b20; }
+    .alarm-item.level-3 { border-color: #fed7d7; border-left-color: #f56565; }
+</style>
+
+<div class="alarm-container">
+    <div class="alarm-card">
+        <div class="alarm-header">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h1 class="alarm-title">
+                        <span>⚠️</span>
+                        @L["Alarm Management"]
+                    </h1>
+                    <p class="alarm-subtitle">@L["Monitor and manage system alarms"]</p>
+                </div>
+                <div>
+                    @if (activeAlarms.Any())
+                    {
+                        <span class="status-badge status-active">
+                            <span>🔴</span> @activeAlarms.Count @L["Active Alarm(s)"]
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="status-badge status-normal">
+                            <span>✅</span> @L["No Active Alarms"]
+                        </span>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary Section -->
+        <div class="summary-grid">
+            <div class="summary-card">
+                <div class="summary-value" style="color: #f56565;">@activeAlarms.Count</div>
+                <div class="summary-label">@L["Total Active Alarms"]</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-value" style="color: #ed8936;">@uniqueSensors</div>
+                <div class="summary-label">@L["Affected Sensors"]</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-value" style="color: #667eea;">@(activeAlarms.Any() ? activeAlarms.Max(a => a.Value.RatioPercent).ToString("F0") + " %" : "—")</div>
+                <div class="summary-label">@L["Taux max atteint / seuil"]</div>
+            </div>
+        </div>
+
+        @* ── Alarm levels ──────────────────────────────────────────────────────────────────
+           Three levels expressed as a percentage of each sensor's own threshold, so the same
+           settings apply to every sensor. Only an administrator can change them. *@
+        <div class="levels-panel">
+            <h3 class="levels-title">@L["Niveaux d'alarme"]</h3>
+            <div class="levels-hint">
+                @L["Chaque niveau est un pourcentage du seuil propre à chaque capteur (« Seuil Alarme »). La détection démarre au niveau 1 : une alarme de niveau 1 est enregistrée et affichée, mais reste silencieuse tant que le niveau de déclenchement de la sirène n'est pas atteint."]
+            </div>
+
+            <div class="levels-row">
+                <div class="fld">
+                    <label>@L["Niveau 1"] (%)</label>
+                    <input type="number" min="1" max="1000" step="1" @bind="level1" disabled="@(!isAdministrator)" />
+                </div>
+                <div class="fld">
+                    <label>@L["Niveau 2"] (%)</label>
+                    <input type="number" min="1" max="1000" step="1" @bind="level2" disabled="@(!isAdministrator)" />
+                </div>
+                <div class="fld">
+                    <label>@L["Niveau 3"] (%)</label>
+                    <input type="number" min="1" max="1000" step="1" @bind="level3" disabled="@(!isAdministrator)" />
+                </div>
+                <div class="fld">
+                    <label>🔊 @L["Sirène à partir du"]</label>
+                    <select @bind="sirenLevel" disabled="@(!isAdministrator)">
+                        <option value="1">@L["Niveau 1"] (@level1 %)</option>
+                        <option value="2">@L["Niveau 2"] (@level2 %)</option>
+                        <option value="3">@L["Niveau 3"] (@level3 %)</option>
+                    </select>
+                </div>
+                <div class="fld">
+                    <label>📧 @L["E-mails à partir du"]</label>
+                    <select @bind="emailLevel" disabled="@(!isAdministrator)">
+                        <option value="1">@L["Niveau 1"] (@level1 %)</option>
+                        <option value="2">@L["Niveau 2"] (@level2 %)</option>
+                        <option value="3">@L["Niveau 3"] (@level3 %)</option>
+                    </select>
+                </div>
+
+                @if (isAdministrator)
+                {
+                    <button type="button" class="btn-modern btn-success" @onclick="SaveLevels" disabled="@isSavingLevels">
+                        <span>💾</span> @(isSavingLevels ? L["Enregistrement…"] : L["Enregistrer les niveaux"])
+                    </button>
+                }
+            </div>
+
+            @if (!string.IsNullOrEmpty(levelsMessage))
+            {
+                <div style="margin-top:12px; font-size:14px; color:#2f855a; font-weight:600;">@levelsMessage</div>
+            }
+            @if (level2 < level1 || level3 < level2)
+            {
+                <div style="margin-top:12px; font-size:13px; color:#c05621;">
+                    ⚠️ @L["Les pourcentages doivent être croissants : niveau 1 ≤ niveau 2 ≤ niveau 3. Ils seront réordonnés à l'enregistrement."]
+                </div>
+            }
+        </div>
+
+        <!-- Global Actions -->
+        <div style="display: flex; gap: 15px; margin-bottom: 30px; flex-wrap: wrap;">
+            @if (activeAlarms.Any())
+            {
+                <button type="button" class="btn-modern btn-danger" @onclick="ResetAllAlarms">
+                    <span>🔄</span> @L["Reset All Alarms"]
+                </button>
+            }
+            <button type="button" class="btn-modern btn-warning" @onclick="RefreshAlarms">
+                <span>🔃</span> @L["Refresh"]
+            </button>
+
+            @* Mute switches — administrators only. They never affect detection: alarms still
+               trigger and are listed, only the siren / e-mail output is suppressed. *@
+            @if (isAdministrator)
+            {
+                <button type="button" class="btn-modern @(sirenMuted ? "btn-success" : "btn-warning")"
+                        @onclick="ToggleSirenMute"
+                        title="@(sirenMuted ? L["The siren is muted — click to re-enable it"] : L["Silence the on-site siren without clearing the alarms"])">
+                    <span>@(sirenMuted ? "🔔" : "🔕")</span>
+                    @(sirenMuted ? L["Réactiver la sirène"] : L["Couper la sirène"])
+                </button>
+
+                <button type="button" class="btn-modern @(emailMuted ? "btn-success" : "btn-warning")"
+                        @onclick="ToggleEmailMute"
+                        title="@(emailMuted ? L["Alarm e-mails are stopped — click to resume"] : L["Stop alarm e-mails and reminders"])">
+                    <span>@(emailMuted ? "📧" : "🚫")</span>
+                    @(emailMuted ? L["Réactiver les e-mails"] : L["Arrêter les e-mails"])
+                </button>
+            }
+
+            @* Not a mute: pausing the collection stops DETECTION. Administrators and developers - a development
+               container catching up on months of reports is exactly who needs it. *@
+            @if (canPauseCollection)
+            {
+                <button type="button" class="btn-modern @(fetchPaused ? "btn-success" : "btn-danger")"
+                        @onclick="ToggleFetchPause"
+                        title="@(fetchPaused ? "La collecte des mesures est suspendue — cliquez pour la reprendre" : "Suspendre la lecture des rapports des capteurs : plus aucune nouvelle alarme ne sera détectée")">
+                    <span>@(fetchPaused ? "▶️" : "⏸️")</span>
+                    @(fetchPaused ? "Reprendre la collecte" : "Suspendre la collecte")
+                </button>
+            }
+        </div>
+
+        @if (fetchPaused)
+        {
+            <div style="background:#fff5f5; border:2px solid #fc8181; border-left:6px solid #c53030;
+                        border-radius:12px; padding:16px 20px; margin-bottom:25px; color:#742a2a;">
+                <div style="font-weight:700; font-size:16px; margin-bottom:6px;">
+                    ⏸️ Collecte des mesures suspendue — aucune nouvelle alarme ne peut être détectée
+                </div>
+                <div style="font-size:14px;">
+                    Les rapports des capteurs ne sont plus lus@(ReportsService.FetchPausedSinceUtc is { } since ? $" depuis le {since.ToLocalTime():dd/MM/yyyy à HH:mm}" : "").
+                    Les alarmes déjà déclenchées restent affichées et continuent leurs rappels. À la reprise, la
+                    lecture repart exactement du dernier rapport traité.
+                </div>
+            </div>
+        }
+
+        @if (AppData.EmailFailureMessage != null)
+        {
+            <div style="background:#fff5f5; border:2px solid #fc8181; border-left:6px solid #c53030;
+                        border-radius:12px; padding:16px 20px; margin-bottom:25px; color:#742a2a;">
+                <div style="font-weight:700; font-size:16px; margin-bottom:6px;">
+                    ✉️⚠️ @L["Échec d'envoi des e-mails d'alarme"]
+                </div>
+                <div style="font-size:14px;">@AppData.EmailFailureMessage</div>
+                <div style="font-size:13px; opacity:.8; margin-top:6px;">
+                    @L["Dernier échec"] : @AppData.EmailFailureTime.ToString("yyyy-MM-dd HH:mm:ss") —
+                    @L["la détection et la sirène ne sont pas affectées. Vérifiez la clé SwanBrevoAPIKey et l'état du service Brevo ; le détail est dans le journal (alarm.email.failed)."]
+                </div>
+            </div>
+        }
+
+        @if (sirenMuted || emailMuted)
+        {
+            <div style="background:#fff3cd; border:1px solid #ffe08a; color:#7a5b00; border-radius:8px;
+                        padding:12px 16px; margin-bottom:25px; font-size:14px;">
+                <strong>@L["Notifications partiellement désactivées"] :</strong>
+                @if (sirenMuted) { <span>@L["sirène coupée"]</span> }
+                @if (sirenMuted && emailMuted) { <span> — </span> }
+                @if (emailMuted) { <span>@L["e-mails arrêtés"]</span> }
+                <span> — @L["la détection reste active."]</span>
+            </div>
+        }
+
+        <!-- Alarms List -->
+        @if (activeAlarms.Any())
+        {
+            <div style="margin-top: 30px;">
+                <h3 style="font-size: 20px; font-weight: 700; color: #2d3748; margin-bottom: 20px;">
+                    @L["Active Alarms"]
+                </h3>
+                
+                @* Most severe first: a level-3 alarm buried under level-1 noise is the failure mode. *@
+                @foreach (var alarm in activeAlarms.OrderByDescending(a => a.Value.Level).ThenBy(a => a.Value.TriggeredTime))
+                {
+                    <div class="alarm-item level-@alarm.Value.Level">
+                        <div class="alarm-info-row">
+                            <div class="info-item">
+                                <span class="info-label">@L["Niveau"]</span>
+                                <span>
+                                    <span class="lvl-badge lvl-@alarm.Value.Level">
+                                        @(alarm.Value.Level >= sirenLevel ? "🔊" : "🔇") @AlarmLevels.Name(alarm.Value.Level)
+                                    </span>
+                                </span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">@L["Structure"]</span>
+                                <span class="info-value">@(string.IsNullOrWhiteSpace(alarm.Value.StructureName) ? "—" : alarm.Value.StructureName)</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">@L["Sensor"]</span>
+                                <span class="info-value">@alarm.Value.SensorName</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">@L["Channel"]</span>
+                                <span class="info-value">@alarm.Value.ChannelName</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">@L["Current Value"]</span>
+                                <span class="info-value value-danger">@alarm.Value.CurrentValue.ToString("F2")</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">@L["Threshold"]</span>
+                                <span class="info-value">@alarm.Value.ThresholdValue.ToString("F2")</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">@L["Taux / seuil"]</span>
+                                <span class="info-value value-warning">
+                                    @alarm.Value.RatioPercent.ToString("F1") %
+                                    (@((alarm.Value.CurrentValue - alarm.Value.ThresholdValue).ToString("F2")))
+                                </span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">@L["Triggered"]</span>
+                                <span class="info-value">@alarm.Value.TriggeredTime.ToString("yyyy-MM-dd HH:mm:ss")</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">@L["Duration"]</span>
+                                <span class="info-value">@GetDurationString(alarm.Value.TriggeredTime)</span>
+                            </div>
+                        </div>
+                        
+                        <div class="alarm-actions">
+                            <button type="button" class="btn-modern btn-success" @onclick="() => ResetSpecificAlarm(alarm.Value.SensorName, alarm.Value.ChannelName)">
+                                <span>✓</span> @L["Reset This Alarm"]
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="empty-state">
+                <div class="empty-icon">✅</div>
+                <div class="empty-title">@L["No Active Alarms"]</div>
+                <div class="empty-description">@L["All systems are operating within normal parameters"]</div>
+                <button type="button" class="btn-modern btn-warning" @onclick="RefreshAlarms" style="margin-top: 20px;">
+                    <span>🔃</span> @L["Refresh"]
+                </button>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private Dictionary<string, AlarmDetail> activeAlarms = new Dictionary<string, AlarmDetail>();
+    private int uniqueSensors = 0;
+
+    // ── Alarm levels ──────────────────────────────────────────────────────────────────────
+    private double level1 = 60, level2 = 80, level3 = 100;
+    private int sirenLevel = 3, emailLevel = 3;
+    private bool isSavingLevels;
+    private string levelsMessage = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        // The page is open to AlarmRecipient/Developer too, but the mute switches and the level
+        // settings are administrator-only.
+        var role = await appData.GetRole();
+        isAdministrator = role == "Administrator";
+        canPauseCollection = role is "Administrator" or "Developer";
+
+        var levels = await AlarmLevels.LoadAsync();
+        level1 = levels.Level1Percent;
+        level2 = levels.Level2Percent;
+        level3 = levels.Level3Percent;
+        sirenLevel = levels.SirenLevel;
+        emailLevel = levels.EmailLevel;
+
+        LoadActiveAlarms();
+    }
+
+    private async Task SaveLevels()
+    {
+        if (!isAdministrator) return;
+
+        isSavingLevels = true;
+        levelsMessage = "";
+
+        try
+        {
+            // Normalised before saving, so a typo like 80/60/100 cannot make a level unreachable.
+            var levels = new AlarmLevels
+            {
+                Level1Percent = level1,
+                Level2Percent = level2,
+                Level3Percent = level3,
+                SirenLevel = sirenLevel,
+                EmailLevel = emailLevel
+            };
+            levels.Normalise();
+
+            await AppSettings.SetAsync(AppSettings.AlarmLevel1Pct, levels.Level1Percent, "Niveau 1 d'alarme, en % du seuil");
+            await AppSettings.SetAsync(AppSettings.AlarmLevel2Pct, levels.Level2Percent, "Niveau 2 d'alarme, en % du seuil");
+            await AppSettings.SetAsync(AppSettings.AlarmLevel3Pct, levels.Level3Percent, "Niveau 3 d'alarme, en % du seuil");
+            await AppSettings.SetAsync(AppSettings.AlarmSirenLevel, levels.SirenLevel, "Niveau à partir duquel la sirène se déclenche");
+            await AppSettings.SetAsync(AppSettings.AlarmEmailLevel, levels.EmailLevel, "Niveau à partir duquel les e-mails sont envoyés");
+
+            level1 = levels.Level1Percent;
+            level2 = levels.Level2Percent;
+            level3 = levels.Level3Percent;
+            sirenLevel = levels.SirenLevel;
+            emailLevel = levels.EmailLevel;
+
+            // Lowering the siren level must start the siren for an alarm that already reached it,
+            // and raising it must stop it — without waiting for the next polling cycle.
+            await ReportsService.DriveSirenAsync();
+
+            await journal.WriteAsync(JournalCategory.Alarme, "alarm.levels.save",
+                target: $"{level1:F0}% / {level2:F0}% / {level3:F0}%",
+                details: $"Sirène à partir du niveau {sirenLevel}, e-mails à partir du niveau {emailLevel}",
+                severity: 1);
+
+            levelsMessage = L["Niveaux enregistrés."];
+        }
+        catch (Exception ex)
+        {
+            await js.InvokeVoidAsync("alert", $"Erreur : {ex.Message}");
+        }
+        finally
+        {
+            isSavingLevels = false;
+            StateHasChanged();
+        }
+    }
+
+    private void LoadActiveAlarms()
+    {
+        var alarmKeys = ReportsService.GetActiveAlarms();
+        activeAlarms.Clear();
+
+        foreach (var key in alarmKeys)
+        {
+            var parts = key.Split('_');
+            if (parts.Length == 2)
+            {
+                // Get the alarm detail from the static dictionary
+                var alarmDetails = ReportsService.GetAlarmDetails();
+                if (alarmDetails.TryGetValue(key, out var detail))
+                {
+                    activeAlarms[key] = detail;
+                }
+            }
+        }
+
+        uniqueSensors = activeAlarms.Select(a => a.Value.SensorName).Distinct().Count();
+    }
+
+    // ── Mute switches (administrator only) ────────────────────────────────────────────────
+    private bool isAdministrator;
+    private bool sirenMuted => ReportsService.SirenMuted;
+    private bool emailMuted => ReportsService.EmailMuted;
+
+    private async Task ToggleSirenMute()
+    {
+        // ResetAlarmAsync/SetSirenMutedAsync drive the controller immediately rather than waiting
+        // for the next polling cycle.
+        bool muted = !ReportsService.SirenMuted;
+        await ReportsService.SetSirenMutedAsync(muted);
+
+        await journal.WriteAsync(JournalCategory.Alarme, muted ? "siren.mute" : "siren.unmute",
+            details: muted ? "Sirène coupée — la détection reste active" : "Sirène réactivée",
+            severity: (byte)(muted ? 1 : 0));
+
+        StateHasChanged();
+    }
+
+    // ── Collection pause (administrators and developers) ─────────────────────────────────────
+    private bool canPauseCollection;
+    private bool fetchPaused => ReportsService.FetchPaused;
+
+    private async Task ToggleFetchPause()
+    {
+        bool pause = !ReportsService.FetchPaused;
+
+        // Asked every time, because it is the one switch on this page that stops detection itself.
+        if (pause)
+        {
+            var confirmed = await js.InvokeAsync<bool>("confirm",
+                "Suspendre la collecte des mesures ?\n\n"
+                + "Plus aucun rapport de capteur ne sera lu : AUCUNE nouvelle alarme ne pourra être détectée, "
+                + "et les tableaux de bord ne recevront plus de données, jusqu'à la reprise.\n\n"
+                + "La suspension est conservée après un redémarrage de l'application.");
+            if (!confirmed) return;
+        }
+
+        await ReportsService.SetFetchPausedAsync(pause);
+
+        await journal.WriteAsync(JournalCategory.Alarme, pause ? "fetch.pause" : "fetch.resume",
+            details: pause
+                ? "Collecte des rapports suspendue — aucune nouvelle alarme ne peut être détectée"
+                : "Collecte des rapports reprise",
+            severity: (byte)(pause ? 2 : 0));
+
+        StateHasChanged();
+    }
+
+    private async Task ToggleEmailMute()
+    {
+        bool muted = !ReportsService.EmailMuted;
+        await ReportsService.SetEmailMutedAsync(muted);
+
+        await journal.WriteAsync(JournalCategory.Alarme, muted ? "email.stop" : "email.resume",
+            details: muted ? "E-mails d'alarme arrêtés — la détection reste active" : "E-mails d'alarme réactivés",
+            severity: (byte)(muted ? 1 : 0));
+
+        StateHasChanged();
+    }
+
+    private async Task ResetAllAlarms()
+    {
+        var confirmed = await js.InvokeAsync<bool>("confirm",
+            L["Are you sure you want to reset ALL alarms? This action cannot be undone."]);
+
+        if (confirmed)
+        {
+            // Snapshot before the reset — afterwards there is nothing left to describe.
+            var cleared = activeAlarms.Values
+                .Select(a => $"[N{a.Level}] {a.SensorName}/{a.ChannelName} = {a.CurrentValue:F2} "
+                           + $"({a.RatioPercent:F1} % du seuil {a.ThresholdValue:F2})")
+                .ToList();
+
+            await ReportsService.ResetAlarmAsync();
+
+            await journal.WriteAsync(JournalCategory.Alarme, "alarm.reset.all",
+                target: $"{cleared.Count} alarme(s)",
+                details: string.Join("\n", cleared), severity: 2);
+
+            LoadActiveAlarms();
+            await js.InvokeVoidAsync("alert", L["All alarms have been successfully reset."].Value);
+            StateHasChanged();
+        }
+    }
+
+    private async Task ResetSpecificAlarm(string sensorName, string channelName)
+    {
+        var confirmed = await js.InvokeAsync<bool>("confirm",
+            $"{L["Are you sure you want to reset the alarm for"]}\n{L["Sensor"]}: {sensorName}\n{L["Channel"]}: {channelName}?");
+
+        if (confirmed)
+        {
+            var detail = activeAlarms.Values
+                .FirstOrDefault(a => a.SensorName == sensorName && a.ChannelName == channelName);
+
+            await ReportsService.ResetAlarmAsync(sensorName, channelName);
+
+            await journal.WriteAsync(JournalCategory.Alarme, "alarm.reset",
+                target: $"{sensorName} / {channelName}",
+                details: detail == null ? null
+                    : $"{AlarmLevels.Name(detail.Level)} — valeur {detail.CurrentValue:F2} "
+                    + $"({detail.RatioPercent:F1} % du seuil {detail.ThresholdValue:F2}), "
+                    + $"déclenchée le {detail.TriggeredTime:yyyy-MM-dd HH:mm:ss}",
+                severity: 2);
+
+            LoadActiveAlarms();
+            await js.InvokeVoidAsync("alert", L["Alarm has been successfully reset."].Value);
+            StateHasChanged();
+        }
+    }
+
+    private void RefreshAlarms()
+    {
+        LoadActiveAlarms();
+        StateHasChanged();
+    }
+
+    private string GetDurationString(DateTime triggeredTime)
+    {
+        var duration = DateTime.Now - triggeredTime;
+        
+        if (duration.TotalMinutes < 60)
+            return $"{(int)duration.TotalMinutes} min";
+        else if (duration.TotalHours < 24)
+            return $"{(int)duration.TotalHours}h {duration.Minutes}min";
+        else
+            return $"{(int)duration.TotalDays}d {duration.Hours}h";
+    }
+}

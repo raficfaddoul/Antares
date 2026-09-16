@@ -1,102 +1,526 @@
 ﻿@using AliantWebS.Data
+@using Microsoft.EntityFrameworkCore
 @using Models
+@using System.Globalization
 @inject AppData appData;
 @inject EntitiesService entitiesService
 @inject NavigationManager navigationManager
 @inject IStringLocalizer<Languages> L
 
-<Div Style="display: flex">
+<Div Style="display: flex; align-items: center;">
     <h3>Selecteur De Capteurs</h3>
-    <div style="margin-left: auto; ">
-        <Label> Page Size: &nbsp;&nbsp;</Label>
-        <RadzenNumeric @bind-Value="PageSize" Style="width:60px"></RadzenNumeric>
+    <div style="margin-left: auto; display: flex; align-items: center; gap: 15px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <Label>View:</Label>
+            <RadzenSwitch Value="@isGroupedView" Change="@(args => ToggleView((bool)args))" />
+            <span style="font-size: 0.9em;">@(isGroupedView ? "Grouped" : "Standard")</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <Label>Page Size:</Label>
+            <RadzenNumeric @bind-Value="PageSize" Style="width:60px" Disabled="@isGroupedView"></RadzenNumeric>
+        </div>
     </div>
 </Div>
+
+@if (!isGroupedView)
+{
+    <!-- Standard DataGrid View -->
     <RadzenDataGrid class="RadzenDataGrid" @ref="eventsGrid" AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="PageSize" RowSelect=@RowSelect
                     Data="@sensors" @bind-Value=@selectedSensors SelectionMode="DataGridSelectionMode.Multiple" TItem="Element" AllowColumnResize="true" >
         <Columns>
             <RadzenDataGridColumn TItem="Element" Property="Name" Title="@L["Name"]"></RadzenDataGridColumn>
             <RadzenDataGridColumn TItem="Element" Property="Description" Title="@L["Description"]"></RadzenDataGridColumn>
-
             <RadzenDataGridColumn TItem="Element" Title="@L["Action"]" Sortable=false Filterable=false>
-
+                <HeaderTemplate>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span>@L["Action"]</span>
+                        <RadzenCheckBox TValue="bool" Value="@selectAll" Change="@OnSelectAllChanged" title="Select/Deselect All Sensors" Disabled="@isSelectAllProcessing" />
+                        <span style="font-size: 0.9em; font-weight: normal;">
+                            @(isSelectAllProcessing ? "Processing..." : "Select All")
+                        </span>
+                    </div>
+                </HeaderTemplate>
                 <Template Context="element">
-                    <Div Style="display: flex">
-                        @foreach (ChannelDataType cdt in element.ElementType.ChannelDataTypeElementTypes.Select(x => x.ChannelDataType))
-                        {
-                        <img title="@cdt.Name" src="@Helpers.Helpers.GetSource(cdt.Icon)" alt="@cdt.Name" />
-                            <RadzenCheckBox TValue=bool Change=@(args =>plot(args,element,cdt))></RadzenCheckBox>
-                        }
-                    </Div>
-
+                    @RenderSensorActions(element)
                 </Template>
             </RadzenDataGridColumn>
         </Columns>
     </RadzenDataGrid>
-    <div class="form-group ">
-        <div>
-            <label>@L["Start Date"] :</label>
-            <div>
-                <InputDate Type="InputDateType.DateTimeLocal" @bind-Value="@startDate" />
-                @*           <ValidationMessage For="@(() => startDate)" />*@
-            </div>
+}
+else
+{
+    <!-- Grouped Accordion View -->
+    <div style="margin-top: 15px;">
+        <div style="margin-bottom: 10px; padding: 10px; background-color: #f5f5f5; border-radius: 4px; display: flex; align-items: center; gap: 10px;">
+            <RadzenCheckBox TValue="bool" Value="@selectAll" Change="@OnSelectAllChanged" title="Select/Deselect All Sensors" Disabled="@isSelectAllProcessing" />
+            <span style="font-weight: bold;">@(isSelectAllProcessing ? "Processing..." : "Select/Deselect All")</span>
         </div>
+        
+        @if (groupedSensors != null && groupedSensors.Count > 0)
+        {
+            @foreach (var group in groupedSensors)
+            {
+                <div style="margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                    <details>
+                        <summary style="padding: 12px; background-color: #f0f0f0; cursor: pointer; font-weight: bold; display: flex; align-items: center; gap: 10px;">
+                            <RadzenCheckBox TValue="bool" 
+                                            Value="@IsGroupFullySelected(group)" 
+                                            Change="@(args => OnGroupSelectAllChanged(args, group))" 
+                                            title="Select/Deselect All in Group"
+                                            @onclick:stopPropagation="true" />
+                            <span>@(group.ElementTypeName) (@group.Sensors.Count sensors)</span>
+                        </summary>
+                        <div style="padding: 10px;">
+                            <!-- Channel Type Select All Row -->
+                            @{
+                                var channelTypes = GetGroupChannelTypes(group);
+                                if (channelTypes.Any())
+                                {
+                                    <div style="display: flex; align-items: center; gap: 15px; padding: 10px; margin-bottom: 12px; background-color: #e8f4fc; border-radius: 4px; border: 1px solid #b8d4e8;">
+                                        <span style="font-weight: 600; color: #2c5282;">Select All by Channel:</span>
+                                        @foreach (var cdt in channelTypes)
+                                        {
+                                            <div style="display: flex; align-items: center; gap: 5px; padding: 4px 8px; background-color: white; border-radius: 4px; border: 1px solid #ddd;">
+                                                <img title="@cdt.Name" src="@Helpers.Helpers.GetSource(cdt.Icon)" alt="@cdt.Name" style="width: 20px; height: 20px;" />
+                                                <RadzenCheckBox TValue="bool" 
+                                                                Value="@IsChannelTypeFullySelectedInGroup(group, cdt)" 
+                                                                Change="@(args => OnChannelTypeSelectAllChanged(args, group, cdt))" 
+                                                                title="@($"Select/Deselect all {cdt.Name}")" />
+                                                <span style="font-size: 0.85em;">@cdt.Name</span>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            }
+                            
+                            @foreach (var sensor in group.Sensors)
+                            {
+                                <div style="border: 1px solid #eee; padding: 12px; margin-bottom: 8px; border-radius: 4px; background-color: #fafafa;">
+                                    <div style="margin-bottom: 8px;">
+                                        <strong>@sensor.Name</strong>
+                                        @if (!string.IsNullOrEmpty(sensor.Description))
+                                        {
+                                            <span style="color: #666; margin-left: 10px;">- @sensor.Description</span>
+                                        }
+                                    </div>
+                                    @RenderSensorActions(sensor)
+                                </div>
+                            }
+                        </div>
+                    </details>
+                </div>
+            }
+        }
+        else
+        {
+            <div style="padding: 20px; text-align: center; color: #999;">No sensor groups found</div>
+        }
     </div>
-    <div class="form-group ">
-        <div>
-            <label>@L["End Date"] :</label>
-            <div>
-                <InputDate Type="InputDateType.DateTimeLocal" @bind-Value="@endDate" />
-                @*           <ValidationMessage For="@(() => startDate)" />*@
-            </div>
-        </div>
-    </div>
+}
+
+<style>
+    @@keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    .btn-positioning {
+        background: linear-gradient(45deg, #ffc107, #ff9800) !important;
+        border: none !important;
+        color: white !important;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .btn-positioning::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+        animation: shimmer 1.5s infinite;
+    }
+    
+    @@keyframes shimmer {
+        0% { left: -100%; }
+        100% { left: 100%; }
+    }
+    
+    .spinner-icon {
+        display: inline-block;
+        animation: spin 1s linear infinite;
+    }
+</style>
 
 @code {
-
     int PageSize { get; set; } = 10;
-
     RadzenDataGrid<Element> eventsGrid;
-
     List<Element> sensors;
+    List<SensorGroup> groupedSensors;
 
-    [Parameter]
-    public Structure Structure { get; set; }
+    [Parameter] public Structure Structure { get; set; }
+    [Parameter] public DateTime StartDate { get; set; }
+    [Parameter] public DateTime EndDate { get; set; }
+    [Parameter] public EventCallback<(List<(Element, ChannelDataType)>, DateTime, DateTime)> OnBatchPlotRaised { get; set; }
+    [Parameter] public EventCallback<Element> OnPositionRequested { get; set; }
+    [Parameter] public EventCallback OnPositionCancelled { get; set; }
+    [Parameter] public Dictionary<string, bool> CheckboxStates { get; set; }
+    
+    // State from parent - which sensor is currently being positioned
+    [Parameter] public Guid? PositioningSensorId { get; set; }
+    [Parameter] public EventCallback<Guid?> PositioningSensorIdChanged { get; set; }
+    
+    // Positioned sensors tracked by parent
+    [Parameter] public HashSet<Guid> PositionedSensorIds { get; set; }
 
     private IList<Element> selectedSensors { get; set; }
+    private bool selectAll = false;
+    private bool isSelectAllProcessing = false;
+    private bool isGroupedView = true;
 
-    DateTime startDate { get; set; } = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-    DateTime endDate { get; set; } = DateTime.UtcNow;
-
-    [Parameter]
-    public EventCallback<(bool, Element, ChannelDataType, DateTime, DateTime)> OnPlotRaised { get; set; }
+    private class SensorGroup
+    {
+        public Guid ElementTypeId { get; set; }
+        public string ElementTypeName { get; set; }
+        public List<Element> Sensors { get; set; } = new();
+    }
 
     protected override async Task OnInitializedAsync()
     {
-        var sensingDeviceTypes = await entitiesService.GetFilteredEntitiesAsync<ElementType>(x => x.Category?.Name?.ToLower() == "sensing device", "Category");
-        foreach (var sdt in sensingDeviceTypes)
+        try
         {
-            entitiesService.LoadCollection(sdt, "ChannelDataTypeElementTypes");
-            foreach (var v in sdt.ChannelDataTypeElementTypes)
+            var context = entitiesService._appDBContext;
+            sensors = await context.Elements
+                .Include(e => e.ElementType).ThenInclude(et => et.Category)
+                .Include(e => e.ElementType).ThenInclude(et => et.ChannelDataTypeElementTypes).ThenInclude(cdtet => cdtet.ChannelDataType)
+                .Include(e => e.AttributeElements).ThenInclude(ae => ae.AttributeType)
+                .Where(e => e.StructureId == Structure.StructureId &&
+                            e.ElementType != null &&
+                            e.ElementType.Category != null &&
+                            e.ElementType.Category.Name.ToLower() == "sensing device")
+                .AsNoTracking()
+                .ToListAsync();
+            
+            RefreshGroupedSensors();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading sensors: {ex.Message}");
+            sensors = new List<Element>();
+            groupedSensors = new List<SensorGroup>();
+        }
+    }
+
+    private void ToggleView(bool value)
+    {
+        isGroupedView = value;
+        if (isGroupedView) RefreshGroupedSensors();
+        StateHasChanged();
+    }
+
+    private void RefreshGroupedSensors()
+    {
+        if (sensors == null || !sensors.Any())
+        {
+            groupedSensors = new List<SensorGroup>();
+            return;
+        }
+
+        groupedSensors = sensors
+            .Where(s => s.ElementType != null)
+            .GroupBy(s => s.ElementType.ElementTypeId)
+            .Select(g => new SensorGroup
             {
-                entitiesService.LoadReference(v, "ChannelDataType");
+                ElementTypeId = g.Key,
+                ElementTypeName = g.First().ElementType?.Name ?? "Unknown",
+                Sensors = g.ToList()
+            })
+            .OrderBy(g => g.ElementTypeName)
+            .ToList();
+    }
+
+    async Task RowSelect(Element sensor) { }
+
+    private async Task OnCheckboxChanged(bool isChecked, Element sensor, ChannelDataType channelDataType)
+    {
+        string checkboxKey = $"{sensor.ElementId}_{channelDataType.ChannelDataTypeId}";
+        if (CheckboxStates != null) CheckboxStates[checkboxKey] = isChecked;
+        
+        var selectedPairs = new List<(Element, ChannelDataType)>();
+        if (sensors != null && CheckboxStates != null)
+        {
+            foreach (var s in sensors)
+            {
+                if (s.ElementType?.ChannelDataTypeElementTypes == null) continue;
+                foreach (var cdt in s.ElementType.ChannelDataTypeElementTypes.OrderBy(x => x.SortOrder ?? int.MaxValue).Select(x => x.ChannelDataType))
+                {
+                    var key = $"{s.ElementId}_{cdt.ChannelDataTypeId}";
+                    if (CheckboxStates.ContainsKey(key) && CheckboxStates[key])
+                        selectedPairs.Add((s, cdt));
+                }
+            }
+        }
+        
+        if (OnBatchPlotRaised.HasDelegate)
+            await OnBatchPlotRaised.InvokeAsync((selectedPairs, StartDate, EndDate));
+        
+        UpdateSelectAllState();
+        StateHasChanged();
+    }
+
+    private async Task TogglePositionSensor(Element sensor)
+    {
+        if (PositioningSensorId == sensor.ElementId)
+        {
+            // Cancel positioning
+            await PositioningSensorIdChanged.InvokeAsync(null);
+            if (OnPositionCancelled.HasDelegate)
+                await OnPositionCancelled.InvokeAsync();
+        }
+        else
+        {
+            // Start positioning
+            await PositioningSensorIdChanged.InvokeAsync(sensor.ElementId);
+            if (OnPositionRequested.HasDelegate)
+                await OnPositionRequested.InvokeAsync(sensor);
+        }
+    }
+
+    private bool IsSensorPositioned(Element element)
+    {
+        // Check from parent's tracked set first
+        if (PositionedSensorIds?.Contains(element.ElementId) == true)
+            return true;
+            
+        // Fallback to checking attributes. Both rows must hold a number the plan can draw, the same test
+        // SVGComponent uses to place the sensor: their mere presence says nothing, since an element is given
+        // an empty row for every attribute type its element type expects, and X and Y are among those types
+        // for the sensor types that carry positions.
+        var xAttr = element.AttributeElements?.FirstOrDefault(ae => ae.AttributeType?.Name == "X");
+        var yAttr = element.AttributeElements?.FirstOrDefault(ae => ae.AttributeType?.Name == "Y");
+        return double.TryParse(xAttr?.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out _)
+            && double.TryParse(yAttr?.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out _);
+    }
+
+    private List<ChannelDataType> GetGroupChannelTypes(SensorGroup group)
+    {
+        if (group?.Sensors == null || !group.Sensors.Any())
+            return new List<ChannelDataType>();
+
+        return group.Sensors
+            .Where(s => s.ElementType?.ChannelDataTypeElementTypes != null)
+            .SelectMany(s => s.ElementType.ChannelDataTypeElementTypes.OrderBy(x => x.SortOrder ?? int.MaxValue).Select(x => x.ChannelDataType))
+            .Where(cdt => cdt != null)
+            .DistinctBy(cdt => cdt.ChannelDataTypeId)   // preserves first-occurrence = SortOrder order
+            .ToList();
+    }
+
+    private bool IsChannelTypeFullySelectedInGroup(SensorGroup group, ChannelDataType channelType)
+    {
+        if (group?.Sensors == null || !group.Sensors.Any() || CheckboxStates == null || channelType == null)
+            return false;
+
+        var sensorsWithChannel = group.Sensors
+            .Where(s => s.ElementType?.ChannelDataTypeElementTypes?.Any(x => x.ChannelDataType.ChannelDataTypeId == channelType.ChannelDataTypeId) == true)
+            .ToList();
+
+        if (!sensorsWithChannel.Any())
+            return false;
+
+        return sensorsWithChannel.All(sensor =>
+        {
+            var key = $"{sensor.ElementId}_{channelType.ChannelDataTypeId}";
+            return CheckboxStates.ContainsKey(key) && CheckboxStates[key];
+        });
+    }
+
+    private async Task OnChannelTypeSelectAllChanged(bool isChecked, SensorGroup group, ChannelDataType channelType)
+    {
+        if (group?.Sensors == null || CheckboxStates == null || channelType == null)
+            return;
+
+        foreach (var sensor in group.Sensors)
+        {
+            if (sensor.ElementType?.ChannelDataTypeElementTypes == null) continue;
+            
+            var hasChannel = sensor.ElementType.ChannelDataTypeElementTypes
+                .Any(x => x.ChannelDataType.ChannelDataTypeId == channelType.ChannelDataTypeId);
+            
+            if (hasChannel)
+            {
+                var key = $"{sensor.ElementId}_{channelType.ChannelDataTypeId}";
+                CheckboxStates[key] = isChecked;
             }
         }
 
-
-        var sensingDeviceTypesIds = sensingDeviceTypes.Select(x => x.ElementTypeId);
-        sensors = await entitiesService.GetFilteredEntitiesAsync<Element>(a => ((a.StructureId == Structure.StructureId) && (sensingDeviceTypesIds.Contains(a.ElementTypeId ?? new Guid()))));
+        await NotifySelectionChanged();
+        UpdateSelectAllState();
+        StateHasChanged();
     }
 
-    async Task RowSelect(Element sensor)
+    private bool IsGroupFullySelected(SensorGroup group)
     {
+        if (group?.Sensors == null || !group.Sensors.Any() || CheckboxStates == null)
+            return false;
 
-        //   selectedEvent = sensor;
+        return group.Sensors.All(sensor =>
+            sensor.ElementType?.ChannelDataTypeElementTypes?.All(cdtet =>
+            {
+                var key = $"{sensor.ElementId}_{cdtet.ChannelDataType.ChannelDataTypeId}";
+                return CheckboxStates.ContainsKey(key) && CheckboxStates[key];
+            }) ?? false);
     }
 
-    private async Task plot(bool args, Element sensor, ChannelDataType channelDataType)
+    private async Task OnGroupSelectAllChanged(bool isChecked, SensorGroup group)
     {
-        await OnPlotRaised.InvokeAsync((args, sensor, channelDataType, startDate, endDate));
+        if (group?.Sensors == null || CheckboxStates == null)
+            return;
+
+        foreach (var sensor in group.Sensors)
+        {
+            if (sensor.ElementType?.ChannelDataTypeElementTypes == null) continue;
+            
+            foreach (var cdtet in sensor.ElementType.ChannelDataTypeElementTypes)
+            {
+                var key = $"{sensor.ElementId}_{cdtet.ChannelDataType.ChannelDataTypeId}";
+                CheckboxStates[key] = isChecked;
+            }
+        }
+
+        await NotifySelectionChanged();
+        UpdateSelectAllState();
+        StateHasChanged();
     }
 
+    private async Task NotifySelectionChanged()
+    {
+        var selectedPairs = new List<(Element, ChannelDataType)>();
+        foreach (var s in sensors)
+        {
+            if (s.ElementType?.ChannelDataTypeElementTypes == null) continue;
+            foreach (var cdt in s.ElementType.ChannelDataTypeElementTypes.OrderBy(x => x.SortOrder ?? int.MaxValue).Select(x => x.ChannelDataType))
+            {
+                var key = $"{s.ElementId}_{cdt.ChannelDataTypeId}";
+                if (CheckboxStates.ContainsKey(key) && CheckboxStates[key])
+                    selectedPairs.Add((s, cdt));
+            }
+        }
+
+        if (OnBatchPlotRaised.HasDelegate)
+            await OnBatchPlotRaised.InvokeAsync((selectedPairs, StartDate, EndDate));
+    }
+
+    private async Task OnSelectAllChanged(bool isChecked)
+    {
+        isSelectAllProcessing = true;
+        selectAll = isChecked;
+        StateHasChanged();
+        
+        try
+        {
+            var sensorChannelPairs = new List<(Element, ChannelDataType)>();
+            if (isChecked)
+            {
+                foreach (var sensor in sensors)
+                {
+                    if (sensor.ElementType?.ChannelDataTypeElementTypes == null) continue;
+                    foreach (var cdt in sensor.ElementType.ChannelDataTypeElementTypes.OrderBy(x => x.SortOrder ?? int.MaxValue).Select(x => x.ChannelDataType))
+                    {
+                        sensorChannelPairs.Add((sensor, cdt));
+                        if (CheckboxStates != null) CheckboxStates[$"{sensor.ElementId}_{cdt.ChannelDataTypeId}"] = true;
+                    }
+                }
+            }
+            else { CheckboxStates?.Clear(); }
+            
+            if (OnBatchPlotRaised.HasDelegate)
+                await OnBatchPlotRaised.InvokeAsync((sensorChannelPairs, StartDate, EndDate));
+        }
+        finally
+        {
+            isSelectAllProcessing = false;
+            StateHasChanged();
+        }
+    }
+
+    private void UpdateSelectAllState()
+    {
+        if (sensors == null || !sensors.Any()) return;
+        selectAll = sensors.All(sensor =>
+            sensor.ElementType?.ChannelDataTypeElementTypes?.All(cdtet =>
+            {
+                var key = $"{sensor.ElementId}_{cdtet.ChannelDataType.ChannelDataTypeId}";
+                return CheckboxStates?.ContainsKey(key) == true && CheckboxStates[key];
+            }) ?? false);
+    }
+
+    private RenderFragment RenderSensorActions(Element element) => __builder =>
+    {
+        if (element?.ElementType?.ChannelDataTypeElementTypes == null) return;
+
+        var isThisSensorPositioning = PositioningSensorId == element.ElementId;
+        var isAnyPositioning = PositioningSensorId.HasValue;
+        var isPositioned = IsSensorPositioned(element);
+        
+        <Div Style="display: flex; align-items: center; gap: 10px;">
+            @foreach (var cdt in element.ElementType.ChannelDataTypeElementTypes.OrderBy(x => x.SortOrder ?? int.MaxValue).Select(x => x.ChannelDataType))
+            {
+                var key = $"{element.ElementId}_{cdt.ChannelDataTypeId}";
+                var isChecked = CheckboxStates?.ContainsKey(key) == true && CheckboxStates[key];
+                <img title="@cdt.Name" src="@Helpers.Helpers.GetSource(cdt.Icon)" alt="@cdt.Name" />
+                <RadzenCheckBox TValue="bool" Value="@isChecked" Change="@(args => OnCheckboxChanged(args, element, cdt))" />
+            }
+            @if (OnPositionRequested.HasDelegate)
+            {
+                <div @onclick:stopPropagation="true" style="display: inline-flex; align-items: center; margin-left: 10px;">
+                    @if (isThisSensorPositioning)
+                    {
+                        <!-- Button when THIS sensor is being positioned - shows spinner and cancel option -->
+                        <button type="button" 
+                                class="btn btn-warning btn-sm btn-positioning"
+                                @onclick="@(() => TogglePositionSensor(element))"
+                                style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 4px;">
+                            <span class="spinner-icon">⏳</span>
+                            <span>Annuler</span>
+                        </button>
+                    }
+                    else if (isPositioned)
+                    {
+                        <!-- Button when sensor is already positioned - green with check -->
+                        <button type="button" 
+                                class="btn btn-success btn-sm"
+                                @onclick="@(() => TogglePositionSensor(element))"
+                                disabled="@(isAnyPositioning)"
+                                title="Repositionner"
+                                style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 12px; border-radius: 4px;">
+                            <span>📍</span>
+                            <span>Positionné</span>
+                        </button>
+                    }
+                    else
+                    {
+                        <!-- Button when sensor is not positioned -->
+                        <button type="button" 
+                                class="btn btn-info btn-sm"
+                                @onclick="@(() => TogglePositionSensor(element))"
+                                disabled="@(isAnyPositioning)"
+                                title="@(isAnyPositioning ? "Un autre capteur est en cours de positionnement" : "Positionner")"
+                                style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 12px; border-radius: 4px;">
+                            <span>📌</span>
+                            <span>Positionner</span>
+                        </button>
+                    }
+                </div>
+            }
+        </Div>
+    };
+
+    // Add this public method to allow parent to highlight a sensor:
+    public void HighlightSensor(Guid sensorId)
+    {
+        // Force re-render to show updated checkbox states
+        StateHasChanged();
+    }
 }

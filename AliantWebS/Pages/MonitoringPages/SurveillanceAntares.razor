@@ -3,15 +3,25 @@
 
 @using AliantWebS.Data
 @using Models
+@using Microsoft.EntityFrameworkCore
+@using AliantWebS.Pages.InventoryElementPages
 @inject AppData appData;
 @inject EntitiesService entitiesService
+@inject IDbContextFactory<AliantWebContext> dbContextFactory
 @inject NavigationManager navigationManager
 @inject IStringLocalizer<Languages> L
 
 <RadzenTabs Change=@OnChange TabPosition="Radzen.TabPosition.Top" RenderMode="TabRenderMode.Server">
     <Tabs>
         <RadzenTabsItem Text="Tableau de bord">
-            <DashBoardComponent2></DashBoardComponent2>
+            @if (appData.Structure is null)
+            {
+                <p><em>@L["Loading"]... !</em></p>
+            }
+            else
+            {
+                <DashBoardComponent2></DashBoardComponent2>
+            }
         </RadzenTabsItem>
         <RadzenTabsItem Text="Surveillance">
             @if (appData.Structure is null)
@@ -26,6 +36,33 @@
         <RadzenTabsItem Text="Corrélation">
             <CorrelationComponent Structure="appData.Structure"></CorrelationComponent>
         </RadzenTabsItem>
+        <RadzenTabsItem Text="Modèle 3D">
+            @if (appData.Structure is null)
+            {
+                <p><em>@L["Loading"]... !</em></p>
+            }
+            else
+            {
+                <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem;">
+                    <RadzenDropDown TValue="string" @bind-Value="selectedPeriod" Data="periodOptions"
+                                    TextProperty="Text" ValueProperty="Value" Style="width:200px;" />
+                    <button type="button" class="btn btn-success" @onclick="CalculCharpenteMesure" disabled="@isCalculating">
+                        @if (isCalculating)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                            <span>@L["Calcul en cours..."]</span>
+                        }
+                        else
+                        {
+                            @L["Calcul Charpente"]
+                        }
+                    </button>
+                    <span style="color:#666;">@statusMessage</span>
+                </div>
+                <BIMComponent @ref="bimRef" Structure="appData.Structure"
+                              ColorMapping="@colorMapping" TauxMap="@tauxByBimId"></BIMComponent>
+            }
+        </RadzenTabsItem>
     </Tabs>
 </RadzenTabs>
 
@@ -34,25 +71,240 @@
     [Parameter]
     public Guid? StructureID { get; set; }
 
-    protected override async Task OnInitializedAsync()
+    private Dictionary<int, (List<long> EntityIds, (int R, int G, int B) Color)> colorMapping = new();
+
+    // ---- Modèle 3D : FE charpente sur charges MESURÉES ----
+    private BIMComponent bimRef;
+    private Dictionary<long, double> tauxByBimId = new();
+    private bool isCalculating = false;
+    private string statusMessage = "";
+
+    private string selectedPeriod = "day";
+    private List<PeriodOption> periodOptions = new()
     {
+        new PeriodOption { Text = "Dernière heure",  Value = "hour" },
+        new PeriodOption { Text = "Dernier jour",    Value = "day" },
+        new PeriodOption { Text = "Dernière semaine", Value = "week" },
+        new PeriodOption { Text = "Dernier mois",    Value = "month" },
+        new PeriodOption { Text = "Dernière année",  Value = "year" },
+    };
+
+    public class PeriodOption
+    {
+        public string Text { get; set; }
+        public string Value { get; set; }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        // Deferred out of OnInitializedAsync so the page paints immediately. The app is
+        // ServerPrerendered, so loading the Structure in OnInitializedAsync blocks the initial HTML.
         if (appData.Structure == null)
         {
-            if (StructureID != null)
-            {
-                appData.Structure = await entitiesService.GetFilteredFirstEntityAsync<Structure>(x => x.StructureId.ToString() == StructureID.ToString());
-            }
+            appData.Structure = await entitiesService.GetFilteredFirstEntityAsync<Structure>(
+                x => x.StructureId.ToString() == "84028ce7-6e17-ef11-ab4f-3c557678c0f7");
+
             if (appData.Structure == null)
             {
                 navigationManager.NavigateTo(@"/Structures");
+                return;
+            }
+            StructureID = appData.Structure.StructureId;
+        }
+
+        await LoadBeam3dColorMapping();
+        StateHasChanged();
+    }
+
+    private async Task LoadBeam3dColorMapping()
+    {
+        if (appData.Structure == null) return;
+
+        // Get all Beam3d elements with BimId for the current structure
+        var beam3dElements = await entitiesService.GetFilteredEntitiesAsync<Element>(
+            x => x.StructureId == appData.Structure.StructureId &&
+                 x.ElementType != null &&
+                 x.ElementType.Name == "Beam3d" &&
+                 x.BimId.HasValue,
+            "ElementType");
+
+        if (beam3dElements == null || !beam3dElements.Any()) return;
+
+        // Get all BimIds for Beam3d elements
+        var bimIds = beam3dElements
+            .Where(x => x.BimId.HasValue)
+            .Select(x => x.BimId!.Value)
+            .ToList();
+
+        // Option 1: Single color for all Beam3d elements (Green)
+        colorMapping = new Dictionary<int, (List<long> EntityIds, (int R, int G, int B) Color)>
+        {
+            { 0, (bimIds, (0, 255, 0)) }  // All Beam3d in Green
+        };
+
+        // Option 2: Color by some condition (uncomment to use)
+        // await LoadBeam3dColorMappingByCondition(beam3dElements);
+
+        // if (ir != null)
+        // {
+        //     int i = 0;
+        //     foreach (var inst in instanceIdsList)
+        //     {
+        //         if (!ir.TauxDetravail.Keys.Contains(inst.Value)) continue;
+        //         var tt = (int)ir.TauxDetravail[inst.Value] * 100;
+
+        //         List<long> ins = new List<long>() { inst.Key };
+
+        //         await js.InvokeVoidAsync("ColorElement", tt, ins.ToArray(), colors[tt].r, colors[tt].g, colors[tt].b);
+        //         i++;
+        //     }
+        // }
+    }
+
+    /// <summary>
+    /// Alternative method: Color Beam3d elements based on a condition (e.g., rigidity, status, etc.)
+    /// </summary>
+    private async Task LoadBeam3dColorMappingByCondition(List<Element> beam3dElements)
+    {
+        // Example: Group elements by parent name or some attribute
+        var criticalElements = new List<long>();
+        var warningElements = new List<long>();
+        var normalElements = new List<long>();
+
+        foreach (var el in beam3dElements)
+        {
+            if (!el.BimId.HasValue) continue;
+
+            // Load attributes if needed
+            if (el.AttributeElements == null || el.AttributeElements.Count == 0)
+            {
+                entitiesService.LoadCollection(el, "AttributeElements");
+            }
+
+            // Example condition: categorize based on some logic
+            // Replace with your actual condition (e.g., rigidity values, sensor data, etc.)
+            var random = new Random();
+            var condition = random.Next(0, 3); // Mockup - replace with real logic
+
+            switch (condition)
+            {
+                case 0:
+                    criticalElements.Add(el.BimId.Value);
+                    break;
+                case 1:
+                    warningElements.Add(el.BimId.Value);
+                    break;
+                default:
+                    normalElements.Add(el.BimId.Value);
+                    break;
             }
         }
 
+        colorMapping = new Dictionary<int, (List<long> EntityIds, (int R, int G, int B) Color)>();
+
+        if (criticalElements.Any())
+            colorMapping.Add(0, (criticalElements, (255, 0, 0)));      // Red - Critical
+
+        if (warningElements.Any())
+            colorMapping.Add(1, (warningElements, (255, 165, 0)));     // Orange - Warning
+
+        if (normalElements.Any())
+            colorMapping.Add(2, (normalElements, (0, 255, 0)));        // Green - Normal
     }
 
     void OnChange(int index)
     {
 
+    }
+
+    // Run the SAME charpente FE as Charpente.razor, but with MEASURED nodal loads: each structural
+    // node's load = Σ of its child manilles' max measured weight over the selected period.
+    private async Task CalculCharpenteMesure()
+    {
+        if (appData.Structure == null) return;
+
+        isCalculating = true;
+        statusMessage = "";
+        StateHasChanged();
+        await Task.Yield(); // let the spinner paint before the (synchronous) FE solve
+
+        try
+        {
+            var (start, end) = GetPeriodRange(selectedPeriod);
+
+            var chargeNodale = await BuildMeasuredChargeNodaleAsync(start, end);
+            if (chargeNodale.Count == 0)
+            {
+                statusMessage = "Aucune charge mesurée sur la période.";
+                return;
+            }
+
+            var selectedLoadCases = (await entitiesService.GetFilteredEntitiesAsync<LoadCase>(
+                x => x.StructureId == appData.Structure.StructureId)).ToDictionary(lc => lc, lc => 1.0);
+
+            var beamTaux = await CharpenteFEHelper.ComputeAsync(
+                appData.Structure, selectedLoadCases, chargeNodale, entitiesService);
+
+            tauxByBimId = beamTaux
+                .Where(b => b.BimId.HasValue)
+                .GroupBy(b => b.BimId.Value)
+                .ToDictionary(g => g.Key, g => g.First().Taux);
+
+            colorMapping = TauxColor.BuildColorMapping(tauxByBimId);
+
+            statusMessage = $"{chargeNodale.Count} nœud(s) chargé(s), {tauxByBimId.Count} élément(s) coloré(s).";
+        }
+        finally
+        {
+            isCalculating = false;
+            StateHasChanged();
+        }
+
+        // Re-apply to the already-loaded 3D model (colours are otherwise only set on first render).
+        if (bimRef != null)
+            await bimRef.ApplyColorsAsync(colorMapping, tauxByBimId);
+    }
+
+    // node load (dof 2 = vertical) = Σ over the node's child manilles of their max weight over [start, end].
+    private async Task<Dictionary<Guid, (int dof, double value)>> BuildMeasuredChargeNodaleAsync(
+        DateTime start, DateTime end)
+    {
+        var chargeNodale = new Dictionary<Guid, (int dof, double value)>();
+
+        var (shackleSensors, weightChannel) =
+            await SensorChargeRatioHelper.LoadShackleSensorsAsync(dbContextFactory, appData.Structure);
+
+        var maxWeights = await SensorChargeRatioHelper.MaxWeightsAsync(shackleSensors, weightChannel, start, end);
+
+        foreach (var sensor in shackleSensors)
+        {
+            if (sensor.ParentId is not Guid nodeId) continue;             // manille → parent structural node
+            if (!maxWeights.TryGetValue(sensor.ElementId, out double w)) continue;
+
+            if (chargeNodale.TryGetValue(nodeId, out var existing))
+                chargeNodale[nodeId] = (2, existing.value + w);
+            else
+                chargeNodale[nodeId] = (2, w);
+        }
+
+        return chargeNodale;
+    }
+
+    private (DateTime start, DateTime end) GetPeriodRange(string period)
+    {
+        var end = DateTime.Now;
+        var start = period switch
+        {
+            "hour"  => end.AddHours(-1),
+            "day"   => end.AddDays(-1),
+            "week"  => end.AddDays(-7),
+            "month" => end.AddMonths(-1),
+            "year"  => end.AddYears(-1),
+            _       => end.AddDays(-1),
+        };
+        return (start, end);
     }
 
 }

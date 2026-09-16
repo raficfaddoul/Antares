@@ -1,0 +1,908 @@
+﻿@page "/settingsFolder/tag-mapping"
+@using AliantWebS.Data
+@using AliantWebS.Models
+@inject EntitiesService entitiesService
+@inject NavigationManager navigationManager
+@inject IStringLocalizer<Languages> L
+@inject IJSRuntime js
+@inject JournalService journal
+
+<style>
+    .mapping-container {
+        padding: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+    }
+
+    .mapping-card {
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        padding: 30px;
+        margin-bottom: 20px;
+    }
+
+    .mapping-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        padding-bottom: 20px;
+        border-bottom: 3px solid #667eea;
+    }
+
+    .mapping-title {
+        font-size: 32px;
+        font-weight: 700;
+        color: #2d3748;
+        margin: 0;
+    }
+
+    .mapping-subtitle {
+        color: #718096;
+        font-size: 14px;
+        margin-top: 5px;
+    }
+
+    .button-group {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .btn-modern {
+        padding: 12px 24px;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .btn-primary-modern {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-primary-modern:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+    }
+
+    .btn-success-modern {
+        background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(72, 187, 120, 0.4);
+    }
+
+    .btn-success-modern:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(72, 187, 120, 0.6);
+    }
+
+    .btn-secondary-modern {
+        background: #e2e8f0;
+        color: #4a5568;
+    }
+
+    .btn-secondary-modern:hover {
+        background: #cbd5e0;
+        transform: translateY(-2px);
+    }
+
+    .btn-danger-modern {
+        background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(245, 101, 101, 0.4);
+    }
+
+    .btn-danger-modern:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(245, 101, 101, 0.6);
+    }
+
+    .mapping-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        margin-top: 20px;
+        overflow: hidden;
+        border-radius: 8px;
+    }
+
+    .mapping-table thead {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+
+    .mapping-table th {
+        padding: 15px;
+        text-align: left;
+        font-weight: 600;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .mapping-table th:first-child {
+        border-top-left-radius: 8px;
+    }
+
+    .mapping-table th:last-child {
+        border-top-right-radius: 8px;
+    }
+
+    .mapping-table tbody tr {
+        background: white;
+        transition: all 0.3s ease;
+    }
+
+    .mapping-table tbody tr:nth-child(even) {
+        background: #f7fafc;
+    }
+
+    .mapping-table tbody tr:hover {
+        background: #edf2f7;
+        transform: scale(1.01);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .mapping-table td {
+        padding: 15px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .code-tag-badge {
+        display: inline-block;
+        padding: 8px 16px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 8px;
+        font-weight: 700;
+        font-size: 16px;
+        font-family: 'Courier New', monospace;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    }
+
+    .user-tag-badge {
+        display: inline-block;
+        padding: 4px 10px;
+        background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+        color: white;
+        border-radius: 6px;
+        font-weight: 600;
+        font-size: 13px;
+        margin: 3px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .user-tag-badge:hover {
+        opacity: 0.9;
+        transform: scale(1.05);
+    }
+
+    .form-control-modern {
+        width: 100%;
+        padding: 10px 15px;
+        border: 2px solid #e2e8f0;
+        border-radius: 8px;
+        font-size: 14px;
+        transition: all 0.3s ease;
+        background: white;
+    }
+
+    .form-control-modern:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .loading-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 400px;
+    }
+
+    .spinner {
+        width: 50px;
+        height: 50px;
+        border: 4px solid #e2e8f0;
+        border-top: 4px solid #667eea;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @@keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+        margin-top: 20px;
+        color: #4a5568;
+        font-size: 16px;
+        font-weight: 600;
+    }
+
+    .stats-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+
+    .stat-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+
+    .stat-number {
+        font-size: 36px;
+        font-weight: 700;
+        margin-bottom: 5px;
+    }
+
+    .stat-label {
+        font-size: 14px;
+        opacity: 0.9;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .search-box {
+        margin-bottom: 20px;
+    }
+
+    .search-input {
+        width: 100%;
+        padding: 12px 20px;
+        border: 2px solid #e2e8f0;
+        border-radius: 25px;
+        font-size: 14px;
+        transition: all 0.3s ease;
+    }
+
+    .search-input:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .action-icon {
+        cursor: pointer;
+        padding: 8px;
+        border-radius: 6px;
+        transition: all 0.3s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+    }
+
+    .action-icon:hover {
+        background: #edf2f7;
+        transform: scale(1.1);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 15px;
+        color: #718096;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 15px;
+    }
+
+    .empty-state-icon {
+        font-size: 24px;
+        margin: 0;
+    }
+
+    .empty-state-text {
+        font-size: 13px;
+        font-style: italic;
+        margin: 0;
+    }
+
+    .user-tags-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+        align-items: center;
+    }
+
+    .add-tag-btn {
+        display: inline-block;
+        padding: 4px 10px;
+        background: #e2e8f0;
+        border-radius: 6px;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        color: #4a5568;
+    }
+
+    .add-tag-btn:hover {
+        background: #667eea;
+        color: white;
+    }
+
+    .tag-description {
+        color: #718096;
+        font-size: 12px;
+        font-style: italic;
+        margin-top: 5px;
+    }
+
+    /* Modal Styles */
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(4px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        animation: fadeIn 0.3s ease;
+    }
+
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
+
+    .modal-content {
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        padding: 30px;
+        max-width: 500px;
+        width: 90%;
+        animation: slideUp 0.3s ease;
+    }
+
+    @@keyframes slideUp {
+        from {
+            transform: translateY(50px);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 25px;
+        padding-bottom: 15px;
+        border-bottom: 2px solid #e2e8f0;
+    }
+
+    .modal-title {
+        font-size: 24px;
+        font-weight: 700;
+        color: #2d3748;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .modal-close {
+        cursor: pointer;
+        padding: 8px;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+        font-size: 24px;
+        color: #718096;
+        background: transparent;
+        border: none;
+    }
+
+    .modal-close:hover {
+        background: #f7fafc;
+        color: #f56565;
+    }
+
+    .modal-body {
+        margin-bottom: 20px;
+    }
+
+    .form-group-modal {
+        margin-bottom: 20px;
+    }
+
+    .form-label-modal {
+        font-size: 14px;
+        font-weight: 600;
+        color: #4a5568;
+        margin-bottom: 8px;
+        display: block;
+    }
+
+    .code-tag-display {
+        display: inline-block;
+        padding: 6px 12px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 6px;
+        font-weight: 700;
+        font-size: 14px;
+        font-family: 'Courier New', monospace;
+    }
+
+    .modal-footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        padding-top: 20px;
+        border-top: 2px solid #e2e8f0;
+    }
+</style>
+
+<div class="mapping-container">
+    <div class="mapping-card">
+        @if (isLoading)
+        {
+            <div class="loading-container">
+                <div class="spinner"></div>
+                <div class="loading-text">@L["Loading..."]</div>
+            </div>
+        }
+        else
+        {
+            <div class="mapping-header">
+                <div>
+                    <h1 class="mapping-title">@L["Tag Mapping Manager"]</h1>
+                    <p class="mapping-subtitle">@L["Map your custom tags to predefined system tags"]</p>
+                </div>
+                <div class="button-group">
+                    <button type="button" class="btn-modern btn-secondary-modern" @onclick="Cancel">
+                        <span>←</span> @L["Back"]
+                    </button>
+                </div>
+            </div>
+
+            <div class="stats-container">
+                <div class="stat-card">
+                    <div class="stat-number">@HARDCODED_TAGS.Count</div>
+                    <div class="stat-label">@L["System Tags"]</div>
+                </div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);">
+                    <div class="stat-number">@totalMappings</div>
+                    <div class="stat-label">@L["User Mappings"]</div>
+                </div>
+                <div class="stat-card" style="background: linear-gradient(135deg, #ed8936 0%, #dd6b20 100%);">
+                    <div class="stat-number">@unmappedTags</div>
+                    <div class="stat-label">@L["Unmapped Tags"]</div>
+                </div>
+            </div>
+
+            <div class="search-box">
+                <input type="text" 
+                       class="search-input" 
+                       placeholder="@L["Search system tags or user mappings..."]"
+                       @bind="searchTerm"
+                       @bind:event="oninput" />
+            </div>
+
+            <div style="overflow-x: auto;">
+                <table class="mapping-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 250px;">@L["System Tag (Hardcoded)"]</th>
+                            <th>@L["Your Custom Tags (User Mappings)"]</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var codeTag in filteredCodeTags)
+                        {
+                            var userMappings = GetUserMappingsForCodeTag(codeTag.Key);
+                            <tr>
+                                <td>
+                                    <div>
+                                        <span class="code-tag-badge">@codeTag.Key</span>
+                                        <div class="tag-description">@codeTag.Value</div>
+                                    </div>
+                                </td>
+                                <td>
+                                    @if (userMappings.Any())
+                                    {
+                                        <div class="user-tags-container">
+                                            @foreach (var mapping in userMappings)
+                                            {
+                                                <div style="position: relative; display: inline-block;">
+                                                    <span class="user-tag-badge" 
+                                                          title="@($"{mapping.Description}\n(Double-click to edit)")"
+                                                          @ondblclick="() => OpenEditModal(mapping)">
+                                                        @mapping.UserTag
+                                                        <span class="action-icon" 
+                                                              style="padding: 2px; margin-left: 5px;" 
+                                                              @onclick="() => DeleteMapping(mapping)" 
+                                                              @onclick:stopPropagation
+                                                              title="@L["Delete"]">
+                                                            ✖
+                                                        </span>
+                                                    </span>
+                                                </div>
+                                            }
+                                            <span class="add-tag-btn" @onclick="() => OpenAddModal(codeTag.Key)">
+                                                ➕ @L["Add"]
+                                            </span>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="empty-state">
+                                            <div class="empty-state-icon">🏷️</div>
+                                            <div class="empty-state-text">@L["No user mappings yet"]</div>
+                                            <button type="button" class="btn-modern btn-primary-modern" style="padding: 8px 16px; font-size: 13px;" 
+                                                    @onclick="() => OpenAddModal(codeTag.Key)">
+                                                <span>➕</span> @L["Add Mapping"]
+                                            </button>
+                                        </div>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@* Modal Popup *@
+@if (showModal)
+{
+    <div class="modal-overlay" @onclick="CloseModal">
+        <div class="modal-content" @onclick:stopPropagation>
+            <div class="modal-header">
+                <h2 class="modal-title">
+                    <span>@(isEditMode ? "✏️" : "➕")</span>
+                    @L[isEditMode ? "Edit User Mapping" : "Add User Mapping"]
+                </h2>
+                <button class="modal-close" @onclick="CloseModal" title="@L["Close"]">
+                    ✖
+                </button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="form-group-modal">
+                    <label class="form-label-modal">@L["System Tag"]</label>
+                    <span class="code-tag-display">@selectedCodeTag</span>
+                    <div class="tag-description" style="margin-top: 8px;">
+                        @(HARDCODED_TAGS.ContainsKey(selectedCodeTag ?? "") ? HARDCODED_TAGS[selectedCodeTag] : "")
+                    </div>
+                </div>
+
+                <div class="form-group-modal">
+                    <label class="form-label-modal">@L["Your Custom Tag"] *</label>
+                    <input type="text" 
+                           class="form-control-modern" 
+                           @bind="modalUserTag" 
+                           placeholder="@L["e.g., Poutre, Nodo, MyTag..."]"
+                           autofocus />
+                </div>
+
+                <div class="form-group-modal">
+                    <label class="form-label-modal">@L["Description"] (@L["Optional"])</label>
+                    <input type="text" 
+                           class="form-control-modern" 
+                           @bind="modalDescription" 
+                           placeholder="@L["Purpose of this mapping..."]" />
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn-modern btn-secondary-modern" @onclick="CloseModal">
+                    <span>✖</span> @L["Cancel"]
+                </button>
+                <button type="button" class="btn-modern btn-success-modern" @onclick="SaveMapping">
+                    <span>✓</span> @L[isEditMode ? "Update" : "Add Mapping"]
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    // HARDCODED SYSTEM TAGS (DEVELOPER DEFINED - DO NOT MODIFY BY USER)
+    private readonly Dictionary<string, string> HARDCODED_TAGS = new Dictionary<string, string>
+    {
+        // Structural Elements
+        { "Beam3d", "3D beam structural element" },
+        { "Beam2d", "2D beam structural element" },
+        { "Noeud3d", "3D node element" },
+        { "Node", "Generic node element" },
+        { "Câble", "Cable element" },
+        { "Treillis3d", "3D truss element" },
+        
+        // Element Groups
+        { "Noeuds", "Node collection" },
+        { "Noeud Structure scénique", "Stage structure node" },
+        { "Noeuds Structure scénique", "Stage structure nodes collection" },
+        
+        // Coordinates & Properties
+        { "X", "X coordinate" },
+        { "Y", "Y coordinate" },
+        { "Z", "Z coordinate" },
+        { "E", "Young's modulus (elasticity)" },
+        { "S", "Section area" },
+        { "I", "Moment of inertia" },
+        { "Iy", "Moment of inertia Y-axis" },
+        { "Iz", "Moment of inertia Z-axis" },
+        { "G", "Shear modulus" },
+        { "Rho", "Density" },
+        { "b", "Width dimension" },
+        { "h", "Height dimension" },
+        
+        // Node References
+        { "Noeud1", "First node reference" },
+        { "Noeud2", "Second node reference" },
+        
+        // Materials
+        { "Matériau", "Material type" },
+        { "S235", "Steel S235" },
+        { "C25/30", "Concrete C25/30" },
+        { "GL30h", "Glued laminated timber GL30h" },
+        { "C24", "Timber C24" },
+        { "mass", "Mass property" },
+        
+        // Constraints
+        { "Constraint_X", "X-axis constraint" },
+        { "Constraint_Y", "Y-axis constraint" },
+        { "Constraint_Z", "Z-axis constraint" },
+        { "Constraint_RX", "Rotation X constraint" },
+        { "Constraint_RY", "Rotation Y constraint" },
+        { "Constraint_RZ", "Rotation Z constraint" },
+        { "Horizontal Constraint 1", "Horizontal constraint type 1" },
+        { "Vertical Constraint", "Vertical constraint" },
+        
+        // Load Cases
+        { "LoadCase", "Load case definition" },
+        { "StaticLoad", "Static load" },
+        { "DynamicLoad", "Dynamic load" },
+        { "MobileLoad", "Mobile load" },
+        { "StaticPointLoad", "Static point load" },
+        { "DynamicPointLoad", "Dynamic point load" },
+        
+        // Other
+        { "Equipement", "Equipment element" },
+        { "BimID", "BIM identifier" },
+        { "ElementType", "Element type definition" },
+        {"seuil_alarme","Seuil Alarme"},
+
+        // Element category that identifies sensors — matched by name when loading sensors for the
+        // SVG plan, the sensor selector, the dashboard and the charge-ratio maps.
+        { "sensing device", "Category grouping all sensor element types" },
+
+        // Sensor calibration (reported value y = C1·x + C0), applied per channel. On each sensor the
+        // coefficients are AttributeElements named "<tag>_<channel>" — e.g. C1_weight, C0_weight,
+        // C1_temperature, C0_temperature. Remap here to decouple from the user's attribute names.
+        { "C1", "Calibration slope prefix — attribute C1_<channel> (default 1)" },
+        { "C0", "Calibration offset prefix — attribute C0_<channel> (default 0)" }
+    };
+
+    private List<TagMappingTable> mappings = new List<TagMappingTable>();
+    private Dictionary<string, string> filteredCodeTags = new Dictionary<string, string>();
+    private bool isLoading = true;
+    private string selectedCodeTag = null;
+    private string modalUserTag = "";
+    private string modalDescription = "";
+    private bool showModal = false;
+    private bool isEditMode = false;
+    private TagMappingTable editingMapping = null;
+
+    private int totalMappings => mappings.Count;
+    private int unmappedTags => HARDCODED_TAGS.Count(tag => !mappings.Any(m => m.CodeTag == tag.Key));
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await LoadMappings();
+            isLoading = false;
+        }
+        catch (Exception ex)
+        {
+            await js.InvokeVoidAsync("alert", $"Error loading mappings: {ex.Message}");
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadMappings()
+    {
+        mappings = await entitiesService.GetAllEntitiesAsync<TagMappingTable>();
+        if (mappings == null)
+        {
+            mappings = new List<TagMappingTable>();
+        }
+        // Only keep mappings for valid hardcoded tags
+        mappings = mappings.Where(m => HARDCODED_TAGS.ContainsKey(m.CodeTag)).ToList();
+        FilterTags();
+    }
+
+    private void FilterTags()
+    {
+        if (string.IsNullOrEmpty(searchTerm))
+        {
+            filteredCodeTags = HARDCODED_TAGS.OrderBy(t => t.Key).ToDictionary(t => t.Key, t => t.Value);
+        }
+        else
+        {
+            filteredCodeTags = HARDCODED_TAGS
+                .Where(tag => 
+                    tag.Key.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                    tag.Value.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                    GetUserMappingsForCodeTag(tag.Key).Any(m => 
+                        m.UserTag.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                        (m.Description?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false)))
+                .OrderBy(t => t.Key)
+                .ToDictionary(t => t.Key, t => t.Value);
+        }
+        StateHasChanged();
+    }
+
+    private List<TagMappingTable> GetUserMappingsForCodeTag(string codeTag)
+    {
+        return mappings.Where(m => m.CodeTag == codeTag).OrderBy(m => m.UserTag).ToList();
+    }
+
+    // Modal methods
+    private void OpenAddModal(string codeTag)
+    {
+        isEditMode = false;
+        editingMapping = null;
+        selectedCodeTag = codeTag;
+        modalUserTag = "";
+        modalDescription = "";
+        showModal = true;
+    }
+
+    private void OpenEditModal(TagMappingTable mapping)
+    {
+        isEditMode = true;
+        editingMapping = mapping;
+        selectedCodeTag = mapping.CodeTag;
+        modalUserTag = mapping.UserTag;
+        modalDescription = mapping.Description ?? "";
+        showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        isEditMode = false;
+        editingMapping = null;
+        selectedCodeTag = null;
+        modalUserTag = "";
+        modalDescription = "";
+    }
+
+    private async Task SaveMapping()
+    {
+        if (string.IsNullOrWhiteSpace(selectedCodeTag))
+        {
+            await js.InvokeVoidAsync("alert", "Please select a system tag!");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(modalUserTag))
+        {
+            await js.InvokeVoidAsync("alert", "Please enter a custom user tag!");
+            return;
+        }
+
+        // Check for duplicate (excluding current mapping if editing)
+        var duplicateExists = mappings.Any(m => 
+            (isEditMode ? m.TagMappingTableId != editingMapping.TagMappingTableId : true) &&
+            m.CodeTag == selectedCodeTag && 
+            m.UserTag.Equals(modalUserTag.Trim(), StringComparison.OrdinalIgnoreCase));
+
+        if (duplicateExists)
+        {
+            await js.InvokeVoidAsync("alert", $"The user tag '{modalUserTag}' already exists for '{selectedCodeTag}'!");
+            return;
+        }
+
+        try
+        {
+            if (isEditMode)
+            {
+                // Update existing mapping
+                string previous = editingMapping.UserTag;
+                editingMapping.UserTag = modalUserTag.Trim();
+                editingMapping.Description = string.IsNullOrWhiteSpace(modalDescription) ? null : modalDescription.Trim();
+                await entitiesService.UpdateEntityAsync(editingMapping);
+
+                // An alias decides which attribute names the alarm and calibration engines recognise,
+                // so an edit here can silently switch a threshold on or off.
+                await journal.WriteAsync(JournalCategory.Configuration, "tagmapping.edit",
+                    target: selectedCodeTag, details: $"{previous} → {editingMapping.UserTag}", severity: 1);
+            }
+            else
+            {
+                // Add new mapping
+                var mapping = new TagMappingTable
+                {
+                    TagMappingTableId = Guid.NewGuid(),
+                    CodeTag = selectedCodeTag,
+                    UserTag = modalUserTag.Trim(),
+                    Description = string.IsNullOrWhiteSpace(modalDescription) ? null : modalDescription.Trim()
+                };
+                await entitiesService.InsertEntityAsync(mapping);
+
+                await journal.WriteAsync(JournalCategory.Configuration, "tagmapping.add",
+                    target: selectedCodeTag, details: $"alias « {mapping.UserTag} »");
+            }
+
+            await LoadMappings();
+            CloseModal();
+        }
+        catch (Exception ex)
+        {
+            await js.InvokeVoidAsync("alert", $"Error {(isEditMode ? "updating" : "adding")} mapping: {ex.Message}");
+        }
+    }
+
+    private async Task DeleteMapping(TagMappingTable mapping)
+    {
+        bool confirmed = await js.InvokeAsync<bool>("confirm", 
+            $"Are you sure you want to delete the user tag '{mapping.UserTag}' for system tag '{mapping.CodeTag}'?");
+        if (!confirmed) return;
+
+        try
+        {
+            await entitiesService.DeleteEntityAsync(mapping);
+
+            await journal.WriteAsync(JournalCategory.Configuration, "tagmapping.delete",
+                target: mapping.CodeTag, details: $"alias « {mapping.UserTag} » supprimé", severity: 1);
+
+            await LoadMappings();
+            await js.InvokeVoidAsync("alert", "Mapping deleted successfully!");
+        }
+        catch (Exception ex)
+        {
+            await js.InvokeVoidAsync("alert", $"Error deleting mapping: {ex.Message}");
+        }
+    }
+
+    private void Cancel()
+    {
+        navigationManager.NavigateTo("/settings");
+    }
+
+    private string _searchTerm = "";
+    private string searchTerm
+    {
+        get => _searchTerm;
+        set
+        {
+            _searchTerm = value;
+            FilterTags();
+        }
+    }
+}

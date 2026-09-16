@@ -1,0 +1,415 @@
+@page "/influxmanagement"
+@using AliantWebS.Data
+@using InfluxDB.Client.Api.Domain
+@using System.Collections.Concurrent
+@inject IJSRuntime js
+@inject IStringLocalizer<Languages> L
+@implements IDisposable
+
+<h3>@L["InfluxDB Bucket Management"]</h3>
+
+<!-- Notification Toast Container -->
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 9999;">
+    <div id="reportToast" class="toast align-items-center text-white bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body">
+                <strong>@L["New Reports Received"]!</strong>
+                <br />
+                <span id="reportCount">@lastReportCount</span> @L["reports processed"]
+                <br />
+                <small>@lastReportTime</small>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+</div>
+
+<!-- Alert for Real-time Status -->
+<div class="row mb-3">
+    <div class="col-md-12">
+        <div class="alert @(isMonitoring ? "alert-info" : "alert-secondary") d-flex align-items-center" role="alert">
+            <div class="flex-grow-1">
+                @if (isMonitoring)
+                {
+                    <span class="spinner-border spinner-border-sm me-2"></span>
+                    <strong>@L["Live Monitoring Active "]</strong>  @L["Listening for new reports..."]
+                    <br />
+                    <small>@L["Total reports received"]: @totalReportsReceived</small>
+                }
+                else
+                {
+                    <strong>@L["Monitoring Inactive"]</strong>
+                }
+            </div>
+            <div>
+                <button class="btn btn-sm @(isMonitoring ? "btn-warning" : "btn-success")" @onclick="ToggleMonitoring">
+                    @(isMonitoring ? L["Stop Monitoring"] : L["Start Monitoring"])
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5>@L["Create New Bucket"]</h5>
+                </div>
+                <div class="card-body">
+                    <div class="form-row">
+                        <div class="col-md-4">
+                            <label>@L["Bucket Name"]:</label>
+                            <input type="text" class="form-control" @bind="newBucketName" placeholder="@L["Enter bucket name"]" />
+                        </div>
+                        <div class="col-md-4">
+                            <label>@L["Retention Period (days)"]:</label>
+                            <input type="number" class="form-control" @bind="retentionDays" placeholder="0 = infinite" min="0" />
+                            <small class="form-text text-muted">@L["0 = Infinite retention"]</small>
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <button class="btn btn-primary" @onclick="CreateBucket" disabled="@isLoading">
+                                @if (isLoading)
+                                {
+                                    <span class="spinner-border spinner-border-sm mr-1"></span>
+                                }
+                                @L["Create Bucket"]
+                            </button>
+                        </div>
+                    </div>
+                    @if (!string.IsNullOrEmpty(createMessage))
+                    {
+                        <div class="alert @(createSuccess ? "alert-success" : "alert-danger") mt-3">
+                            @createMessage
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5>@L["Existing Buckets"]</h5>
+                    <button class="btn btn-secondary btn-sm" @onclick="RefreshBuckets" disabled="@isLoading">
+                        @if (isLoading)
+                        {
+                            <span class="spinner-border spinner-border-sm mr-1"></span>
+                        }
+                        @L["Refresh"]
+                    </button>
+                </div>
+                <div class="card-body">
+                    @if (buckets == null || isLoading)
+                    {
+                        <div class="text-center">
+                            <div class="spinner-border" role="status">
+                                <span class="sr-only">@L["Loading..."]</span>
+                            </div>
+                        </div>
+                    }
+                    else if (buckets.Count == 0)
+                    {
+                        <p class="text-muted">@L["No buckets found."]</p>
+                    }
+                    else
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>@L["Bucket Name"]</th>
+                                        <th>@L["Retention"]</th>
+                                        <th>@L["Record Count"]</th>
+                                        <th>@L["Created"]</th>
+                                        <th>@L["Actions"]</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var bucket in buckets)
+                                    {
+                                        <tr>
+                                            <td><strong>@bucket.Name</strong></td>
+                                            <td>
+                                                @if (bucket.RetentionRules != null && bucket.RetentionRules.Any())
+                                                {
+                                                    var retention = bucket.RetentionRules.First();
+                                                    if (retention.EverySeconds > 0)
+                                                    {
+                                                        @($"{retention.EverySeconds / 86400} days")
+                                                    }
+                                                    else
+                                                    {
+                                                        @L["Infinite"]
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    @L["Infinite"]
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (recordCounts.ContainsKey(bucket.Name))
+                                                {
+                                                    @recordCounts[bucket.Name].ToString("N0")
+                                                }
+                                                else
+                                                {
+                                                    <span class="spinner-border spinner-border-sm"></span>
+                                                }
+                                            </td>
+                                            <td>@bucket.CreatedAt?.ToString("yyyy-MM-dd HH:mm")</td>
+                                            <td>
+                                                <button class="btn btn-sm btn-info mr-2"
+                                                        @onclick="() => GetRecordCount(bucket.Name)" 
+                                                        disabled="@(loadingBuckets.Contains(bucket.Name))">
+                                                    @if (loadingBuckets.Contains(bucket.Name))
+                                                    {
+                                                        <span class="spinner-border spinner-border-sm mr-1"></span>
+                                                    }
+                                                    @L["Count Records"]
+                                                </button>
+                                                <button class="btn btn-sm btn-danger" @onclick="() => DeleteBucket(bucket.Name)" 
+                                                        disabled="@(IsSystemBucket(bucket.Name))">
+                                                    @L["Delete"]
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<Bucket> buckets;
+    private ConcurrentDictionary<string, int> recordCounts = new ConcurrentDictionary<string, int>();
+    private string newBucketName = string.Empty;
+    private int retentionDays = 0;
+    private bool isLoading = false;
+    private string createMessage = string.Empty;
+    private bool createSuccess = false;
+    private bool isMonitoring = false;
+    private int totalReportsReceived = 0;
+    private int lastReportCount = 0;
+    private string lastReportTime = string.Empty;
+
+    private readonly string[] systemBuckets = { "_monitoring", "_tasks" };
+    private HashSet<string> loadingBuckets = new HashSet<string>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshBuckets();
+        
+        // Subscribe to report events
+        ReportsService.OnReportsReceived += HandleReportsReceived;
+        
+        // Check if monitoring is already active (from Program.cs)
+        isMonitoring = true; // Assuming the continuous fetch is running from startup
+    }
+
+    private async Task HandleReportsReceived(List<Report> reports)
+    {
+        if (reports == null || !reports.Any())
+            return;
+
+        totalReportsReceived += reports.Count;
+        lastReportCount = reports.Count;
+
+       var dto = DateTimeOffset.FromUnixTimeSeconds(reports.FirstOrDefault().report_datetime);// DateTime.Now.ToString("HH:mm:ss");
+
+        lastReportTime = dto.LocalDateTime.ToString("yyyy-MM-dd HH:mm:ss");
+
+        // Update UI
+        await InvokeAsync(StateHasChanged);
+
+        // Show toast notification
+        await ShowReportNotification(reports.Count);
+    }
+
+    private async Task ShowReportNotification(int reportCount)
+    {
+        try
+        {
+            await js.InvokeVoidAsync("showReportToast", reportCount, DateTime.Now.ToString("HH:mm:ss"));
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error showing notification: {ex.Message}");
+        }
+    }
+
+    private void ToggleMonitoring()
+    {
+        // This is just a UI toggle - the actual monitoring is controlled by Program.cs
+        // You would need to implement start/stop functionality if needed
+        isMonitoring = !isMonitoring;
+        
+        if (!isMonitoring)
+        {
+            totalReportsReceived = 0;
+            lastReportCount = 0;
+            lastReportTime = string.Empty;
+        }
+    }
+
+    private async Task RefreshBuckets()
+    {
+        isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            buckets = await InfluxService.GetAllBucketsAsync();
+            recordCounts.Clear();
+
+            foreach (var bucket in buckets)
+            {
+                _ = Task.Run(async () =>
+                {
+                    var count = await InfluxService.GetBucketRecordCountAsync(bucket.Name);
+                    recordCounts[bucket.Name] = count; // ? ConcurrentDictionary — thread-safe
+                    await InvokeAsync(StateHasChanged);
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            await js.InvokeVoidAsync("alert", $"Error loading buckets: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CreateBucket()
+    {
+        if (string.IsNullOrWhiteSpace(newBucketName))
+        {
+            createMessage = L["Please enter a bucket name."];
+            createSuccess = false;
+            return;
+        }
+
+        isLoading = true;
+        createMessage = string.Empty;
+        StateHasChanged();
+
+        try
+        {
+            int retentionSeconds = retentionDays > 0 ? retentionDays * 86400 : 0;
+            bool success = await InfluxService.CreateBucketAsync(newBucketName, retentionSeconds);
+
+            if (success)
+            {
+                createMessage = L[$"Bucket '{newBucketName}' created successfully!"];
+                createSuccess = true;
+                newBucketName = string.Empty;
+                retentionDays = 0;
+                await RefreshBuckets();
+            }
+            else
+            {
+                createMessage = L[$"Failed to create bucket '{newBucketName}'."];
+                createSuccess = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            createMessage = $"Error: {ex.Message}";
+            createSuccess = false;
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task DeleteBucket(string bucketName)
+    {
+        if (IsSystemBucket(bucketName))
+        {
+            await js.InvokeVoidAsync("alert", L["Cannot delete system buckets."].ToString());
+            return;
+        }
+
+        bool confirmed = await js.InvokeAsync<bool>("confirm", 
+            L[$"Are you sure you want to delete bucket '{bucketName}'? This action cannot be undone."].ToString());
+
+        if (!confirmed)
+            return;
+
+        isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            bool success = await InfluxService.DeleteBucketAsync(bucketName);
+
+            if (success)
+            {
+                await js.InvokeVoidAsync("alert", L[$"Bucket '{bucketName}' deleted successfully."].ToString());
+                await RefreshBuckets();
+            }
+            else
+            {
+                await js.InvokeVoidAsync("alert", L[$"Failed to delete bucket '{bucketName}'."].ToString());
+            }
+        }
+        catch (Exception ex)
+        {
+            await js.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task GetRecordCount(string bucketName)
+    {
+        if (loadingBuckets.Contains(bucketName)) return;
+
+        loadingBuckets.Add(bucketName);
+        recordCounts.TryRemove(bucketName, out _); // ? show spinner in count cell while refreshing
+        StateHasChanged();
+
+        try
+        {
+            var count = await InfluxService.GetBucketRecordCountAsync(bucketName);
+            recordCounts[bucketName] = count;
+        }
+        catch (Exception ex)
+        {
+            await js.InvokeVoidAsync("alert", $"Error counting records: {ex.Message}");
+        }
+        finally
+        {
+            loadingBuckets.Remove(bucketName);
+            StateHasChanged();
+        }
+    }
+
+    private bool IsSystemBucket(string bucketName)
+    {
+        return systemBuckets.Contains(bucketName);
+    }
+
+    public void Dispose()
+    {
+        // Unsubscribe from events when component is disposed
+        ReportsService.OnReportsReceived -= HandleReportsReceived;
+    }
+}

@@ -19,7 +19,7 @@ else
         <Div Style="display: flex">
             <h2>@Title</h2>
             <div style="margin-left: auto; ">
-                <Blazorise.Button Clicked="@OnLoadCasesButtonClicked" Color="Blazorise.Color.Primary">Edit Event Load Cases</Blazorise.Button>
+                <Blazorise.Button Clicked="@OnLoadCasesButtonClicked" Color="Blazorise.Color.Primary">@L["Edit Event Load Cases"]</Blazorise.Button>
             </div>
         </Div>
     }
@@ -39,12 +39,12 @@ else
                 <div class="form-group">
                     <div class="input-group">
                         <div class="flex-item">
-                            <label>Date de début</label>
+                            <label>@L["Start Date"]</label>
                             <InputDate TValue="DateTime?" @bind-Value="@Eventt.StartDate" class="form-control"></InputDate>
                             @* <ValidationMessage For="@(() => Structure.Geolocation)" /> *@
                         </div>
                         <div class="flex-item">
-                            <label>Date de fin</label>
+                            <label>@L["End Date"]</label>
                             <InputDate TValue="DateTime?" @bind-Value="@Eventt.EndDate" class="form-control"></InputDate>
                             @* <ValidationMessage For="@(() => Structure.Geolocation)" /> *@
                         </div>
@@ -64,7 +64,7 @@ else
                 </div>
                 <div class="form-group">
                     <!-- Main Label for the whole group -->
-                    <label class="form-label" style="font-weight: bold; font-size: larger;">Point 0</label>
+                    <label class="form-label" style="font-weight: bold; font-size: larger;">@L["Point 0"]</label>
 
                     <div class="input-group" style="justify-content: flex-start; gap: 1em;">
                         <div style="display: flex; align-items: center;">
@@ -95,7 +95,7 @@ else
             <div class="col-md-4">
                 <div class="form-group">
                     <button type="button" class="btn btn-success" @onclick="@Cancel">
-                        Cancel
+                        @L["Cancel"]
                     </button>
                 </div>
             </div>
@@ -171,7 +171,6 @@ else
     {
         navigationManager.NavigateTo("Events");
     }
-
 
 
 

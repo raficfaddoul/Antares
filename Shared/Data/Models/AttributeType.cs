@@ -28,9 +28,6 @@ public partial class AttributeType
     public string? FileAddr { get; set; }
 
     [InverseProperty("AttributeType")]
-    public virtual ICollection<AttributeDefect> AttributeDefects { get; set; } = new List<AttributeDefect>();
-
-    [InverseProperty("AttributeType")]
     public virtual ICollection<AttributeElement> AttributeElements { get; set; } = new List<AttributeElement>();
 
     [InverseProperty("AttributeType")]
@@ -38,9 +35,6 @@ public partial class AttributeType
 
     [InverseProperty("AttributeType")]
     public virtual ICollection<AttributeStructure> AttributeStructures { get; set; } = new List<AttributeStructure>();
-
-    [InverseProperty("AttributeType")]
-    public virtual ICollection<AttributeTypeDefectType> AttributeTypeDefectTypes { get; set; } = new List<AttributeTypeDefectType>();
 
     [InverseProperty("AttributeType")]
     public virtual ICollection<AttributeTypeElementType> AttributeTypeElementTypes { get; set; } = new List<AttributeTypeElementType>();

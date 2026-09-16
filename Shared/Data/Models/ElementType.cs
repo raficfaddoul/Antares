@@ -36,16 +36,7 @@ public partial class ElementType
     public virtual ICollection<ChannelDataTypeElementType> ChannelDataTypeElementTypes { get; set; } = new List<ChannelDataTypeElementType>();
 
     [InverseProperty("ElementType")]
-    public virtual ICollection<ElementTypeDefectType> ElementTypeDefectTypes { get; set; } = new List<ElementTypeDefectType>();
-
-    [InverseProperty("ElementType")]
     public virtual ICollection<Element> Elements { get; set; } = new List<Element>();
-
-    [InverseProperty("ElementType")]
-    public virtual ICollection<FlagTypeElementType> FlagTypeElementTypes { get; set; } = new List<FlagTypeElementType>();
-
-    [InverseProperty("ElementType")]
-    public virtual ICollection<InspectionResultTypeElementType> InspectionResultTypeElementTypes { get; set; } = new List<InspectionResultTypeElementType>();
 
     [InverseProperty("ElementType")]
     public virtual ICollection<MotherGridPalonnier> MotherGridPalonniers { get; set; } = new List<MotherGridPalonnier>();

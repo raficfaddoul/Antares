@@ -2,6 +2,7 @@
 @using AliantWebS.Data
 @using System.Text.RegularExpressions;
 @inject EntitiesService entitiesService
+@inject JournalService journal
 @inject AliantWebContext aliantWebContext
 @using Models
 @using System.Text.Json;
@@ -185,6 +186,15 @@
     }
 
     List<Element> copiedElements = new List<Element>();
+
+    // Whether copiedElements were cut rather than copied: the next paste moves them, and their ParentId
+    // is changed only then, just before it is saved. Cut used to set it at once, in memory, to the
+    // placeholder 9245fe4a-d402-451c-b9ed-9c1a04247482, an id no element has. The elements are tracked by
+    // the circuit's shared context, so the next SaveChanges of any page sent that id and failed on
+    // FK_Element_Element1: the paste of two cut elements, an element saved in EditElement, a copy
+    // pasted after the cut was abandoned (nothing inserted, and no error shown) - and every insert of
+    // the circuit after that, since a failed insert leaves the Modified element where it is.
+    bool clipboardIsCut;
 
 
 
@@ -370,6 +380,7 @@
             {
                 copiedElements.Add(el);
             }
+            clipboardIsCut = false;
 
         }
 
@@ -429,12 +440,13 @@
         }
         else
         {
+            // The elements themselves are left as they are until the paste; see clipboardIsCut.
             copiedElements.Clear();
             foreach (Element el in appData.CheckedNodeObjects)
             {
-                el.ParentId = Guid.Parse("9245fe4a-d402-451c-b9ed-9c1a04247482");
                 copiedElements.Add(el);
             }
+            clipboardIsCut = true;
 
         }
 
@@ -554,12 +566,30 @@
         element.Name = ProposeName(parent, element);
         if (copyAttributes)
         {
-            foreach (var att in el.AttributeElements)
+            // Not el.AttributeElements: the tree loads elements without their attributes, so that
+            // collection holds only the rows another page happened to track - all of them once the
+            // element was opened in EditElement, none otherwise - and LoadCollection would not
+            // refresh it once marked loaded. Pasting elements nobody had opened copied no attribute
+            // at all (Membrure F-1..F-20 and Membrure 2-1, 2026-09-14). Read the source's rows from
+            // the database.
+            var sourceAttributes = await entitiesService.QueryCollectionAsync(el, e => e.AttributeElements);
+
+            // The source can still hold two rows for one attribute type (a valued row and an empty
+            // twin left by doubled type links); copying both is how the twins reached hundreds of
+            // elements. Copy one row per type, preferring the one that holds a value, then a date.
+            // ElementId is left unset: EF takes it from element.AttributeElements when the new
+            // element is inserted, and the source element's id has no place on the copy.
+            var attributesToCopy = sourceAttributes
+                .GroupBy(a => a.AttributeTypeId)
+                .Select(g => g.OrderByDescending(a => !string.IsNullOrWhiteSpace(a.Value))
+                              .ThenByDescending(a => a.Date != null)
+                              .First());
+
+            foreach (var att in attributesToCopy)
             {
                 AttributeElement attribute = new AttributeElement();
                 //attribute.AttributeType = att.AttributeType;
                 attribute.AttributeTypeId = att.AttributeTypeId;
-                attribute.ElementId = att.ElementId;
                 attribute.Value = att.Value;
                 attribute.Date = att.Date;
 
@@ -567,13 +597,28 @@
             }
         }
         element = await entitiesService.InsertEntityAsync(element);
+        if (element == null)
+        {
+            // InsertEntityAsync returns null when the insert fails. There is no new element to
+            // attach the children to, so this branch is left unpasted instead of adding null to
+            // the structure and failing on its id.
+            updating = false;
+            return;
+        }
         Structure.Elements.Add(element);
 
 
 
         updating = false;
         forbidens.Add(element.ElementId);
-        foreach (Element childEl in el.InverseParent)
+
+        // el.InverseParent was loaded with the tree and is not refreshed: children added since by
+        // another user or through an owned context are missing from it. Ask the database, and keep
+        // only the rows whose parent is still el in this circuit (a row the shared context tracks
+        // keeps its in-memory ParentId, which is what its next save writes). The copy just made is
+        // among them when pasting an element into itself; forbidens skips it.
+        var children = await entitiesService.QueryCollectionAsync(el, e => e.InverseParent);
+        foreach (Element childEl in children.Where(c => c.ParentId == el.ElementId))
         {
 
             if (forbidens.Contains(childEl.ElementId)) continue;
@@ -612,13 +657,15 @@
 
         if (appData.CheckedNodeObjects is null || appData.CheckedNodeObjects.Count() == 0)
         {
-            if (copiedElements[0].ParentId == Guid.Parse("9245fe4a-d402-451c-b9ed-9c1a04247482"))
+            if (clipboardIsCut)
             {
                 foreach (Element v1 in copiedElements)
                 {
                     v1.ParentId = null;
                     await entitiesService.UpdateEntityAsync(v1);
                 }
+                // Moved; pasting them again copies them, as it always has after a move.
+                clipboardIsCut = false;
             }
             else
             {
@@ -635,7 +682,7 @@
         }
         else
         {
-            if (copiedElements[0].ParentId == Guid.Parse("9245fe4a-d402-451c-b9ed-9c1a04247482"))
+            if (clipboardIsCut)
             {
                 foreach (Element v in appData.CheckedNodeObjects)
                 {
@@ -647,6 +694,7 @@
                     }
 
                 }
+                clipboardIsCut = false;
 
             }
             else
@@ -798,6 +846,8 @@
 
         Dictionary<string, object> dict = new Dictionary<string, object>();
 
+        // Keys are trimmed, so "Ix" and " Ix " on the same line are the same key: the first value
+        // is kept and the repeat ignored, rather than throwing and abandoning the whole import.
         foreach (System.Text.RegularExpressions.Match match in matches)
         {
             string key = match.Groups[1].Value.Trim();
@@ -807,15 +857,15 @@
 
             if (int.TryParse(value, out intValue))
             {
-                dict.Add(key, intValue);
+                dict.TryAdd(key, intValue);
             }
             else if (bool.TryParse(value, out booleanValue))
             {
-                dict.Add(key, booleanValue);
+                dict.TryAdd(key, booleanValue);
             }
             else
             {
-                dict.Add(key, value);
+                dict.TryAdd(key, value);
             }
         }
 
@@ -825,6 +875,12 @@
     async void OnClickImportStructure(InputFileChangeEventArgs e)
     {
         isImporting = true;
+
+        // An import is ONE user action that happens to write hundreds of rows. Per-entity journal
+        // rows would bury the rest of the journal (and double the writes), so the blanket coverage
+        // is muted here and a single summary row is written at the end instead.
+        entitiesService.SuppressJournal = true;
+        int importedElements = 0;
 
         List<string> categoriesWanted = new List<string>();
         List<string> channelDataTypesWanted = new List<string>();
@@ -842,6 +898,8 @@
 
         Stream stream = e.File.OpenReadStream();
 
+        try
+        {
         using (StreamReader reader = new StreamReader(stream))
         {
             string content = await reader.ReadToEndAsync();
@@ -1005,18 +1063,27 @@
                     }
 
                     el = await entitiesService.InsertEntityAsync(el);
+                    if (el != null) importedElements++;
 
 
 
+
+                    // An element gets at most one row per attribute type; if two keys of the line
+                    // resolve to the same type, the first one is kept.
+                    HashSet<Guid> importedAttributeTypeIds = new HashSet<Guid>();
 
                     foreach (var pair in dict)
                     {
                         AttributeType attributeType = null;
 
-                        if (!attributesTypesWanted.Keys.Contains(pair.Key) && !attributesTypesExcluded.Contains(pair.Key))
+                        // One trimmed key for every lookup and insert below, so a type is never
+                        // cached under one spelling and looked up under another.
+                        string attributeKey = pair.Key.Trim();
+
+                        if (!attributesTypesWanted.Keys.Contains(attributeKey) && !attributesTypesExcluded.Contains(attributeKey))
                         {
 
-                            attributeType = await entitiesService.GetFilteredFirstEntityAsync<AttributeType>(a => a.Name == pair.Key);
+                            attributeType = await entitiesService.GetFilteredFirstEntityAsync<AttributeType>(a => a.Name == attributeKey);
 
                             if (attributeType == null)
                             {
@@ -1026,29 +1093,30 @@
                                 {
 
                                     AttributeType at = new AttributeType();
-                                    at.Name = pair.Key?.Trim();
+                                    at.Name = attributeKey;
                                     attributeType = await entitiesService.InsertEntityAsync(at);
-                                    attributesTypesWanted.Add(attributeType.Name, attributeType);
+                                    attributesTypesWanted[attributeKey] = attributeType;
 
                                 }
                                 else
                                 {
-                                    attributesTypesExcluded.Add(pair.Key);
+                                    attributesTypesExcluded.Add(attributeKey);
                                     continue;
                                 }
 
                             }
                             else
                             {
-                                attributesTypesWanted.Add(attributeType.Name, attributeType);
+                                attributesTypesWanted[attributeKey] = attributeType;
                             }
                         }
 
-                        attributeType = (AttributeType)attributesTypesWanted[pair.Key?.Trim()];
+                        attributeType = (AttributeType)attributesTypesWanted[attributeKey];
 
                         AttributeTypeElementType attributeTypeElementType = null;
+                        string attributeTypeElementTypeKey = attributeKey + el.ElementTypeId.ToString();
 
-                        if (!attributeTypeElementTypesWanted.Keys.Contains(pair.Key?.Trim() + el.ElementTypeId.ToString()) && !attributeTypeElementTypesExcluded.Contains(pair.Key?.Trim() + el.ElementTypeId.ToString()))
+                        if (!attributeTypeElementTypesWanted.Keys.Contains(attributeTypeElementTypeKey) && !attributeTypeElementTypesExcluded.Contains(attributeTypeElementTypeKey))
                         {
 
                             attributeTypeElementType = await entitiesService.GetFilteredFirstEntityAsync<AttributeTypeElementType>((a => (a.AttributeTypeId == attributeType.AttributeTypeId) && (a.ElementTypeId == ((ElementType)elementsTypesWanted[typeName]).ElementTypeId)));
@@ -1060,14 +1128,16 @@
                                 atet.ElementTypeId = ((ElementType)elementsTypesWanted[typeName]).ElementTypeId;
                                 atet.AttributeTypeId = attributeType.AttributeTypeId;
                                 attributeTypeElementType = await entitiesService.InsertEntityAsync(atet);
-                                attributeTypeElementTypesWanted.Add(pair.Key?.Trim() + el.ElementTypeId.ToString(), atet);
+                                attributeTypeElementTypesWanted[attributeTypeElementTypeKey] = atet;
 
                             }
                             else
                             {
-                                attributeTypeElementTypesWanted.Add(pair.Key + el.ElementTypeId.ToString(), attributeTypeElementType);
+                                attributeTypeElementTypesWanted[attributeTypeElementTypeKey] = attributeTypeElementType;
                             }
                         }
+
+                        if (!importedAttributeTypeIds.Add(attributeType.AttributeTypeId)) continue;
 
                         AttributeElement ae = new AttributeElement();
                         ae.ElementId = el.ElementId;
@@ -1094,7 +1164,19 @@
 
             isImporting = false;
             StateHasChanged();
+
+            await journal.WriteAsync(JournalCategory.Edition, "structure.import", e.File?.Name,
+                $"{importedElements} élément(s) importé(s) dans « {Structure?.Name} »",
+                severity: 1, structureId: Structure?.StructureId);
+
             await JsRuntime.InvokeVoidAsync("alert", "Creation completed...");
+        }
+        }
+        finally
+        {
+            // Never leave journaling switched off for the rest of the circuit, even if the import
+            // throws half-way through.
+            entitiesService.SuppressJournal = false;
         }
 
     }

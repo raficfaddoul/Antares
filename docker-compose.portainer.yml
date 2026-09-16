@@ -1,0 +1,149 @@
+﻿
+networks:
+  AliantNetwork:
+
+services:
+  # This service creates directories AND copies database files from Docker Hub image
+  init-folders:
+    image: raficfaddoul/antares-db:latest
+    user: root
+    volumes:
+      - /opt/aliant/data:/data
+    command: >
+      sh -c "
+        mkdir -p /data/sql &&
+        mkdir -p /data/images &&
+        mkdir -p /data/influx &&
+        mkdir -p /data/influx-config &&
+        mkdir -p /data/ScenariosData/data &&
+        mkdir -p /data/ScenariosData/output &&
+        mkdir -p /data/backups &&
+
+        echo '📥 Copying database files...' &&
+        if [ ! -f /data/sql/Antares.mdf ]; then
+          cp /dbfiles/Antares.mdf /data/sql/ &&
+          cp /dbfiles/Antares_log.ldf /data/sql/ &&
+          echo '✅ Database files copied'
+        else
+          echo '✅ Database files already exist'
+        fi &&
+
+        chown -R 10001:0 /data/sql &&
+        chown -R 10001:0 /data/backups &&
+        chmod -R 755 /data &&
+        echo '✅ All folders created and permissions set'
+      "
+    restart: "no"
+
+  AliantDb:
+    container_name: AliantDbContainer
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    depends_on:
+      init-folders:
+        condition: service_completed_successfully
+    ports:
+      - "1433:1433"
+    volumes:
+      - /opt/aliant/data/sql:/var/opt/mssql/data
+      - /opt/aliant/data/backups:/backups   # ← shared backup folder
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=password@12345#
+      - MSSQL_PID=Developer
+      - MSSQL_SSL_CERTIFICATE_CREATION=disabled
+    networks:
+      - AliantNetwork
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'password@12345#' -Q 'SELECT 1' -C"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  aliant-db-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    depends_on:
+      AliantDb:
+        condition: service_healthy
+    user: root
+    networks:
+      - AliantNetwork
+    volumes:
+      - /opt/aliant/data/sql:/var/opt/mssql/data
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=password@12345#
+    entrypoint:
+      - /bin/bash
+      - -c
+      - |
+        echo '📂 Checking for Antares files...';
+        if [ -f /var/opt/mssql/data/Antares.mdf ]; then
+          echo '✅ Database files found, attaching...';
+          chown -R 10001:0 /var/opt/mssql/data;
+          until /opt/mssql-tools18/bin/sqlcmd -S AliantDb -U sa -P "$$MSSQL_SA_PASSWORD" -C -Q 'SELECT 1' >/dev/null 2>&1; do
+            echo '   …waiting for SQL Server'; sleep 5;
+          done
+          /opt/mssql-tools18/bin/sqlcmd -S AliantDb -U sa -P "$$MSSQL_SA_PASSWORD" -C -Q "
+            USE master;
+            IF DB_ID('Antares') IS NULL
+            CREATE DATABASE [Antares]
+              ON (FILENAME='/var/opt/mssql/data/Antares.mdf'),
+                 (FILENAME='/var/opt/mssql/data/Antares_log.ldf')
+              FOR ATTACH;
+            SELECT 'Antares attached successfully' AS Status;"
+          echo '🏁 Antares attached';
+        else
+          echo '⚠️ No database files found - skipping attachment';
+        fi
+    restart: "no"
+
+  aliantwebs:
+    container_name: AliantWebContainer
+    image: raficfaddoul/antares:latest
+    ports:
+      - "8080:80"
+    volumes:
+      - /opt/aliant/data/images:/app/Images
+      - /opt/aliant/data/ScenariosData:/app/ScenariosData
+      - /opt/aliant/data/backups:/backups   # ← same host path as AliantDb
+    depends_on:
+      init-folders:
+        condition: service_completed_successfully
+      AliantDb:
+        condition: service_healthy
+    environment:
+      - ASPNETCORE_URLS=http://+:80
+      - ASPNETCORE_ENVIRONMENT=Production
+      - DB_HOST=AliantDb
+      - DB_NAME=Antares
+      - DB_SA_PASSWORD=password@12345#
+      - MSSQL_SSL_CERTIFICATE_CREATION=disabled
+      - BasePath=Aliant1
+      - API_URL=http://192.168.2.10:3001
+      - SwanBrevoAPIKey=${SWAN_BREVO_API_KEY}
+      - BackupPath=/backups              # ← tells the app where to write the .bak
+      - ScenariosDataPath=/app/ScenariosData   # ← must match the ScenariosData bind mount
+    networks:
+      - AliantNetwork
+
+  influxdb2:
+    image: influxdb:2
+    container_name: InfluxDbContainer
+    depends_on:
+      init-folders:
+        condition: service_completed_successfully
+    ports:
+      - "8086:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUXDB_USERNAME}
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_PASSWORD}
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_ADMIN_TOKEN}
+      DOCKER_INFLUXDB_INIT_ORG: Aliant
+      DOCKER_INFLUXDB_INIT_BUCKET: AliantWebT
+    volumes:
+      - /opt/aliant/data/influx:/var/lib/influxdb2
+      - /opt/aliant/data/influx-config:/etc/influxdb2
+    networks:
+      - AliantNetwork

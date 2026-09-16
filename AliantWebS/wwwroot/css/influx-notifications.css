@@ -1,0 +1,43 @@
+.toast-container {
+    z-index: 9999 !important;
+}
+
+.toast {
+    min-width: 300px;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.toast.bg-success {
+    background-color: #28a745 !important;
+}
+
+.toast-body {
+    padding: 1rem;
+}
+
+.alert-info {
+    border-left: 4px solid #17a2b8;
+}
+
+.spinner-border-sm {
+    width: 1rem;
+    height: 1rem;
+    border-width: 0.15em;
+}
+
+/* Pulse animation for active monitoring */
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(23, 162, 184, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(23, 162, 184, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(23, 162, 184, 0);
+    }
+}
+
+.alert-info.monitoring-active {
+    animation: pulse 2s infinite;
+}

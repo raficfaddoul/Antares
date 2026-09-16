@@ -35,15 +35,6 @@ public partial class Element
     [InverseProperty("Element")]
     public virtual ICollection<AttributeElement> AttributeElements { get; set; } = new List<AttributeElement>();
 
-    [InverseProperty("Element")]
-    public virtual ICollection<Defect> Defects { get; set; } = new List<Defect>();
-
-    [InverseProperty("Element")]
-    public virtual ICollection<DynamicLoadElement> DynamicLoadElements { get; set; } = new List<DynamicLoadElement>();
-
-    [InverseProperty("Element")]
-    public virtual ICollection<DynamicPointLoadElement> DynamicPointLoadElements { get; set; } = new List<DynamicPointLoadElement>();
-
     [ForeignKey("ElementTypeId")]
     [InverseProperty("Elements")]
     public virtual ElementType? ElementType { get; set; }
@@ -51,17 +42,8 @@ public partial class Element
     [InverseProperty("Element")]
     public virtual ICollection<Equipement> Equipements { get; set; } = new List<Equipement>();
 
-    [InverseProperty("Element")]
-    public virtual ICollection<FlagElement> FlagElements { get; set; } = new List<FlagElement>();
-
-    [InverseProperty("Element")]
-    public virtual ICollection<InspectionResult> InspectionResults { get; set; } = new List<InspectionResult>();
-
     [InverseProperty("Parent")]
     public virtual ICollection<Element> InverseParent { get; set; } = new List<Element>();
-
-    [InverseProperty("Element")]
-    public virtual ICollection<MobileLoadElement> MobileLoadElements { get; set; } = new List<MobileLoadElement>();
 
     [ForeignKey("ParentId")]
     [InverseProperty("InverseParent")]

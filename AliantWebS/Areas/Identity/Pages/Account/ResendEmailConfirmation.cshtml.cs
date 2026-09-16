@@ -2,87 +2,46 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 #nullable disable
 
-using System;
 using System.ComponentModel.DataAnnotations;
-using System.Text;
-using System.Text.Encodings.Web;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.AspNetCore.WebUtilities;
 
 namespace AliantWebS.Areas.Identity.Pages.Account
 {
+    /// <summary>
+    /// Retired by the administrator-invitation flow, and closed rather than merely unlinked.
+    ///
+    /// This page used to mail a bare ConfirmEmail link. That link confirms the address WITHOUT
+    /// setting a password, which left an invited user worse off than before: still unable to sign
+    /// in, because SignIn.RequireConfirmedAccount is not the obstacle -- the missing password is --
+    /// and no longer visible to the administrator either, because the "Renvoyer l'invitation"
+    /// button in UserManager.razor is shown only while EmailConfirmed is false. Using this page
+    /// made an account unusable and invisible in the same click.
+    ///
+    /// An invited user who never activated asks the administrator to resend the invitation. That
+    /// link sets the password AND confirms the address in one step (AcceptInvitation).
+    ///
+    /// Both handlers redirect. Dropping the links from the UI was not enough: a typed or
+    /// bookmarked URL still reached the old behaviour, and OnPost was reachable without ever
+    /// passing through OnGet. The view is left in place but never renders.
+    /// </summary>
     [AllowAnonymous]
     public class ResendEmailConfirmationModel : PageModel
     {
-        private readonly UserManager<IdentityUser> _userManager;
-        private readonly IEmailSender _emailSender;
-
-        public ResendEmailConfirmationModel(UserManager<IdentityUser> userManager, IEmailSender emailSender)
-        {
-            _userManager = userManager;
-            _emailSender = emailSender;
-        }
-
-        /// <summary>
-        ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
-        /// </summary>
+        /// <summary>Kept only because the (never-rendered) view binds to it; nothing reads it.</summary>
         [BindProperty]
         public InputModel Input { get; set; }
 
-        /// <summary>
-        ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-        ///     directly from your code. This API may change or be removed in future releases.
-        /// </summary>
         public class InputModel
         {
-            /// <summary>
-            ///     This API supports the ASP.NET Core Identity default UI infrastructure and is not intended to be used
-            ///     directly from your code. This API may change or be removed in future releases.
-            /// </summary>
             [Required]
             [EmailAddress]
             public string Email { get; set; }
         }
 
-        public void OnGet()
-        {
-        }
+        public IActionResult OnGet() => RedirectToPage("./Login");
 
-        public async Task<IActionResult> OnPostAsync()
-        {
-            if (!ModelState.IsValid)
-            {
-                return Page();
-            }
-
-            var user = await _userManager.FindByEmailAsync(Input.Email);
-            if (user == null)
-            {
-                ModelState.AddModelError(string.Empty, "Verification email sent. Please check your email.");
-                return Page();
-            }
-
-            var userId = await _userManager.GetUserIdAsync(user);
-            var code = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-            code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
-            var callbackUrl = Url.Page(
-                "/Account/ConfirmEmail",
-                pageHandler: null,
-                values: new { userId = userId, code = code },
-                protocol: Request.Scheme);
-            await _emailSender.SendEmailAsync(
-                Input.Email,
-                "Confirm your email",
-                $"Please confirm your account by <a href='{HtmlEncoder.Default.Encode(callbackUrl)}'>clicking here</a>.");
-
-            ModelState.AddModelError(string.Empty, "Verification email sent. Please check your email.");
-            return Page();
-        }
+        public IActionResult OnPost() => RedirectToPage("./Login");
     }
 }
