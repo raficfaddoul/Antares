@@ -109,7 +109,7 @@
 
                     <AliantWebS.Pages.CADPages.SVGComponent
                         @ref="svgComponent"
-             
+                        Mode="AliantWebS.Pages.CADPages.PlanMode.View"
                         Point0X="@(selectedEvent?.Point0X ?? 0)"
                         Point0Y="@(selectedEvent?.Point0Y ?? 0)"
                         EventName="@selectedEvent?.Name"
@@ -300,7 +300,7 @@
     {
         if (appData.Structure == null)
         {
-            navigationManager.NavigateTo(@"/Structures");
+            navigationManager.NavigateTo(@"Structures");
             return;
         }
 
@@ -565,8 +565,10 @@
             // Each sensor is rated against its OWN alarm threshold, so the gauges aggregate
             // per-sensor RATIOS instead of dividing a shared total by one rated load. Sensors with
             // no threshold for this channel are left out entirely — nothing is assumed for them.
+            var unreadableThresholds = new List<(Guid ElementId, string Value)>();
             var thresholds = await SensorChargeRatioHelper.LoadThresholdsAsync(
-                dbContextFactory, shackleSensors, weightChannelDataType?.Name);
+                dbContextFactory, shackleSensors, weightChannelDataType?.Name, unreadableThresholds);
+            LogUnreadableThresholds(unreadableThresholds);
 
             double? RatioFor(string sensorId, double value)
                 => Guid.TryParse(sensorId, out var id) && thresholds.TryGetValue(id, out var t) && t != 0
@@ -634,6 +636,23 @@
             Console.WriteLine($"Error computing gauge indicators: {ex.Message}");
             value1 = 0; value2 = 0; value3 = 0;
         }
+    }
+
+    // An unreadable threshold is no threshold, for the gauges, the charge curve and the alarms alike, and
+    // nothing else says so: the gauges simply fall. Name the sensors, so the cause is in the log.
+    private void LogUnreadableThresholds(List<(Guid ElementId, string Value)> unreadable)
+    {
+        if (unreadable.Count == 0) return;
+
+        var names = shackleSensors.ToDictionary(s => s.ElementId, s => s.Name);
+        var examples = unreadable
+            .Take(5)
+            .Select(u => $"{(names.TryGetValue(u.ElementId, out var n) ? n : u.ElementId.ToString())} '{u.Value}'");
+
+        Console.WriteLine($"[Dashboard] {unreadable.Count} sensor(s) whose alarm threshold cannot be read in full "
+                        + $"(an unreadable part is a threshold for no channel): "
+                        + $"{string.Join(", ", examples)}{(unreadable.Count > 5 ? ", ..." : "")}. "
+                        + $"Expected channel:value, e.g. {AlarmThresholdFormat.Example}.");
     }
 
     /// <summary>

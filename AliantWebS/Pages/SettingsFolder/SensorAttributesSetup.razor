@@ -71,7 +71,7 @@
                     <strong>@L["Noms presque identiques — rien ne sera généré pour ceux-ci."]</strong>
                     <div style="margin-top:6px;">
                         @L["Les moteurs (alarmes, calibration) comparent les noms à l'identique. Pour que l'attribut existant soit reconnu, ajoutez son nom exact comme alias dans"]
-                        <a href="/settingsFolder/tag-mapping">@L["Tag Mapping"]</a> @L["ou renommez-le."]
+                        <a href="settingsFolder/tag-mapping">@L["Tag Mapping"]</a> @L["ou renommez-le."]
                     </div>
                     <ul style="margin:8px 0 0 18px;">
                         @foreach (var c in Conflicts.Take(12))
@@ -467,5 +467,5 @@
         }
     }
 
-    private void Cancel() => navigationManager.NavigateTo("/settings");
+    private void Cancel() => navigationManager.NavigateTo("settings");
 }

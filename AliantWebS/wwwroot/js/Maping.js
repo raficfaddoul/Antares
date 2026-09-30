@@ -30,7 +30,7 @@ window.MakeMap = async (objRef, x, y,c, zoom) => {
 
 window.AddMarker = async (ids,type, names, x, y, c) => {
     var SiteIcon = L.icon({
-        iconUrl: '../images/maps-icon-8210.png',
+        iconUrl: 'images/maps-icon-8210.png',
         iconSize: [25, 25], // Adjusted size for a more square appearance
         iconAnchor: [12, 12], // Adjusted anchor to the center for a square icon
         popupAnchor: [0, -12] // Adjusted popup anchor point// point from which the popup should open relative to the iconAnchor

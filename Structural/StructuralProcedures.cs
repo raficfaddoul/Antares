@@ -1,4 +1,5 @@
-﻿using AliantWebS.Models;
+﻿using Accord.Math;
+using AliantWebS.Models;
 using DocumentFormat.OpenXml.EMMA;
 using MathNet.Numerics.LinearAlgebra.Factorization;
 using NetTopologySuite.Algorithm;
@@ -202,7 +203,7 @@ namespace Structural
             double xi, yi, zi, xj, yj, zj, b, h;
             int i = elem.Field<int>("Noeudi");
             int j = elem.Field<int>("Noeudj");
-  
+           
             xi = noeud[i][0];
             yi = noeud[i][1];
             zi = noeud[i][2];
@@ -210,17 +211,33 @@ namespace Structural
             yj = noeud[j][1];
             zj = noeud[j][2];
 
+            double E = elem.Field<double>("E"); // MPa = MN/m²
+            // G calculé par matériau dans Simulation (E / 2(1+nu)) ; à défaut, nu = 0.2
+            double G = elem.Field<double>("G");
+            if (G <= 0) G = E / (2 * (1 + 0.2));
+
             b = elem.Field<double>("b");
             h = elem.Field<double>("h");
+            double S, Iy, Iz, J;
+            if (b > 0 && h > 0)
+            {
+                S = b * h;
+                Iy = b * Math.Pow(h, 3) / 12.0;
+                Iz = h * Math.Pow(b, 3) / 12.0;
+                // Torsion de St-Venant d'un rectangle (a : grand côté, c : petit côté)
+                double a = Math.Max(b, h), c = Math.Min(b, h);
+                J = a * Math.Pow(c, 3) * (1.0 / 3.0 - 0.21 * (c / a) * (1 - Math.Pow(c, 4) / (12 * Math.Pow(a, 4))));
+            }
+            else
+            {
+                S = elem.Field<double>("S");
 
-            double E = elem.Field<double>("E"); // MPa = MN/m²
-            double S = b*h;
-            double Iy = b * Math.Pow(h, 3) / 12.0;
-            double Iz = h * Math.Pow(b, 3) / 12.0;
-            double nu = 0.1;
-            double G = E / (2*(1 + nu));
-            double J = Iy + Iz;
-
+                Iy = elem.Field<double>("Iy");
+                Iz = elem.Field<double>("Iz");
+                // Constante de torsion fournie (attribut "Ix") ; à défaut, moment polaire Iy + Iz
+                double Jdonne = elem.Table.Columns.Contains("J") && !elem.IsNull("J") ? elem.Field<double>("J") : 0;
+                J = Jdonne > 0 ? Jdonne : Iy + Iz;
+            }
             double L = Math.Sqrt(Math.Pow(xj - xi, 2) + Math.Pow(yj - yi, 2) + Math.Pow(zj - zi, 2));
             double L2 = L * L;
             double L3 = L * L * L;
@@ -282,6 +299,7 @@ namespace Structural
             double[,] K = new double[6 * noeud.Count(), 6 * noeud.Count()];
             foreach (DataRow elem in element.Rows)
             {
+       
                 double[,] Ke = Calcul_Ke_Beam3D(elem, noeud);
                 Ke = Rotation_Beam3D(elem, noeud, Ke);
                 Assemblage_Beam3D(K, Ke, elem);
@@ -293,6 +311,30 @@ namespace Structural
                         int korp = 0;
                     }
                 }
+
+                string s0 = "";
+                for (int i = 0; i < 12; i ++)
+                {
+                    for (int j = 0; j < 12; j++)
+                        s0 += Ke[i, j].ToString("N3")+" ; "; 
+                    s0 += "\n";
+                }
+                string hs1 = s0;
+/*
+                string s1 = "";
+                for (int i = 0; i < 6*10; i += 6)
+                {
+                    s1 += (i / 6).ToString() + ";" + K[i, i].ToString() + ";" + K[i + 1, i + 1].ToString() + ";" + K[i + 2, i + 2].ToString() + ";" + K[i + 3, i + 3].ToString() + ";" + K[i + 4, i + 4].ToString() + ";" + K[i + 5, i + 5].ToString() + "\n";
+                }
+                hs1 = s1;
+                for (int i = 0; i < (6 * noeud.Count()); i++)
+                {
+                    if (K[i, i]==double.NaN)
+                    {
+                        int korp = 0;
+                    }
+                }
+*/
             }
 
 
@@ -339,7 +381,7 @@ namespace Structural
             {
                 double P = charge.value;
                 for (int j = 0; j < charge.noeudInd.Count; j++)
-                    F[6 * charge.noeudInd[j] + 1] += P/100;
+                    F[6 * charge.noeudInd[j] + 2] += P/100;
             }
             return F;
         }

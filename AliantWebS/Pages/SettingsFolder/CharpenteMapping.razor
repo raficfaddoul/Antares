@@ -420,6 +420,10 @@
                                                         <span style="font-size:11px;">@(expanded ? "▼" : "▶")</span>
                                                         @sensorList.Count @(sensorList.Count > 1 ? L["capteurs"] : L["capteur"])
                                                         · @sensorList.Sum(s => s.Channels.Count) @L["canaux"]
+                                                        @if (sensorList.Any(s => s.UnreadableParts.Count > 0))
+                                                        {
+                                                            <span style="color:#c08a00;" title="@L["Seuil d'alarme illisible"]">⚠</span>
+                                                        }
                                                     </span>
                                                 }
                                             </td>
@@ -503,6 +507,15 @@
                                                                         }
                                                                     </tbody>
                                                                 </table>
+                                                                @if (st.UnreadableParts.Count > 0)
+                                                                {
+                                                                    <div style="font-size:12px; color:#a05a00; background:#fff3cd;
+                                                                                border:1px solid #ffe08a; border-radius:6px; padding:6px 10px; margin-top:8px;">
+                                                                        ⚠ @L["Seuil d'alarme illisible"] : « @string.Join(";", st.UnreadableParts) ».
+                                                                        @L["Format attendu canal:valeur, par ex."] @AlarmThresholdFormat.Example.
+                                                                        @L["Cette partie ne compte pour aucun canal (jauges, alarmes) ; modifier un seuil ci-dessus puis Enregistrer la remplace."]
+                                                                    </div>
+                                                                }
                                                                 @if (st.ThresholdAttributeTypeId == Guid.Empty)
                                                                 {
                                                                     <div style="font-size:12px; color:#a05a00; background:#fff3cd;
@@ -555,6 +568,10 @@
         public List<string> Channels { get; set; } = new();
         public Dictionary<string, double?> Values { get; set; } = new(StringComparer.OrdinalIgnoreCase);
         public bool Dirty { get; set; }
+
+        // Parts of the stored value that are not "channel:number", a bare "1500" for one. They count for no
+        // channel, show as empty fields, and a Save here drops them.
+        public List<string> UnreadableParts { get; } = new();
 
         // Calibration y = C1·x + C0. Unlike the threshold (one packed attribute for all channels),
         // these are one attribute PER channel, named "<prefix>_<channel>" — e.g. C1_weight.
@@ -782,13 +799,8 @@
             }
 
             foreach (var ch in channels) st.Values[ch] = null;
-            foreach (var pair in (attr?.Value ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries))
-            {
-                var kv = pair.Split(':');
-                if (kv.Length == 2 && double.TryParse(kv[1], System.Globalization.NumberStyles.Float,
-                        System.Globalization.CultureInfo.InvariantCulture, out var v))
-                    st.Values[kv[0].Trim()] = v;
-            }
+            foreach (var (channel, v) in AlarmThresholdFormat.Parse(attr?.Value, st.UnreadableParts))
+                st.Values[channel] = v;
 
             if (!sensorsByParent.TryGetValue(sensor.ParentId.Value, out var list))
                 sensorsByParent[sensor.ParentId.Value] = list = new List<SensorThresholds>();
@@ -975,6 +987,7 @@
                     severity: 1);
 
                 st.Dirty = false;
+                st.UnreadableParts.Clear();
                 thresholdsSaved++;
             }
 
@@ -1050,6 +1063,6 @@
 
     private void Cancel()
     {
-        navigationManager.NavigateTo("/settings");
+        navigationManager.NavigateTo("settings");
     }
 }

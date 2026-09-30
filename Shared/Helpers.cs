@@ -470,11 +470,22 @@ namespace Helpers
 
         static public void GetChildren(Element element, List<Guid?> listIDs, List<Element> childrens = null)
         {
+            GetChildren(element, listIDs, childrens, new HashSet<Guid>());
+        }
+
+        // Each element is walked once. adbo.Element accepts a parent chain that runs in a circle - a cut
+        // element pasted into its own branch made one - and walking such a branch never ended: the stack
+        // overflow takes the whole web process down, not only the circuit. GetTheChildren shares the set
+        // between the elements it starts from, so an element under two of them is listed once.
+        static void GetChildren(Element element, List<Guid?> listIDs, List<Element>? childrens, HashSet<Guid> walked)
+        {
+            if (!walked.Add(element.ElementId)) return;
+
             listIDs.Add(element.ElementId);
             if (childrens != null) childrens.Add(element);
             foreach (Element e in element.InverseParent)
             {
-                GetChildren(e, listIDs, childrens);
+                GetChildren(e, listIDs, childrens, walked);
             }
 
         }
@@ -482,17 +493,35 @@ namespace Helpers
         static public List<Guid?> GetTheChildren(IEnumerable<object> parents, List<Element> childrens = null)
         {
             List<Guid?> listIDs = new List<Guid?>();
+            HashSet<Guid> walked = new HashSet<Guid>();
 
 
             foreach (Element v in parents)
             {
 
-                GetChildren(v, listIDs, childrens);
+                GetChildren(v, listIDs, childrens, walked);
 
             }
 
             listIDs = listIDs.Distinct().ToList();
             return listIDs;
+        }
+
+        /// <summary>
+        /// Whether an element is one of <paramref name="branchRootIds"/> or lies anywhere below one of them.
+        /// Walks up from the element through <paramref name="parentIdOf"/>, which gives an element's ParentId:
+        /// null for a root, and for an element it does not know. An id met a second time ends the walk, so a
+        /// parent chain that runs in a circle is followed once round, not for ever.
+        /// </summary>
+        public static async Task<bool> IsInAnyBranchAsync(Guid elementId, IReadOnlySet<Guid> branchRootIds,
+                                                         Func<Guid, Task<Guid?>> parentIdOf)
+        {
+            var met = new HashSet<Guid>();
+            for (Guid? id = elementId; id is Guid current && met.Add(current); id = await parentIdOf(current))
+            {
+                if (branchRootIds.Contains(current)) return true;
+            }
+            return false;
         }
         public static IEnumerable<T> ListFromString<T>(string s)
         {

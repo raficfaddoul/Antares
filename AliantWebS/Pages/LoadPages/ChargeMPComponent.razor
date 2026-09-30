@@ -9,9 +9,14 @@
 @inject AliantWebS.Data.AppData AppData
 @using Models
 @using Helpers
+@using Microsoft.EntityFrameworkCore
 @inject IStringLocalizer<Languages> L
+@inject NotificationService notifications
 
 @layout AntaresConceptionLayout
+
+@* Leaving the page that shows these charges stores their loads first (CalculateBeforeLeaving). *@
+<NavigationLock OnBeforeInternalNavigation="CalculateBeforeLeaving" />
 
 @if (ChargeList is null)
 {
@@ -48,7 +53,7 @@ else
     @* Also runs automatically when leaving /MotherGrid. The button matters because the calculation
        depends on the truss masses in MotherGrill.xlsx and Palonnier.xlsx: after filling one in there is
        otherwise no way to ask for a recompute except to navigate away and back. *@
-    <Blazorise.Button Color="Blazorise.Color.Primary" Clicked="CalculCharpente">@L["Calcul Charpente"]</Blazorise.Button>
+    <Blazorise.Button Color="Blazorise.Color.Primary" Clicked="CalculCharpenteClicked" Disabled="@isCalculating">@L["Calcul Charpente"]</Blazorise.Button>
 </div>
     <div style="margin-left: auto; display: flex; align-items: center; gap: 10px;">
         <Label>@L["Page Size"]: &nbsp;&nbsp;</Label>
@@ -176,8 +181,11 @@ else
     [Parameter]
     public Guid EventMpscenarioId { get; set; }
 
-    // [Parameter]
-    // public EventCallback<LoadTransmissionResult> OnCalculCharpente { get; set; }
+    // The result of a calculation, for the page to draw on the plan: where load enters the mothers (a palonnier's hanging
+    // point, or a charge placed straight on a mother) and the load on every charpente point. Reconnected on 2026-09-17 -
+    // it had been commented out, so the plan's two layers never showed.
+    [Parameter]
+    public EventCallback<LoadTransmissionResult> OnCalculCharpente { get; set; }
 
     [Parameter]
     public EventCallback ChargeListChanged { get; set; }
@@ -191,9 +199,125 @@ else
 private bool showDecimalSettings = false;
 bool isImportingCharges = false;
 
-    protected override void OnInitialized()
+    // One calculation at a time: two that overlap would both save the Charpente row, and a double click started two. A
+    // run asked for while another is going waits behind it, and the queue never fails - so a run that throws or is
+    // cancelled (an alert left open past the JS timeout) does not stop the one after it.
+    private Task calculation = Task.CompletedTask;   // the last run asked for
+    private bool runWaiting;                          // that run waits behind another and has not started
+    private int unfinishedRuns;                       // asked for and not finished
+    private bool isCalculating => unfinishedRuns > 0;
+
+    /// <summary>Completes when no calculation is running or waiting - including one queued while this waits (never
+    /// faults). The page awaits it before it reloads its rows through the circuit's shared context, which a calculation
+    /// may be saving through.</summary>
+    public async Task WhenIdle()
     {
-        Layout?.RegisterCalculCharpente(CalculCharpente);
+        while (!calculation.IsCompleted)
+            await calculation;
+    }
+
+    // The button: a click while anything runs or waits is dropped, not queued (the button is disabled then, but a second
+    // click can arrive before that shows).
+    private Task CalculCharpenteClicked() => isCalculating ? Task.CompletedTask : QueueCalculation(leaving: false);
+
+    // Leaving the page that shows these charges for another page of the application - a link, Back or Forward, a
+    // NavigateTo, another scenario's Mother Grid - stores their loads first: the Charpente page, the report and the 3D
+    // model read the stored table. The navigation waits for it. A NavigationLock is active only while this component is
+    // shown; the layout used to guess from the address instead, which a download link left on the file's address - the
+    // download then calculated, and a later departure did not. Never seen, by any handler: a reload (F5), closing the
+    // tab, a lost connection, Log out (a plain form post), an address typed or a bookmark, a link or Back to an address
+    // outside the application, and a departure in the very first moment after the page appears (the lock registers
+    // after its first render).
+    private async Task CalculateBeforeLeaving(LocationChangingContext context)
+    {
+        try
+        {
+            if (IsStaying(context)) return;
+            await QueueCalculation(leaving: true);
+        }
+        catch (Exception ex)
+        {
+            // Nothing may escape a navigation's handler: it would end the circuit.
+            Console.WriteLine($"Calcul charpente avant de quitter la page : {ex}");
+        }
+    }
+
+    // Staying: this very Mother Grid (Générer l'implantation navigates back to it), or the router's own reload of a link it
+    // could not route - the click itself was the departure, handled then. Mother Grid is the only page that shows this
+    // component (its own route, unused, has no scenario: a departure there calculates nothing). Any other address, another
+    // scenario's Mother Grid included, is a departure: the calculation reads this page's own scenario, whatever the
+    // dropdown already shows.
+    private bool IsStaying(LocationChangingContext context)
+    {
+        if (!context.IsNavigationIntercepted && string.Equals(context.TargetLocation, navigationManager.Uri, StringComparison.Ordinal))
+            return true;
+        return ConceptionRoute.TryParse(navigationManager, context.TargetLocation, out var page, out var id)
+               && page == "MotherGrid" && id == EventMpscenarioId;
+    }
+
+    private Task QueueCalculation(bool leaving)
+    {
+        // A run waiting reads the page when it starts, so it serves this request too: repeated requests - clicks on a
+        // link, the dropdown's arrow keys (one navigation per key) - never pile up more than one run behind the one going.
+        // Not the run going itself: the page stays live while a navigation waits, and an edit made since that run read
+        // the rows would not be stored.
+        if (runWaiting) return calculation;
+
+        runWaiting = !calculation.IsCompleted;
+        unfinishedRuns++;
+        calculation = CalculateAfter(calculation, leaving);
+        Redraw();   // the button, disabled - for a click Blazor would do it, not for a departure
+        return calculation;
+    }
+
+    private async Task CalculateAfter(Task previous, bool leaving)
+    {
+        try { await previous; }
+        catch { /* CalculateAfter never fails; kept so a change there cannot stop the queue */ }
+        runWaiting = false;
+
+        try
+        {
+            await CalculCharpente(leaving);
+        }
+        catch (Exception ex)
+        {
+            // CalculCharpente reports its own errors; this is what escapes its catch - its error alert itself cancelled,
+            // or the circuit gone.
+            Console.WriteLine($"Calcul charpente interrompu : {ex}");
+        }
+        finally
+        {
+            unfinishedRuns--;
+        }
+
+        Redraw();   // the button, enabled again when nothing else is queued, however the run ended and whoever asked
+    }
+
+    // The button's messages are alerts, as they always were. A departure's are notifications, which name the scenario: the
+    // navigation does not wait for someone to close them, and by then the dropdown may already show the next scenario.
+    private async Task Tell(bool leaving, string message)
+    {
+        if (!leaving)
+        {
+            await js.InvokeVoidAsync("alert", message);
+            return;
+        }
+        notifications.Notify(new NotificationMessage
+        {
+            Severity = NotificationSeverity.Warning,
+            Summary = "Calcul charpente",
+            Detail = message,
+            Duration = 30000,
+            CloseOnClick = true,
+            Style = "white-space: pre-line; max-width: 34rem;"
+        });
+    }
+
+    private void Redraw()
+    {
+        try { StateHasChanged(); }
+        catch (ObjectDisposedException) { }
     }
 
     protected override async Task OnParametersSetAsync()
@@ -286,51 +410,75 @@ bool isImportingCharges = false;
     // Ajouter une liste pour stocker les messages d'alerte
     private List<string> alertMessages = new List<string>();
 
-    private async Task CalculCharpente()
+    private async Task CalculCharpente(bool leaving)
     {
+        // The scenario on screen - this page's own id, read once - and its event. Never the layout's dropdown: after Back,
+        // or once the dropdown already names the scenario a navigation is taking the page to, it shows another scenario,
+        // and this calculation used to write the page's loads into that one's Charpente row, weighed with its inventory
+        // and placed from its event's Point0.
+        Guid scenarioId = EventMpscenarioId;
+        string scenarioName = null;
         try
         {
             // Vider les anciennes alertes
             alertMessages.Clear();
-            
+
+            if (scenarioId == Guid.Empty)
+            {
+                // No scenario on screen (after « Supprimer le scénario »): nothing to calculate, nothing to store.
+                if (!leaving) await Tell(false, "Aucun scénario sélectionné : rien à calculer.");
+                return;
+            }
+
+            var here = await ConceptionScenario.ResolveAsync(entitiesService, Layout, scenarioId);
+            if (here is null)
+            {
+                // Deleted - « Supprimer le scénario » navigates away right after, or someone else did. Nothing is written:
+                // no Charpente row is created for a scenario that is gone.
+                if (leaving)
+                    Console.WriteLine($"Calcul charpente : le scénario {scenarioId} n'existe plus, rien n'est enregistré.");
+                else
+                    await Tell(false, "Ce scénario n'existe plus : calcul impossible.");
+                return;
+            }
+            scenarioName = here.Scenario.Name;
+
             // Récupérer tous les mothergrids et palonniers du scénario
             var allMotherGridsAndPalonniers = await entitiesService.GetFilteredEntitiesAsync<MotherGridPalonnier>(
-                x => x.EventMpscenarioId == EventMpscenarioId);
+                x => x.EventMpscenarioId == scenarioId);
 
             // Récupérer toutes les charges
             var allCharges = await entitiesService.GetFilteredEntitiesAsync<ChargeMp>(
-                x => x.MotherGridPalonnier.EventMpscenarioId == EventMpscenarioId,
+                x => x.MotherGridPalonnier.EventMpscenarioId == scenarioId,
                 "MotherGridPalonnier");
 
-            // // Récupérer ou créer la charpente
-            // var scenario = await entitiesService.GetFilteredFirstEntityAsync<EventMpscenario>(
-            //     x => x.EventMpscenarioId == EventMpscenarioId);
+            // The scenario's Charpente row, read fresh through a context of its own - or a new one, inserted with its loads
+            // once they are calculated (SaveCharpenteAsync), not empty before. The Charpente page and the report read it fresh
+            // too, and nothing of it stays in the circuit's shared context.
+            Models.Charpente charpente;
+            await using (var db = entitiesService.CreateOwnedContext())
+                charpente = await db.Charpentes.AsNoTracking().FirstOrDefaultAsync(x => x.EventMpscenarioId == scenarioId)
+                            ?? new Models.Charpente { EventMpscenarioId = scenarioId };
 
-            Models.Charpente charpente = await entitiesService.GetFilteredFirstEntityAsync<Models.Charpente>(
-                x => x.EventMpscenarioId == Layout.selectedScenario.EventMpscenarioId);
-            
-            if (charpente == null)
-            {
-                charpente = new Models.Charpente();
-                charpente.EventMpscenarioId = Layout.selectedScenario.EventMpscenarioId;
-                charpente = await entitiesService.InsertEntityAsync(charpente);
-                
-                if (charpente == null)
-                {
-                    await js.InvokeVoidAsync("alert", "Erreur lors de la création de la charpente!");
-                    return;
-                }
-            }
+            var elementTypes = await entitiesService.GetAllEntitiesAsync<ElementType>();
+            var typeNames = elementTypes.ToDictionary(t => t.ElementTypeId, t => t.Name ?? "");
 
             // The trusses carry themselves. Their masses come from the inventory, MotherGrill.xlsx and
             // Palonnier.xlsx, the scenario's copies first - the same lookup the report uses, so the
             // study and the calculation can never disagree about what a truss weighs.
             var paths = scenarioStorage.GetScenarioPaths(
-                Layout.selectedEvent, Layout.selectedScenario, create: false);
-            var catalog = RiggingOptimizer.IO.InventoryFiles.Load(paths.DataDir, scenarioStorage.CommonDataDir).Catalog;
+                here.Event, here.Scenario, create: false);
 
-            var elementTypes = await entitiesService.GetAllEntitiesAsync<ElementType>();
-            var typeNames = elementTypes.ToDictionary(t => t.ElementTypeId, t => t.Name ?? "");
+            // What this calculation is given, signed with no await from here to the calculation, so it is exactly what
+            // the calculation reads: these rows with their values now, and the inventory files as they are before being
+            // read (a file replaced in between then differs from the page's next look at it, which hides the result).
+            // MotherGrid compares it with what it holds (CalculationSignature).
+            string inputSignature = CalculationSignature.Of(scenarioId,
+                here.Event.Point0X, here.Event.Point0Y,
+                CalculationSignature.InventoryStamp(paths.DataDir, scenarioStorage.CommonDataDir),
+                allMotherGridsAndPalonniers, allCharges);
+
+            var catalog = RiggingOptimizer.IO.InventoryFiles.Load(paths.DataDir, scenarioStorage.CommonDataDir).Catalog;
 
             // Créer le helper et configurer les alertes
             var helper = new LoadTransmissionHelper();
@@ -339,8 +487,8 @@ bool isImportingCharges = false;
             // disagree about what a truss weighs. See ReportDataBuilder.MassSource.
             helper.TrussMassOf = ReportDataBuilder.MassSource(catalog, typeNames);
             // Event-dependent origin: palonnier/charge coords are stored relative to Point0.
-            helper.Point0X = Layout?.selectedEvent?.Point0X ?? 0;
-            helper.Point0Y = Layout?.selectedEvent?.Point0Y ?? 0;
+            helper.Point0X = here.Event.Point0X ?? 0;
+            helper.Point0Y = here.Event.Point0Y ?? 0;
             helper.AlertAction = (message) => 
             {
                 Console.WriteLine(message);
@@ -357,19 +505,21 @@ bool isImportingCharges = false;
             // Appliquer les charges à la charpente
             helper.ApplyLoadsToCharpente(charpente, charpenteLoads);
 
-            // Sauvegarder la charpente
-            await entitiesService.UpdateEntityAsync(charpente);
+            // Sauvegarder la charpente - inserted if the scenario had none yet. A refusal throws into the catch below, which
+            // says so (an alert for the button, a notification for a departure).
+            await entitiesService.SaveCharpenteAsync(charpente);
 
             // Créer le résultat pour la visualisation
             var result = new LoadTransmissionResult
             {
                 MotherGridLoads = motherGridLoads,
                 CharpenteLoads = charpenteLoads,
-                Charpente = charpente
+                Charpente = charpente,
+                InputSignature = inputSignature
             };
 
             // Notifier le composant parent
-           // await OnCalculCharpente.InvokeAsync(result);
+            await OnCalculCharpente.InvokeAsync(result);
 
             // Afficher toutes les alertes à la fin si il y en a
             // All calc messages concatenated — set a breakpoint on the next line to copy
@@ -395,15 +545,15 @@ bool isImportingCharges = false;
 
             if (reserves.Count > 0)
             {
-                await js.InvokeVoidAsync("alert",
-                    $"Calcul charpente terminé : {helper.Account.ScenicTransmittedKg:N0} daN de charges "
+                await Tell(leaving,
+                    $"Calcul charpente de « {scenarioName} » terminé : {helper.Account.ScenicTransmittedKg:N0} daN de charges "
                     + $"scéniques et {helper.Account.SelfWeightTransmittedKg:N0} daN de poids propre des ponts.\n\n"
                     + "Réserves :\n• " + string.Join("\n• ", reserves));
             }
         }
         catch (Exception ex)
         {
-            await js.InvokeVoidAsync("alert", $"❌ ERREUR lors du calcul:\n{ex.Message}");
+            await Tell(leaving, $"❌ ERREUR lors du calcul{(scenarioName is null ? "" : $" de « {scenarioName} »")} :\n{ex.GetBaseException().Message}");
             Console.WriteLine($"Erreur détaillée: {ex}");
         }
     }
@@ -414,6 +564,9 @@ bool isImportingCharges = false;
         public Dictionary<Guid, (double Load, List<(double X, double Y)> IntersectionPoints)> MotherGridLoads { get; set; }
         public Dictionary<string, double> CharpenteLoads { get; set; }
         public Models.Charpente Charpente { get; set; }
+
+        // What the calculation was given, as CalculationSignature.Of signs it.
+        public string InputSignature { get; set; }
     }
 
     public void SelectItem(ChargeMp item)

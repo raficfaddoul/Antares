@@ -18,32 +18,53 @@ namespace Structural
         static public void StructureVerification(Structural.Structure structure, double[] q, double[] FeMax)
         {
             //************* Provisoire : début  *******************
-/*
-            structure = new Structure();
+            /*
+                        structure = new Structure();
 
-            structure.noeud.Add([0, 0, 0]);
-            structure.noeud.Add([0, 0, 2]);
-            structure.noeud.Add([-3, 4, 2]);
-           // structure.noeud.Add([10, 2, 2]);
+                        structure.noeud.Add([0, 0, 0]);
+                        structure.noeud.Add([0, 0, 2]);
+                        structure.noeud.Add([-3, 4, 2]);
+                       // structure.noeud.Add([10, 2, 2]);
 
-            structure.element.Rows.Add(0, 1, 12000, 5454, 0.5 * 1, 0.5 * 1 / 12, 1 * 0.5 / 12, 0.5, 1, 0.5, Guid.Empty);
-            structure.element.Rows.Add(1, 2, 12000, 5454, 0.5 * 1, 0.5 * 1 / 12, 1 * 0.5 / 12, 0.5, 1, 0.5, Guid.Empty);
-           // structure.element.Rows.Add(2, 3, 12000, 5454, 0.5 * 1, 0.5 * 1 / 12, 1 * 0.5 / 12, 0.5, 1, 0.5, Guid.Empty);
+                        structure.element.Rows.Add(0, 1, 12000, 5454, 0.5 * 1, 0.5 * 1 / 12, 1 * 0.5 / 12, 0.5, 1, 0.5, Guid.Empty);
+                        structure.element.Rows.Add(1, 2, 12000, 5454, 0.5 * 1, 0.5 * 1 / 12, 1 * 0.5 / 12, 0.5, 1, 0.5, Guid.Empty);
+                       // structure.element.Rows.Add(2, 3, 12000, 5454, 0.5 * 1, 0.5 * 1 / 12, 1 * 0.5 / 12, 0.5, 1, 0.5, Guid.Empty);
 
+
+                        structure.nddl = 6 * structure.noeud.Count();
+
+                        structure.CL.Add(new string[] { "0", "U" });
+                        structure.CL.Add(new string[] { "0", "V" });
+                        structure.CL.Add(new string[] { "0", "W" });
+                        structure.CL.Add(new string[] { "0", "RX" });
+                        structure.CL.Add(new string[] { "0", "RY" });
+                        structure.CL.Add(new string[] { "0", "RZ" });
+
+
+            */
+
+        /*    structure = new Structure();
+
+            structure.noeud.Add([0, -3, 0]);
+            structure.noeud.Add([4, 0, 0]);
+            structure.noeud.Add([0, 3, 0]);
+            structure.noeud.Add([-4, 0, 0]);
+            structure.noeud.Add([6, 3, 5]);
+
+            structure.element.Rows.Add(0, 4, 12000, 5000, 0.3 * 1.2, 0.3 * 1.2 * 1.2 * 1.2 / 12, 1.2 * 0.3 * 0.3 * 0.3 / 12, 700, 1.2, 0.3, Guid.Empty);
+            structure.element.Rows.Add(1, 4, 12000, 5000, 0.3 * 1.2, 0.3 * 1.2 * 1.2 * 1.2 / 12, 1.2 * 0.3 * 0.3 * 0.3 / 12, 700, 1.2, 0.3, Guid.Empty);
+            structure.element.Rows.Add(2, 4, 12000, 5000, 0.3 * 1.2, 0.3 * 1.2 * 1.2 * 1.2 / 12, 1.2 * 0.3 * 0.3 * 0.3 / 12, 700, 1.2, 0.3, Guid.Empty);
+            structure.element.Rows.Add(3, 4, 12000, 5000, 0.3 * 1.2, 0.3 * 1.2 * 1.2 * 1.2 / 12, 1.2 * 0.3 * 0.3 * 0.3 / 12, 700, 1.2, 0.3, Guid.Empty);
 
             structure.nddl = 6 * structure.noeud.Count();
 
-            structure.CL.Add(new string[] { "0", "U" });
-            structure.CL.Add(new string[] { "0", "V" });
-            structure.CL.Add(new string[] { "0", "W" });
-            structure.CL.Add(new string[] { "0", "RX" });
-            structure.CL.Add(new string[] { "0", "RY" });
-            structure.CL.Add(new string[] { "0", "RZ" });
-
-           
-*/
-
-
+            for (int i = 0; i < 4; i++)
+            {
+                structure.CL.Add(new string[] { i.ToString(), "U" });
+                structure.CL.Add(new string[] { i.ToString(), "V" });
+                structure.CL.Add(new string[] { i.ToString(), "W" });
+            }
+        */
             //************* Provisoire : fin  *********************
 
 
@@ -75,10 +96,13 @@ namespace Structural
             Fe = new List<double[]>();
 
             double[,] K = StructuralProcedures.Calcul_K_3D(structure.element, structure.noeud);
-            double[] F = StructuralProcedures.Calcul_F_3D(structure.element, structure.noeud,structure.ChargesStatiquePonctuelles);
+            double[] F = StructuralProcedures.Calcul_F_3D(structure.element, structure.noeud, structure.ChargesStatiquePonctuelles);
             // *Provisoire
             //double[] F = new double[structure.nddl];
             //F[12] = 10;
+
+            //F[6*4+2] = 100;
+
             /*
             int[,] tabNodes =
                 {
@@ -109,10 +133,16 @@ namespace Structural
                 for (int j = 0; j < 9; j++)
                     F[6 * tabNodes[i, j] + 2] = tabCharges[i, j];
             */
-          
+            
+
             //*** Conditions aux limites ***
             int inoeud, iddl = 0;
-            foreach (string[] cl in structure.CL)
+            string sf = "";
+            for (int i = 0; i < structure.nddl; i++)
+            {
+                if (Math.Abs(F[i]) > 0) sf += i.ToString() + ";" + F[i].ToString() + "\n";
+            }
+                foreach (string[] cl in structure.CL)
             {
                 inoeud = iddl = 0;
                 if (int.TryParse(cl[0], out inoeud))
@@ -140,13 +170,13 @@ namespace Structural
                     K[6 * inoeud + iddl, 6 * inoeud + iddl] = 1;
                     F[6 * inoeud + iddl] = 0;
                     //Blocage des rotations
-               /*     for (int ir = 3; ir <= 5; ir++)
-                    {
-                        for (int i = 0; i < structure.nddl; i++)
-                            K[i, 6 * inoeud + ir] = K[6 * inoeud + ir, i] = 0;
-                        K[6 * inoeud + ir, 6 * inoeud + ir] = 1;
-                    }
-               */
+                    /*     for (int ir = 3; ir <= 5; ir++)
+                         {
+                             for (int i = 0; i < structure.nddl; i++)
+                                 K[i, 6 * inoeud + ir] = K[6 * inoeud + ir, i] = 0;
+                             K[6 * inoeud + ir, 6 * inoeud + ir] = 1;
+                         }
+                    */
                 }
             }
             /* for (int ind = 10; ind < 261; ind++)
@@ -166,58 +196,47 @@ namespace Structural
                  }
              }
             */
-
-            MathNet.Numerics.LinearAlgebra.Matrix<double> K1 = MathNet.Numerics.LinearAlgebra.Double.DenseMatrix.OfArray(K);
-
-          /*  string ss = "";
-            for (int ii = 0; ii < structure.nddl; ii++)
+       /*     string s1 = "";
+            for (int i = 0; i < structure.nddl; i += 6)
             {
-                for (int jj = 0; jj < structure.nddl; jj++)
-                {
-                    ss += K[ii, jj].ToString() + ";";
-                }
-                ss += "\n";
+                s1 += (i / 6).ToString() + ";" + K[i, i].ToString() + ";" + K[i + 1, i + 1].ToString() + ";" + K[i + 2, i + 2].ToString() + ";" + K[i + 3, i + 3].ToString() + ";" + K[i + 4, i + 4].ToString() + ";" + K[i + 5, i + 5].ToString() + "\n";
             }
-            string dd = ss;
- */
+            string hs1 = s1;
+
+            s1 = "";
             for (int i = 0; i < structure.nddl; i++)
             {
-                if (Math.Abs(K1[i, i]) < 1e-10 || Math.Abs(K1[i, i]) > 1e50)
-                {
-                    int korp = 0;
-                }
-            }
-         
-            double dt = K1.Determinant();
-            if (dt>1e-20)
-                K1 = K1.Inverse();
-            if ( double.IsInfinity(dt))
-            {
-                int korp = 0;
-            }
-            for (int i = 0; i < structure.nddl; i++)
                 for (int j = 0; j < structure.nddl; j++)
                 {
-                    if (double.IsNaN(K1[i, j]) || double.IsInfinity(K1[i, j]))
-                    {
-                        int korp = 0;
-                    }
+                    s1 += K[i, j].ToString("N2") + ";";
                 }
-
-            for (int i = 0; i < structure.nddl; i++)
-                {
-                    if (Math.Abs(K1[i, i])<1e-10 || K1[i, i] > 100)
-                    {
-                        int korp = 0;
-                    }
-                }
+                s1 += "\n";
+            }
+            hs1 = s1;
+       */
+            // Un ddl sans rigidité (noeud relié à aucun élément, élément de longueur nulle...) rend K singulière
             for (int i = 0; i < structure.nddl; i++)
             {
-                double s = 0;
-                for (int j = 0; j < structure.nddl; j++)
-                    s += K1[i, j] * F[j];
-                q[i] = s;
+                if (double.IsNaN(K[i, i]) || Math.Abs(K[i, i]) < 1e-12)
+                    throw new InvalidOperationException($"Ddl {i % 6} du noeud {i / 6} sans rigidité (noeud non relié ou élément dégénéré).");
             }
+
+            // Résolution K q = F par Cholesky (K symétrique définie positive).
+            // Ne pas tester le déterminant : pour ~2000 ddl il vaut ~10^4000 et déborde en Infinity,
+            // ou tombe à 0, alors que la matrice est parfaitement inversible.
+            var K1 = MathNet.Numerics.LinearAlgebra.Double.DenseMatrix.OfArray(K);
+            var F1 = MathNet.Numerics.LinearAlgebra.Double.DenseVector.OfArray(F);
+            MathNet.Numerics.LinearAlgebra.Vector<double> q1;
+            try
+            {
+                q1 = K1.Cholesky().Solve(F1);
+            }
+            catch (ArgumentException)
+            {
+                throw new InvalidOperationException("Matrice de rigidité non définie positive : structure instable (mécanisme ou appuis insuffisants).");
+            }
+            for (int i = 0; i < structure.nddl; i++)
+                q[i] = q1[i];
 
             foreach (DataRow elem in structure.element.Rows)
             {

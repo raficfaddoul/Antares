@@ -28,10 +28,10 @@
     protected async void DeleteElement()
     {
         await entitiesService.DeleteEntityAsync(element);
-        NavigationManager.NavigateTo("/ElementComponent/" + element.StructureId);
+        NavigationManager.NavigateTo("ElementComponent/" + element.StructureId);
     }
     void Cancel()
     {
-        NavigationManager.NavigateTo("/ElementComponent/" + element.StructureId);
+        NavigationManager.NavigateTo("ElementComponent/" + element.StructureId);
     }
 }

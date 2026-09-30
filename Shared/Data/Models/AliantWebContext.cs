@@ -244,6 +244,9 @@ public partial class AliantWebContext : DbContext
         {
             entity.Property(e => e.CharpenteId).HasDefaultValueSql("(newsequentialid())");
 
+            // One row per scenario, created by the startup patch (Program.EnsureDatabaseSchema).
+            entity.HasIndex(e => e.EventMpscenarioId, "UX_Charpente_EventMPScenarioID").IsUnique();
+
             entity.HasOne(d => d.EventMpscenario).WithMany(p => p.Charpentes).HasConstraintName("FK_Charpente_EventMPScenario");
         });
 

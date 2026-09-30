@@ -195,13 +195,13 @@
     {
         if (appData.Structure == null)
         {
-            navigationManager.NavigateTo(@"/Structures");
+            navigationManager.NavigateTo(@"Structures");
         }
         events = await entitiesService.GetFilteredEntitiesAsync<Event>(x => x.StructureId == appData.Structure.StructureId);
         if (events.Count == 0)
         {
             await js.InvokeVoidAsync("alert", "No events are associated with this structure");
-            navigationManager.NavigateTo(@"/Structures");
+            navigationManager.NavigateTo(@"Structures");
         }
         selectedEvent = events.First();
         appData.appDataElements = await entitiesService.GetFilteredEntitiesAsync<Element>(x => x.StructureId == appData.Structure.StructureId, "Equipements");

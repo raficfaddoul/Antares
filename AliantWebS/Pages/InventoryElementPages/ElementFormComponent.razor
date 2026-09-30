@@ -253,7 +253,7 @@ else
     {
         AppData.obj1 = Element;
 
-        navigationManager.NavigateTo("/ElementInspections/" + Element.ElementId);
+        navigationManager.NavigateTo("ElementInspections/" + Element.ElementId);
 
     }
 
@@ -261,7 +261,7 @@ else
     {
         AppData.obj1 = Element;
 
-        navigationManager.NavigateTo("/ElementDefects/" + Element.ElementId);
+        navigationManager.NavigateTo("ElementDefects/" + Element.ElementId);
 
     }
 
@@ -273,7 +273,7 @@ else
 
         string param = JsonSerializer.Serialize(listIDs);
 
-        navigationManager.NavigateTo("/SensorData/" + param);
+        navigationManager.NavigateTo("SensorData/" + param);
 
     }
 

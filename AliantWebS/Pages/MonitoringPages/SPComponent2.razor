@@ -519,7 +519,7 @@
     {
         if (appData.Structure == null)
         {
-            navigationManager.NavigateTo("/Structures");
+            navigationManager.NavigateTo("Structures");
         }
 
         somethingToPresent = false;
@@ -1189,7 +1189,7 @@
 
     private async Task AddData()
     {
-        navigationManager.NavigateTo("/AddDataToInflux/" + ListJson);
+        navigationManager.NavigateTo("AddDataToInflux/" + ListJson);
     }
 
 

@@ -12,6 +12,7 @@
 @using System.Text.Json.Serialization;
 @using System.Collections.Generic;
 @using Microsoft.Extensions.Configuration
+@using Microsoft.EntityFrameworkCore
 @inject AppData appData;
 @inject Blazored.LocalStorage.ILocalStorageService localStorage
 @inject IStringLocalizer<Languages> L
@@ -330,7 +331,7 @@
 
                  string param = JsonSerializer.Serialize(elem, options);*/
 
-            navigationManager.NavigateTo("/EditElement/" + elem.ElementId);
+            navigationManager.NavigateTo("EditElement/" + elem.ElementId);
 
         }
     }
@@ -360,7 +361,7 @@
         }
         string param = JsonSerializer.Serialize(listIDs);
 
-        navigationManager.NavigateTo("/AddElement/" + Structure.StructureId + @"/" + param);
+        navigationManager.NavigateTo("AddElement/" + Structure.StructureId + @"/" + param);
 
     }
 
@@ -395,21 +396,20 @@
 
         Helpers.Helpers.GetTheChildren(appData.CheckedNodeObjects, elementsToBeDeleted);
 
+        // The whole branch in one change, through a context of its own, and the tab's memory forgets the elements and what
+        // hangs off them (EntitiesService.DeleteElementsAsync). The parents used to be unhooked first (ParentId = null,
+        // saved through the shared context) - no longer needed, and a delete refused after it left the branch flattened.
+        // Refused now: nothing is deleted, the service has said why, and the tree stays as it is.
+        if (!await entitiesService.DeleteElementsAsync(elementsToBeDeleted.ToArray())) return;
 
+        // The element open in the edit page was in the branch: its unsaved edits went with it, and the "not saved" prompt
+        // must not follow the user to the next element. Edits of an element outside the branch are still pending: kept.
+        if (elementsToBeDeleted.Any(e => e.ElementId == appData.Element.ElementId)) appData.SaveChanges = false;
 
         appData.CheckedNodeObjects = Enumerable.Empty<Element>();
 
         appData.appDataElements.RemoveAll(x => elementsToBeDeleted.Contains(x));
         rootEmployees = appData.appDataElements.Where(e => e.ParentId == null).ToList();
-
-        foreach(var el in elementsToBeDeleted)
-        {
-            el.ParentId = null;
-        }
-
-        await entitiesService.UpdateEntitesAsync(elementsToBeDeleted);
-        await entitiesService.DeleteElementsAsync(elementsToBeDeleted.ToArray());
-
 
         this.StateHasChanged();
     }
@@ -611,12 +611,14 @@
 
         updating = false;
         forbidens.Add(element.ElementId);
+        forbidens.Add(el.ElementId);
 
         // el.InverseParent was loaded with the tree and is not refreshed: children added since by
         // another user or through an owned context are missing from it. Ask the database, and keep
         // only the rows whose parent is still el in this circuit (a row the shared context tracks
         // keeps its in-memory ParentId, which is what its next save writes). The copy just made is
-        // among them when pasting an element into itself; forbidens skips it.
+        // among them when pasting an element into itself; forbidens skips it. It skips el as well
+        // when el comes round again: a branch whose parents run in a circle was copied without end.
         var children = await entitiesService.QueryCollectionAsync(el, e => e.InverseParent);
         foreach (Element childEl in children.Where(c => c.ParentId == el.ElementId))
         {
@@ -644,7 +646,40 @@
         return maxLocalDepth;
     }
 
+    // The checked elements the cut cannot be pasted into: the cut elements themselves and everything
+    // below them. Moved there, an element becomes its own ancestor. FK_Element_Element1 accepts that;
+    // no root reaches the branch any more - it is gone from the tree, still listed in Grid View - and
+    // every walk down its children goes round without end. Checking an element, cutting it and pasting
+    // straight away was enough, since Cut leaves the checks as they are.
+    //
+    // Two pictures of the parents are asked, and either one is enough to refuse. The database, read on a
+    // context of its own: the tree's elements are loaded once, so a move another user made since shows
+    // only there. And the elements this circuit tracks: the tree is drawn from them, and a loop among
+    // them keeps the tree drawing itself even when the database would have the move right.
+    async Task<List<Element>> CheckedInsideCutBranchesAsync()
+    {
+        var cutIds = copiedElements.Select(e => e.ElementId).ToHashSet();
 
+        var trackedParents = new Dictionary<Guid, Guid?>();
+        foreach (Element tracked in entitiesService._appDBContext.Elements.Local)
+        {
+            trackedParents[tracked.ElementId] = tracked.ParentId;
+        }
+
+        var inside = new List<Element>();
+        using var db = entitiesService.CreateOwnedContext();
+        foreach (Element target in appData.CheckedNodeObjects)
+        {
+            if (await Helpers.Helpers.IsInAnyBranchAsync(target.ElementId, cutIds,
+                    id => Task.FromResult(trackedParents.GetValueOrDefault(id)))
+                || await Helpers.Helpers.IsInAnyBranchAsync(target.ElementId, cutIds,
+                    id => db.Elements.Where(e => e.ElementId == id).Select(e => e.ParentId).FirstOrDefaultAsync()))
+            {
+                inside.Add(target);
+            }
+        }
+        return inside;
+    }
 
     async Task OnClickPaste()
     {
@@ -684,6 +719,17 @@
         {
             if (clipboardIsCut)
             {
+                // Refused before anything moves, so the cut stays on the clipboard for another try.
+                var refused = await CheckedInsideCutBranchesAsync();
+                if (refused.Count > 0)
+                {
+                    await JsRuntime.InvokeVoidAsync("alert",
+                        "Nothing was moved: an element cannot be pasted into itself or into its own branch. Uncheck "
+                        + string.Join(", ", refused.Select(e => "\"" + (e.Name ?? e.ElementId.ToString()) + "\""))
+                        + " and paste again.");
+                    return;
+                }
+
                 foreach (Element v in appData.CheckedNodeObjects)
                 {
 
@@ -785,7 +831,7 @@
         string param = JsonSerializer.Serialize(listIDs);
 
 
-        navigationManager.NavigateTo("/Statistics/" + param);
+        navigationManager.NavigateTo("Statistics/" + param);
 
 
     }
@@ -809,7 +855,7 @@
         string param = JsonSerializer.Serialize(listIDs);
 
 
-        navigationManager.NavigateTo("/SensorData/" + param);
+        navigationManager.NavigateTo("SensorData/" + param);
 
 
     }
@@ -833,7 +879,7 @@
         // string param = JsonSerializer.Serialize(listIDs);
 
 
-        navigationManager.NavigateTo("/LoadCases/");
+        navigationManager.NavigateTo("LoadCases/");
 
 
     }
@@ -1194,7 +1240,7 @@
             if ((settingEditElementOnSelect == null) || (bool)settingEditElementOnSelect)
             {
                 Element elem = (Element)args.Value;
-                navigationManager.NavigateTo("/EditElement/" + elem.ElementId);
+                navigationManager.NavigateTo("EditElement/" + elem.ElementId);
             }
         }
 

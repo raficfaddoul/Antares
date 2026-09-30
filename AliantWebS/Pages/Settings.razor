@@ -1191,19 +1191,19 @@
 
     void UserManager()
     {
-        navigationManager.NavigateTo(@"/Account/UserManager");
+        navigationManager.NavigateTo(@"Account/UserManager");
     }
 
     void InfluxManagement()
     {
-        navigationManager.NavigateTo(@"/influxmanagement");
+        navigationManager.NavigateTo(@"influxmanagement");
     }
 
     void PalonnierMotherGridDefinition()
     {
         if (appData.Structure != null)
         {
-            navigationManager.NavigateTo($@"/PalonnierMotherGridDefinition/{appData.Structure.StructureId}");
+            navigationManager.NavigateTo($@"PalonnierMotherGridDefinition/{appData.Structure.StructureId}");
         }
         else
         {
@@ -1213,32 +1213,32 @@
 
     void CharpenteMapping()
     {
-        navigationManager.NavigateTo(@"/settingsFolder/charpente-mapping");
+        navigationManager.NavigateTo(@"settingsFolder/charpente-mapping");
     }
 
     void TagMapping()
     {
-        navigationManager.NavigateTo(@"/settingsFolder/tag-mapping");
+        navigationManager.NavigateTo(@"settingsFolder/tag-mapping");
     }
 
     void OptimizerManualPage()
     {
-        navigationManager.NavigateTo(@"/settingsFolder/optimizer-manual");
+        navigationManager.NavigateTo(@"settingsFolder/optimizer-manual");
     }
 
     void JournalPage()
     {
-        navigationManager.NavigateTo(@"/settingsFolder/journal");
+        navigationManager.NavigateTo(@"settingsFolder/journal");
     }
 
     void SensorAttributesSetup()
     {
-        navigationManager.NavigateTo(@"/settingsFolder/sensor-attributes");
+        navigationManager.NavigateTo(@"settingsFolder/sensor-attributes");
     }
 
     void AlarmManagement()
     {
-        navigationManager.NavigateTo(@"/alarm-management");
+        navigationManager.NavigateTo(@"alarm-management");
     }
 
     bool isBackingUp = false;

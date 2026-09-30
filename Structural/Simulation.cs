@@ -195,7 +195,8 @@ namespace Structural
 
             nodes = entitiesService.GetFilteredEntitiesAsync<Element>(a => ((a.StructureId == structure.StructureId) && (a.ElementType?.Name == "Noeud3d") && (a.ParentId == parentn.ParentId)),
     "ElementType").Result;
-            beams = entitiesService.GetFilteredEntitiesAsync<Element>(a => ((a.StructureId == structure.StructureId) && ((a.ElementType?.Name == "Beam3d"))),
+            beams = entitiesService.GetFilteredEntitiesAsync<Element>(a => ((a.StructureId == structure.StructureId) 
+            && ((a.ElementType?.Name == "Beam3d"|| a.ElementType?.Name == "Elem3d")) && a.Structural==1),
                 "Equipements",
                  "ElementType").Result;
 
@@ -227,12 +228,14 @@ namespace Structural
             nodes = entitiesService.GetFilteredEntitiesAsync<Element>(a => ((a.StructureId == structure.StructureId) && (a.ElementType?.Name == "Noeud3d")),
     "StaticLoadElements.StaticLoad",
     "StaticPointLoadElements.StaticPointLoad",
-
     "ElementType", "AttributeElements.AttributeType").Result;
-            elements = entitiesService.GetFilteredEntitiesAsync<Element>(a => ((a.StructureId == structure.StructureId) && ((a.ElementType?.Name == "Beam3d"))),
+
+            /**** Alaa : on exclut non structural, et on prend Beam3d et Elem3d **/
+            elements = entitiesService.GetFilteredEntitiesAsync<Element>(a => ((a.StructureId == structure.StructureId) 
+            && ((a.ElementType?.Name == "Beam3d") || (a.ElementType?.Name == "Elem3d"))
+            && a.Structural == 1),
                 "StaticLoadElements.StaticLoad",
                 "StaticPointLoadElements.StaticPointLoad",
-
                 "ElementType", "AttributeElements.AttributeType").Result;
 
 
@@ -372,13 +375,20 @@ namespace Structural
 
                 string materiau = el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name == "Matériau").Value;
 
+                // Constante de torsion de St-Venant (profilés : attribut "Ix" ; sections rectangulaires : calculée dans Calcul_Ke_Beam3D)
+                double J = double.TryParse(el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name.Trim() == "Ix")?.Value, NumberStyles.Any, CultureInfo.InvariantCulture, out double tempJ) ? tempJ : 0;
+
+                // E (MPa) et coefficient de Poisson par matériau ; G = E / (2(1+nu))
+                double nu = -1;
                 switch (materiau)
                 {
-                    case "S235": e = 210000; break;
-                    case "C25/30": e = 31000; break;
-                    case "GL30h": e = 12000; break;
-                    case "C24": e = 9000; break;
+                    case "S235": e = 210000; nu = 0.3; break;
+                    case "S355": e = 210000; nu = 0.3; break;
+                    case "C25/30": e = 31000; nu = 0.2; break;
+                    case "GL30h": e = 12000; nu = 0.1; break;
+                    case "C24": e = 9000; nu = 0.1; break;
                 }
+                if (nu >= 0) G = e / (2 * (1 + nu));
                 //double e = 1E6 * double.Parse(el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name.Trim() == "E").Value, CultureInfo.InvariantCulture);
                 //double s = double.Parse(el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name.Trim() == "S").Value, CultureInfo.InvariantCulture);
                 //double i = double.Parse(el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name.Trim() == "I").Value, CultureInfo.InvariantCulture);
@@ -394,7 +404,7 @@ namespace Structural
                 {
                     int hh = indexnoeud1;
                 }
-                element.Rows.Add(indexnoeud1, indexnoeud2, e, G, s, iy, iz, rho, b, h, el.ElementId);
+                element.Rows.Add(indexnoeud1, indexnoeud2, e, G, s, iy, iz, rho, b, h, el.ElementId, J);
 
                 foreach (var eq in el.Equipements)
                 {

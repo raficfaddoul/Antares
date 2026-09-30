@@ -98,7 +98,9 @@
 
         <RadzenStack Orientation="Radzen.Orientation.Horizontal"
                      JustifyContent="Radzen.JustifyContent.End" Gap="0.5rem">
-            <RadzenLink Path="@downloadUrl" Icon="download" Text="Télécharger" />
+            @* `download`: the browser fetches the file itself. Blazor would take the link for a page of the application,
+               find none and reload it, leaving the application on the file's address (see ScenariosDataFileManager). *@
+            <RadzenLink Path="@downloadUrl" Icon="download" Text="Télécharger" download="" />
             <RadzenButton Text="Fermer" ButtonStyle="ButtonStyle.Primary"
                           Click="@(() => dialogService.Close(true))" />
         </RadzenStack>

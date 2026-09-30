@@ -22,7 +22,7 @@ function showReportToast(reportCount, timestamp) {
 // Optional: Play notification sound
 function playNotificationSound() {
     try {
-        var audio = new Audio('/sounds/notification.mp3');
+        var audio = new Audio('sounds/notification.mp3');
         audio.volume = 0.3;
         audio.play().catch(e => console.log('Audio play failed:', e));
     } catch (e) {
@@ -35,8 +35,8 @@ function showBrowserNotification(reportCount) {
     if ('Notification' in window && Notification.permission === 'granted') {
         new Notification('InfluxDB - New Reports', {
             body: `${reportCount} new report(s) received`,
-            icon: '/favicon.ico',
-            badge: '/favicon.ico'
+            icon: 'favicon.ico',
+            badge: 'favicon.ico'
         });
     }
 }

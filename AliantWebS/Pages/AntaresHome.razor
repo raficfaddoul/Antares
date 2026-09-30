@@ -66,13 +66,13 @@
 </style>
 
 <div class="button-container">
-    <button class="start-button" @onclick='()=> HandleClick("Conception")' style="@($"background-image:url('/img/Background_Scenique.png');")font-size: 32px; font-weight: bold;">
+    <button class="start-button" @onclick='()=> HandleClick("Conception")' style="@($"background-image:url('img/Background_Scenique.png');")font-size: 32px; font-weight: bold;">
         Conception scénique
     </button>
-    <button class="start-button" @onclick='()=> HandleClick("Surveillance")' style="@($"background-image:url('/img/Background_Surveillance.png');")font-size: 32px; font-weight: bold;">
+    <button class="start-button" @onclick='()=> HandleClick("Surveillance")' style="@($"background-image:url('img/Background_Surveillance.png');")font-size: 32px; font-weight: bold;">
         Surveillance structurale
     </button>
-    <button class="start-button" @onclick='()=> HandleClick("Administration")' style="@($"background-image:url('/img/Background_Admin.png');")font-size: 32px; font-weight: bold;">
+    <button class="start-button" @onclick='()=> HandleClick("Administration")' style="@($"background-image:url('img/Background_Admin.png');")font-size: 32px; font-weight: bold;">
         Administration
     </button>
 </div>
@@ -96,17 +96,17 @@
         {
             case "Conception":
                 // Code to execute for "Conception"
-                navigationManager.NavigateTo(@"/Events/" + Structure.StructureId);
+                navigationManager.NavigateTo(@"Events/" + Structure.StructureId);
                 break;
 
             case "Surveillance":
                 // Code to execute for "OtherCase"
-                navigationManager.NavigateTo(@"/SurveillanceAntares/" + Structure.StructureId);
+                navigationManager.NavigateTo(@"SurveillanceAntares/" + Structure.StructureId);
                 break;
 
             case "Administration":
                 // Code to execute for "OtherCase"
-                navigationManager.NavigateTo(@"/settings");
+                navigationManager.NavigateTo(@"settings");
                // navigationManager.NavigateTo(@"/SVG");
                 break;
 

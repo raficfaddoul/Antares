@@ -39,7 +39,7 @@
                 (@AppData.EmailFailureTime.ToString("yyyy-MM-dd HH:mm:ss"))
             </span>
         </span>
-        <a href="/alarm-management" style="color:#fff; text-decoration:underline;">@L["Alarm Management"]</a>
+        <a href="alarm-management" style="color:#fff; text-decoration:underline;">@L["Alarm Management"]</a>
         <button type="button" @onclick="DismissEmailFailure"
                 style="background:transparent; border:1px solid rgba(255,255,255,.6); color:#fff;
                        border-radius:6px; padding:3px 10px; cursor:pointer;">
@@ -68,7 +68,7 @@
                 </a>
             }
             
-            <a style=" display:inline-block; margin-right: auto; " class="pn" href="/EditStructure/@appData.Structure?.StructureId">
+            <a style=" display:inline-block; margin-right: auto; " class="pn" href="EditStructure/@appData.Structure?.StructureId">
                 @StructureName
             </a>
 
@@ -355,7 +355,7 @@
           //  string param = JsonSerializer.Serialize(listIDs);
 
 
-            navigationManager.NavigateTo("/SP2");
+            navigationManager.NavigateTo("SP2");
 
 
             // JsRuntime.InvokeVoidAsync("alert", "Please check one or more elements...");
@@ -368,7 +368,7 @@
             string param = JsonSerializer.Serialize(listIDs);
 
 
-            navigationManager.NavigateTo("/SP2/" + param);
+            navigationManager.NavigateTo("SP2/" + param);
         }
 
 

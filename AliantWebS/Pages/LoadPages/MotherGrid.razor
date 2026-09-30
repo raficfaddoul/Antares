@@ -26,6 +26,7 @@
                     <div class="@(palonnierComponentSelected ? "" : "selected-background" )" @onclick="MotherGridComponentEntered">
                         <MotherGridComponent @ref="MotherGridGridRef" ElementTypesList="ElementTypesList" MPList="MList" Title="MotherGrids"
                                            MPGridChanged="HandleMGridChanged" MotherGridPalonnierListChanged="HandleMotherGridListChanged"
+                                           RowSaved="HandleRowSaved"
                                            Famille="true" EventMpscenarioId="@EventMpscenarioId" @bind-SelectedMP="selectedMotherGrid"
                                            Inventory="inventory" InventoryError="@inventoryError">
                         </MotherGridComponent>
@@ -40,6 +41,7 @@
                     <div class="@(palonnierComponentSelected ? "selected-background" : "")" @onclick="PalonnierComponentEntered">
                         <MotherGridComponent @ref="PalonnierGridRef" ElementTypesList="ElementTypesList" MPList="PList" Title="Palonniers"
                                            MPGridChanged="HandlePGridChanged" MotherGridPalonnierListChanged="HandlePalonnierListChanged"
+                                           RowSaved="HandleRowSaved"
                                            Famille="false" EventMpscenarioId="@EventMpscenarioId" @bind-SelectedMP="selectedPalonnier"
                                            Inventory="inventory" InventoryError="@inventoryError">
                         </MotherGridComponent>
@@ -62,25 +64,34 @@
                     MotherGridPalonnierID="@(selectedMotherGrid?.MotherGridPalonnierId ?? selectedPalonnier?.MotherGridPalonnierId)"
 
                     ChargeListChanged="HandleChargeListChanged"
+                    OnCalculCharpente="HandleCalculCharpente"
                     @bind-selectedChargeMP="selectedCharge" />
             </RadzenSplitterPane>
 
             @* SVG/CAD *@
             <RadzenSplitterPane Style="overflow: auto;" @onwheel:stopPropagation Size="50%">
+                @* Draw lines, or select - the plan's Selection button switches between the two. The plan draws where the
+                   selected palonnier hangs, as PalonnierHanging decides. *@
+                @* The plan of this page's own scenario (here): its event's Point0 and names. Drawing waits until that is known -
+                   a line snapped to a charpente point is stored relative to Point0. *@
                 <AliantWebS.Pages.CADPages.SVGComponent @ref="svgComponent"
+                                                        Mode="@(Here is null ? AliantWebS.Pages.CADPages.PlanMode.View : planMode)"
+                                                        ModeChanged="@(m => planMode = m)"
+                                                        HangingMarks="@AliantWebS.Plan.PlanHangingMarks.For(selectedPalonnier, MList)"
                                                         OnErase="HandleErase"
                                                         LineDrawn="HandleLineDrawn"
                                                         Palonniers="PList"
                                                         MotherGrids="MList"
-                                                        IntersectionPoints="intersectionPoints"
-                                                        CharpenteLoads="charpenteLoads"
+                                                        IntersectionPoints="ShownIntersectionPoints"
+                                                        CharpenteLoads="ShownCharpenteLoads"
+                                                        CharpenteCapacities="charpenteCapacities"
                                                         PalonnierLoads="ChargeList"
-                                                        Point0X="@(Layout?.selectedEvent?.Point0X ?? 0)"
-                                                        Point0Y="@(Layout?.selectedEvent?.Point0Y ?? 0)"
-                                                        EventName="@Layout?.selectedEvent?.Name"
-                                                        EventId="@Layout?.selectedEvent?.EventId"
-                                                        ScenarioName="@Layout?.selectedScenario?.Name"
-                                                        ScenarioId="@Layout?.selectedScenario?.EventMpscenarioId"
+                                                        Point0X="@(here?.Event.Point0X ?? 0)"
+                                                        Point0Y="@(here?.Event.Point0Y ?? 0)"
+                                                        EventName="@here?.Event.Name"
+                                                        EventId="@here?.Event.EventId"
+                                                        ScenarioName="@here?.Scenario.Name"
+                                                        ScenarioId="@here?.Scenario.EventMpscenarioId"
                                                         ModuleName="Mother Grid"
                                                         SelectedPalonnier="selectedPalonnier"
                                                         SelectedPalonnierChanged="HandleSvgPalonnierSelected"
@@ -106,6 +117,7 @@
     MotherGridComponent MotherGridGridRef;
     MotherGridComponent PalonnierGridRef;
     AliantWebS.Pages.CADPages.SVGComponent svgComponent;
+    AliantWebS.Pages.CADPages.PlanMode planMode = AliantWebS.Pages.CADPages.PlanMode.Draw;
 
     private MotherGridPalonnier selectedMotherGrid { get; set; }
     private MotherGridPalonnier selectedPalonnier { get; set; }
@@ -118,9 +130,13 @@
 
     bool palonnierComponentSelected = false;
 
-    // Données de visualisation
+    // Données de visualisation: what the last « Calcul Charpente » of this visit found - where load enters the mothers,
+    // the load on every charpente point - and the venue load book the loads are coloured against. The plan shows them
+    // only while the layout is still the one calculated (ShownCharpenteLoads), so it does not show loads that no longer
+    // match what is drawn - as far as this page can see (calculatedLayout).
     private Dictionary<Guid, List<(double X, double Y)>> intersectionPoints = new Dictionary<Guid, List<(double X, double Y)>>();
     private Dictionary<string, double> charpenteLoads = new Dictionary<string, double>();
+    private Dictionary<string, double> charpenteCapacities = new Dictionary<string, double>();
 
     //   Liste des charges sur les palonniers et sur les mothers
     private List<ChargeMp> ChargeList = new List<ChargeMp>();
@@ -135,6 +151,40 @@
     private string inventoryError;
     private Guid? inventoryScenarioId;
 
+    // The scenario this page shows - its own id - and its event: the plan's Point0 and names, the inventory files, the
+    // calculation check. Never the layout's dropdown, which after Back, or while a switch waits for its navigation, may
+    // name another scenario. Resolved once per id, first thing in OnParametersSetAsync. `here` is the last one resolved
+    // (the plan keeps drawing it while the next is looked up); Here is null unless it is this id's.
+    private ConceptionScenario here;
+    private Guid? hereFor;
+    private ConceptionScenario Here => hereFor == EventMpscenarioId ? here : null;
+
+    private async Task ResolveHereAsync()
+    {
+        Guid id = EventMpscenarioId;
+        if (hereFor == id) return;
+        try
+        {
+            var found = await ConceptionScenario.ResolveAsync(entitiesService, Layout, id);
+            if (EventMpscenarioId != id) return;   // moved on meanwhile: that id's own pass resolves it
+            here = found;
+            hereFor = id;   // a scenario that no longer exists too (null): not looked up again at every redraw
+        }
+        catch (Exception ex)
+        {
+            // Tried again at the next pass. Meanwhile Here is null: the plan is in View mode, no line is stored, and it
+            // shows no other scenario's Point0 or names. Unless a newer pass has already resolved the page's current id -
+            // a late failure of an older pass must not wipe that. hereFor is cleared too: the scenario resolved before
+            // (the one the page may come back to) is looked up again rather than taken as known with nothing kept.
+            if (hereFor != EventMpscenarioId)
+            {
+                here = null;
+                hereFor = null;
+            }
+            Console.Error.WriteLine($"MotherGrid : scénario {id} illisible : {ex.Message}");
+        }
+    }
+
     protected override async Task OnInitializedAsync()
     {
         ElementTypesList = await entitiesService.GetFilteredEntitiesAsync<ElementType>(
@@ -148,6 +198,14 @@
 
     protected override async Task OnParametersSetAsync()
     {
+        // After the calculation going, if any. This runs at every redraw of the layout - a pick in the scenario dropdown
+        // redraws it while the calculation for the scenario being left saves - and its queries share the circuit's
+        // context: a query started during that save made EF refuse a second operation on it and ended the circuit.
+        if (chargeMpComponent is { } charges)
+            await charges.WhenIdle();
+
+        await ResolveHereAsync();
+
         // The element types again, not only once in OnInitializedAsync: « Générer l'implantation » creates a
         // type for any model of the inventory the database does not have yet, and it lands on this very
         // URL - so the page is re-parameterised, never re-initialised, and the list the edit dropdown offers
@@ -169,6 +227,8 @@
         //   Charger toutes les charges pour la visualisation
         ChargeList = await LoadChargesAsync();
 
+        inventoryStamp = InventoryStamp();
+
         await LoadInventoryAsync();
     }
 
@@ -182,25 +242,18 @@
     private async Task LoadInventoryAsync()
     {
         if (inventoryScenarioId == EventMpscenarioId) return;
-        inventoryScenarioId = EventMpscenarioId;
+        // Kept for this id only once its scenario is known (a scenario that no longer exists counts): a pass whose lookup
+        // failed loads the shared files for now - marked as nobody's, so the next pass for this id, or for the scenario
+        // shown before, loads its own again.
+        inventoryScenarioId = hereFor == EventMpscenarioId ? EventMpscenarioId : null;
         inventory = null;
         inventoryError = null;
 
         try
         {
-            // The scenario's own folder, from the layout when it shows this scenario, else from the database.
-            AliantWebS.Models.EventMpscenario scenario =
-                Layout?.selectedScenario?.EventMpscenarioId == EventMpscenarioId ? Layout.selectedScenario : null;
-            AliantWebS.Models.Event ev =
-                scenario != null && Layout?.selectedEvent?.EventId == scenario.EventId ? Layout.selectedEvent : null;
-            if (scenario == null || ev == null)
-            {
-                scenario = await entitiesService.GetEntityAsync<AliantWebS.Models.EventMpscenario>(EventMpscenarioId);
-                ev = scenario == null ? null : await entitiesService.GetEntityAsync<AliantWebS.Models.Event>(scenario.EventId);
-            }
-
-            string dataDir = scenario != null && ev != null
-                ? scenarioStorage.GetScenarioPaths(ev, scenario, create: false).DataDir
+            // This page's own scenario's folder (Here), else the shared files only.
+            string dataDir = Here is { } shown
+                ? scenarioStorage.GetScenarioPaths(shown.Event, shown.Scenario, create: false).DataDir
                 : null;
             inventory = RiggingOptimizer.IO.InventoryFiles.Load(dataDir, scenarioStorage.CommonDataDir);
         }
@@ -210,29 +263,80 @@
         }
     }
 
+    // « Calcul Charpente » has run (the button, or leaving the page): draw its results on the plan. The charges are
+    // not reloaded - the calculation does not change them.
     private async Task HandleCalculCharpente(ChargeMPComponent.LoadTransmissionResult result)
     {
-        // Convertir les données pour la visualisation
-        intersectionPoints.Clear();
-
-        foreach (var motherGridLoad in result.MotherGridLoads)
+        // The load book first, read at every calculation from the database itself: the circuit's own context would hand
+        // back the row it already tracks, and miss a capacity saved meanwhile from another tab or by another user.
+        Tcharpente loadBook;
+        using (var context = entitiesService.CreateOwnedContext())
         {
-            intersectionPoints[motherGridLoad.Key] = motherGridLoad.Value.IntersectionPoints;
+            loadBook = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.FirstOrDefaultAsync(
+                Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.AsNoTracking(context.Tcharpentes));
         }
 
+        // Then the result and its capacities together, with no await in between, so the plan never draws new loads
+        // against old capacities. The inventory files are looked at again: one replaced since the calculation read it
+        // hides the result. No signature, no layers.
+        intersectionPoints = result.MotherGridLoads.ToDictionary(m => m.Key, m => m.Value.IntersectionPoints);
         charpenteLoads = result.CharpenteLoads;
+        charpenteCapacities = AliantWebS.Plan.PlanData.CapacitiesOf(loadBook);
+        inventoryStamp = InventoryStamp();
+        calculatedLayout = result.InputSignature;
 
-        //  Rafraîchir aussi les charges
-        ChargeList = await LoadChargesAsync();
-
-        // Forcer la mise à jour du SVGComponent
         StateHasChanged();
-
         if (svgComponent != null)
-        {
             await svgComponent.RefreshVisualization();
-        }
     }
+
+    // A row of either list was saved (✓, or "Proposer" on a row not being edited, which stops the click reaching this
+    // page): draw again, which checks the calculation against it.
+    private void HandleRowSaved(MotherGridPalonnier row) => StateHasChanged();
+
+    // What the last calculation was given (CalculationSignature). The results are shown only while the page still holds
+    // that layout - the same rows, with the same values:
+    // a change made on this page or through its layout to an element (ends, type, name, pieces, hooks), a charge, the
+    // inventory files, the scenario or Point0 hides them - by the grids, a line drawn or erased on the plan, Proposer, an
+    // import, the file manager or Générer l'implantation - and putting the old value back shows them again. A page merely
+    // drawn again, with the same rows reloaded, keeps them. (The grids have no cancel: leaving an edit keeps what was
+    // typed.) A change made from another tab or by another user is not seen: the check compares what this page holds,
+    // and it looks at the inventory files again only when the page is given its parameters or a result arrives.
+    private string calculatedLayout;
+
+    // The inventory workbooks, as CalculationSignature.InventoryStamp gives them, from the same folders the calculation
+    // reads (this page's scenario, else the shared ones). Read when the page is given its parameters (the layout draws it
+    // again when its file manager closes) and when a result arrives, never at every render.
+    private string inventoryStamp = "";
+
+    private string InventoryStamp()
+    {
+        string dataDir;
+        try
+        {
+            dataDir = Here is { } shown
+                ? scenarioStorage.GetScenarioPaths(shown.Event, shown.Scenario, create: false).DataDir
+                : null;
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return "unreadable";
+        }
+        return CalculationSignature.InventoryStamp(dataDir, scenarioStorage.CommonDataDir);
+    }
+
+    private bool CalculationCurrent => calculatedLayout != null && calculatedLayout == LayoutSignature();
+
+    private Dictionary<Guid, List<(double X, double Y)>> ShownIntersectionPoints =>
+        CalculationCurrent ? intersectionPoints : new Dictionary<Guid, List<(double X, double Y)>>();
+
+    private Dictionary<string, double> ShownCharpenteLoads =>
+        CalculationCurrent ? charpenteLoads : new Dictionary<string, double>();
+
+    // What this page holds, signed as the calculation signs what it is given.
+    private string LayoutSignature() =>
+        CalculationSignature.Of(EventMpscenarioId, Here?.Event.Point0X, Here?.Event.Point0Y,
+            inventoryStamp, (MList ?? new()).Concat(PList ?? new()), ChargeList);
 
     private void MotherGridComponentEntered(MouseEventArgs e)
     {
@@ -258,7 +362,6 @@
 
     private async void HandleMotherGridListChanged(List<MotherGridPalonnier> l)
     {
-
             await RefreshChargeList();
         RebindSelection();
         StateHasChanged();
@@ -266,7 +369,6 @@
 
     private async void HandlePalonnierListChanged(List<MotherGridPalonnier> l)
     {
-
             await RefreshChargeList();
         RebindSelection();
         StateHasChanged();
@@ -293,6 +395,9 @@
     // pieces the stock can still make for it (MotherGridComponent.ProposeFor).
     private async void HandleLineDrawn((double x1, double y1, double x2, double y2) t)
     {
+        // Relative to Point0 of a scenario not known yet (the plan is in View mode then; a line already under way).
+        if (Here is null) return;
+
         if (!palonnierComponentSelected)
         {
             if ((MotherGridGridRef.lastSelectedElementType == null) ||

@@ -294,14 +294,11 @@ else
         if (PositionedSensorIds?.Contains(element.ElementId) == true)
             return true;
             
-        // Fallback to checking attributes. Both rows must hold a number the plan can draw, the same test
-        // SVGComponent uses to place the sensor: their mere presence says nothing, since an element is given
-        // an empty row for every attribute type its element type expects, and X and Y are among those types
+        // Fallback to checking attributes. Both rows must hold a finite number, the very test the plan uses to
+        // place the sensor (PlanData.TrySensorAbsoluteMm): their mere presence says nothing, since an element is
+        // given an empty row for every attribute type its element type expects, and X and Y are among those types
         // for the sensor types that carry positions.
-        var xAttr = element.AttributeElements?.FirstOrDefault(ae => ae.AttributeType?.Name == "X");
-        var yAttr = element.AttributeElements?.FirstOrDefault(ae => ae.AttributeType?.Name == "Y");
-        return double.TryParse(xAttr?.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out _)
-            && double.TryParse(yAttr?.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out _);
+        return AliantWebS.Plan.PlanData.TrySensorAbsoluteMm(element, out _, out _);
     }
 
     private List<ChannelDataType> GetGroupChannelTypes(SensorGroup group)

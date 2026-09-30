@@ -78,9 +78,11 @@ namespace AliantWebS.Data
             //}
             //rafic????
             
+            // The foreign keys, not the Structure navigations: same value, but always set, even on an entity read
+            // without its Structure (a NullReferenceException here used to lose the upload).
             if (obj.GetType() == typeof(Event))
             {
-                path = Path.Combine(path, ((Event)obj).Structure.StructureId.ToString());
+                path = Path.Combine(path, ((Event)obj).StructureId.ToString());
                 path = Path.Combine(path,"Event");
 
                 guidEvent = ((Event)obj).EventId.ToString("N");
@@ -88,7 +90,7 @@ namespace AliantWebS.Data
             }
             if (obj.GetType() == typeof(Element))
             {
-                path = Path.Combine(path, ((Element)obj).Structure.StructureId.ToString());
+                path = Path.Combine(path, ((Element)obj).StructureId.ToString());
 
                 guidElement = ((Element)obj).ElementId.ToString("N");
                 path = Path.Combine(path, guidElement[0].ToString());

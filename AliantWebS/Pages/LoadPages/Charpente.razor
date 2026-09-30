@@ -2,11 +2,14 @@
 
 @using AliantWebS.Data
 @using Models
+@using Microsoft.EntityFrameworkCore
 @inject IStringLocalizer<Languages> L
 @inject EntitiesService entitiesService
 @inject AppData appData;
+@inject IJSRuntime js
 
 @layout AntaresConceptionLayout
+@implements IAsyncDisposable
 
 @* Importing necessary namespaces *@
 @using System.Collections.Generic
@@ -90,18 +93,53 @@
     vertical-align: middle;
     }
 
+    /* Boutons, interrupteurs de charges et légende sur une seule ligne ; retour à la ligne seulement
+       si le volet est trop étroit pour tout contenir. */
     .controls-container {
     display: flex;
-    justify-content: start;
-    align-items: flex-start;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 20px;
     }
 
     .buttons-container {
-    flex-grow: 1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+    }
+
+    .buttons-container .btn {
+    white-space: nowrap;
+    }
+
+    .charges-options {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 16px;
+    }
+
+    .charge-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    }
+
+    .charge-label {
+    font-weight: 600;
+    }
+
+    .charge-param, .charge-unit {
+    color: #555;
     }
 
     .legend-container {
-    margin-left: 20px; /* Adjust spacing between buttons and legend as needed */
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    white-space: nowrap;
     }
 
     .tooltip-container {
@@ -145,6 +183,11 @@
         margin: 6px;
     }
 
+    .cr-card {
+        height: calc(100% - 12px);   /* 100 % moins la marge de 6px haut et bas : pas de débordement du volet */
+        box-sizing: border-box;
+    }
+
     .grid-card {
         height: auto;
         margin-top: 16px;
@@ -164,20 +207,119 @@
 
     .cr-icon { font-size: 1.05rem; line-height: 1; }
 
-    .cr-textarea {
-        flex: 1 1 auto;
-        width: 100%;
-        min-height: 200px;
-        border: none;
-        resize: none;
+    .cr-body {
+        flex: 1 1 0;
+        min-height: 0;          /* sans cela, un enfant flex grandit avec son contenu au lieu de défiler */
+        overflow: auto;
         padding: 12px 14px;
-        font-family: 'Consolas', 'Courier New', monospace;
         font-size: 0.85rem;
-        line-height: 1.55;
+        line-height: 1.5;
         color: #2c3e50;
         background: #fbfbfd;
-        outline: none;
     }
+
+    .cr-body .cr-titre {
+        text-align: center;
+        font-size: 1.1rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin: 0 0 10px;
+        padding-bottom: 6px;
+        border-bottom: 2px solid #2c3e50;
+    }
+
+    .cr-body h5 {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #46637f;
+        margin: 16px 0 6px;
+        border-bottom: 1px solid #e6e6ef;
+        padding-bottom: 3px;
+    }
+
+    .cr-body .cr-info td { padding: 1px 0; }
+    .cr-body .cr-info td:first-child { font-weight: 600; padding-right: 2em; }  /* tabulation label / valeur */
+
+    .cr-body .cr-table {
+        border-collapse: collapse;
+        width: 100%;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .cr-body .cr-table th {
+        background: #ecedf3;
+        text-align: center;
+        padding: 4px 8px;
+    }
+
+    .cr-body .cr-table td {
+        padding: 3px 8px;
+        border-bottom: 1px solid #ecedf3;
+        text-align: right;
+    }
+
+    .cr-body .cr-table td:first-child { text-align: left; }
+    .cr-body .cr-table tr.cr-total td { font-weight: 700; border-top: 2px solid #2c3e50; }
+    .cr-body .cr-note { font-size: 0.78rem; color: #666; margin: 4px 0 0; }
+
+    .cr-body .cr-table td.cr-taux {
+        text-align: center;
+        color: #fff;
+        font-weight: 600;
+    }
+
+    .cr-body .cr-etat {
+        text-align: center;
+        font-weight: 700;
+        color: #fff;
+        padding: 8px;
+        border-radius: 6px;
+        margin: 6px 0;
+    }
+
+    /* Bandeau d'état en tête du compte rendu : plus gros que le texte courant (0.85rem) */
+    .cr-body .cr-bandeau {
+        text-align: center;
+        color: #fff;
+        font-size: 1.4rem;
+        font-weight: 700;
+        padding: 12px 10px;
+        border-radius: 8px;
+        margin-bottom: 14px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    }
+
+    .cr-body .cr-bandeau-message {
+        font-weight: 800;
+        letter-spacing: 0.5px;
+    }
+
+    .cr-body .cr-bandeau-taux {
+        display: block;
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin-top: 2px;
+        opacity: 0.95;
+    }
+
+    .cr-body .cr-oui    { color: #388e3c; font-weight: 700; }
+    .cr-body .cr-non    { color: #888; font-style: italic; }
+    .cr-body .cr-info td.cr-detail { font-weight: 400; padding-left: 1.5em; color: #666; }
+
+    .cr-body .cr-alerte {
+        background: #fff3e0;
+        border-left: 4px solid #f57c00;
+        color: #8a4b00;
+        padding: 6px 10px;
+        margin: 8px 0;
+        border-radius: 4px;
+    }
+
+    .cr-body .cr-rouge  { background: #d32f2f; }
+    .cr-body .cr-orange { background: #f57c00; }
+    .cr-body .cr-vert   { background: #388e3c; }
+    .cr-body .cr-vide   { color: #888; font-style: italic; text-align: center; }
 
     .taux-bar-wrap {
         display: flex;
@@ -213,9 +355,14 @@
 
 <RadzenSplitter>
     <RadzenSplitterPane>
-        <RadzenSplitter Orientation="Radzen.Orientation.Vertical">
-            <RadzenSplitterPane>
-                <AliantWebS.Pages.CADPages.SVGComponent Point0X="@(Layout?.selectedEvent?.Point0X ?? 0)"
+        @* Hauteur explicite et tailles fixes : le compte rendu défile dans son cadre au lieu d'agrandir
+           son volet, ce qui réduisait le plan au-dessus à chaque calcul. La hauteur du conteneur est
+           alignée par charpente-layout.js sur le bas du contenu de droite (90vh avant le premier rendu). *@
+        <div @ref="colonneGauche" style="height: 90vh;">
+        <RadzenSplitter Orientation="Radzen.Orientation.Vertical" Style="height: 100%;">
+            <RadzenSplitterPane Size="50%">
+                <AliantWebS.Pages.CADPages.SVGComponent Mode="AliantWebS.Pages.CADPages.PlanMode.View"
+                                                        Point0X="@(Layout?.selectedEvent?.Point0X ?? 0)"
                                                         Point0Y="@(Layout?.selectedEvent?.Point0Y ?? 0)"
                                                         EventName="@Layout?.selectedEvent?.Name"
                                                         EventId="@Layout?.selectedEvent?.EventId"
@@ -224,17 +371,28 @@
                                                         StructureName="@appData.Structure?.Name"
                                                         ModuleName="Charpente"></AliantWebS.Pages.CADPages.SVGComponent>
             </RadzenSplitterPane>
-             <RadzenSplitterPane>
+             <RadzenSplitterPane Size="50%" Style="overflow: hidden;">
                 <div class="cr-card">
                     <div class="cr-card-header">
                         <span class="cr-icon">📋</span> @L["Compte Rendu"]
                     </div>
-                    <InputTextArea @bind-Value="compteRendu" class="cr-textarea"></InputTextArea>
+                    <div class="cr-body">
+                        @if (string.IsNullOrEmpty(compteRendu))
+                        {
+                            <p class="cr-vide">@L["Lancer « Calcul Charpente » pour obtenir le compte rendu."]</p>
+                        }
+                        else
+                        {
+                            @((MarkupString)compteRendu)
+                        }
+                    </div>
                 </div>
              </RadzenSplitterPane>
         </RadzenSplitter>
+        </div>
     </RadzenSplitterPane>
     <RadzenSplitterPane>
+        <div @ref="colonneDroite">
         <div class="form-group">
             <div class="controls-container">
                 <!-- Buttons Container -->
@@ -252,10 +410,32 @@
                     </button>
                     @if (canEditLimits)
                     {
-                        <button type="button" class="btn btn-success" @onclick="saveLimitstodatabase" style="margin-left: 10px;">
+                        <button type="button" class="btn btn-success" @onclick="saveLimitstodatabase">
                             @L["Save Critical Loads"]
                         </button>
                     }
+                    <div class="charges-options">
+                        <div class="charge-option">
+                            <RadzenSwitch @bind-Value="poidsPropre" Disabled="@isCalculating" />
+                            <span class="charge-label">@L["Poids propre"]</span>
+                            <span class="charge-param">q =</span>
+                            <RadzenNumeric TValue="double" @bind-Value="chargeQ" Min="0" Step="5" Format="0"
+                                           Disabled="@(!poidsPropre || isCalculating)" Style="width:75px" />
+                            <span class="charge-unit">kg/m²</span>
+                            <span class="charge-param">q1 =</span>
+                            <RadzenNumeric TValue="double" @bind-Value="chargeQ1" Min="0" Step="5" Format="0"
+                                           Disabled="@(!poidsPropre || isCalculating)" Style="width:75px" />
+                            <span class="charge-unit">kg/m²</span>
+                        </div>
+                        <div class="charge-option">
+                            <RadzenSwitch @bind-Value="neige" Disabled="@isCalculating" />
+                            <span class="charge-label">@L["Neige"]</span>
+                            <span class="charge-param">épaisseur =</span>
+                            <RadzenNumeric TValue="double" @bind-Value="epaisseurNeige" Min="0" Step="1" Format="0"
+                                           Disabled="@(!neige || isCalculating)" Style="width:75px" />
+                            <span class="charge-unit">cm</span>
+                        </div>
+                    </div>
                 </div>
                 <!-- Legend Container -->
                 @* Listed in the order the two inputs appear inside each cell: the white box on top is
@@ -315,7 +495,7 @@
                 @* Total row: the summed load on a beam over that beam's own capacity.
                    The beam limit is NOT the sum of its nine point limits — it is considerably lower,
                    and it is usually the constraint that actually binds — so it is entered here rather
-                   than derived. It lives in row 10 of TCharpente, which the grid above does not show. *@
+                   than derived. It comes from the beamCapacity vector (9000 kg per beam by default). *@
                 <tr>
                     <th class="small-cell">Total</th>
                     @foreach (var col in columns)
@@ -332,8 +512,8 @@
                                        style="@RatioStyle(CalculateBeamRatio(col))" />
                                 <input type="number" step="any"
                                        class="form-control small-input center-text"
-                                       value="@(GetCellValue(BeamCapacityRow, col, false).ToString(System.Globalization.CultureInfo.InvariantCulture))"
-                                       @onchange="e => UpdateCellValue(BeamCapacityRow, col, e, false)"
+                                       value="@(GetBeamCapacity(col).ToString(System.Globalization.CultureInfo.InvariantCulture))"
+                                       @onchange="e => UpdateBeamCapacity(col, e)"
                                        disabled="@(!canEditLimits)"
                                        style="background-color: #fde4f9;" />
                             </div>
@@ -373,6 +553,7 @@
                 </Columns>
             </RadzenDataGrid>
         </div>
+        </div>
     </RadzenSplitterPane>
 </RadzenSplitter>
 
@@ -386,12 +567,132 @@
     [CascadingParameter]
     public AntaresConceptionLayout Layout { get; set; }
 
+    // Alignement du bas de la colonne gauche (plan + compte rendu) sur celui du contenu de droite.
+    private ElementReference colonneGauche;
+    private ElementReference colonneDroite;
+    private IJSObjectReference layoutModule;
+    private IJSObjectReference alignementHandle;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            layoutModule = await js.InvokeAsync<IJSObjectReference>("import", "./js/charpente-layout.js");
+            alignementHandle = await layoutModule.InvokeAsync<IJSObjectReference>("alignerHauteur", colonneGauche, colonneDroite);
+        }
+        catch (JSDisconnectedException) { }   // circuit fermé pendant le chargement : rien à aligner
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (layoutModule != null) await layoutModule.InvokeVoidAsync("liberer", alignementHandle);
+            if (alignementHandle != null) await alignementHandle.DisposeAsync();
+            if (layoutModule != null) await layoutModule.DisposeAsync();
+        }
+        catch (JSDisconnectedException) { }   // onglet fermé : le navigateur a déjà tout libéré
+    }
+
     // Define the columns and rows — display order: columns J→A (left→right), rows 9→1 (top→bottom).
     private readonly string[] columns = { "J", "I", "H", "G", "F", "E", "D", "C", "B", "A" };
     private readonly string[] rows = { "9", "8", "7", "6", "5", "4", "3", "2", "1" };
 
-    // Row 10 is not an attachment point: it holds each beam's own capacity, shown on the Total row.
-    private const string BeamCapacityRow = "10";
+    // Capacité propre de chaque poutre A→J (kg), comparée à la somme de ses charges sur la ligne Total.
+    // Elle n'est PAS la somme des capacités de ses neuf points d'accroche : elle est nettement plus
+    // faible, et c'est en général elle qui dimensionne.
+    private readonly Dictionary<string, double> beamCapacity = new()
+    {
+        ["A"] = 9000, ["B"] = 9000, ["C"] = 9000, ["D"] = 9000, ["E"] = 9000,
+        ["F"] = 9000, ["G"] = 9000, ["H"] = 9000, ["I"] = 9000, ["J"] = 9000,
+    };
+
+    private double GetBeamCapacity(string col) => beamCapacity.TryGetValue(col, out double c) ? c : 0;
+
+    // Modifiable par les administrateurs pour la session ; non enregistrée en base.
+    private void UpdateBeamCapacity(string col, ChangeEventArgs e)
+    {
+        if (double.TryParse(e.Value?.ToString(), System.Globalization.NumberStyles.Float,
+                            System.Globalization.CultureInfo.InvariantCulture, out double value))
+            beamCapacity[col] = value;
+    }
+
+    // ---- Vérification RDM : poutre simplement appuyée sous les charges ponctuelles de la grille ----
+    // Valeurs par défaut calées sur la capacité de 9000 kg : 9 × 1000 kg aux points 1..9 donnent
+    // V = 44,1 kN et M = 122,6 kN·m sur 10 m. À remplacer par les valeurs réelles de chaque poutre.
+    private readonly Dictionary<string, double> beamSpan = columnsDefault(10);    // portée L, m
+    private readonly Dictionary<string, double> beamMRd = columnsDefault(125);    // moment résistant, kN·m
+    private readonly Dictionary<string, double> beamVRd = columnsDefault(45);     // effort tranchant résistant, kN
+
+    private static Dictionary<string, double> columnsDefault(double v) =>
+        new[] { "A", "B", "C", "D", "E", "F", "G", "H", "I", "J" }.ToDictionary(c => c, _ => v);
+
+    private const double Gravite = 9.81;   // kg → N
+
+    /// <summary>Résultat RDM d'une poutre. Charges additionnelles en kg ; null si MRd/VRd/L non renseignés.</summary>
+    private record BeamRdm(double MEd, double VEd, double? Taux, double? AjoutMiTravee, double? AjoutQuart);
+
+    /// <summary>
+    /// Position du point d'accroche le long de la poutre : les points 1..9 sont supposés équidistants,
+    /// à i·L/10 de l'appui gauche.
+    /// </summary>
+    private static double PositionPoint(string row, double portee) => int.Parse(row) * portee / 10;
+
+    /// <summary>
+    /// Poutre simplement appuyée de portée L, charges ponctuelles P_i (kg de la grille → kN) en a_i.
+    ///   R_A = Σ P_i (L − a_i) / L,  R_B = Σ P_i a_i / L
+    ///   V_Ed = max(R_A, R_B) (effort tranchant maximal, aux appuis)
+    ///   M(x) = R_A x − Σ_{a_i < x} P_i (x − a_i), maximal sous une charge → M_Ed = max M(a_i)
+    ///   Taux = max(M_Ed / MRd, V_Ed / VRd)
+    /// Charge additionnelle admissible ΔP en ξ (mi-travée ξ = L/2 ; quart de travée ξ = L/4 et 3L/4, la
+    /// plus défavorable) : plus grande ΔP telle que M(x) + ΔP·G(x, ξ) ≤ MRd en tout point et que les
+    /// réactions restent ≤ VRd, avec G la ligne d'influence du moment :
+    ///   G(x, ξ) = x (L − ξ) / L si x ≤ ξ,  ξ (L − x) / L sinon.
+    /// </summary>
+    private BeamRdm CalculateBeamRdm(string col)
+    {
+        double L = beamSpan.GetValueOrDefault(col);
+        double mRd = beamMRd.GetValueOrDefault(col);
+        double vRd = beamVRd.GetValueOrDefault(col);
+
+        var charges = rows
+            .Select(r => (a: PositionPoint(r, L), P: GetCellValue(r, col) * Gravite / 1000))   // kN
+            .Where(c => c.P != 0)
+            .ToList();
+
+        double rA = charges.Sum(c => c.P * (L - c.a)) / (L > 0 ? L : 1);
+        double rB = charges.Sum(c => c.P * c.a) / (L > 0 ? L : 1);
+
+        double Moment(double x) => rA * x - charges.Where(c => c.a < x).Sum(c => c.P * (x - c.a));
+
+        double vEd = Math.Max(Math.Abs(rA), Math.Abs(rB));
+        double mEd = charges.Select(c => Moment(c.a)).DefaultIfEmpty(0).Max();
+
+        if (L <= 0 || mRd <= 0 || vRd <= 0)
+            return new BeamRdm(mEd, vEd, null, null, null);
+
+        double taux = Math.Max(mEd / mRd, vEd / vRd);
+
+        double? Ajout(double xi)
+        {
+            double G(double x) => x <= xi ? x * (L - xi) / L : xi * (L - x) / L;
+
+            double dp = double.MaxValue;
+            foreach (double x in charges.Select(c => c.a).Append(xi))
+            {
+                double g = G(x);
+                if (g > 0) dp = Math.Min(dp, (mRd - Moment(x)) / g);
+            }
+            dp = Math.Min(dp, (vRd - rA) / ((L - xi) / L));
+            dp = Math.Min(dp, (vRd - rB) / (xi / L));
+
+            return Math.Max(0, dp) * 1000 / Gravite;   // kN → kg
+        }
+
+        double? ajoutQuart = Math.Min(Ajout(L / 4) ?? 0, Ajout(3 * L / 4) ?? 0);
+        return new BeamRdm(mEd, vEd, taux, Ajout(L / 2), ajoutQuart);
+    }
 
     // Resolved once per parameter set. The limit inputs used to call appData.GetRole().Result inline,
     // which blocks the circuit's thread ninety times per render just to decide a disabled attribute.
@@ -404,9 +705,24 @@
     Models.Charpente charpente;
     Models.Tcharpente tcharpente;
 
+    // The scenario whose row the page holds - or is reading - and which read is the latest.
+    Guid? charpenteScenarioId;
+    bool charpenteRead;
+    int charpenteReads;
+
     bool isCalculating = false;
 
-    string compteRendu = "epsom loren";
+    // HTML construit par ConstruireCompteRendu, affiché via MarkupString.
+    string compteRendu = "";
+
+    // Charges complémentaires du calcul (interrupteurs au-dessus de la grille).
+    // q en kg/m² ; neige en cm d'épaisseur (× 2 kg/m² par cm). Appliqués sur la surface de toiture
+    // affectée à chaque nœud des éléments bois (voir CharpenteFEHelper.SurfacesAffectees).
+    bool poidsPropre = true;
+    bool neige = false;
+    double chargeQ = 90;
+    double chargeQ1 = 0;   // surcharge, kg/m² : activée avec le poids propre
+    double epaisseurNeige = 0;
 
     // Store tauxTravail at class level for grid access
     private Dictionary<Guid, double> tauxTravail = new Dictionary<Guid, double>();
@@ -426,15 +742,34 @@
         var role = await appData.GetRole();
         canEditLimits = role is "Administrator" or "Developer";
 
-        charpente = await entitiesService.GetFilteredFirstEntityAsync<Models.Charpente>(x => (x.EventMpscenarioId == Layout.selectedScenario.EventMpscenarioId));
-        if (charpente == null)
+        // No scenario - the event has none, or it was just deleted (« Supprimer le scénario » lands on Charpente/0000):
+        // an empty table, and nothing to calculate or save. This read used to throw and end the circuit.
+        //
+        // The scenario's row is read fresh, through a context of its own, and held as plain data: this page's calculation
+        // saves it the same way (SaveCharpenteAsync), as does Mother Grid's « Calcul Charpente », so nothing of it is left in
+        // the circuit's shared context. Read again only when the scenario shown changes - the layout re-renders this page
+        // for many reasons, and a new read replaced the grid, cells being typed included - and the latest read wins.
+        var scenarioId = Layout?.selectedScenario?.EventMpscenarioId;
+        if (!charpenteRead || scenarioId != charpenteScenarioId)
         {
-            charpente = new Models.Charpente();
-            charpente.EventMpscenarioId = Layout.selectedScenario.EventMpscenarioId;
+            charpenteRead = true;
+            charpenteScenarioId = scenarioId;
+            int read = ++charpenteReads;
+
+            Models.Charpente row = null;
+            if (scenarioId is { } id)
+            {
+                await using var db = entitiesService.CreateOwnedContext();
+                row = await db.Charpentes.AsNoTracking().FirstOrDefaultAsync(x => x.EventMpscenarioId == id)
+                      ?? new Models.Charpente { EventMpscenarioId = id };   // none yet: inserted by the first save
+            }
+
+            if (read == charpenteReads)
+            {
+                charpente = row;
+                tableData = row is null ? new Dictionary<(string, string), double>() : ReadCharpenteData(row);
+            }
         }
-
-
-        tableData = ReadCharpenteData(charpente);
 
 
         var tcharpentes = await entitiesService.GetAllEntitiesAsync<Models.Tcharpente>();
@@ -733,7 +1068,9 @@
 
     }
 
-    public async Task savetodatabase()
+    public Task savetodatabase() => charpente is null ? Task.CompletedTask : savetodatabase(charpente, tableData);   // no scenario: nothing
+
+    private async Task savetodatabase(Models.Charpente charpente, Dictionary<(string, string), double> tableData)
     {
 
         foreach (var entry in tableData)
@@ -849,7 +1186,9 @@
             }
         }
 
-        await entitiesService.UpdateEntityAsync(charpente);
+        // Inserted when the scenario had no row yet, updated otherwise; through a context of its own. Throws when refused,
+        // DbUpdateConcurrencyException when the row is gone (the scenario deleted from another tab) - Calcul says which.
+        await entitiesService.SaveCharpenteAsync(charpente);
 
 
     }
@@ -890,12 +1229,12 @@
     }
 
     /// <summary>
-    /// How hard a whole beam is working: its summed load against its own capacity from row 10. Kept
-    /// separate from CalculateRatio because the numerator is a sum, not a stored cell.
+    /// Taux de charge d'une poutre : somme de ses charges / sa capacité (beamCapacity). Null quand la
+    /// capacité est nulle : une capacité manquante n'est pas une poutre peu chargée.
     /// </summary>
     private double? CalculateBeamRatio(string col)
     {
-        double capacity = GetCellValue(BeamCapacityRow, col, false);
+        double capacity = GetBeamCapacity(col);
         if (capacity == 0) return null;
 
         return GetSumValue(col) / capacity;
@@ -907,7 +1246,7 @@
         var chargeNodale = new Dictionary<Guid, (int dof, double value)>();
 
         Models.Charpente charpente1 = new Models.Charpente();
-        
+
 
         // Use reflection to iterate through all properties
         var charpenteProperties = typeof(Models.Charpente).GetProperties()
@@ -948,8 +1287,42 @@
 
     private async void Calcul()
     {
+        // async void: nothing above catches what escapes it - it would end the circuit. The scenario's row and its grid as
+        // the click found them: a navigation during the calculation (to Charpente/0000, or to another scenario) replaces
+        // the page's fields, and one scenario's row must never be saved with another's grid.
+        var charpente = this.charpente;
+        var grid = tableData;
+        if (charpente is null)
+        {
+            await js.InvokeVoidAsync("alert", "Aucun scénario sélectionné : rien à calculer.");
+            return;
+        }
+
         isCalculating = true;
         StateHasChanged();
+        try
+        {
+            await CalculFor(charpente, grid);
+        }
+        catch (Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException)
+        {
+            // Its row no longer exists: the scenario was deleted, from another tab.
+            await js.InvokeVoidAsync("alert", "Ce scénario n'existe plus : le calcul n'est pas enregistré.");
+        }
+        catch (Exception ex)
+        {
+            await js.InvokeVoidAsync("alert", $"❌ ERREUR lors du calcul : {ex.GetBaseException().Message}");
+            Console.WriteLine($"Charpente.Calcul : {ex}");
+        }
+        finally
+        {
+            isCalculating = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CalculFor(Models.Charpente charpente, Dictionary<(string, string), double> grid)
+    {
         await Task.Yield(); // let the spinner paint before the (heavy, synchronous) FE solve
         if (appData.Structure == null)
         {
@@ -966,22 +1339,39 @@
 
         var chargeNodale = GetChargeNodale(charpente, tcharpente);
 
+        // Beam3d elements (for the datagrid sort + the 3D BimId map below).
+
+
+        //****** Alaa : début ********/
+
+        List<Element> elements =  entitiesService.GetFilteredEntitiesAsync<Element>(
+            a => ((a.StructureId == appData.Structure.StructureId)
+            && ((a.ElementType != null && (a.ElementType.Name == "Beam3d" || a.ElementType.Name == "Elem3d")
+            && a.Structural == 1))),
+            "ElementType", "AttributeElements.AttributeType").Result;
+
+        List<Element> nodes = entitiesService.GetFilteredEntitiesAsync<Element>(
+            a => ((a.StructureId == appData.Structure.StructureId) 
+             && ((a.ElementType?.Name == "Noeud3d"))),
+            "ElementType", "AttributeElements.AttributeType").Result;
+
+        // Poids propre (Rho × S × L + q × surface) et neige (s × surface), selon les interrupteurs.
+        var chargesComplementaires = CharpenteFEHelper.AjouterChargesComplementaires(
+            chargeNodale, appData.Structure.StructureId, elements, nodes, poidsPropre, chargeQ, chargeQ1, neige, epaisseurNeige);
+
+        VerificationCalculMEF(elements, nodes, chargeNodale);
+        
+        //****** Alaa : fin ********/
+
         // FE solve (extracted to CharpenteFEHelper so SurveillanceAntares runs the SAME solve
         // with measured loads). Here the loads are the calculated ones (chargeNodale above).
-        var beamTaux = await CharpenteFEHelper.ComputeAsync(appData.Structure, selectedLoadCases, chargeNodale, entitiesService);
+        var (beamTaux, componentTaux) = await CharpenteFEHelper.ComputeAsync(appData.Structure, selectedLoadCases, chargeNodale, entitiesService);
 
-        // Beam3d elements (for the datagrid sort + the 3D BimId map below).
-        List<Element> elements = await entitiesService.GetFilteredEntitiesAsync<Element>(
-            a => a.StructureId == appData.Structure.StructureId && a.ElementType != null && a.ElementType.Name == "Beam3d");
-
-        compteRendu = "";
         tauxTravail.Clear();
         foreach (var bt in beamTaux)
-        {
             tauxTravail[bt.ElementId] = bt.Taux;
-            compteRendu += bt.Name + " : Sigma = " + bt.Sigma.ToString("N2") + " : Tau = " + bt.Tau.ToString("N2") + "\n";
-        }
 
+        compteRendu = ConstruireCompteRendu(beamTaux, componentTaux, chargesComplementaires);
 
         //TauxGroupe[]={Nom,charge totale, tauxTravail max,  Effortcritique}
         // Message : état de la structure "Charges validées", Charges inadmissible, diminuer les charges sur poutre E
@@ -1000,10 +1390,267 @@
             .GroupBy(e => e.BimId.Value)
             .ToDictionary(g => g.Key, g => tauxTravail[g.First().ElementId]);
 
-        await savetodatabase();
+        await savetodatabase(charpente, grid);
+    }
 
-        isCalculating = false;
-        StateHasChanged();
+
+    // Seuil au-delà duquel un taux est signalé « à surveiller » (orange) avant de devenir inadmissible (> 1).
+    private const double SeuilVigilance = 0.8;
+
+    /// <summary>
+    /// Compte rendu HTML du calcul, affiché en lecture seule dans le panneau « Compte Rendu ».
+    /// Les noms venant de la base passent par Enc() : un « < » ou un « & » ne doit pas casser le rendu.
+    /// </summary>
+    private string ConstruireCompteRendu(List<BeamTaux> beamTaux, List<ComponentTaux> componentTaux, ChargesComplementaires charges)
+    {
+        var sb = new System.Text.StringBuilder();
+
+        // ---- Bilan, calculé d'abord : il alimente le bandeau du haut et la conclusion ----
+        var elementsTries = beamTaux.OrderByDescending(b => b.Taux).ToList();
+        var rdm = columns.ToDictionary(c => c, CalculateBeamRdm);
+        // Une poutre est hors limite si elle dépasse sa capacité globale OU sa vérification RDM (MRd, VRd).
+        double? TauxPoutre(string c) =>
+            new[] { CalculateBeamRatio(c), rdm[c].Taux }.Where(t => t.HasValue).Select(t => t.Value).DefaultIfEmpty().Max();
+        var poutresKo = Enumerable.Reverse(columns).Where(c => TauxPoutre(c) > 1).ToList();
+        var elementsKo = elementsTries.Where(b => b.Taux > 1).Select(b => Enc(b.Name)).ToList();
+
+        // Taux maximal sur les éléments ET sur les poutres : une poutre au-delà de sa capacité suffit
+        // à rendre la structure trop chargée, le bandeau doit alors afficher un taux > 100 %.
+        double tauxMax = elementsTries.Select(b => b.Taux)
+            .Concat(columns.Select(c => TauxPoutre(c) ?? 0))
+            .DefaultIfEmpty(0)
+            .Max();
+
+        string classeEtat = tauxMax > 1 ? "cr-rouge" : tauxMax > SeuilVigilance ? "cr-orange" : "cr-vert";
+        string messageEtat = tauxMax > 1 ? "Structure trop chargée" : "Structure vérifiée";
+
+        // ---- Bandeau d'état ----
+        sb.Append($"<div class='cr-bandeau {classeEtat}'><strong class='cr-bandeau-message'>{messageEtat}</strong><span class='cr-bandeau-taux'>Taux maximal : {tauxMax * 100:F1} %</span></div>");
+
+        // ---- En-tête ----
+        sb.Append("<h4 class='cr-titre'>Compte rendu &ndash; Calcul de la charpente</h4>");
+        sb.Append("<table class='cr-info'>");
+        sb.Append($"<tr><td>Date</td><td>{DateTime.Now:dd/MM/yyyy HH:mm}</td></tr>");
+        sb.Append($"<tr><td>Événement</td><td>{Enc(Layout?.selectedEvent?.Name)}</td></tr>");
+        sb.Append($"<tr><td>Scénario</td><td>{Enc(Layout?.selectedScenario?.Name)}</td></tr>");
+        sb.Append($"<tr><td>Structure</td><td>{Enc(appData.Structure?.Name)}</td></tr>");
+        sb.Append("</table>");
+
+        // ---- Hypothèses de calcul : poids propre et neige ----
+        sb.Append("<h5>Hypothèses de calcul</h5>");
+        sb.Append("<table class='cr-info'>");
+        sb.Append($"<tr><td>Charges scéniques appliquées</td><td><b>{charges.ChargesAppliquees:N0} kg</b></td></tr>");
+        if (charges.PoidsPropre)
+        {
+            sb.Append("<tr><td>Poids propre</td><td><span class='cr-oui'>pris en compte</span></td></tr>");
+            sb.Append($"<tr><td class='cr-detail'>Charpente</td><td>{charges.PoidsElements:N0} kg</td></tr>");
+            sb.Append($"<tr><td class='cr-detail'>Toiture = {charges.Q:N0} kg/m²</td><td>{charges.ChargeQ:N0} kg</td></tr>");
+            sb.Append($"<tr><td class='cr-detail'>Surcharge q1 = {charges.Q1:N0} kg/m²</td><td>{charges.ChargeQ1:N0} kg</td></tr>");
+        }
+        else
+        {
+            sb.Append("<tr><td>Poids propre</td><td><span class='cr-non'>non pris en compte</span></td></tr>");
+        }
+        if (charges.Neige)
+        {
+            sb.Append("<tr><td>Neige</td><td><span class='cr-oui'>prise en compte</span></td></tr>");
+            sb.Append($"<tr><td class='cr-detail'>{charges.EpaisseurNeige:N0} cm → s = {charges.S:N0} kg/m²</td><td>{charges.ChargeNeige:N0} kg</td></tr>");
+        }
+        else
+        {
+            sb.Append("<tr><td>Neige</td><td><span class='cr-non'>non prise en compte</span></td></tr>");
+        }
+        sb.Append("</table>");
+
+        // Un point de la grille sans nœud associé (TCharpente « …map ») n'entre pas dans le calcul, et deux
+        // points associés au même nœud n'en font compter qu'un (GetChargeNodale écrase) : le signaler
+        // plutôt que de laisser croire que toute la charge saisie a été vérifiée.
+        double chargeGrille = GetGrandSumValue();
+        if (Math.Abs(chargeGrille - charges.ChargesAppliquees) > 0.5)
+            sb.Append($"<div class='cr-alerte'>La grille totalise {chargeGrille:N0} kg, mais seuls {charges.ChargesAppliquees:N0} kg sont appliqués : certains points chargés n'ont pas de nœud associé, ou partagent le même nœud.</div>");
+
+        // q et s ne s'appliquent qu'à la surface affectée aux nœuds : sans elle, ils ne pèsent rien.
+        bool chargeSurfacique = (charges.PoidsPropre && (charges.Q > 0 || charges.Q1 > 0)) || (charges.Neige && charges.S > 0);
+        if (chargeSurfacique && charges.SurfaceTotale <= 0)
+            sb.Append("<div class='cr-alerte'>Aucune surface de toiture n'a pu être affectée aux nœuds : q, q1 et s n'ont pas été appliqués.</div>");
+
+        // ---- Charges par poutre ----
+        sb.Append("<h5>1. Charges par poutre</h5>");
+        sb.Append("<table class='cr-table'><tr><th>Poutre</th><th>Charge (kg)</th><th>Capacité (kg)</th><th>Taux</th>"
+                + "<th>Taux RDM</th>"
+                + "<th>+ mi-travée (kg)</th><th>+ quart (kg)</th></tr>");
+        foreach (var col in Enumerable.Reverse(columns))   // A → J
+        {
+            var r = rdm[col];
+            string Ajout(double? kg) => kg is { } v ? $"{v:N0}" : "n.r.";
+            sb.Append($"<tr><td>{col}</td><td>{GetSumValue(col):N0}</td><td>{GetBeamCapacity(col):N0}</td>{CelluleTaux(CalculateBeamRatio(col))}"
+                    + CelluleTaux(r.Taux)
+                    + $"<td>{Ajout(r.AjoutMiTravee)}</td><td>{Ajout(r.AjoutQuart)}</td></tr>");
+        }
+        sb.Append($"<tr class='cr-total'><td>Total</td><td>{GetGrandSumValue():N0}</td><td colspan='5'></td></tr>");
+        sb.Append("</table>");
+
+        // Hypothèses RDM, regroupées quand plusieurs poutres ont les mêmes valeurs.
+        var hypotheses = Enumerable.Reverse(columns)
+            .GroupBy(c => (L: beamSpan.GetValueOrDefault(c), M: beamMRd.GetValueOrDefault(c), V: beamVRd.GetValueOrDefault(c)))
+            .Select(g => $"{string.Join(", ", g)} : L = {g.Key.L:0.##} m, M<sub>Rd</sub> = {g.Key.M:0.#} kN·m, V<sub>Rd</sub> = {g.Key.V:0.#} kN");
+        sb.Append("<p class='cr-note'>RDM : poutre simplement appuyée, points 1 à 9 à L/10 … 9L/10, g = 9,81 m/s². "
+                + "Charge additionnelle : la plus grande charge ponctuelle ajoutable à mi-travée, ou au quart de travée "
+                + "(L/4 ou 3L/4, le plus défavorable), sans dépasser M<sub>Rd</sub> ni V<sub>Rd</sub>.<br/>"
+                + string.Join("<br/>", hypotheses) + "</p>");
+
+        // ---- Poutres ----
+        sb.Append("<h5>2. Poutres</h5>");
+        if (componentTaux.Count == 0)
+        {
+            sb.Append("<p class='cr-vide'>Aucun composant calculé.</p>");
+        }
+        else
+        {
+            sb.Append("<table class='cr-table'><tr><th>Composant</th><th>Sigma</th><th>Tau</th><th>Taux</th></tr>");
+            foreach (var c in componentTaux.OrderByDescending(c => c.Taux))
+                sb.Append($"<tr><td>{Enc(c.Name)}</td><td>{c.Sigma:N2}</td><td>{c.Tau:N2}</td>{CelluleTaux(c.Taux)}</tr>");
+            sb.Append("</table>");
+        }
+
+        // ---- Éléments les plus sollicités ----
+        sb.Append("<h5>3. Éléments les plus sollicités</h5>");
+        if (elementsTries.Count == 0)
+        {
+            sb.Append("<p class='cr-vide'>Aucun élément calculé.</p>");
+        }
+        else
+        {
+            sb.Append("<table class='cr-table'><tr><th>Élément</th><th>Sigma</th><th>Tau</th><th>Taux</th></tr>");
+            foreach (var b in elementsTries.Take(10))
+                sb.Append($"<tr><td>{Enc(b.Name)}</td><td>{b.Sigma:N2}</td><td>{b.Tau:N2}</td>{CelluleTaux(b.Taux)}</tr>");
+            sb.Append("</table>");
+        }
+
+        // ---- Conclusion ----
+        sb.Append("<h5>4. Conclusion</h5>");
+        sb.Append($"<p>Taux de travail maximal : <b>{tauxMax * 100:F1} %</b></p>");
+        if (tauxMax > 1)
+        {
+            sb.Append("<div class='cr-etat cr-rouge'>Charges inadmissibles</div>");
+            sb.Append("<ul>");
+            if (poutresKo.Count > 0)
+                sb.Append($"<li>Diminuer les charges sur la/les poutre(s) : <b>{string.Join(", ", poutresKo)}</b></li>");
+            if (elementsKo.Count > 0)
+                sb.Append($"<li>Éléments surchargés : <b>{string.Join(", ", elementsKo)}</b></li>");
+            sb.Append("</ul>");
+        }
+        else if (tauxMax > SeuilVigilance)
+        {
+            sb.Append($"<div class='cr-etat cr-orange'>Charges admissibles &ndash; taux supérieur à {SeuilVigilance * 100:F0} % : à surveiller</div>");
+        }
+        else
+        {
+            sb.Append("<div class='cr-etat cr-vert'>Charges validées</div>");
+        }
+
+        return sb.ToString();
+    }
+
+    /// <summary>Cellule « Taux » colorée comme la grille et le datagrid (TauxColor) ; grise si capacité non renseignée.</summary>
+    private static string CelluleTaux(double? taux)
+    {
+        if (taux is not { } t)
+            return "<td class='cr-taux' style='background:#757575'>n.r.</td>";
+
+        var (r, g, b) = TauxColor.ToColor(t);
+        return $"<td class='cr-taux' style='background:rgb({r},{g},{b})'>{t * 100:F1} %</td>";
+    }
+
+    private static string Enc(string s) => System.Net.WebUtility.HtmlEncode(s ?? "");
+
+    private void VerificationCalculMEF(List<Element> elements, List<Element> nodes,Dictionary<Guid,(int dof, double value)> chargeNodale)
+    {
+        //**********************/
+        // Vérification
+        //*********************/
+
+        string s = "";
+        int i = -1;
+        foreach (Element el in elements)
+        {
+            i++;
+            if (el.AttributeElements.Count() > 0)
+            {
+                string n1Name = el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name == "Noeud1").Value;
+                string n2Name = el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name == "Noeud2").Value;
+                var n1 = nodes.Find(x => x.Name == n1Name);
+                var n2 = nodes.Find(x => x.Name == n2Name);
+
+                string nom = el.Name;
+                string mat = el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name == "Matériau").Value;
+
+                if (el.ElementType.Name == "Beam3d")
+                {
+                    double b = double.Parse(el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name == "b").Value, System.Globalization.CultureInfo.InvariantCulture);
+                    double h = double.Parse(el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name == "h").Value, System.Globalization.CultureInfo.InvariantCulture);
+                    s += i.ToString() + ";" + nom + ";" + n1Name + ";" + n2Name + ";" + el.ElementType.Name + ";" + mat + ";" + b.ToString() + ";" + h.ToString() + "\n";
+                }
+                else
+                {
+                    double S = double.Parse(el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name == "S").Value, System.Globalization.CultureInfo.InvariantCulture);
+                    double Ix = double.Parse(el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name == "Ix").Value, System.Globalization.CultureInfo.InvariantCulture);
+                    double Iy = double.Parse(el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name == "Iy").Value, System.Globalization.CultureInfo.InvariantCulture);
+                    double Iz = double.Parse(el.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name == "Iz").Value, System.Globalization.CultureInfo.InvariantCulture);
+                    s += i.ToString() + ";" + nom + ";" + n1Name + ";" + n2Name + ";" + el.ElementType.Name + ";" + mat + ";"
+                    + S.ToString() + ";" + Ix.ToString() + ";" + Iy.ToString() + ";" + Iz.ToString() + "\n";
+                }
+
+            }
+            else
+            {
+                string nom = el.Name;
+            }
+        }
+        string hs = s;
+
+
+        s = "";
+        i = -1;
+        foreach (Element nod in nodes)
+        {
+            i++;
+            try
+            {
+                double x = double.Parse(nod.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name == "X").Value, System.Globalization.CultureInfo.InvariantCulture);
+                double y = double.Parse(nod.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name == "Y").Value, System.Globalization.CultureInfo.InvariantCulture);
+                double z = double.Parse(nod.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name == "Z").Value, System.Globalization.CultureInfo.InvariantCulture);
+
+                string clX = nod.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name == "Constraint_X").Value;
+                string clY = nod.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name == "Constraint_Y").Value;
+                string clZ = nod.AttributeElements.FirstOrDefault(ae => ae.AttributeType.Name == "Constraint_Z").Value;
+
+
+                string nom = nod.Name;
+
+                s += i.ToString() + ";" + nom + ";" + x.ToString() + ";" + y.ToString() + ";" + z.ToString() + ";" + clX + ";" + clY + ";" + clZ + "\n";
+            }
+            catch(Exception ex)
+            {
+                string xx = ex.Message;
+            }
+        }
+        hs = s;
+
+
+        s = "";
+        foreach (var charge in chargeNodale) 
+        {
+            Guid guid = charge.Key;
+//            int indexnoeud1 = nodes.Find(x => x.Gui.Gguid == noeud1);
+  
+            double P = charge.Value.value;
+            int dof = charge.Value.dof;
+            s += guid.ToString()+";"+ P.ToString() + ";" + dof.ToString()+ "\n";
+        }
+        hs = s;
+      
+
     }
 }
 

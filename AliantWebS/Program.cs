@@ -536,6 +536,217 @@ END", ran, xTypes, yTypes, linksAdded, rowsRemoved, rowsKept);
                     db.Database.SetCommandTimeout(null);
                 }
 
+                // Every reader of an alarm threshold - the dashboard gauges and charge curve, the plan's colours, alarm
+                // detection, the Charpente Element Mapping page - reads it per channel, "weight:1500;temperature:60". The
+                // shackles held a bare "1500" (59 of production's 81) or nothing (the other 22), so none had a threshold:
+                // the gauges sat at 0 %, the charge curve was empty and no shackle could raise an alarm. Once per database,
+                // give every shackle's threshold attribute a weight threshold: a blank value becomes "weight:1500", the
+                // figure decided for every shackle on 2026-09-16, a bare number keeps its number, and a shackle with no
+                // row gets one. Anything else is left alone. Previous values go to adbo.AttributeElementDedupeBackup with
+                // Reason 'threshold-format', and each shackle gets a system journal row. Once only, because an emptied
+                // threshold is later somebody's decision. The threshold attribute is the one linked to the shackle's
+                // element type under the name seuil_alarme or one of its aliases, as the mapping page picks it; a type
+                // linked to several stops the whole step, since only a person can say which one is meant.
+                try
+                {
+                    var ran = new SqlParameter("@Ran", SqlDbType.Bit) { Direction = ParameterDirection.Output };
+                    var ambiguousTypes = new SqlParameter("@AmbiguousTypes", SqlDbType.Int) { Direction = ParameterDirection.Output };
+                    var unlinkedTypes = new SqlParameter("@UnlinkedTypes", SqlDbType.Int) { Direction = ParameterDirection.Output };
+                    var rowsRewritten = new SqlParameter("@RowsRewritten", SqlDbType.Int) { Direction = ParameterDirection.Output };
+                    var rowsAdded = new SqlParameter("@RowsAdded", SqlDbType.Int) { Direction = ParameterDirection.Output };
+                    var rowsLeft = new SqlParameter("@RowsLeft", SqlDbType.Int) { Direction = ParameterDirection.Output };
+
+                    // Full scans of AttributeElement under table locks, as in the clean-ups above.
+                    db.Database.SetCommandTimeout(TimeSpan.FromMinutes(10));
+                    db.Database.ExecuteSqlRaw(@"
+SET @Ran = 0;
+SET @AmbiguousTypes = 0;
+SET @UnlinkedTypes = 0;
+SET @RowsRewritten = 0;
+SET @RowsAdded = 0;
+SET @RowsLeft = 0;
+
+IF NOT EXISTS (SELECT 1 FROM AppSetting WHERE [Key] = N'thresholds.manille-weight')
+BEGIN
+    SET XACT_ABORT ON;
+    BEGIN TRANSACTION;
+    SET @Ran = 1;
+
+    -- The names TagMappingResolver accepts for the tag: the tag itself and every alias.
+    DECLARE @ThresholdNames TABLE (Name NVARCHAR(400) NOT NULL);
+    INSERT INTO @ThresholdNames (Name) VALUES (N'seuil_alarme');
+    IF OBJECT_ID(N'dbo.TagMappingTable', N'U') IS NOT NULL
+        INSERT INTO @ThresholdNames (Name)
+            SELECT LTRIM(RTRIM(UserTag))
+            FROM dbo.TagMappingTable
+            WHERE LTRIM(RTRIM(CodeTag)) = N'seuil_alarme'
+              AND NULLIF(LTRIM(RTRIM(UserTag)), N'') IS NOT NULL;
+
+    -- Shackle types, found as SensorChargeRatioHelper finds them, with their linked threshold attribute types.
+    DECLARE @Links TABLE (ElementTypeID UNIQUEIDENTIFIER NOT NULL, AttributeTypeID UNIQUEIDENTIFIER NULL);
+    INSERT INTO @Links (ElementTypeID, AttributeTypeID)
+        SELECT DISTINCT et.ElementTypeID, t.AttributeTypeID
+        FROM adbo.ElementType et
+        JOIN adbo.Category c ON c.CategoryID = et.CategoryID
+        LEFT JOIN adbo.AttributeTypeElementType l ON l.ElementTypeID = et.ElementTypeID
+        LEFT JOIN adbo.AttributeType t ON t.AttributeTypeID = l.AttributeTypeID
+                                      AND LTRIM(RTRIM(t.Name)) IN (SELECT Name FROM @ThresholdNames)
+        WHERE LOWER(c.Name) = N'sensing device'
+          AND et.Name LIKE N'%Manille%';
+
+    DECLARE @Types TABLE (ElementTypeID UNIQUEIDENTIFIER NOT NULL PRIMARY KEY, AttributeTypeID UNIQUEIDENTIFIER NULL, Candidates INT NOT NULL);
+    INSERT INTO @Types (ElementTypeID, AttributeTypeID, Candidates)
+        SELECT k.ElementTypeID,
+               CASE WHEN k.Candidates = 1 THEN (SELECT TOP 1 x.AttributeTypeID FROM @Links x
+                                                WHERE x.ElementTypeID = k.ElementTypeID AND x.AttributeTypeID IS NOT NULL) END,
+               k.Candidates
+        FROM (SELECT ElementTypeID, SUM(CASE WHEN AttributeTypeID IS NULL THEN 0 ELSE 1 END) AS Candidates
+              FROM @Links GROUP BY ElementTypeID) AS k;
+
+    SELECT @AmbiguousTypes = COUNT(*) FROM @Types WHERE Candidates > 1;
+    SELECT @UnlinkedTypes = COUNT(*) FROM @Types WHERE Candidates = 0;
+
+    IF @AmbiguousTypes = 0
+    BEGIN
+        IF OBJECT_ID(N'adbo.AttributeElementDedupeBackup', N'U') IS NULL
+            CREATE TABLE adbo.AttributeElementDedupeBackup (
+                AttributeElementID     UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
+                ElementID              UNIQUEIDENTIFIER NOT NULL,
+                AttributeTypeID        UNIQUEIDENTIFIER NOT NULL,
+                [Date]                 DATE             NULL,
+                [Value]                NVARCHAR(50)     NULL,
+                KeptAttributeElementID UNIQUEIDENTIFIER NULL,
+                BackedUpAt             DATETIME2        NOT NULL CONSTRAINT DF_AttributeElementDedupeBackup_At DEFAULT SYSDATETIME(),
+                [Reason]               NVARCHAR(30)     NOT NULL CONSTRAINT DF_AttributeElementDedupeBackup_Reason DEFAULT N'duplicate'
+            );
+
+        -- A row with no id is one to add. A bare number is at most 50 characters, the backup's width.
+        DECLARE @Changes TABLE (
+            AttributeElementID UNIQUEIDENTIFIER NULL,
+            ElementID          UNIQUEIDENTIFIER NOT NULL,
+            AttributeTypeID    UNIQUEIDENTIFIER NOT NULL,
+            OldValue           NVARCHAR(100)    NULL,
+            NewValue           NVARCHAR(100)    NOT NULL);
+
+        INSERT INTO @Changes (AttributeElementID, ElementID, AttributeTypeID, OldValue, NewValue)
+            SELECT a.AttributeElementID, a.ElementID, a.AttributeTypeID, a.[Value],
+                   N'weight:' + COALESCE(NULLIF(LTRIM(RTRIM(a.[Value])), N''), N'1500')
+            FROM adbo.AttributeElement a WITH (TABLOCKX, HOLDLOCK)
+            JOIN adbo.Element e ON e.ElementID = a.ElementID
+            JOIN @Types ty ON ty.ElementTypeID = e.ElementTypeID AND ty.AttributeTypeID = a.AttributeTypeID
+            WHERE NULLIF(LTRIM(RTRIM(a.[Value])), N'') IS NULL
+               OR (TRY_CONVERT(FLOAT, LTRIM(RTRIM(a.[Value]))) IS NOT NULL AND LEN(LTRIM(RTRIM(a.[Value]))) <= 50);
+
+        INSERT INTO @Changes (AttributeElementID, ElementID, AttributeTypeID, OldValue, NewValue)
+            SELECT NULL, e.ElementID, ty.AttributeTypeID, NULL, N'weight:1500'
+            FROM adbo.Element e
+            JOIN @Types ty ON ty.ElementTypeID = e.ElementTypeID
+            WHERE ty.AttributeTypeID IS NOT NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM adbo.AttributeElement a
+                  WHERE a.ElementID = e.ElementID AND a.AttributeTypeID = ty.AttributeTypeID);
+
+        -- The row stays, holding the new value, so it is its own kept row.
+        INSERT INTO adbo.AttributeElementDedupeBackup (AttributeElementID, ElementID, AttributeTypeID, [Date], [Value], KeptAttributeElementID, [Reason])
+            SELECT a.AttributeElementID, a.ElementID, a.AttributeTypeID, a.[Date], LEFT(a.[Value], 50), a.AttributeElementID, N'threshold-format'
+            FROM adbo.AttributeElement a
+            JOIN @Changes ch ON ch.AttributeElementID = a.AttributeElementID
+            WHERE NOT EXISTS (
+                SELECT 1 FROM adbo.AttributeElementDedupeBackup b
+                WHERE b.AttributeElementID = a.AttributeElementID);
+
+        UPDATE a
+            SET a.[Value] = ch.NewValue
+            FROM adbo.AttributeElement a
+            JOIN @Changes ch ON ch.AttributeElementID = a.AttributeElementID;
+        SET @RowsRewritten = @@ROWCOUNT;
+
+        INSERT INTO adbo.AttributeElement (ElementID, AttributeTypeID, [Value])
+            SELECT ElementID, AttributeTypeID, NewValue FROM @Changes WHERE AttributeElementID IS NULL;
+        SET @RowsAdded = @@ROWCOUNT;
+
+        -- Written as CharpenteMapping journals a threshold save, with no user: the journal shows it as Système.
+        -- The timestamp is given, as the app gives it: a Journal table made by EF has no default for it.
+        INSERT INTO Journal ([Timestamp], Category, [Action], Target, Details, StructureId, Severity)
+            SELECT SYSDATETIME(), N'Alarme', N'threshold.migrate', LEFT(e.Name, 400),
+                   COALESCE(NULLIF(LTRIM(RTRIM(ch.OldValue)), N''), N'(vide)') + N' → ' + ch.NewValue,
+                   e.StructureID, 1
+            FROM @Changes ch
+            JOIN adbo.Element e ON e.ElementID = ch.ElementID;
+
+        -- What is left naming no channel at all is for a person; the mapping page flags it.
+        SELECT @RowsLeft = COUNT(*)
+            FROM adbo.AttributeElement a
+            JOIN adbo.Element e ON e.ElementID = a.ElementID
+            JOIN @Types ty ON ty.ElementTypeID = e.ElementTypeID AND ty.AttributeTypeID = a.AttributeTypeID
+            WHERE CHARINDEX(N':', a.[Value]) = 0;
+
+        INSERT INTO AppSetting ([Key], [Value], Description)
+            VALUES (N'thresholds.manille-weight', N'done',
+                    N'Seuils d''alarme des manilles au format weight: (vide → weight:1500, nombre seul → weight:nombre) ; anciennes valeurs dans adbo.AttributeElementDedupeBackup, Reason threshold-format');
+    END
+
+    COMMIT TRANSACTION;
+END", ran, ambiguousTypes, unlinkedTypes, rowsRewritten, rowsAdded, rowsLeft);
+
+                    if ((bool)ran.Value)
+                    {
+                        if ((int)ambiguousTypes.Value > 0)
+                        {
+                            Console.WriteLine($"[EnsureDatabaseSchema] shackle thresholds: {ambiguousTypes.Value} Manille type(s) linked to several alarm threshold attributes, so nothing rewritten; keep one link per type and the next start does it.");
+                        }
+                        else
+                        {
+                            AliantWebS.Data.AppSettings.Invalidate();
+                            Console.WriteLine($"[EnsureDatabaseSchema] shackle thresholds: rows rewritten as weight:<value>: {rowsRewritten.Value}, rows added as weight:1500: {rowsAdded.Value}; previous values in adbo.AttributeElementDedupeBackup (Reason 'threshold-format').");
+                            if ((int)rowsLeft.Value > 0)
+                                Console.WriteLine($"[EnsureDatabaseSchema] shackle thresholds: values naming no channel, left for a person to fix: {rowsLeft.Value}.");
+                        }
+                        if ((int)unlinkedTypes.Value > 0)
+                            Console.WriteLine($"[EnsureDatabaseSchema] shackle thresholds: {unlinkedTypes.Value} Manille type(s) with no alarm threshold attribute linked, left without thresholds.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[EnsureDatabaseSchema] shackle thresholds rewrite failed: {ex.Message}");
+                }
+                finally
+                {
+                    db.Database.SetCommandTimeout(null);
+                }
+
+                // One Charpente row per scenario: UX_Charpente_EventMPScenarioID (decided by Rafic, 2026-09-27). Two tabs
+                // saving a scenario's first Charpente at the same moment could insert two rows, and only one was ever read
+                // again - the other tab's calculation was lost without a word. Created only while no scenario has two rows:
+                // a scenario that has is reported and left for a person to choose from, and the index waits for it.
+                try
+                {
+                    var state = new SqlParameter("@State", SqlDbType.Int) { Direction = ParameterDirection.Output };
+                    db.Database.ExecuteSqlRaw(@"
+SET @State = 0;
+IF NOT EXISTS (SELECT 1 FROM sys.indexes
+               WHERE name = N'UX_Charpente_EventMPScenarioID' AND object_id = OBJECT_ID(N'dbo.Charpente'))
+BEGIN
+    IF EXISTS (SELECT 1 FROM dbo.Charpente GROUP BY EventMPScenarioID HAVING COUNT(*) > 1)
+        SET @State = 2;
+    ELSE
+    BEGIN
+        CREATE UNIQUE NONCLUSTERED INDEX UX_Charpente_EventMPScenarioID ON dbo.Charpente (EventMPScenarioID);
+        SET @State = 1;
+    END
+END", state);
+
+                    if ((int)state.Value == 1)
+                        Console.WriteLine("[EnsureDatabaseSchema] Charpente: unique index UX_Charpente_EventMPScenarioID created.");
+                    else if ((int)state.Value == 2)
+                        Console.WriteLine("[EnsureDatabaseSchema] Charpente: some scenarios have several Charpente rows; "
+                            + "UX_Charpente_EventMPScenarioID not created until one row of each is kept.");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[EnsureDatabaseSchema] Charpente unique index failed: {ex.Message}");
+                }
+
                 Console.WriteLine("[EnsureDatabaseSchema] schema check complete.");
             }
             catch (Exception ex)

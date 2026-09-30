@@ -2,6 +2,7 @@
 
 @using AliantWebS.Data
 @using Models
+@using Microsoft.EntityFrameworkCore
 @using RiggingOptimizer
 @inject AppData appData;
 @inject EntitiesService entitiesService
@@ -27,20 +28,21 @@
 
     <header>
         <div class="top-row px-4 auth" style="display: flex; align-items: center; position: sticky; top: 0; background-color: #fff; z-index: 1000;">
-            <!-- Breadcrumbs -->
+            <!-- Breadcrumbs. Relative, no leading slash: resolved against the base href, they stay inside the application
+                 when it is served under a sub-path (/Aliant1), where "/MotherGrid/..." left it for a full reload. -->
             <div style="flex-grow: 1;">
                 <Breadcrumb Mode="BreadcrumbMode.Auto">
                     <BreadcrumbItem Active>
-                        <BreadcrumbLink To="@($"/ChargesSceniques/{selectedScenario?.EventMpscenarioId ?? Guid.Empty}")">Charges Scéniques</BreadcrumbLink>
+                        <BreadcrumbLink To="@($"ChargesSceniques/{selectedScenario?.EventMpscenarioId ?? Guid.Empty}")">Charges Scéniques</BreadcrumbLink>
                     </BreadcrumbItem>
                     <BreadcrumbItem>
-                        <BreadcrumbLink To="@($"/MotherGrid/{selectedScenario?.EventMpscenarioId ?? Guid.Empty}")">Mother Grid</BreadcrumbLink>
+                        <BreadcrumbLink To="@($"MotherGrid/{selectedScenario?.EventMpscenarioId ?? Guid.Empty}")">Mother Grid</BreadcrumbLink>
                     </BreadcrumbItem>
                     <BreadcrumbItem>
-                        <BreadcrumbLink To="@($"/Charpente/{selectedScenario?.EventMpscenarioId ?? Guid.Empty}")">Charpente</BreadcrumbLink>
+                        <BreadcrumbLink To="@($"Charpente/{selectedScenario?.EventMpscenarioId ?? Guid.Empty}")">Charpente</BreadcrumbLink>
                     </BreadcrumbItem>
                     <BreadcrumbItem>
-                        <BreadcrumbLink To="@($"/Model3D/{selectedScenario?.EventMpscenarioId ?? Guid.Empty}")">Modèle 3D</BreadcrumbLink>
+                        <BreadcrumbLink To="@($"Model3D/{selectedScenario?.EventMpscenarioId ?? Guid.Empty}")">Modèle 3D</BreadcrumbLink>
                     </BreadcrumbItem>
                 </Breadcrumb>
             </div>
@@ -69,7 +71,12 @@
 
     <main>
         <CascadingValue Value="this">
-            @Body
+            @* Only once the layout knows the scenario the address names (FollowAddressAsync): no page ever runs against
+               the first scenario of an event it does not show. *@
+            @if (ready)
+            {
+                @Body
+            }
         </CascadingValue>
     </main>
 </div>
@@ -81,16 +88,18 @@
     public EventMpscenario selectedScenario { get; set; }
     public Event selectedEvent { get; set; }
 
+    /// <summary>The scenarios of the event shown, as the dropdown lists them.</summary>
+    public IReadOnlyList<EventMpscenario> ScenarioList => Scenarios;
+
     private bool isGenerating = false;
 
-    // Callback registered by ChargeMPComponent
-    private Func<Task> _calculCharpenteCallback;
-    private IDisposable _locationChangingRegistration;
+    // The pages are drawn once the layout has followed the address a first time (see the markup).
+    private bool ready;
+    private bool disposed;
 
-    public void RegisterCalculCharpente(Func<Task> callback)
-    {
-        _calculCharpenteCallback = callback;
-    }
+    // Leaving Mother Grid - which stores its loads - is no longer detected here: the page's own NavigationLock does it
+    // (ChargeMPComponent), for as long as it is shown. This layout guessed from the address, which a download link left
+    // on the file's address: a later departure then calculated nothing, and the download itself did.
 
     protected override async Task OnInitializedAsync()
     {
@@ -99,36 +108,141 @@
             navigationManager.NavigateTo("AntaresHome");
         }
 
-        Scenarios = await entitiesService.GetFilteredEntitiesAsync<EventMpscenario>(x => x.EventId == appData.EventID);
+        (Scenarios, selectedEvent) = await ReadEventAsync(appData.EventID);
         selectedScenario = Scenarios.FirstOrDefault();
-        selectedEvent = await entitiesService.GetEntityAsync<Event>(appData.EventID);
 
         // Resolving a scenario's folders also corrects the name of a folder whose event or scenario was
         // renamed since it was created, and adopts folders left behind by the old naming scheme.
         EnsureScenarioFolders();
 
-        // Register navigation interception
-        _locationChangingRegistration = navigationManager.RegisterLocationChangingHandler(OnLocationChanging);
+        await FollowAddressAsync();
+        ready = true;
+
+        // Not for a layout already gone (a quick Back during its first lookups): Dispose ran before there was anything
+        // to remove, and the circuit would keep it.
+        if (!disposed)
+            navigationManager.LocationChanged += OnLocationChanged;
     }
 
-    private async ValueTask OnLocationChanging(LocationChangingContext context)
-    {
-        // If we are currently on MotherGrid and navigating away from it → trigger CalculCharpente
-        bool leavingMotherGrid = navigationManager.Uri.Contains("MotherGrid")
-                                 && !context.TargetLocation.Contains("MotherGrid");
+    // Every navigation within this layout comes through here, before the page is given its new parameters in the same
+    // pass: for a scenario of the event shown, the page sees the scenario of its own address at once. For another event's
+    // (a jump back in the history past a change of event) the lookup waits on the database: the page runs one pass
+    // against the event shown before, and is given its parameters again once the layout has switched.
+    protected override Task OnParametersSetAsync() => ready ? FollowAddressAsync() : Task.CompletedTask;
 
-        if (leavingMotherGrid && _calculCharpenteCallback is not null)
+    // Every completed navigation, even to the very same address - Back onto a duplicate entry (Générer l'implantation
+    // adds one) while a dropdown choice waited for its own navigation, which that Back then cancelled: the dropdown shows
+    // the page's scenario again. Runs after the router has drawn the page. A redraw from elsewhere is no navigation, so a
+    // choice still waiting keeps its place.
+    private void OnLocationChanged(object sender, LocationChangedEventArgs e)
+    {
+        _ = InvokeAsync(async () =>
         {
-            await _calculCharpenteCallback.Invoke();
-        }
+            try
+            {
+                var shown = (selectedScenario, selectedEvent);
+                followedAddress = null;
+                await FollowAddressAsync();
+                if (!disposed && (!ReferenceEquals(shown.selectedScenario, selectedScenario) || !ReferenceEquals(shown.selectedEvent, selectedEvent)))
+                    StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Layout : adresse {navigationManager.Uri} non suivie : {ex.Message}");
+            }
+        });
     }
 
     public void Dispose()
     {
-        _locationChangingRegistration?.Dispose();
+        disposed = true;
+        navigationManager.LocationChanged -= OnLocationChanged;
     }
 
-    // ... all your existing methods unchanged below ...
+    // The address last followed. The layout follows it again only when it changes: a redraw from elsewhere (the main
+    // layout, a save) while a dropdown choice waits for its navigation - held by the leave calculation - must not put the
+    // dropdown back.
+    private string followedAddress;
+    private bool following;
+
+    // Ids of an address that name nothing - a scenario deleted since: looked up once.
+    private readonly HashSet<Guid> namesNothing = new();
+
+    // The dropdown shows the scenario of the page's address - after Back, after Back past a change of event, whatever
+    // the dropdown said before. Generate, Delete, the file manager, the report and the breadcrumbs act on what it shows,
+    // so they act on the scenario on screen. The event followed is this layout's alone: appData.EventID stays the one
+    // chosen on the Events page (the monitoring pages use it), and a later Charges Scéniques opened with that event's id
+    // shows that event again.
+    private async Task FollowAddressAsync()
+    {
+        if (following) return;   // the one running goes round again until the address stops changing
+        following = true;
+        try
+        {
+            while (!disposed && navigationManager.Uri != followedAddress)
+            {
+                string address = navigationManager.Uri;
+                followedAddress = address;
+                if (!ConceptionRoute.TryParse(navigationManager, address, out _, out var id)) continue;
+
+                // No scenario (after a delete): keep what is shown - the page shows nothing to act on.
+                if (id == Guid.Empty || id == selectedScenario?.EventMpscenarioId) continue;
+
+                // A scenario of the event shown: at once, with no await, so the pages drawn in this pass see it.
+                var listed = Scenarios.FirstOrDefault(s => s.EventMpscenarioId == id);
+                if (listed != null)
+                {
+                    selectedScenario = listed;
+                    continue;
+                }
+
+                // The event shown, by its own id (Charges Scéniques from the Events page), or an id already known to name
+                // nothing: keep what is shown.
+                if (id == selectedEvent?.EventId || namesNothing.Contains(id)) continue;
+
+                // Another event's scenario (Back past a change of event), or another event's id.
+                (Guid EventId, Guid? ScenarioId)? named = null;
+                List<EventMpscenario> scenarios = null;
+                Event ev = null;
+                try
+                {
+                    named = await ConceptionScenario.LookUpAsync(entitiesService, id);
+                    if (named is { } n)
+                    {
+                        (scenarios, ev) = await ReadEventAsync(n.EventId);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"Scénario de l'adresse {address} introuvable : {ex.Message}");
+                    // Moved on meanwhile: follow the newer address, which the navigation that brought it left to this loop.
+                    if (!disposed && navigationManager.Uri != address) continue;
+                    // Otherwise tried again the next time the layout is given its parameters; nothing is changed meanwhile.
+                    followedAddress = null;
+                    break;
+                }
+
+                if (disposed || navigationManager.Uri != address) continue;   // moved on meanwhile: follow the newer one
+                if (named is null || ev is null)
+                {
+                    namesNothing.Add(id);
+                    continue;
+                }
+
+                // In one step, with no await: never half of one event and half of another.
+                Scenarios = scenarios;
+                selectedEvent = ev;
+                selectedScenario = named.Value.ScenarioId is { } scenarioId
+                    ? scenarios.FirstOrDefault(s => s.EventMpscenarioId == scenarioId)
+                    : scenarios.FirstOrDefault();
+                EnsureScenarioFolders();
+            }
+        }
+        finally
+        {
+            following = false;
+        }
+    }
 
     private void EnsureScenarioFolders()
     {
@@ -150,9 +264,26 @@
         }
     }
 
+    /// <summary>
+    /// The event and its scenarios, read through a context of its own and not tracked: what this layout shows is a
+    /// picture taken now, not rows living in the circuit's shared context. Nothing of a deleted scenario can be left
+    /// behind there, and the filter runs in the database - GetFilteredEntitiesAsync takes a C# function, so it read
+    /// every scenario row of every event and filtered them in memory.
+    /// </summary>
+    private async Task<(List<EventMpscenario> Scenarios, Event Event)> ReadEventAsync(Guid eventId)
+    {
+        await using var db = entitiesService.CreateOwnedContext();
+        return (await db.EventMpscenarios.AsNoTracking()
+                        .Where(s => s.EventId == eventId).ToListAsync(),
+                await db.Events.AsNoTracking()
+                        .FirstOrDefaultAsync(e => e.EventId == eventId));
+    }
+
     public async void RequestRedraw()
     {
-        Scenarios = await entitiesService.GetFilteredEntitiesAsync<EventMpscenario>(x => x.EventId == appData.EventID);
+        // The event shown is left as it is: only its list is read again (the layout follows the address, so the event shown
+        // is not necessarily appData.EventID).
+        (Scenarios, _) = await ReadEventAsync(selectedEvent?.EventId ?? appData.EventID);
         selectedScenario = Scenarios.FirstOrDefault();
     }
 
@@ -223,7 +354,8 @@
     private async Task addScenario()
     {
         EventMpscenario emp = new EventMpscenario();
-        emp.EventId = appData.EventID;
+        // The event shown, which follows the address: not necessarily the one last chosen on the Events page.
+        emp.EventId = selectedEvent?.EventId ?? appData.EventID;
 
         var res = await dialogService.OpenAsync<LoadPages.ScenarioNameDialog>($"Scenario",
                new Dictionary<string, object>() { { "emp", emp } },
@@ -231,7 +363,7 @@
 
         if (res == true)
         {
-            if ((await entitiesService.InsertEntityAsync(emp)) != null)
+            if (await entitiesService.InsertOwnedAsync(emp))
             {
                 scenarioStorage.GetScenarioPaths(selectedEvent, emp);
                 Scenarios.Add(emp);
@@ -243,41 +375,69 @@
 
     private async Task DeleteScenario()
     {
-        if (selectedScenario is null) return;
+        // The scenario the confirmation names, captured before it: the layout follows the address, and a lookup finishing
+        // while the dialog is open can change the selection - what is deleted is what was confirmed, or nothing. Matched by
+        // its id, not as an object: the list is read fresh (ReadEventAsync), so following an address can bring the same
+        // row back as a new object.
+        var scenario = selectedScenario;
+        if (scenario is null) return;
 
         var confirmed = await js.InvokeAsync<bool>("confirm",
-            $"Supprimer le scénario « {selectedScenario.Name} » ?\n"
+            $"Supprimer le scénario « {scenario.Name} » ?\n"
+            + "Ses charges scéniques, ses mother grids et palonniers, leurs charges et sa charpente sont supprimés avec lui.\n"
             + "Ses fichiers seront déplacés dans la corbeille, pas effacés.");
-        if (!confirmed) return;
+        if (!confirmed || selectedScenario?.EventMpscenarioId != scenario.EventMpscenarioId) return;
 
-        // Captured before the delete: the entity is what tells us which folder to move.
+        // Captured before the delete: the entity is what tells us which folder to move. The event's name with its id - the
+        // layout may follow the address to another event while the delete runs.
         var eventId = selectedEvent?.EventId ?? appData.EventID;
-        var scenarioId = selectedScenario.EventMpscenarioId;
+        var eventName = selectedEvent?.Name;
+        var scenarioId = scenario.EventMpscenarioId;
 
-        if (await entitiesService.DeleteEntityAsync(selectedScenario))
+        // Through a context of its own, children first, in one transaction (EntitiesService.DeleteScenarioAsync): the
+        // database refused the scenario alone as soon as it had charges scéniques, and the refused delete then stayed
+        // queued in the circuit's context for every later save. The folder goes to the trash only once the rows are gone,
+        // so a refused delete cannot strand it there.
+        bool hadFolder = false;
+        string moved = null;
+        var deleted = await entitiesService.DeleteScenarioAsync(scenario, afterDelete: () =>
         {
-            // Only once the row is gone, so a failed delete cannot strand the folder in the trash.
-            scenarioStorage.TrashScenarioFolder(eventId, scenarioId);
+            // Right after the commit, before anything else can run: off the list, so that no page resolves the deleted
+            // scenario from it in the meantime (a departure calculation would try to create its Charpente row).
+            Scenarios.RemoveAll(s => s.EventMpscenarioId == scenarioId);
+            hadFolder = scenarioStorage.HasScenarioFolder(eventId, scenarioId, eventName, scenario.Name);
+            moved = hadFolder ? scenarioStorage.TrashScenarioFolder(eventId, scenarioId, eventName) : null;
+            return !hadFolder ? "aucun dossier" : moved is null ? "dossier non déplacé" : $"dossier déplacé dans {moved}";
+        });
+        if (deleted is null) return;
 
-            if (Scenarios.Remove(selectedScenario))
-            {
-                selectedScenario = null;
-                StateHasChanged();
-                await ScenarioChanged();
-            }
+        // Then the page, for no scenario - unless the layout has already followed the address elsewhere meanwhile.
+        if (selectedScenario?.EventMpscenarioId == scenarioId)
+        {
+            selectedScenario = null;
+            StateHasChanged();
+            await ScenarioChanged();
         }
+        else
+        {
+            StateHasChanged();
+        }
+
+        if (hadFolder && moved is null)
+            await js.InvokeVoidAsync("alert",
+                $"Le scénario « {scenario.Name} » est supprimé, mais son dossier n'a pas pu être déplacé dans la corbeille : "
+                + "ses fichiers sont restés en place.");
     }
 
-    private async Task ScenarioChanged()
+    // The same page, for the scenario the dropdown now shows. The page is read from the address as its route names it
+    // (four Contains tests used to match "MotherGrid" inside MotherGridComponent, and nothing at all once a download link
+    // had left the address on the file). A layout already gone - Back pressed while « Générer l'implantation » ran -
+    // navigates nowhere.
+    private Task ScenarioChanged()
     {
-        if (navigationManager.Uri.Contains("ChargesSceniques"))
-            navigationManager.NavigateTo($"ChargesSceniques/{selectedScenario?.EventMpscenarioId ?? Guid.Empty}");
-        if (navigationManager.Uri.Contains("MotherGrid"))
-            navigationManager.NavigateTo($"MotherGrid/{selectedScenario?.EventMpscenarioId ?? Guid.Empty}");
-        if (navigationManager.Uri.Contains("Charpente"))
-            navigationManager.NavigateTo($"Charpente/{selectedScenario?.EventMpscenarioId ?? Guid.Empty}");
-        if (navigationManager.Uri.Contains("Model3D"))
-            navigationManager.NavigateTo($"Model3D/{selectedScenario?.EventMpscenarioId ?? Guid.Empty}");
+        if (!disposed && ConceptionRoute.TryParse(navigationManager, navigationManager.Uri, out var page, out _))
+            navigationManager.NavigateTo($"{page}/{selectedScenario?.EventMpscenarioId ?? Guid.Empty}");
+        return Task.CompletedTask;
     }
 
     private async Task OpenReportDialog()

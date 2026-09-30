@@ -272,6 +272,11 @@ else
     [Parameter]
     public EventCallback<List<MotherGridPalonnier>> MotherGridPalonnierListChanged { get; set; }
 
+    // A row was saved - its ends, type, name or pieces, from ✓ or from "Proposer" - so the page can check what it shows
+    // against it (MotherGrid hides a charpente calculation the row no longer matches).
+    [Parameter]
+    public EventCallback<MotherGridPalonnier> RowSaved { get; set; }
+
     [Parameter]
     public List<MotherGridPalonnier> MPList{ get; set; }
 
@@ -482,6 +487,7 @@ else
             piecesText.Remove(mp);
             await MPGrid.UpdateRow(mp);
             lastSelectedElementType = mp.ElementType;
+            await RowSaved.InvokeAsync(mp);
             return true;
         }
         return false;
@@ -495,7 +501,10 @@ else
         var toDelete = MPList.ToList();
         foreach (var item in toDelete)
         {
-            await entitiesService.DeleteEntityAsync(item);
+            // Off the list only once deleted (a row another tab already deleted counts as deleted): a refused delete
+            // is undone in memory too, and the row stays. Stopped at the first refusal, which the service has already
+            // shown - one alert, not one per row.
+            if (!await entitiesService.DeleteEntityAsync(item)) break;
             MPList.Remove(item);
         }
         piecesText.Clear();

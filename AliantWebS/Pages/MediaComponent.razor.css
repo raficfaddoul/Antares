@@ -1,0 +1,438 @@
+/* The gallery sits in the app's light forms: a white card in the app's navy and mint, with a dark stage so photos
+   read as photos. Inline SVG icons are reached with ::deep (they carry no scope attribute). */
+
+.media {
+    --media-navy: #192440;
+    --media-navy-dark: #121a2e;
+    --media-mint: #00ffad;
+    --media-mint-ink: #00a874;
+    --media-line: #e3e8f0;
+    --media-muted: #66728a;
+    --media-stage: #0b1120;
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid var(--media-line);
+    border-radius: 14px;
+    background: #fff;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+    color: #1d2638;
+}
+
+.media ::deep .media-ico {
+    width: 18px;
+    height: 18px;
+    flex: none;
+}
+
+.media :focus-visible {
+    outline: 2px solid var(--media-mint-ink);
+    outline-offset: 2px;
+}
+
+.media-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.media-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--media-navy);
+    font-weight: 650;
+}
+
+.media-count {
+    min-width: 22px;
+    padding: 0 7px;
+    border-radius: 999px;
+    background: #eef2f8;
+    color: var(--media-muted);
+    font-size: 12px;
+    font-weight: 650;
+    line-height: 20px;
+    text-align: center;
+}
+
+.media-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.media-btn {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 34px;
+    margin: 0;
+    padding: 0 12px;
+    border: 1px solid var(--media-line);
+    border-radius: 10px;
+    background: #fff;
+    color: var(--media-navy);
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.15s, border-color 0.15s;
+}
+
+.media-btn:hover {
+    background: #f4f7fb;
+    border-color: #cfd7e4;
+}
+
+.media-btn:disabled, .media-btn.is-disabled {
+    opacity: 0.5;
+    cursor: default;
+    pointer-events: none;
+}
+
+.media-btn-primary {
+    background: var(--media-navy);
+    border-color: var(--media-navy);
+    color: #fff;
+}
+
+.media-btn-primary:hover {
+    background: var(--media-navy-dark);
+    border-color: var(--media-navy-dark);
+}
+
+.media-btn-primary ::deep .media-ico {
+    color: var(--media-mint);
+}
+
+.media-btn-icon {
+    width: 34px;
+    padding: 0;
+    justify-content: center;
+}
+
+.media ::deep .media-hidden-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    pointer-events: none;
+}
+
+.media-upload {
+    display: grid;
+    gap: 5px;
+    color: var(--media-muted);
+    font-size: 12px;
+}
+
+.media-upload em {
+    font-style: normal;
+    color: #1d2638;
+}
+
+.media-upload-bar {
+    height: 4px;
+    border-radius: 2px;
+    background: #eef2f8;
+    overflow: hidden;
+}
+
+.media-upload-bar i {
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, var(--media-mint-ink), var(--media-mint));
+    transition: width 0.2s;
+}
+
+/* ---- empty ------------------------------------------------------------------------------------------------------ */
+
+.media-empty {
+    position: relative;
+    display: grid;
+    justify-items: center;
+    gap: 4px;
+    padding: 28px 16px;
+    border: 1.5px dashed #cfd7e4;
+    border-radius: 12px;
+    background: #f8fafd;
+    color: var(--media-muted);
+    text-align: center;
+}
+
+.media-empty strong {
+    color: var(--media-navy);
+    font-weight: 650;
+}
+
+.media-empty.is-droppable:hover {
+    border-color: var(--media-mint-ink);
+    background: #f1fbf7;
+}
+
+.media-empty-icon {
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    margin-bottom: 6px;
+    border-radius: 50%;
+    background: #fff;
+    border: 1px solid var(--media-line);
+    color: var(--media-navy);
+}
+
+.media-empty-icon ::deep .media-ico {
+    width: 22px;
+    height: 22px;
+}
+
+/* The whole empty zone takes a drop (or a click) of files. */
+.media ::deep .media-drop-input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.media-skeleton {
+    aspect-ratio: 16 / 10;
+    max-height: 60vh;
+    border-radius: 12px;
+    background: linear-gradient(90deg, #eef2f8 25%, #f7f9fc 50%, #eef2f8 75%);
+    background-size: 200% 100%;
+    animation: media-shimmer 1.2s linear infinite;
+}
+
+/* ---- stage ------------------------------------------------------------------------------------------------------ */
+
+.media-stage {
+    position: relative;
+    display: grid;
+    place-items: center;
+    aspect-ratio: 16 / 10;
+    max-height: 62vh;
+    overflow: hidden;
+    border-radius: 12px;
+    background: var(--media-stage);
+}
+
+.media-stage img, .media-stage video {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.media-stage img {
+    cursor: zoom-in;
+}
+
+.media-file {
+    display: grid;
+    justify-items: center;
+    gap: 8px;
+    color: #98a4ba;
+}
+
+.media-counter {
+    position: absolute;
+    left: 10px;
+    top: 10px;
+    padding: 2px 9px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.5);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    pointer-events: none;
+}
+
+.media-stage-actions {
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    display: flex;
+    gap: 6px;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.media-stage:hover .media-stage-actions, .media-stage:focus-within .media-stage-actions {
+    opacity: 1;
+}
+
+@media (hover: none) {
+    .media-stage-actions {
+        opacity: 1;
+    }
+}
+
+.media-round {
+    display: inline-grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(8, 13, 26, 0.62);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    color: #fff;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background-color 0.15s;
+}
+
+.media-round:hover {
+    background: rgba(8, 13, 26, 0.85);
+    color: #fff;
+}
+
+.media-round-danger:hover {
+    background: rgba(255, 59, 48, 0.9);
+}
+
+.media-round:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.media-nav {
+    position: absolute;
+    top: 50%;
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    margin-top: -19px;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(8, 13, 26, 0.55);
+    color: #fff;
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+
+.media-nav:hover {
+    background: rgba(8, 13, 26, 0.85);
+}
+
+.media-nav-prev { left: 10px; }
+.media-nav-next { right: 10px; }
+
+.media-caption {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    color: var(--media-muted);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+
+.media-name {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #1d2638;
+    font-weight: 600;
+}
+
+/* ---- filmstrip -------------------------------------------------------------------------------------------------- */
+
+.media-strip {
+    display: flex;
+    gap: 8px;
+    padding: 2px 2px 4px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #cfd7e4 transparent;
+}
+
+.media-thumb {
+    position: relative;
+    flex: none;
+    width: 72px;
+    height: 52px;
+    padding: 0;
+    overflow: hidden;
+    border: 2px solid transparent;
+    border-radius: 9px;
+    background: #e9eef5;
+    cursor: pointer;
+    transition: border-color 0.15s, transform 0.1s;
+}
+
+.media-thumb:hover {
+    border-color: #cfd7e4;
+}
+
+.media-thumb.is-active {
+    border-color: var(--media-mint-ink);
+    box-shadow: 0 0 0 2px rgba(0, 255, 173, 0.25);
+}
+
+.media-thumb img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.media-thumb-icon {
+    display: grid;
+    place-items: center;
+    height: 100%;
+    color: var(--media-muted);
+}
+
+.media-thumb-play {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: rgba(0, 0, 0, 0.18);
+    color: #fff;
+}
+
+.media-thumb-play ::deep .media-ico {
+    width: 16px;
+    height: 16px;
+    fill: rgba(255, 255, 255, 0.95);
+    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.6));
+}
+
+@media (max-width: 560px) {
+    .media {
+        padding: 10px;
+    }
+
+    .media-hide-sm {
+        display: none;
+    }
+
+    .media-btn {
+        width: 34px;
+        padding: 0;
+        justify-content: center;
+    }
+
+    .media-stage {
+        aspect-ratio: 4 / 3;
+    }
+}
+
+@keyframes media-shimmer {
+    to { background-position: -200% 0; }
+}

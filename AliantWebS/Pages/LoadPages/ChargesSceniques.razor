@@ -7,6 +7,7 @@
 @inject IJSRuntime js
 @inject AliantWebS.Data.AppData AppData
 @using Models
+@using Microsoft.EntityFrameworkCore
 @using RiggingOptimizer.IO
 @inject IStringLocalizer<Languages> L
 
@@ -142,7 +143,8 @@
 
                 </RadzenSplitterPane>
                 <RadzenSplitterPane Size="80">
-                    <AliantWebS.Pages.CADPages.SVGComponent ChargesSceniques="chargeSceniqueList"
+                    <AliantWebS.Pages.CADPages.SVGComponent Mode="AliantWebS.Pages.CADPages.PlanMode.View"
+                                                            ChargesSceniques="chargeSceniqueList"
                                                             Point0X="@(Layout?.selectedEvent?.Point0X ?? 0)"
                                                             Point0Y="@(Layout?.selectedEvent?.Point0Y ?? 0)"
                                                             EventName="@Layout?.selectedEvent?.Name"
@@ -181,17 +183,45 @@
     private int decimalPlaces = 3;
 private bool showDecimalSettings = false;
 
+    // The scenario whose charges the list holds - or is being read - and which read is the latest.
+    Guid? listScenarioId;
+    bool listRead;
+    int listReads;
+
     protected override async Task OnParametersSetAsync()
     {
-        chargeSceniqueList = await entitiesService.GetFilteredEntitiesAsync<ChargesScenique>(x => x.EventMpscenarioId == Layout.selectedScenario?.EventMpscenarioId);
+        // The scenario's charges, read through a context of their own and not tracked: the page holds them as plain data
+        // and saves each change itself (UpdateOwnedAsync...), so none is left behind in the circuit's shared context when
+        // the scenario is deleted. The filter runs in the database: GetFilteredEntitiesAsync took a C# function and read
+        // every charge scénique of every scenario.
+        //
+        // Read again only when the scenario shown changes. The layout re-renders this page for many reasons - a save
+        // anywhere in the tab, the unsaved-changes flag - and every read gives new objects: it replaced the rows the grid
+        // was editing, and listed a row just added a second time. The page keeps its list in step itself.
+        var scenarioId = Layout?.selectedScenario?.EventMpscenarioId;
+        if (listRead && scenarioId == listScenarioId) return;
+        listRead = true;
+        listScenarioId = scenarioId;
+        int read = ++listReads;
+
+        var rows = new List<ChargesScenique>();
+        if (scenarioId is { } id)
+        {
+            await using var db = entitiesService.CreateOwnedContext();
+            rows = await db.ChargesSceniques.AsNoTracking().Where(c => c.EventMpscenarioId == id).ToListAsync();
+        }
+
+        // The latest read wins: a slower read of the scenario shown before must not replace this one's rows.
+        if (read != listReads) return;
+        chargeSceniqueList = rows;
         CalculateChargeTotale();
     }
 
     async Task DeleteChargeScenique(ChargesScenique chargesScenique)
     {
-        if (await entitiesService.DeleteEntityAsync(chargesScenique))
+        if (await entitiesService.DeleteOwnedAsync(chargesScenique))
         {
-            if (chargeSceniqueList.Remove(chargesScenique))
+            if (chargeSceniqueList.RemoveAll(c => c.ChargesSceniqueId == chargesScenique.ChargesSceniqueId) > 0)
             {
                 await chargeSceniqueGrid.Reload();
             }
@@ -222,14 +252,15 @@ private bool showDecimalSettings = false;
         // here instead — the user has only its position and its weight left to fill in.
         chargeScenique.Name = NextFreeChargeName(chargeScenique.EventMpscenarioId);
 
-        if ((await entitiesService.InsertEntityAsync(chargeScenique)) != null)
+        // A refused insert is shown by the service itself.
+        if (await entitiesService.InsertOwnedAsync(chargeScenique))
         {
-            chargeSceniqueList.Add(chargeScenique);
-            await chargeSceniqueGrid.InsertRow(chargeScenique);
-        }
-        else
-        {
-            await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
+            // Into the grid only if it still shows that scenario (Back, or the dropdown, may have moved it meanwhile).
+            if (Layout?.selectedScenario?.EventMpscenarioId == chargeScenique.EventMpscenarioId)
+            {
+                chargeSceniqueList.Add(chargeScenique);
+                await chargeSceniqueGrid.InsertRow(chargeScenique);
+            }
         }
 
         CalculateChargeTotale();
@@ -286,7 +317,7 @@ private bool showDecimalSettings = false;
         // Trimmed and ignoring case — that is how the optimiser and the study match the names, so two rows
         // the database would happily keep side by side would still be one single load for the placement.
         bool duplicate = chargeSceniqueList.Any(c =>
-            !ReferenceEquals(c, chargeScenique)
+            c.ChargesSceniqueId != chargeScenique.ChargesSceniqueId
             && c.EventMpscenarioId == chargeScenique.EventMpscenarioId
             && string.Equals((c.Name ?? string.Empty).Trim(), name, StringComparison.OrdinalIgnoreCase));
 
@@ -301,7 +332,7 @@ private bool showDecimalSettings = false;
 
         try
         {
-            if (await entitiesService.UpdateEntityAsync(chargeScenique))
+            if (await entitiesService.UpdateOwnedAsync(chargeScenique))
             {
                 await chargeSceniqueGrid.UpdateRow(chargeScenique);
             }
@@ -313,10 +344,10 @@ private bool showDecimalSettings = false;
         }
         catch (Exception ex)
         {
-            // UpdateEntityAsync rethrows DbUpdateException. Unhandled here it kills the Blazor circuit, so a
+            // UpdateOwnedAsync throws when the save fails. Unhandled here it kills the Blazor circuit, so a
             // name the column cannot hold used to blank the whole page and take the other rows' edits with it.
             await js.InvokeVoidAsync("alert",
-                $"L'enregistrement a échoué : {ex.Message}\nLa ligne reste en édition, rien n'est perdu.");
+                $"L'enregistrement a échoué : {ex.GetBaseException().Message}\nLa ligne reste en édition, rien n'est perdu.");
         }
 
         CalculateChargeTotale();
@@ -324,14 +355,20 @@ private bool showDecimalSettings = false;
 
     async Task DeleteAllChargesSceniques()
     {
+        // The rows on screen when asked, not whatever list the page holds once the dialog is answered: the layout follows
+        // the address and can switch the page to another scenario meanwhile.
+        var toDelete = chargeSceniqueList.ToList();
+
         bool confirmed = await js.InvokeAsync<bool>("confirm", L["Are you sure you want to delete all charges scéniques?"].ToString());
         if (!confirmed) return;
 
-        var toDelete = chargeSceniqueList.ToList();
         foreach (var item in toDelete)
         {
-            await entitiesService.DeleteEntityAsync(item);
-            chargeSceniqueList.Remove(item);
+            // Off the list only once deleted (a row another tab already deleted counts as deleted): a refused delete
+            // is undone in memory too, and the row stays. Stopped at the first refusal, which the service has already
+            // shown - one alert, not one per row.
+            if (!await entitiesService.DeleteOwnedAsync(item)) break;
+            chargeSceniqueList.RemoveAll(c => c.ChargesSceniqueId == item.ChargesSceniqueId);
         }
 
         await chargeSceniqueGrid.Reload();
@@ -356,12 +393,17 @@ private bool showDecimalSettings = false;
         // Read once, up front. Reading it unchecked was the "Object reference not set to an instance of
         // an object" the import showed when no scenario was selected.
         var scenarioId = Layout?.selectedScenario?.EventMpscenarioId;
+        var scenarioName = Layout?.selectedScenario?.Name;
         if (scenarioId is null)
         {
             await js.InvokeVoidAsync("alert",
                 L["No scenario selected. Please select or create a scenario before importing charges."].ToString());
             return;
         }
+
+        // Its names too, with the id and before the upload: the page may be moved to another scenario while the file
+        // comes, and the import must compare with the scenario it writes to.
+        var existingNames = chargeSceniqueList.Select(x => x.Name).ToList();
 
         isImporting = true;
         StateHasChanged();
@@ -379,7 +421,7 @@ private bool showDecimalSettings = false;
             var toInsert = await RiggingOptimizer.Pipeline.ImportChargesSceniquesFromStream(
                 mem,
                 scenarioId.Value,
-                chargeSceniqueList.Select(x => x.Name),
+                existingNames,
                 warnings);
 
             // ── Show what the reader noticed ──────────────────────────
@@ -395,13 +437,20 @@ private bool showDecimalSettings = false;
                 return;
             }
 
-            if (await entitiesService.InsertEntitiesAsync(toInsert))
+            if (await entitiesService.InsertOwnedRangeAsync(toInsert))
             {
-                chargeSceniqueList.AddRange(toInsert);
+                // Into the list on screen only if it is still that scenario's: Back, or the dropdown, may have moved the
+                // page to another scenario while the file was read, and its list was reloaded then - « Tout supprimer »
+                // would otherwise delete these rows from the other scenario.
+                bool stillShown = Layout?.selectedScenario?.EventMpscenarioId == scenarioId;
+                if (stillShown)
+                    chargeSceniqueList.AddRange(toInsert);
                 await chargeSceniqueGrid.Reload();
                 CalculateChargeTotale();
-                await js.InvokeVoidAsync("alert",
-                    L["{0} charge(s) imported successfully.", toInsert.Count].ToString());
+                await js.InvokeVoidAsync("alert", stillShown
+                    ? L["{0} charge(s) imported successfully.", toInsert.Count].ToString()
+                    : $"{toInsert.Count} charge(s) importée(s) dans « {scenarioName} », le scénario où l'import a été lancé "
+                      + "- la page n'affiche plus ce scénario.");
             }
             else
             {
@@ -410,7 +459,8 @@ private bool showDecimalSettings = false;
         }
         catch (Exception ex)
         {
-            await js.InvokeVoidAsync("alert", L["Error: {0}", ex.Message].ToString());
+            // The reason the database gave, not EF's "see the inner exception".
+            await js.InvokeVoidAsync("alert", L["Error: {0}", ex.GetBaseException().Message].ToString());
         }
         finally
         {

@@ -55,14 +55,16 @@
 
                 @* Relative paths, no leading slash: the browser resolves them against the application's
                    base href, so UsePathBase rewrites them when the application is served under a
-                   sub-path — the same reason the download links above are relative. *@
+                   sub-path — the same reason the download links above are relative. `download` on the
+                   workbooks and a new tab for the readme, so the browser handles the click and Blazor does not
+                   take it for a navigation (see the per-file link in « Résultats »). *@
                 <RadzenText TextStyle="TextStyle.Caption">
                     Exemples de fichiers, au format attendu :
-                    <RadzenLink Path="exemples/Charges.xlsx" Text="Charges.xlsx" />,
-                    <RadzenLink Path="exemples/MotherGrill.xlsx" Text="MotherGrill.xlsx" />,
-                    <RadzenLink Path="exemples/Palonnier.xlsx" Text="Palonnier.xlsx" />,
-                    <RadzenLink Path="exemples/Elements.xlsx" Text="Elements.xlsx" />,
-                    <RadzenLink Path="exemples/LISEZ-MOI.md" Text="LISEZ-MOI.md" />.
+                    <RadzenLink Path="exemples/Charges.xlsx" Text="Charges.xlsx" download="" />,
+                    <RadzenLink Path="exemples/MotherGrill.xlsx" Text="MotherGrill.xlsx" download="" />,
+                    <RadzenLink Path="exemples/Palonnier.xlsx" Text="Palonnier.xlsx" download="" />,
+                    <RadzenLink Path="exemples/Elements.xlsx" Text="Elements.xlsx" download="" />,
+                    <RadzenLink Path="exemples/LISEZ-MOI.md" Text="LISEZ-MOI.md" Target="_blank" />.
                 </RadzenText>
             </RadzenStack>
         </RadzenTabsItem>
@@ -146,9 +148,13 @@
                         <RadzenStack Orientation="Radzen.Orientation.Horizontal" Gap="0.25rem">
                             @* A plain link to the streaming endpoint. The previous version base64-encoded
                                the whole file into an eval'd script, which broke on large files and let a
-                               quote in a file name escape into the JavaScript. *@
+                               quote in a file name escape into the JavaScript. `download`: Blazor leaves the click
+                               to the browser. Without it Blazor took the link for a page of the application, found
+                               none, and reloaded it - the file came, but the application stayed on the file's
+                               address (the dropdown stopped switching scenario, Back hung) and Mother Grid calculated
+                               as if it were being left. Bare, not the file's name: the server's name is kept. *@
                             <RadzenLink Path="@ScenarioFilesController.BuildDownloadUrl(EventId, ScenarioId, folder, file.Name)"
-                                        Icon="download" title="Télécharger" />
+                                        Icon="download" title="Télécharger" download="" />
                             <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Text"
                                           Size="ButtonSize.Small" title="Supprimer"
                                           Click="@(() => DeleteFile(folder, file.Name))" />

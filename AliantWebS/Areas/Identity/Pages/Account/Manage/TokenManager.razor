@@ -31,7 +31,7 @@
 }
 else
 {
-    <a class="nav-link" @onclick="@(args => InsertToken())" @onclick:preventDefault="true" href="/nothing">
+    <a class="nav-link" @onclick="@(args => InsertToken())" @onclick:preventDefault="true" href="">
         <span class="oi oi-plus" aria-hidden="true">@L["Add New"]</span>
     </a>
     <RadzenDataGrid TItem="Token" @ref="tokenGrid" Data="@tokenList" @bind-Value="@SelectedTokens"
@@ -93,13 +93,13 @@ else
             <RadzenDataGridColumn Width="50" TItem="Token" Title="@L["Action"]" Filterable="false" Sortable="false">
                 <Template Context="data">
                     <div Style="display: flex">
-                        <a title="@L["Edit"]" class="nav-link" @onclick="@(args => EditRow(data))" @onclick:preventDefault="true" href="/nothing">
+                        <a title="@L["Edit"]" class="nav-link" @onclick="@(args => EditRow(data))" @onclick:preventDefault="true" href="">
                         <span class="oi oi-pencil" aria-hidden="true"></span>
                         </a>
-                        <a title="@L["End Edit"]" class="nav-link" @onclick="@(args => UpdateRow(data))" @onclick:preventDefault="true" href="/nothing">
+                        <a title="@L["End Edit"]" class="nav-link" @onclick="@(args => UpdateRow(data))" @onclick:preventDefault="true" href="">
                             <span class="oi oi-check" aria-hidden="true"></span>
                         </a>
-                        <a title="@L["Delete"]" class="nav-link" @onclick="@(() => DeleteToken(data))" @onclick:preventDefault="true" href="/nothing">
+                        <a title="@L["Delete"]" class="nav-link" @onclick="@(() => DeleteToken(data))" @onclick:preventDefault="true" href="">
                             <span class="oi oi-trash" aria-hidden="true"></span>
                         </a>
                     </div> 

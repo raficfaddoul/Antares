@@ -71,8 +71,9 @@ function initializeDygraph(divid,xlabel, ylabel) {
             strokeBorderWidth: 1,
             highlightCircleSize: 5
         },
-        highlightCallback: function(event, x, points, row, seriesName) {
-            console.log(`Hovered on: ${seriesName}, X: ${x}, Y: ${points}`);
+        // A redraw (new data, zoom, resize) clears dygraph's highlight, so the curve tooltip goes too.
+        drawCallback: function () {
+            hideCurveTooltip(divid);
         }
     };
 
@@ -82,6 +83,7 @@ function initializeDygraph(divid,xlabel, ylabel) {
         headers = `${xlabel},${ylabel}\n`;
     g = new Dygraph(document.getElementById(divid), headers, options);
     dygraphInstances[divid] = g;
+    attachCurveTooltip(g, divid);
 
     // Observe the *parent* container � it is sized by the splitter layout,
     // not by Dygraph's canvas, so its width is always the correct available space.
@@ -94,6 +96,227 @@ function initializeDygraph(divid,xlabel, ylabel) {
         }
     });
     resizeObserver.observe(observeTarget);
+}
+
+// Tooltip naming the curve under the mouse pointer. The pointer is on a curve when it is within
+// CURVE_TOOLTIP_DISTANCE pixels of the line as drawn: the segments, not only the data points, since a
+// sparse series is drawn with long segments. The curve found is also the highlighted one, so the tooltip
+// and the thickened line never disagree (left alone, dygraph highlights the series owning the nearest
+// data point, which near crossings or on long segments is another curve).
+// Reads dygraph's internals (layout_.points, as its own findClosestPoint does, and canvas_), so it is
+// tied to the dygraph version loaded in _Host.cshtml (2.2.1).
+var CURVE_TOOLTIP_DISTANCE = 7;
+
+function hideCurveTooltip(divid) {
+    const tip = document.getElementById(divid + '_curve_tooltip');
+    if (tip) tip.style.display = 'none';
+}
+
+function attachCurveTooltip(g, divid) {
+    // In <body> with position:fixed so the splitter panes' overflow cannot clip it, and so the JPG
+    // export, which captures only the chart's own elements, never draws it. Reused when the graph is
+    // created again under the same id (switching tabs).
+    const tipId = divid + '_curve_tooltip';
+    let tip = document.getElementById(tipId);
+    if (!tip) {
+        tip = document.createElement('div');
+        tip.id = tipId;
+        tip.style.cssText = 'position:fixed; z-index:10000; pointer-events:none; display:none;'
+            + ' background:rgba(33,37,41,0.92); color:#fff; padding:4px 8px; border-radius:4px;'
+            + ' font:12px "Segoe UI", Arial, sans-serif; white-space:nowrap; box-shadow:0 2px 6px rgba(0,0,0,0.25);';
+        document.body.appendChild(tip);
+    }
+    tip.style.display = 'none';
+    tip.dataset.content = '';   // label and colour the content was last built for
+
+    const elem = document.getElementById(divid);
+
+    // Dygraph's mousemove handler selects the row and the series of the point findClosestPoint returns:
+    // the row gives the hover dot and the legend's time and values, the series the thickened line.
+    // Answering with the curve under the pointer, and with that curve's own nearest sample, makes dygraph
+    // select exactly what the tooltip names, once per move. With each sensor at its own timestamps, the
+    // row of another sensor's sample would carry no value for this curve, leaving it out of the legend.
+    // Only that handler calls findClosestPoint, and only with highlightSeriesOpts set, as
+    // initializeDygraph does. The curve found is handed on to the handler below: dygraph's listens on its
+    // canvas, so it runs first for the same event.
+    let curveOfThisMove = null;
+    const findClosestPoint = g.findClosestPoint;
+    g.findClosestPoint = function (domX, domY) {
+        const curve = findCurveAt(g, domX, domY);
+        curveOfThisMove = curve ? curve.name : null;
+        return curve
+            ? { row: curve.point.idx, seriesName: curve.name, point: curve.point }
+            : findClosestPoint.call(this, domX, domY);
+    };
+
+    elem.addEventListener('mouseleave', function () {
+        if (dygraphInstances[divid] === g) hideCurveTooltip(divid);
+    });
+    elem.addEventListener('mousemove', function (e) {
+        const name = curveOfThisMove;
+        curveOfThisMove = null;
+
+        // The ids are fixed ("g3", "graphdiv1"): once a newer graph has taken this id, possibly on this
+        // very element, only that graph's handler may drive the shared tooltip.
+        if (dygraphInstances[divid] !== g) return;
+
+        // No curve when dygraph did not handle this move itself (the pointer is over its legend box or
+        // the roller rather than its canvas), or when a button is pressed: a zoom or pan drag, where the
+        // tooltip would sit in the way.
+        if (!name || e.target !== g.canvas_ || e.buttons) {
+            hideCurveTooltip(divid);
+            return;
+        }
+
+        // Keyed on the colour too: dygraph recolours every series when the set of series changes.
+        const props = g.getPropertiesForSeries(name);
+        const content = name + '\n' + (props ? props.color : '');
+        if (tip.dataset.content !== content) {
+            fillCurveTooltip(tip, name, props);
+            tip.dataset.content = content;
+        }
+
+        tip.style.display = 'block';
+        const offset = 14;
+        let left = e.clientX + offset;
+        let top = e.clientY + offset;
+        if (left + tip.offsetWidth > window.innerWidth - 4) left = e.clientX - offset - tip.offsetWidth;
+        if (top + tip.offsetHeight > window.innerHeight - 4) top = e.clientY - offset - tip.offsetHeight;
+        tip.style.left = Math.max(4, left) + 'px';
+        tip.style.top = Math.max(4, top) + 'px';
+
+        watchCurveTooltip(tip, elem);
+    });
+}
+
+// A chart removed while the pointer rests on one of its curves (browser Back, a tab switched from the
+// keyboard) gets no mouseleave, and the tooltip, which lives in <body>, would stay on the next page. So
+// while it is shown, each frame checks that its chart is still in the document.
+function watchCurveTooltip(tip, elem) {
+    tip.chartElement = elem;
+    if (tip.watching) return;
+    tip.watching = true;
+
+    const check = function () {
+        if (tip.style.display !== 'none' && !tip.chartElement.isConnected) tip.style.display = 'none';
+        if (tip.style.display === 'none') {
+            tip.watching = false;
+            tip.chartElement = null;
+            return;
+        }
+        requestAnimationFrame(check);
+    };
+    requestAnimationFrame(check);
+}
+
+// Series labels on the surveillance plot are "Sensor|channel": the sensor is the tooltip's title and
+// the channel goes under it. Any other label is shown whole. Built with textContent, never as HTML.
+function fillCurveTooltip(tip, label, props) {
+    tip.textContent = '';
+    const sep = label.lastIndexOf('|');
+
+    const title = document.createElement('div');
+    const swatch = document.createElement('span');
+    swatch.style.cssText = 'display:inline-block; width:12px; height:3px; margin-right:6px; vertical-align:middle;'
+        + ' background:' + ((props && props.color) || '#fff') + ';';
+    const sensor = document.createElement('strong');
+    sensor.textContent = sep < 0 ? label : label.substring(0, sep);
+    title.appendChild(swatch);
+    title.appendChild(sensor);
+    tip.appendChild(title);
+
+    if (sep >= 0) {
+        const channel = document.createElement('div');
+        channel.style.cssText = 'opacity:0.8; font-size:11px; padding-left:18px;';
+        channel.textContent = label.substring(sep + 1);
+        tip.appendChild(channel);
+    }
+}
+
+// The visible series whose drawn line passes within CURVE_TOOLTIP_DISTANCE pixels of (x, y), the nearest
+// one if several do, as { name, point }: point is that series' sample nearest along its line, a layout
+// point whose idx is the row. null when no line is that close or (x, y) is outside the plotting area
+// (axes, range selector). x and y are pixels from the top-left corner of dygraph's canvas, as its layout
+// points and the coordinates it hands to findClosestPoint are.
+function findCurveAt(g, x, y) {
+    const layout = g.layout_;
+    if (!layout || !layout.points) return null;
+
+    const area = g.getArea();
+    if (x < area.x || x > area.x + area.w || y < area.y || y > area.y + area.h) return null;
+
+    let best = null;
+    for (let s = 0; s < layout.points.length; s++) {
+        const name = layout.setNames[s];
+        const hit = nearestOnDrawnSeries(layout.points[s], x, y, CURVE_TOOLTIP_DISTANCE,
+            g.getBooleanOption('connectSeparatedPoints', name));
+        // "<=": on a tie the series drawn later, i.e. on top, wins.
+        if (hit && hit.distance <= (best ? best.distance : CURVE_TOOLTIP_DISTANCE)) {
+            best = { name: name, point: hit.point, distance: hit.distance };
+        }
+    }
+    return best;
+}
+
+// Distance from (x, y) to one series' line as dygraph draws it, with the sample at the nearer end of the
+// nearest segment (or the dot), as { distance, point }; null when nothing is drawn near. Only the
+// segments reaching the band [x - maxDist, x + maxDist] are looked at. Mirrors
+// DygraphCanvasRenderer._drawSeries: a missing value is skipped when connectSeparatedPoints is on, and
+// otherwise (or for a NaN) breaks the line; a point with no drawn neighbour counts as a dot.
+function nearestOnDrawnSeries(points, x, y, maxDist, connectSeparated) {
+    if (!points || points.length === 0) return null;
+
+    const skipped = function (p) { return connectSeparated && p.yval === null; };
+
+    // Points are in x order: find the first one inside the band, then step back to the last point
+    // drawn before it, so the segment entering the band counts.
+    let lo = 0, hi = points.length;
+    while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (points[mid].canvasx < x - maxDist) lo = mid + 1; else hi = mid;
+    }
+    let start = lo - 1;
+    while (start >= 0 && skipped(points[start])) start--;
+
+    let bestDistance = Infinity;
+    let bestPoint = null;
+    let prev = null;
+    for (let i = Math.max(start, 0); i < points.length; i++) {
+        const p = points[i];
+        if (skipped(p)) continue;
+
+        const beyond = p.canvasx > x + maxDist;
+        if (p.canvasy === null || p.canvasy !== p.canvasy) {
+            prev = null;                                  // the line is broken here
+        } else {
+            let d, nearer;
+            if (prev) {
+                const t = projectOnSegment(x, y, prev, p);
+                d = Math.hypot(x - (prev.canvasx + t * (p.canvasx - prev.canvasx)),
+                               y - (prev.canvasy + t * (p.canvasy - prev.canvasy)));
+                nearer = t < 0.5 ? prev : p;
+            } else {
+                d = Math.hypot(p.canvasx - x, p.canvasy - y);
+                nearer = p;
+            }
+            if (d < bestDistance) {
+                bestDistance = d;
+                bestPoint = nearer;
+            }
+            prev = p;
+        }
+        if (beyond) break;                                // the segment leaving the band is done
+    }
+    return bestPoint ? { distance: bestDistance, point: bestPoint } : null;
+}
+
+// Position (0 at a, 1 at b) of the point of segment ab nearest to (x, y).
+function projectOnSegment(x, y, a, b) {
+    const dx = b.canvasx - a.canvasx;
+    const dy = b.canvasy - a.canvasy;
+    const len2 = dx * dx + dy * dy;
+    const t = len2 > 0 ? ((x - a.canvasx) * dx + (y - a.canvasy) * dy) / len2 : 0;
+    return Math.max(0, Math.min(1, t));
 }
 
 // Export a dygraph (plot + its side legend) to a JPEG download.

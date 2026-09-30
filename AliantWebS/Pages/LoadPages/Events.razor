@@ -106,7 +106,7 @@ else
             }
             if (appData.Structure == null)
             {
-                navigationManager.NavigateTo(@"/Structures");
+                navigationManager.NavigateTo(@"Structures");
             }
         }
 
@@ -124,40 +124,51 @@ else
 
     async Task DeleteEvent(Event eventt)
     {
-        var isConfirmed = await js.InvokeAsync<bool>("confirm", L["Are you sure you want to delete this event?"]);
+        var isConfirmed = await js.InvokeAsync<bool>("confirm",
+            $"Supprimer l'événement « {eventt.Name} » ?\n"
+            + "Ses scénarios (charges scéniques, mother grids et palonniers, leurs charges, charpentes), ses équipements, "
+            + "ses axes et ses liens aux cas de charge sont supprimés avec lui.\n"
+            + "Ses fichiers seront déplacés dans la corbeille, pas effacés.");
+        if (!isConfirmed) return;
 
-        if (isConfirmed)
+        var eventId = eventt.EventId;
+        var eventName = eventt.Name;
+
+        // Through a context of its own, children first, in one transaction (EntitiesService.DeleteEventAsync): the event
+        // alone was refused as soon as one of its scenarios had charges scéniques. The event's folder - its scenarios'
+        // files, uploaded by hand - goes to the trash only once the rows are gone, so a refused delete cannot strand it.
+        bool hadFolder = false;
+        string moved = null;
+        var deleted = await entitiesService.DeleteEventAsync(eventt, afterDelete: () =>
         {
-            try
-            {
-                var eventId = eventt.EventId;
-                var eventName = eventt.Name;
+            hadFolder = scenarioStorage.HasEventFolder(eventId, eventName);
+            moved = hadFolder ? scenarioStorage.TrashEventFolder(eventId, eventName) : null;
+            return !hadFolder ? "aucun dossier" : moved is null ? "dossier non déplacé" : $"dossier déplacé dans {moved}";
+        });
+        if (deleted is null) return;
 
-                if (await entitiesService.DeleteEntityAsync(eventt))
-                {
-                    // The event's scenario folders hold files the user uploaded by hand, so they are
-                    // moved to the trash rather than left orphaned or destroyed.
-                    scenarioStorage.TrashEventFolder(eventId, eventName);
-
-                    if (eventsList.Remove(eventt))
-                    {
-                        await eventsGrid.Reload();
-
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                await js.InvokeVoidAsync("alert", L["Error"] + ": " + ex.Message);
-            }
-
+        eventsList.RemoveAll(e => e.EventId == eventId);
+        // Nothing may go on pointing at the deleted event: its photos pane, and the event the conception and
+        // monitoring pages open (they treat none as "choose an event").
+        if (selectedEvent?.EventId == eventId) selectedEvent = null;
+        if (appData.EventID == eventId)
+        {
+            appData.EventID = Guid.Empty;
+            appData.CharpenteTauxByBimId = new();   // the 3D model's colours came from its calculations
         }
+        await eventsGrid.Reload();
+        StateHasChanged();
+
+        if (hadFolder && moved is null)
+            await js.InvokeVoidAsync("alert",
+                $"L'événement « {eventName} » est supprimé, mais son dossier n'a pas pu être déplacé dans la corbeille : "
+                + "ses fichiers sont restés en place.");
     }
 
     async Task Charges(Event eventt)
     {
         appData.EventID = eventt.EventId;
-        navigationManager.NavigateTo(@"/ChargesSceniques/" + eventt.EventId);
+        navigationManager.NavigateTo(@"ChargesSceniques/" + eventt.EventId);
     }
 
 

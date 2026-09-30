@@ -924,4 +924,391 @@
   <data name="Developer Tools" xml:space="preserve">
     <value>Outils développeur</value>
   </data>
+  <data name="Camera" xml:space="preserve">
+    <value>Caméra</value>
+  </data>
+  <data name="Flash" xml:space="preserve">
+    <value>Flash</value>
+  </data>
+  <data name="Self-timer" xml:space="preserve">
+    <value>Retardateur</value>
+  </data>
+  <data name="Grid" xml:space="preserve">
+    <value>Grille</value>
+  </data>
+  <data name="Date stamp" xml:space="preserve">
+    <value>Horodatage</value>
+  </data>
+  <data name="Location" xml:space="preserve">
+    <value>Position</value>
+  </data>
+  <data name="Zoom" xml:space="preserve">
+    <value>Zoom</value>
+  </data>
+  <data name="Starting the camera…" xml:space="preserve">
+    <value>Démarrage de la caméra…</value>
+  </data>
+  <data name="Restart" xml:space="preserve">
+    <value>Redémarrer</value>
+  </data>
+  <data name="Try again" xml:space="preserve">
+    <value>Réessayer</value>
+  </data>
+  <data name="Use the device camera app" xml:space="preserve">
+    <value>Utiliser l'application photo de l'appareil</value>
+  </data>
+  <data name="Import from device" xml:space="preserve">
+    <value>Importer depuis l'appareil</value>
+  </data>
+  <data name="Camera settings" xml:space="preserve">
+    <value>Réglages de la caméra</value>
+  </data>
+  <data name="Resolution" xml:space="preserve">
+    <value>Résolution</value>
+  </data>
+  <data name="Automatic: the sharpest for photos, Full HD for videos." xml:space="preserve">
+    <value>Automatique : la plus nette pour les photos, Full HD pour les vidéos.</value>
+  </data>
+  <data name="Review shots before saving" xml:space="preserve">
+    <value>Vérifier les prises avant l'enregistrement</value>
+  </data>
+  <data name="Off: every shot is saved as soon as it is taken." xml:space="preserve">
+    <value>Désactivé : chaque prise est enregistrée dès qu'elle est faite.</value>
+  </data>
+  <data name="GPS position in the stamp and in the photo data." xml:space="preserve">
+    <value>Position GPS dans l'horodatage et dans les données de la photo.</value>
+  </data>
+  <data name="Record sound with videos" xml:space="preserve">
+    <value>Enregistrer le son des vidéos</value>
+  </data>
+  <data name="Shutter sound" xml:space="preserve">
+    <value>Son du déclencheur</value>
+  </data>
+  <data name="Keyboard shortcuts" xml:space="preserve">
+    <value>Raccourcis clavier</value>
+  </data>
+  <data name="Space" xml:space="preserve">
+    <value>Espace</value>
+  </data>
+  <data name="Take a photo / start or stop a video" xml:space="preserve">
+    <value>Prendre une photo / démarrer ou arrêter une vidéo</value>
+  </data>
+  <data name="Photo or video" xml:space="preserve">
+    <value>Photo ou vidéo</value>
+  </data>
+  <data name="Previous / next shot" xml:space="preserve">
+    <value>Prise précédente / suivante</value>
+  </data>
+  <data name="Back / close" xml:space="preserve">
+    <value>Retour / fermer</value>
+  </data>
+  <data name="Review" xml:space="preserve">
+    <value>Aperçu</value>
+  </data>
+  <data name="Back to camera" xml:space="preserve">
+    <value>Retour à la caméra</value>
+  </data>
+  <data name="{0} of {1}" xml:space="preserve">
+    <value>{0} sur {1}</value>
+  </data>
+  <data name="Markup" xml:space="preserve">
+    <value>Annoter</value>
+  </data>
+  <data name="Previous" xml:space="preserve">
+    <value>Précédent</value>
+  </data>
+  <data name="Next" xml:space="preserve">
+    <value>Suivant</value>
+  </data>
+  <data name="Retry" xml:space="preserve">
+    <value>Réessayer</value>
+  </data>
+  <data name="Save" xml:space="preserve">
+    <value>Enregistrer</value>
+  </data>
+  <data name="Tool" xml:space="preserve">
+    <value>Outil</value>
+  </data>
+  <data name="Colour" xml:space="preserve">
+    <value>Couleur</value>
+  </data>
+  <data name="Thickness" xml:space="preserve">
+    <value>Épaisseur</value>
+  </data>
+  <data name="Undo" xml:space="preserve">
+    <value>Défaire</value>
+  </data>
+  <data name="Redo" xml:space="preserve">
+    <value>Rétablir</value>
+  </data>
+  <data name="Clear" xml:space="preserve">
+    <value>Tout effacer</value>
+  </data>
+  <data name="Apply" xml:space="preserve">
+    <value>Appliquer</value>
+  </data>
+  <data name="Type, then Enter" xml:space="preserve">
+    <value>Saisir, puis Entrée</value>
+  </data>
+  <data name="Mode" xml:space="preserve">
+    <value>Mode</value>
+  </data>
+  <data name="Photo" xml:space="preserve">
+    <value>Photo</value>
+  </data>
+  <data name="This browser cannot record videos." xml:space="preserve">
+    <value>Ce navigateur ne peut pas enregistrer de vidéos.</value>
+  </data>
+  <data name="Video" xml:space="preserve">
+    <value>Vidéo</value>
+  </data>
+  <data name="Stop recording" xml:space="preserve">
+    <value>Arrêter l'enregistrement</value>
+  </data>
+  <data name="Record a video" xml:space="preserve">
+    <value>Enregistrer une vidéo</value>
+  </data>
+  <data name="Take a photo" xml:space="preserve">
+    <value>Prendre une photo</value>
+  </data>
+  <data name="Switch camera" xml:space="preserve">
+    <value>Changer de caméra</value>
+  </data>
+  <data name="Saving {0}…" xml:space="preserve">
+    <value>Enregistrement de {0}…</value>
+  </data>
+  <data name="Save {0}" xml:space="preserve">
+    <value>Enregistrer ({0})</value>
+  </data>
+  <data name="All saved" xml:space="preserve">
+    <value>Tout est enregistré</value>
+  </data>
+  <data name="Done" xml:space="preserve">
+    <value>Terminé</value>
+  </data>
+  <data name="Save this item first to add photos and videos." xml:space="preserve">
+    <value>Enregistrez d'abord cet élément pour y ajouter des photos et des vidéos.</value>
+  </data>
+  <data name="Photos and videos cannot be stored for this item." xml:space="preserve">
+    <value>Impossible de stocker des photos et des vidéos pour cet élément.</value>
+  </data>
+  <data name="Shots can be reviewed but not saved here." xml:space="preserve">
+    <value>Les prises peuvent être vérifiées, mais pas enregistrées ici.</value>
+  </data>
+  <data name="Shots wait here until you save them." xml:space="preserve">
+    <value>Les prises restent ici jusqu'à ce que vous les enregistriez.</value>
+  </data>
+  <data name="Shots are saved as soon as they are taken." xml:space="preserve">
+    <value>Les prises sont enregistrées dès qu'elles sont faites.</value>
+  </data>
+  <data name="Location is blocked for this site: photos are taken without it." xml:space="preserve">
+    <value>La position est bloquée pour ce site : les photos sont prises sans elle.</value>
+  </data>
+  <data name="The camera is not ready yet." xml:space="preserve">
+    <value>La caméra n'est pas encore prête.</value>
+  </data>
+  <data name="No microphone: the video is recorded without sound." xml:space="preserve">
+    <value>Pas de micro : la vidéo est enregistrée sans son.</value>
+  </data>
+  <data name="Recording stopped at the maximum length ({0} min)." xml:space="preserve">
+    <value>Enregistrement arrêté à la durée maximale ({0} min).</value>
+  </data>
+  <data name="{0} is not a photo or a video." xml:space="preserve">
+    <value>{0} n'est ni une photo ni une vidéo.</value>
+  </data>
+  <data name="Something went wrong with the camera." xml:space="preserve">
+    <value>Un problème est survenu avec la caméra.</value>
+  </data>
+  <data name="Delete this video?" xml:space="preserve">
+    <value>Supprimer cette vidéo ?</value>
+  </data>
+  <data name="Delete this photo?" xml:space="preserve">
+    <value>Supprimer cette photo ?</value>
+  </data>
+  <data name="It is already saved with {0}. It will be removed from there too." xml:space="preserve">
+    <value>Elle est déjà enregistrée avec {0}. Elle y sera aussi supprimée.</value>
+  </data>
+  <data name="this item" xml:space="preserve">
+    <value>cet élément</value>
+  </data>
+  <data name="The file could not be deleted." xml:space="preserve">
+    <value>Le fichier n'a pas pu être supprimé.</value>
+  </data>
+  <data name="The markup could not be applied." xml:space="preserve">
+    <value>L'annotation n'a pas pu être appliquée.</value>
+  </data>
+  <data name="Not saved: {0}. Open a shot to retry." xml:space="preserve">
+    <value>Non enregistrées : {0}. Ouvrez une prise pour réessayer.</value>
+  </data>
+  <data name="Saved: {0}" xml:space="preserve">
+    <value>Enregistrées : {0}</value>
+  </data>
+  <data name="This file type cannot be stored." xml:space="preserve">
+    <value>Ce type de fichier ne peut pas être stocké.</value>
+  </data>
+  <data name="Too large (maximum {0})." xml:space="preserve">
+    <value>Trop volumineux (maximum {0}).</value>
+  </data>
+  <data name="The connection was lost." xml:space="preserve">
+    <value>La connexion a été perdue.</value>
+  </data>
+  <data name="Saving is not finished" xml:space="preserve">
+    <value>L'enregistrement n'est pas terminé</value>
+  </data>
+  <data name="Unsaved shots: {0}" xml:space="preserve">
+    <value>Prises non enregistrées : {0}</value>
+  </data>
+  <data name="Wait for the files to be saved, or close and lose what is not saved yet." xml:space="preserve">
+    <value>Attendez la fin de l'enregistrement, ou fermez et perdez ce qui n'est pas encore enregistré.</value>
+  </data>
+  <data name="Save them before closing, or they will be lost." xml:space="preserve">
+    <value>Enregistrez-les avant de fermer, sinon elles seront perdues.</value>
+  </data>
+  <data name="They cannot be saved for this item and will be lost." xml:space="preserve">
+    <value>Elles ne peuvent pas être enregistrées pour cet élément et seront perdues.</value>
+  </data>
+  <data name="Close when saved" xml:space="preserve">
+    <value>Fermer une fois enregistré</value>
+  </data>
+  <data name="Save and close" xml:space="preserve">
+    <value>Enregistrer et fermer</value>
+  </data>
+  <data name="Keep editing" xml:space="preserve">
+    <value>Continuer</value>
+  </data>
+  <data name="Discard" xml:space="preserve">
+    <value>Abandonner</value>
+  </data>
+  <data name="Not saved yet" xml:space="preserve">
+    <value>Pas encore enregistrée</value>
+  </data>
+  <data name="Not saved" xml:space="preserve">
+    <value>Non enregistrée</value>
+  </data>
+  <data name="Waiting to be saved" xml:space="preserve">
+    <value>En attente d'enregistrement</value>
+  </data>
+  <data name="Saving… {0}%" xml:space="preserve">
+    <value>Enregistrement… {0} %</value>
+  </data>
+  <data name="Saved" xml:space="preserve">
+    <value>Enregistrée</value>
+  </data>
+  <data name="Changed, not saved yet" xml:space="preserve">
+    <value>Modifiée, pas encore enregistrée</value>
+  </data>
+  <data name="The camera stopped" xml:space="preserve">
+    <value>La caméra s'est arrêtée</value>
+  </data>
+  <data name="It may have been disconnected, or taken by another application." xml:space="preserve">
+    <value>Elle a peut-être été déconnectée, ou prise par une autre application.</value>
+  </data>
+  <data name="The camera needs a secure connection" xml:space="preserve">
+    <value>La caméra exige une connexion sécurisée</value>
+  </data>
+  <data name="Browsers only allow the camera on HTTPS pages (or on the computer running the app). Open the app over HTTPS, or use the device camera app." xml:space="preserve">
+    <value>Les navigateurs n'autorisent la caméra que sur les pages HTTPS (ou sur l'ordinateur qui exécute l'application). Ouvrez l'application en HTTPS, ou utilisez l'application photo de l'appareil.</value>
+  </data>
+  <data name="Camera access is blocked" xml:space="preserve">
+    <value>L'accès à la caméra est bloqué</value>
+  </data>
+  <data name="Allow the camera for this site (the camera icon in the address bar), then try again." xml:space="preserve">
+    <value>Autorisez la caméra pour ce site (icône de caméra dans la barre d'adresse), puis réessayez.</value>
+  </data>
+  <data name="No camera found" xml:space="preserve">
+    <value>Aucune caméra trouvée</value>
+  </data>
+  <data name="Connect a camera, or add photos and videos from this device." xml:space="preserve">
+    <value>Branchez une caméra, ou ajoutez des photos et des vidéos depuis cet appareil.</value>
+  </data>
+  <data name="The camera is in use" xml:space="preserve">
+    <value>La caméra est déjà utilisée</value>
+  </data>
+  <data name="Another application or tab is using the camera. Close it, then try again." xml:space="preserve">
+    <value>Une autre application ou un autre onglet utilise la caméra. Fermez-le, puis réessayez.</value>
+  </data>
+  <data name="This browser cannot use the camera" xml:space="preserve">
+    <value>Ce navigateur ne peut pas utiliser la caméra</value>
+  </data>
+  <data name="Use a recent Chrome, Edge, Safari or Firefox, or the device camera app." xml:space="preserve">
+    <value>Utilisez un Chrome, Edge, Safari ou Firefox récent, ou l'application photo de l'appareil.</value>
+  </data>
+  <data name="The camera could not start" xml:space="preserve">
+    <value>La caméra n'a pas pu démarrer</value>
+  </data>
+  <data name="Try again. If it keeps failing, reload the page." xml:space="preserve">
+    <value>Réessayez. Si le problème persiste, rechargez la page.</value>
+  </data>
+  <data name="Photos and videos" xml:space="preserve">
+    <value>Photos et vidéos</value>
+  </data>
+  <data name="Add files" xml:space="preserve">
+    <value>Ajouter des fichiers</value>
+  </data>
+  <data name="Adding {0} of {1}…" xml:space="preserve">
+    <value>Ajout de {0} sur {1}…</value>
+  </data>
+  <data name="No photos or videos yet" xml:space="preserve">
+    <value>Aucune photo ni vidéo pour l'instant</value>
+  </data>
+  <data name="Use the camera, add files, or drop them here." xml:space="preserve">
+    <value>Utilisez la caméra, ajoutez des fichiers ou déposez-les ici.</value>
+  </data>
+  <data name="Open full screen" xml:space="preserve">
+    <value>Plein écran</value>
+  </data>
+  <data name="Download" xml:space="preserve">
+    <value>Télécharger</value>
+  </data>
+  <data name="At most {0} files at a time." xml:space="preserve">
+    <value>{0} fichiers au maximum à la fois.</value>
+  </data>
+  <data name="Not added" xml:space="preserve">
+    <value>Non ajoutés</value>
+  </data>
+  <data name="Added: {0}" xml:space="preserve">
+    <value>Ajoutés : {0}</value>
+  </data>
+  <data name="{0} will be deleted. This cannot be undone." xml:space="preserve">
+    <value>{0} sera supprimé. Cette action est irréversible.</value>
+  </data>
+  <data name="Zoom out" xml:space="preserve">
+    <value>Zoom arrière</value>
+  </data>
+  <data name="Fit to screen" xml:space="preserve">
+    <value>Ajuster à l'écran</value>
+  </data>
+  <data name="Zoom in" xml:space="preserve">
+    <value>Zoom avant</value>
+  </data>
+  <data name="Arrow" xml:space="preserve">
+    <value>Flèche</value>
+  </data>
+  <data name="Rectangle" xml:space="preserve">
+    <value>Rectangle</value>
+  </data>
+  <data name="Ellipse" xml:space="preserve">
+    <value>Ellipse</value>
+  </data>
+  <data name="Pen" xml:space="preserve">
+    <value>Crayon</value>
+  </data>
+  <data name="Text" xml:space="preserve">
+    <value>Texte</value>
+  </data>
+  <data name="Event" xml:space="preserve">
+    <value>Événement</value>
+  </data>
+  <data name="Element" xml:space="preserve">
+    <value>Élément</value>
+  </data>
+  <data name="Structure" xml:space="preserve">
+    <value>Structure</value>
+  </data>
+  <data name="Equipment" xml:space="preserve">
+    <value>Équipement</value>
+  </data>
+  <data name="Item" xml:space="preserve">
+    <value>Élément</value>
+  </data>
 </root>

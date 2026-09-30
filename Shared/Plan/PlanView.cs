@@ -1,5 +1,5 @@
 // =============================================================
-// PlanView.cs — Where SVGComponent draws things, and how the background picture sits under them.
+// PlanView.cs — Where the plan (SVGComponent) draws things, and how the background picture sits under them.
 //
 // The plan is drawn HORIZONTAL, the way the hall's own plan is drawn: the beams J..A as vertical lines,
 // J at the left and A at the right, point line 9 at the top and 1 at the bottom. The hall is twice as
@@ -13,16 +13,23 @@
 //
 // It was drawn in Figure 2's orientation for a while (2026-09-11 to 09-12): beams horizontal, the whole
 // plan standing on end. That was asked for the axes, never for the view, and it is undone here - in the
-// one place the screen orientation lives, ToSvg and FromSvg.
+// one place the screen orientation lives, StoredToSvg and SvgToStored.
 //
-// SVGComponent keeps its "real" coordinates as they always were: the grid's axes, in absolute
-// millimetres, as CharpenteCoordinates and the sensors' X/Y attributes are. One SVG unit is the same
-// length in every direction, so what is measured on the screen - a drawn line, the distance to a mother -
-// is true, and hand drawing, hit tests and what is saved do not change.
+// Two frames meet the screen:
+// - the STORED frame: the grid's axes, metres from Point0, as element ends, loads and intersections are
+//   stored. Everything the plan draws is converted to it first (PlanData), then to SVG (StoredToSvg). The
+//   SVG origin is Point0 itself, so this conversion does not depend on Point0;
+// - absolute millimetres in the grid's axes, as CharpenteCoordinates (×1000), the picture's calibration and
+//   the sensors' X/Y attributes hold them. ToSvg and FromSvg are StoredToSvg and SvgToStored for those, taking
+//   Point0: a sensor placed on the plan is saved with FromSvg.
+// One SVG unit is the same length in every direction, so what is measured on the screen - a drawn line,
+// the distance to a mother - is true.
 //
 // The background picture is drawn this way already, so it is laid on the plan with a scale and a shift
 // only - neither turned nor mirrored - placed by the positions of its own grid lines, measured on it, so
 // they fall on the charpente points.
+//
+// Lived in the web project (Pages/CADPages) until 2026-09-17; moved to Shared with the DXF exporter.
 // =============================================================
 
 #nullable enable
@@ -34,7 +41,7 @@ using System.Linq;
 using AliantWebS.Models;
 using Helpers;
 
-namespace AliantWebS.Pages.CADPages;
+namespace AliantWebS.Plan;
 
 public static class PlanView
 {
@@ -42,41 +49,71 @@ public static class PlanView
 
     /// <summary>
     /// SVG user units per millimetre - the scale the plan has always been drawn at: 754 units across the
-    /// 68,4 m the old view spanned. Every marker, stroke and text on the plan is sized in SVG units, so
-    /// keeping the scale keeps them the size people know.
+    /// 68,4 m the old view spanned. The grid labels are sized in SVG units, so keeping the scale keeps them
+    /// the size people know.
     /// </summary>
     public const double SvgPerMm = 754.0 / 68397.0;
 
     /// <summary>
     /// A length on the plan, SVG user units, in metres. One SVG unit is the same length in every direction, so this
-    /// holds along any line: the pick tolerance of a click, set in screen pixels, is turned into metres by it.
+    /// holds along any line.
     /// </summary>
     public static double SvgToMetres(double svgUnits) => svgUnits / SvgPerMm / MmPerM;
 
+    /// <summary>A length in metres, on the plan in SVG user units.</summary>
+    public static double MetresToSvg(double metres) => metres * MmPerM * SvgPerMm;
+
     // ── Grid <-> screen ─────────────────────────────────────────────────────────────────────────
 
-    /// <summary>A position in the grid's axes, absolute millimetres, on the plan (SVG user units).</summary>
-    public static (double X, double Y) ToSvg(double gridXmm, double gridYmm, double point0Xm, double point0Ym)
+    /// <summary>A position in the stored frame - the grid's axes, metres from Point0 - on the plan (SVG user units).</summary>
+    public static (double X, double Y) StoredToSvg(double gridXm, double gridYm)
     {
-        var (studyX, studyY) = StudyAxes.ToStudy(gridXmm - point0Xm * MmPerM, gridYmm - point0Ym * MmPerM);
+        var (studyX, studyY) = StudyAxes.ToStudy(gridXm, gridYm);
 
         // Horizontal. Study X, along the beams towards point 9, goes UP the screen - and SVG's y points
         // down, hence the minus. Study Y, across the beams towards J, goes LEFT - hence the other one.
         // A right-handed pair either way: the plan is turned, never mirrored.
-        return (-studyY * SvgPerMm, -studyX * SvgPerMm);
+        return (-studyY * MmPerM * SvgPerMm, -studyX * MmPerM * SvgPerMm);
     }
+
+    /// <summary>A point of the plan (SVG user units) in the stored frame: the grid's axes, metres from Point0.</summary>
+    public static (double X, double Y) SvgToStored(double svgX, double svgY) =>
+        // The inverse of StoredToSvg, term for term: up is study X, left is study Y.
+        StudyAxes.ToGrid(-svgY / SvgPerMm / MmPerM, -svgX / SvgPerMm / MmPerM);
+
+    /// <summary>A position in the grid's axes, absolute millimetres, on the plan (SVG user units).</summary>
+    public static (double X, double Y) ToSvg(double gridXmm, double gridYmm, double point0Xm, double point0Ym) =>
+        StoredToSvg(gridXmm / MmPerM - point0Xm, gridYmm / MmPerM - point0Ym);
 
     /// <summary>A point of the plan (SVG user units), in the grid's axes, absolute millimetres.</summary>
     public static (double X, double Y) FromSvg(double svgX, double svgY, double point0Xm, double point0Ym)
     {
-        // The inverse of ToSvg, term for term: up is study X, left is study Y.
-        var (gridX, gridY) = StudyAxes.ToGrid(-svgY / SvgPerMm, -svgX / SvgPerMm);
-        return (gridX + point0Xm * MmPerM, gridY + point0Ym * MmPerM);
+        var (x, y) = SvgToStored(svgX, svgY);
+        return ((x + point0Xm) * MmPerM, (y + point0Ym) * MmPerM);
     }
 
     /// <summary>A position in the grid's axes, absolute millimetres, in the studies' axes: metres from Point0.</summary>
     public static (double X, double Y) StudyMetres(double gridXmm, double gridYmm, double point0Xm, double point0Ym) =>
         StudyAxes.ToStudy(gridXmm / MmPerM - point0Xm, gridYmm / MmPerM - point0Ym);
+
+    /// <summary>
+    /// The affine map from a point of the plan (SVG user units) to the studies' axes, metres from Point0, as the six
+    /// numbers a b c d e f of X = a·x + c·y + e, Y = b·x + d·y + f. The browser shows the mouse's position with it,
+    /// so the screen orientation stays written here only.
+    /// </summary>
+    public static double[] SvgToStudyMatrix()
+    {
+        (double X, double Y) At(double x, double y)
+        {
+            var (gx, gy) = SvgToStored(x, y);
+            return StudyAxes.ToStudy(gx, gy);
+        }
+
+        var o = At(0, 0);
+        var alongX = At(1, 0);
+        var alongY = At(0, 1);
+        return new[] { alongX.X - o.X, alongX.Y - o.Y, alongY.X - o.X, alongY.Y - o.Y, o.X, o.Y };
+    }
 
     // ── The background picture ──────────────────────────────────────────────────────────────────
 

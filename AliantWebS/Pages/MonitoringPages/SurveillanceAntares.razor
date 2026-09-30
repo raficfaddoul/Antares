@@ -108,7 +108,7 @@
 
             if (appData.Structure == null)
             {
-                navigationManager.NavigateTo(@"/Structures");
+                navigationManager.NavigateTo(@"Structures");
                 return;
             }
             StructureID = appData.Structure.StructureId;
@@ -244,7 +244,7 @@
             var selectedLoadCases = (await entitiesService.GetFilteredEntitiesAsync<LoadCase>(
                 x => x.StructureId == appData.Structure.StructureId)).ToDictionary(lc => lc, lc => 1.0);
 
-            var beamTaux = await CharpenteFEHelper.ComputeAsync(
+            var (beamTaux, componentTaux) = await CharpenteFEHelper.ComputeAsync(
                 appData.Structure, selectedLoadCases, chargeNodale, entitiesService);
 
             tauxByBimId = beamTaux

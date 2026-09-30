@@ -56,6 +56,7 @@ namespace Structural
             element.Columns.Add("b", typeof(double));
             element.Columns.Add("h", typeof(double));
             element.Columns.Add("Guid", typeof(Guid));
+            element.Columns.Add("J", typeof(double));   // constante de torsion ; en dernier pour ne pas décaler les Rows.Add existants
 
             return element;
 

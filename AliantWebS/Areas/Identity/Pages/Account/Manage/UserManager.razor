@@ -38,7 +38,7 @@
 }
 else
 {
-    <a class="nav-link" @onclick="@(args => OpenInvite())" @onclick:preventDefault="true" href="/nothing">
+    <a class="nav-link" @onclick="@(args => OpenInvite())" @onclick:preventDefault="true" href="">
         <span class="oi oi-plus" aria-hidden="true">@L["Inviter un utilisateur"]</span>
     </a>
 
@@ -132,14 +132,14 @@ else
             <RadzenDataGridColumn Width="50" TItem="AspNetUser" Title="@L["Action"]" Filterable="false" Sortable="false">
                 <Template Context="data">
                     <div Style="display: flex">
-                        <a title="@L["Edit"]" class="nav-link" @onclick="@(args => EditRow(data))" @onclick:preventDefault="true" href="/nothing">
+                        <a title="@L["Edit"]" class="nav-link" @onclick="@(args => EditRow(data))" @onclick:preventDefault="true" href="">
                             <!--href="/patient/EditSideEffectComponent/@data.SideEffectID-->
                             <span class="oi oi-pencil" aria-hidden="true"></span>
                         </a>
-                        <a title="@L["End Edit"]" class="nav-link" @onclick="@(args => UpdateRow(data))" @onclick:preventDefault="true" href="/nothing">
+                        <a title="@L["End Edit"]" class="nav-link" @onclick="@(args => UpdateRow(data))" @onclick:preventDefault="true" href="">
                             <span class="oi oi-check" aria-hidden="true"></span>
                         </a>
-                        <a title="@L["Delete"]" class="nav-link" @onclick="@(() => DeleteUser(data))" @onclick:preventDefault="true" href="/nothing">
+                        <a title="@L["Delete"]" class="nav-link" @onclick="@(() => DeleteUser(data))" @onclick:preventDefault="true" href="">
                             <span class="oi oi-trash" aria-hidden="true"></span>
                         </a>
                         @* Only for accounts that never completed their invitation: an expired link
@@ -148,11 +148,11 @@ else
                         @if (!data.EmailConfirmed)
                         {
                             <a title="@L["Renvoyer l'invitation"]" class="nav-link"
-                               @onclick="@(() => ResendInvite(data))" @onclick:preventDefault="true" href="/nothing">
+                               @onclick="@(() => ResendInvite(data))" @onclick:preventDefault="true" href="">
                                 <span class="oi oi-envelope-closed" aria-hidden="true"></span>
                             </a>
                             <a title="@L["Copier le lien d'invitation"]" class="nav-link"
-                               @onclick="@(() => CopyInvitationLink(data))" @onclick:preventDefault="true" href="/nothing">
+                               @onclick="@(() => CopyInvitationLink(data))" @onclick:preventDefault="true" href="">
                                 <span class="oi oi-link-intact" aria-hidden="true"></span>
                             </a>
                         }

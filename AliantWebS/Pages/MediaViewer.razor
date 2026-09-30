@@ -1,0 +1,213 @@
+@using System.Globalization
+@implements IAsyncDisposable
+@inject IJSRuntime js
+@inject IStringLocalizer<Languages> L
+@inject Radzen.DialogService DialogService
+@inject Microsoft.AspNetCore.Mvc.ViewFeatures.IFileVersionProvider fileVersions
+
+@* Full-screen viewer for an item's photos and videos, opened from MediaComponent. Zoom (wheel, pinch, double-click),
+   pan and swipe run in wwwroot/js/media-gallery.js. The dialog's result is the index last shown, so the gallery
+   stays on it. *@
+
+<div class="mv" tabindex="-1" @ref="root" @onkeydown="OnKeyAsync">
+    @if (Items.Count > 0)
+    {
+        var item = Items[index];
+        <header class="mv-top">
+            <span class="mv-count">@L["{0} of {1}", index + 1, Items.Count]</span>
+            <div class="mv-name">
+                <strong title="@item.Name">@item.Name</strong>
+                <small>@item.Modified.ToString("g", CultureInfo.CurrentCulture) · @CameraComponent.FormatSize(item.Size)</small>
+            </div>
+            <div class="mv-actions">
+                @if (item.Kind == MediaKind.Photo)
+                {
+                    <button type="button" class="mv-btn" title="@L["Zoom out"] (−)" aria-label="@L["Zoom out"]" disabled="@(zoom <= 1.001)" @onclick="() => ZoomAsync(1 / 1.5)">@MediaIcons.Svg("zoom-out")</button>
+                    <button type="button" class="mv-zoom" title="@L["Fit to screen"] (0)" @onclick="ResetZoomAsync">@((int)Math.Round(zoom * 100))%</button>
+                    <button type="button" class="mv-btn" title="@L["Zoom in"] (+)" aria-label="@L["Zoom in"]" disabled="@(zoom >= 7.99)" @onclick="() => ZoomAsync(1.5)">@MediaIcons.Svg("zoom-in")</button>
+                }
+                <a class="mv-btn" href="@item.Url" download="@item.Name" title="@L["Download"]" aria-label="@L["Download"]">@MediaIcons.Svg("download")</a>
+                <button type="button" class="mv-btn" title="@L["Close"] (Esc)" aria-label="@L["Close"]" @onclick="Close">@MediaIcons.Svg("close")</button>
+            </div>
+        </header>
+
+        <div class="mv-stage" @ref="viewport">
+            @if (item.Kind == MediaKind.Photo)
+            {
+                <img @key="item.Url" data-media="zoomable" src="@item.Url" alt="@item.Name" draggable="false" />
+            }
+            else if (item.Kind == MediaKind.Video)
+            {
+                <video @key="item.Url" src="@item.Url" poster="@item.ThumbnailUrl" controls autoplay playsinline></video>
+            }
+            else
+            {
+                <div class="mv-file">@MediaIcons.Svg("image") <span>@item.Name</span></div>
+            }
+            @if (index > 0)
+            {
+                <button type="button" class="mv-nav mv-nav-prev" aria-label="@L["Previous"]" @onclick="() => GoAsync(index - 1)">@MediaIcons.Svg("chevron-left")</button>
+            }
+            @if (index < Items.Count - 1)
+            {
+                <button type="button" class="mv-nav mv-nav-next" aria-label="@L["Next"]" @onclick="() => GoAsync(index + 1)">@MediaIcons.Svg("chevron-right")</button>
+            }
+        </div>
+
+        @if (Items.Count > 1)
+        {
+            <div class="mv-strip" @ref="strip">
+                @for (var i = 0; i < Items.Count; i++)
+                {
+                    var position = i;
+                    var thumb = Items[i];
+                    <button type="button" @key="thumb.Path" class="mv-thumb @(position == index ? "is-active" : "")" aria-label="@thumb.Name" @onclick="() => GoAsync(position)">
+                        @if (thumb.ThumbnailUrl != null || thumb.Kind == MediaKind.Photo)
+                        {
+                            <img src="@(thumb.ThumbnailUrl ?? thumb.Url)" alt="" loading="lazy" decoding="async" />
+                        }
+                        else
+                        {
+                            <span class="mv-thumb-icon">@MediaIcons.Svg("video")</span>
+                        }
+                        @if (thumb.Kind == MediaKind.Video)
+                        {
+                            <span class="mv-thumb-play">@MediaIcons.Svg("play")</span>
+                        }
+                    </button>
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public List<MediaItem> Items { get; set; } = new();
+    [Parameter] public int Index { get; set; }
+
+    private ElementReference root, viewport, strip;
+    private IJSObjectReference? module, viewer;
+    private DotNetObjectReference<MediaViewer>? selfRef;
+    private int index;
+    private double zoom = 1;
+    private bool disposed, moved;
+
+    protected override void OnInitialized()
+    {
+        index = Items.Count == 0 ? 0 : Math.Clamp(Index, 0, Items.Count - 1);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                var path = fileVersions.AddFileVersionToPath(default, "/js/media-gallery.js");
+                module = await js.InvokeAsync<IJSObjectReference>("import", "." + path);
+                if (disposed || Items.Count == 0) return;
+                selfRef = DotNetObjectReference.Create(this);
+                viewer = await module.InvokeAsync<IJSObjectReference>("createViewer", viewport, selfRef);
+                await module.InvokeVoidAsync("focus", root);
+                moved = true;
+            }
+            catch (Exception ex) when (IsInteropFailure(ex))
+            {
+                // Without the module the viewer still shows, navigates and downloads; only zoom is missing.
+            }
+            finally
+            {
+                if (disposed) await ReleaseAsync();
+            }
+        }
+        if (moved && module != null && Items.Count > 1)
+        {
+            moved = false;
+            await Quietly(() => module.InvokeVoidAsync("reveal", strip, index).AsTask());
+        }
+    }
+
+    private async Task GoAsync(int next)
+    {
+        if (next < 0 || next >= Items.Count || next == index) return;
+        index = next;
+        moved = true;
+        zoom = 1;
+        if (viewer != null) await Quietly(() => viewer.InvokeAsync<double>("reset").AsTask());
+    }
+
+    private async Task ZoomAsync(double factor)
+    {
+        if (viewer != null) zoom = await Quietly(() => viewer.InvokeAsync<double>("zoomBy", factor).AsTask(), zoom);
+    }
+
+    private async Task ResetZoomAsync()
+    {
+        if (viewer != null) zoom = await Quietly(() => viewer.InvokeAsync<double>("reset").AsTask(), 1);
+    }
+
+    private async Task OnKeyAsync(KeyboardEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case "ArrowLeft": await GoAsync(index - 1); break;
+            case "ArrowRight": await GoAsync(index + 1); break;
+            case "Home": await GoAsync(0); break;
+            case "End": await GoAsync(Items.Count - 1); break;
+            case "+": case "=": if (Items[index].Kind == MediaKind.Photo) await ZoomAsync(1.5); break;
+            case "-": if (Items[index].Kind == MediaKind.Photo) await ZoomAsync(1 / 1.5); break;
+            case "0": await ResetZoomAsync(); break;
+        }
+    }
+
+    [JSInvokable]
+    public Task OnSwipe(int direction) => InvokeAsync(async () =>
+    {
+        await GoAsync(index + Math.Sign(direction));
+        StateHasChanged();
+    });
+
+    [JSInvokable]
+    public Task OnZoom(double scale) => InvokeAsync(() =>
+    {
+        zoom = scale;
+        StateHasChanged();
+    });
+
+    private void Close() => DialogService.Close(index);
+
+    public async ValueTask DisposeAsync()
+    {
+        if (disposed) return;
+        disposed = true;
+        await ReleaseAsync();
+    }
+
+    private async Task ReleaseAsync()
+    {
+        var (releasedViewer, releasedModule, releasedSelf) = (viewer, module, selfRef);
+        (viewer, module, selfRef) = (null, null, null);
+        if (releasedViewer != null)
+        {
+            await Quietly(() => releasedViewer.InvokeVoidAsync("dispose").AsTask());
+            await Quietly(() => releasedViewer.DisposeAsync().AsTask());
+        }
+        if (releasedModule != null) await Quietly(() => releasedModule.DisposeAsync().AsTask());
+        releasedSelf?.Dispose();
+    }
+
+    private static bool IsInteropFailure(Exception ex) =>
+        ex is JSException or JSDisconnectedException or TaskCanceledException or OperationCanceledException or ObjectDisposedException;
+
+    private static async Task Quietly(Func<Task> interop)
+    {
+        try { await interop(); }
+        catch (Exception ex) when (IsInteropFailure(ex)) { }
+    }
+
+    private static async Task<T> Quietly<T>(Func<Task<T>> interop, T fallback)
+    {
+        try { return await interop(); }
+        catch (Exception ex) when (IsInteropFailure(ex)) { return fallback; }
+    }
+}

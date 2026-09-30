@@ -171,7 +171,7 @@ else
 
        
 
-        navigationManager.NavigateTo("/StructureTypeInspectionResultTypes/" + structureType.StructureTypeId);
+        navigationManager.NavigateTo("StructureTypeInspectionResultTypes/" + structureType.StructureTypeId);
     }
 
     async Task DefectsTypes(StructureType structureType)
@@ -186,14 +186,14 @@ else
     {
         AppData.obj1 = structureType;
 
-        navigationManager.NavigateTo("/StructureTypeFlagTypes/" + structureType.StructureTypeId);
+        navigationManager.NavigateTo("StructureTypeFlagTypes/" + structureType.StructureTypeId);
     }
 
     async Task AttributesTypes(StructureType structureType)
     {
         AppData.obj1 = structureType;
 
-        navigationManager.NavigateTo("/StructureTypeAttributeTypes/" + structureType.StructureTypeId);
+        navigationManager.NavigateTo("StructureTypeAttributeTypes/" + structureType.StructureTypeId);
     }
 
 

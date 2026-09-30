@@ -1,124 +1,145 @@
-﻿@using AliantWebS.Data
-@using Models
-@using Microsoft.AspNetCore.Hosting;
+@using System.Globalization
+@using Microsoft.AspNetCore.Hosting
 @using Microsoft.Extensions.Logging
-
-@using ExifLibrary;
-@using System.Text.Json;
+@using AliantWebS.Data
+@using AliantWebS.Models
+@implements IAsyncDisposable
 @inject NavigationManager navigationManager
 @inject ILogger<MediaComponent> Logger
-@inject EntitiesService structureService
 @inject AliantWebS.Data.AppData AppData
 @inject Radzen.DialogService DialogService
+@inject Radzen.NotificationService Notifications
 @inject IJSRuntime js
+@inject IWebHostEnvironment Environment
+@inject IStringLocalizer<Languages> L
+@inject Microsoft.AspNetCore.Mvc.ViewFeatures.IFileVersionProvider fileVersions
 
-@*<style>
-    .file-input-zone {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background-color: blue;
-        color: white;
-        cursor: pointer;
-        position: relative;
-        width: fit-content;
-        height: fit-content;
+@* The photos and videos of an event, element, structure or site: a viewer with a filmstrip, the camera, file
+   upload, full screen (MediaViewer), download and delete. The files are MediaLibrary's (the Images folder). *@
+
+<div class="media">
+    <div class="media-head">
+        <div class="media-title">
+            @MediaIcons.Svg("image")
+            <span>@L["Photos and videos"]</span>
+            @if (items.Count > 0)
+            {
+                <span class="media-count">@items.Count</span>
+            }
+        </div>
+        <div class="media-actions">
+            @if (canStore)
+            {
+                <button type="button" class="media-btn media-btn-primary" title="@L["Camera"]" disabled="@uploading" @onclick="OpenCameraAsync">
+                    @MediaIcons.Svg("camera") <span class="media-hide-sm">@L["Camera"]</span>
+                </button>
+                <label class="media-btn @(uploading ? "is-disabled" : "")" title="@L["Add files"]">
+                    @MediaIcons.Svg("image-plus") <span class="media-hide-sm">@L["Add files"]</span>
+                    <InputFile class="media-hidden-input" OnChange="AddFilesAsync" multiple accept="image/*,video/*" disabled="@uploading" />
+                </label>
+            }
+            @if (selectedObject is Element)
+            {
+                <button type="button" class="media-btn media-btn-icon" title="@L["Defects"]" aria-label="@L["Defects"]" @onclick="Defects">@MediaIcons.Svg("flag")</button>
+            }
+        </div>
+    </div>
+
+    @if (uploading)
+    {
+        <div class="media-upload" role="status">
+            <span>@L["Adding {0} of {1}…", uploadIndex, uploadCount] <em>@uploadName</em></span>
+            <div class="media-upload-bar"><i style="width:@(uploadPercent)%"></i></div>
+        </div>
     }
 
-        .file-input-zone:hover {
-            background-color: lightblue;
-        }
-
-        .file-input-zone input[type=file] {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            opacity: 0;
-            cursor: pointer;
-        }
-</style>*@
-
-@if (pathsForFiles.Count != 0)
-{
-
-
-    <TemplatedCarousel  @ref="templatedCarouselRef" Items="pathsForFiles" TItem="string" ShowNavigation="true" ActiveItemIndexChanged="@(args => DisplayTags(args))">
-        <ItemTemplate >
-            <div class="outfit">
-                <img class="center" src="@context" alt="@context" style="width: 100%; height: 100%; object-fit: fill;">
-            </div>
-
-            <Div Style="display: flex">
-                <div class="file-input-zone">
-
-                    <NavLink class="nav-link" href="dgfrdgh" @onclick:preventDefault="true">
-                        <span align="center" style="width:30px" class="oi oi-plus" aria-hidden="true"></span>
-                    </NavLink>
-                    <InputFile OnChange="@LoadFiles" />
-                </div>
-
-                <div class="file-input-zone">
-
-                    <a class="nav-link" @onclick="@(args => Capture())" href="dgfrdgh" @onclick:preventDefault="true">
-                        <span align="center" style="width:30px" class="oi oi-camera-slr" aria-hidden="true"></span>
-                    </a>
-                    @*   <input type="file" accept="image/*" capture>*@
-                    @*              <InputFile capture />*@
-                </div>
-
-                <div class="file-input-zone">
-                    <a class="nav-link" @onclick="@(args => DeleteFile(context))" href="dgfrdgh" @onclick:preventDefault="true">
-                        <span align="center" style="width:30px" class="oi oi-trash" aria-hidden="true"></span>
-                    </a>
-                </div>
-                @if (selectedObject.GetType() == typeof(Element))
+    @if (items.Count == 0)
+    {
+        @if (loading)
         {
-                <div class="file-input-zone">
-                    <a class="nav-link" @onclick="@Defects" href="dgfrdgh" @onclick:preventDefault="true">
-                        <span align="center" style="width:30px" class="oi oi-flag" aria-hidden="true"></span>
-                    </a>
-                </div>
+            <div class="media-skeleton" aria-hidden="true"></div>
         }
+        else
+        {
+            <div class="media-empty @(canStore ? "is-droppable" : "")">
+                <div class="media-empty-icon">@MediaIcons.Svg(canStore ? "image-plus" : "image")</div>
+                <strong>@L["No photos or videos yet"]</strong>
+                <span>@(canStore ? L["Use the camera, add files, or drop them here."] : CannotStoreText)</span>
+                @if (canStore && !uploading)
+                {
+                    <InputFile class="media-drop-input" OnChange="AddFilesAsync" multiple accept="image/*,video/*" title="@L["Add files"]" />
+                }
+            </div>
+        }
+    }
+    else
+    {
+        var item = items[active];
+        <div class="media-stage" tabindex="0" aria-label="@L["{0} of {1}", active + 1, items.Count]" @onkeydown="OnStageKeyAsync">
+            @if (item.Kind == MediaKind.Photo)
+            {
+                <img @key="item.Url" src="@item.Url" alt="@item.Name" decoding="async" title="@L["Open full screen"]" @onclick="OpenViewerAsync" />
+            }
+            else if (item.Kind == MediaKind.Video)
+            {
+                <video @key="item.Url" src="@item.Url" poster="@item.ThumbnailUrl" controls preload="metadata" playsinline></video>
+            }
+            else
+            {
+                <div class="media-file">@MediaIcons.Svg("image") <span>@item.Name</span></div>
+            }
 
-            </Div>
+            <span class="media-counter">@(active + 1) / @items.Count</span>
+            <div class="media-stage-actions">
+                <button type="button" class="media-round" title="@L["Open full screen"]" aria-label="@L["Open full screen"]" @onclick="OpenViewerAsync">@MediaIcons.Svg("expand")</button>
+                <a class="media-round" href="@item.Url" download="@item.Name" title="@L["Download"]" aria-label="@L["Download"]">@MediaIcons.Svg("download")</a>
+                <button type="button" class="media-round media-round-danger" title="@L["Delete"]" aria-label="@L["Delete"]" disabled="@uploading" @onclick="() => DeleteAsync(item)">@MediaIcons.Svg("trash")</button>
+            </div>
+            @if (active > 0)
+            {
+                <button type="button" class="media-nav media-nav-prev" aria-label="@L["Previous"]" @onclick="() => Select(active - 1)">@MediaIcons.Svg("chevron-left")</button>
+            }
+            @if (active < items.Count - 1)
+            {
+                <button type="button" class="media-nav media-nav-next" aria-label="@L["Next"]" @onclick="() => Select(active + 1)">@MediaIcons.Svg("chevron-right")</button>
+            }
+        </div>
 
+        <div class="media-caption">
+            <span class="media-name" title="@item.Name">@item.Name</span>
+            <span>@item.Modified.ToString("g", CultureInfo.CurrentCulture)</span>
+            <span>@CameraComponent.FormatSize(item.Size)</span>
+        </div>
 
-        </ItemTemplate>
-
-    </TemplatedCarousel>
-
-}
-else
-
-{
-    <h3>Add Media here</h3>
-                <Div Style="display: flex">
-    <div class="file-input-zone">
-        <NavLink class="nav-link" href="dgfrdgh" @onclick:preventDefault="true">
-            <span align="center" style="width:30px" class="oi oi-plus" aria-hidden="true"></span>
-        </NavLink>
-        <InputFile OnChange="@LoadFiles" />
-    </div>
-    <div class="file-input-zone">
-
-        <a class="nav-link" @onclick="@(args => Capture())" href="dgfrdgh" @onclick:preventDefault="true">
-            <span align="center" style="width:30px" class="oi oi-camera-slr" aria-hidden="true"></span>
-        </a>
-        @*   <input type="file" accept="image/*" capture>*@
-        @*              <InputFile capture />*@
-    </div>
-    </Div>
-}
-
-@*    https://icon-sets.iconify.design/oi/page-3.html*@
-
-
+        @if (items.Count > 1)
+        {
+            <div class="media-strip" @ref="strip">
+                @for (var i = 0; i < items.Count; i++)
+                {
+                    var position = i;
+                    var thumb = items[i];
+                    <button type="button" @key="thumb.Path" class="media-thumb @(position == active ? "is-active" : "")" title="@thumb.Name" aria-label="@thumb.Name" @onclick="() => Select(position)">
+                        @if (thumb.ThumbnailUrl != null || thumb.Kind == MediaKind.Photo)
+                        {
+                            <img src="@(thumb.ThumbnailUrl ?? thumb.Url)" alt="" loading="lazy" decoding="async" />
+                        }
+                        else
+                        {
+                            <span class="media-thumb-icon">@MediaIcons.Svg("video")</span>
+                        }
+                        @if (thumb.Kind == MediaKind.Video)
+                        {
+                            <span class="media-thumb-play">@MediaIcons.Svg("play")</span>
+                        }
+                    </button>
+                }
+            </div>
+        }
+    }
+</div>
 
 @code {
-
-    private int index = 0;
-
-    TemplatedCarousel<string> templatedCarouselRef;
+    private const int MaxFilesAtOnce = 30;
 
     [Parameter]
     public object selectedObject { get; set; }
@@ -126,13 +147,9 @@ else
     [Parameter]
     public List<Element> ElementsToDispay { get; set; }
 
+    // Kept for the pages that pass them; the image tags they served were never drawn by this component.
     [Parameter]
     public Element DefectSelectedElement { get; set; }
-
-    List<string> pathsForFiles = new List<string>();
-
-    private DotNetObjectReference<MediaComponent>? objRef;
-
 
     [Parameter]
     public EventCallback<Guid> OnNewTagForNewDefect { get; set; }
@@ -140,273 +157,262 @@ else
     [Parameter]
     public EventCallback<Guid> OnTagClicked { get; set; }
 
-    protected override async Task OnInitializedAsync()
-    {
-        objRef = DotNetObjectReference.Create(this);
-    }
+    private List<MediaItem> items = new();
+    private int active;
+    private bool loading = true, canStore, revealActive, disposed;
+    private object? loadedOwner;
+    private List<Element>? loadedElements;
+    private ElementReference strip;
+    private IJSObjectReference? module;
 
+    private bool uploading;
+    private int uploadIndex, uploadCount, uploadPercent;
+    private string uploadName = "";
+    private DateTime lastUploadRender;
+
+    private string CannotStoreText => MediaLibrary.IsSupportedType(selectedObject)
+        ? L["Save this item first to add photos and videos."]
+        : L["Photos and videos cannot be stored for this item."];
+
+    // Parents re-render often: the folder is read again only when the item changes, not on every render.
     protected override async Task OnParametersSetAsync()
     {
-        pathsForFiles = await GetPathForFiles();
+        canStore = ElementsToDispay == null && MediaLibrary.CanStore(selectedObject);
+        if (ReferenceEquals(loadedOwner, selectedObject) && ReferenceEquals(loadedElements, ElementsToDispay) && !loading) return;
+        var sameItem = loadedOwner != null && MediaLibrary.IdOf(loadedOwner) == MediaLibrary.IdOf(selectedObject);
+        loadedOwner = selectedObject;
+        loadedElements = ElementsToDispay;
+        await ReloadAsync(keepPosition: sameItem);
     }
 
-    /* async Task StoreSelectedFiles(IFileListEntry[] files)
-         {
-         await fileManagementService.WriteSelectedFiles(files, selectedStructure);
-     }*/
-
-    private List<IBrowserFile> loadedFiles = new();
-    private long maxFileSize = 1024 * 15;
-    private int maxAllowedFiles = 3;
-
-
-    private async Task LoadFiles(InputFileChangeEventArgs e)
+    private async Task ReloadAsync(bool keepPosition = false, bool selectNewest = false)
     {
-        await DialogService.OpenAsync<FilesUpload>($"Files Upload",
-
-               new Dictionary<string, object>() { { "obj", selectedObject }, { "e", e }, { "Folder", "Images" } },
-               new DialogOptions() { Width = "700px", Height = "570px" });
-
-        pathsForFiles = await GetPathForFiles();
-
-    }
-
-    private async Task Capture()
-    {
-        // navigationManager.NavigateTo(@"/Camera");
-
-        var z = await DialogService.OpenAsync<CameraComponent>($"Camera",
-
-       new Dictionary<string, object>() { { "obj", selectedObject } },
-       new DialogOptions() { Width = "800px", Height = "570px", Draggable = true, Resizable=true });
-        try{
-            await js.InvokeVoidAsync("disposeCamera");
-        }
-        catch
-        {}
-        pathsForFiles = await GetPathForFiles();
-
-
-
-    }
-
-    private async Task DeleteFile(string fileName)
-    {
-        bool resetToZero = false;
-        if (templatedCarouselRef.ActiveItemIndex == pathsForFiles.Count - 1) resetToZero = true;
-
+        var current = keepPosition && active < items.Count ? items[active].Path : null;
         try
         {
-            await FileManagementService.deleteFile(fileName);
-            pathsForFiles.Remove(fileName);
-            if (resetToZero)
-            {
-                templatedCarouselRef.ActiveItemIndex = 0;
-
-            }
+            items = await MediaLibrary.ListAsync(selectedObject, ElementsToDispay);
         }
-        catch
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-        int k = 1;
+            Logger.LogError(ex, "Media: the folder could not be read");
+            items = new();
         }
-
+        loading = false;
+        var kept = current == null ? -1 : items.FindIndex(i => i.Path == current);
+        active = selectNewest || kept < 0 ? 0 : kept;
+        revealActive = true;
     }
 
-    private async Task Defects()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-
-        if (selectedObject.GetType() == typeof(Element))
-        {
-
-            Element el = (Element)selectedObject;
-
-            AppData.obj1 = el;
-
-
-
-            //     navigationManager.NavigateTo("/Structures");
-
-            navigationManager.NavigateTo("/defects/" + el.ElementId);
-        }
-
-    }
-
-
-
-    async Task<List<string>> GetPathForFiles()
-    {
-        List<string> paths = new List<string>();
-        if (ElementsToDispay != null)
-        {
-            foreach (Element el in ElementsToDispay)
-            {
-                paths.AddRange(await FileManagementService.GetPathForFilesAsync(el, false));
-            }
-        }
-        else
-        {
-            paths = await FileManagementService.GetPathForFilesAsync(selectedObject, false);
-        }
-
-
-        return paths;
-
-    }
-
-
-    private async Task DisplayTags(int index)
-    {
-        List<Tag> tags;
-
-        this.index = index;
-
-        ExifLibrary.ImageFile file;
-
+        if (!revealActive || items.Count < 2 || disposed) return;
+        revealActive = false;
         try
         {
-            file = ExifLibrary.ImageFile.FromFile(pathsForFiles[index]);
+            module ??= await js.InvokeAsync<IJSObjectReference>("import", "." + fileVersions.AddFileVersionToPath(default, "/js/media-gallery.js"));
+            if (disposed) return;
+            await module.InvokeVoidAsync("reveal", strip, active);
         }
-        catch
+        catch (Exception ex) when (IsInteropFailure(ex))
         {
-            await js.InvokeVoidAsync("renderTags", null, null, null);
+            // Scrolling the strip is a comfort; the gallery works without it.
+        }
+    }
+
+    private void Select(int index)
+    {
+        if (index < 0 || index >= items.Count || index == active) return;
+        active = index;
+        revealActive = true;
+    }
+
+    private async Task OnStageKeyAsync(KeyboardEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case "ArrowLeft": Select(active - 1); break;
+            case "ArrowRight": Select(active + 1); break;
+            case "Home": Select(0); break;
+            case "End": Select(items.Count - 1); break;
+            case "Enter": await OpenViewerAsync(); break;
+            case "Delete": if (items.Count > 0 && !uploading) await DeleteAsync(items[active]); break;
+        }
+    }
+
+    // ---- dialogs -----------------------------------------------------------------------------------------------
+
+    public static DialogOptions MediaDialogOptions(bool closeOnEsc, bool fullScreen) => new()
+    {
+        ShowTitle = false,
+        ShowClose = false,
+        Width = fullScreen ? "100vw" : "min(1180px, 96vw)",
+        Height = fullScreen ? "100vh" : "min(860px, 94vh)",
+        CssClass = fullScreen ? "media-dialog media-dialog-full" : "media-dialog",
+        ContentCssClass = "media-dialog-content",
+        CloseDialogOnEsc = closeOnEsc,
+        CloseDialogOnOverlayClick = false,
+        Draggable = false,
+        Resizable = false,
+    };
+
+    private async Task OpenCameraAsync()
+    {
+        var result = await DialogService.OpenAsync<CameraComponent>(L["Camera"],
+            new Dictionary<string, object> { { "obj", selectedObject } },
+            MediaDialogOptions(closeOnEsc: false, fullScreen: false));
+        if (disposed) return;
+        await ReloadAsync(keepPosition: true, selectNewest: result is int changed && changed > 0);
+    }
+
+    private async Task OpenViewerAsync()
+    {
+        if (items.Count == 0) return;
+        var result = await DialogService.OpenAsync<MediaViewer>(items[active].Name,
+            new Dictionary<string, object> { { "Items", items }, { "Index", active } },
+            MediaDialogOptions(closeOnEsc: true, fullScreen: true));
+        if (disposed) return;
+        if (result is int index && index >= 0 && index < items.Count)
+        {
+            active = index;
+            revealActive = true;
+        }
+    }
+
+    // ---- adding and deleting -----------------------------------------------------------------------------------
+
+    private async Task AddFilesAsync(InputFileChangeEventArgs e)
+    {
+        if (!canStore || uploading) return;
+        IReadOnlyList<IBrowserFile> files;
+        try
+        {
+            files = e.GetMultipleFiles(MaxFilesAtOnce);
+        }
+        catch (InvalidOperationException)
+        {
+            Notify(NotificationSeverity.Warning, L["At most {0} files at a time.", MaxFilesAtOnce]);
             return;
         }
 
-        var reee = file.Properties.Get(ExifTag.ImageDescription);
-
+        uploading = true;
+        uploadCount = files.Count;
+        var added = 0;
+        var problems = new List<string>();
         try
         {
-            var vv = JsonSerializer.Deserialize<List<Tag>>(reee?.ToString());
-            tags = vv;
+            foreach (var file in files)
+            {
+                if (disposed) return;
+                uploadIndex++;
+                uploadName = file.Name;
+                uploadPercent = 0;
+                StateHasChanged();
+
+                var kind = MediaLibrary.KindOfFile(file.Name);
+                var ext = MediaLibrary.CheckExtension(Path.GetExtension(file.Name), kind);
+                if (ext == null)
+                {
+                    problems.Add(L["{0} is not a photo or a video.", file.Name]);
+                    continue;
+                }
+                var limit = MediaLibrary.MaxBytes(kind);
+                if (file.Size > limit)
+                {
+                    problems.Add($"{file.Name}: {L["Too large (maximum {0}).", CameraComponent.FormatSize(limit)]}");
+                    continue;
+                }
+
+                var baseName = MediaLibrary.CleanBaseName(file.Name) ?? MediaLibrary.TimestampName(file.LastModified.LocalDateTime);
+                try
+                {
+                    await MediaLibrary.StoreAsync(selectedObject, Environment.ContentRootPath, baseName, ext, async temp =>
+                    {
+                        await using var input = file.OpenReadStream(limit);
+                        await using var output = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous);
+                        var buffer = new byte[81920];
+                        long total = 0;
+                        int read;
+                        while ((read = await input.ReadAsync(buffer)) > 0)
+                        {
+                            await output.WriteAsync(buffer.AsMemory(0, read));
+                            total += read;
+                            uploadPercent = file.Size > 0 ? (int)(total * 100 / file.Size) : 100;
+                            if (DateTime.UtcNow - lastUploadRender > TimeSpan.FromMilliseconds(200))
+                            {
+                                lastUploadRender = DateTime.UtcNow;
+                                StateHasChanged();
+                            }
+                        }
+                    });
+                    added++;
+                }
+                catch (Exception ex) when (ex is not JSDisconnectedException)
+                {
+                    Logger.LogError(ex, "Media: adding {File} failed", file.Name);
+                    problems.Add($"{file.Name}: {(ex is MediaStorageException ? CannotStoreText : ex.Message)}");
+                }
+            }
         }
-        catch
+        finally
         {
-            await js.InvokeVoidAsync("renderTags", null, null, null);
+            uploading = false;
+            uploadIndex = uploadCount = uploadPercent = 0;
+        }
+
+        if (disposed) return;
+        await ReloadAsync(keepPosition: added == 0, selectNewest: added > 0);
+        if (problems.Count > 0)
+            Notify(NotificationSeverity.Error, string.Join(" · ", problems), L["Not added"]);
+        else if (added > 0)
+            Notify(NotificationSeverity.Success, L["Added: {0}", added]);
+    }
+
+    private async Task DeleteAsync(MediaItem item)
+    {
+        var confirmed = await DialogService.Confirm(
+            L["{0} will be deleted. This cannot be undone.", item.Name],
+            item.Kind == MediaKind.Video ? L["Delete this video?"] : L["Delete this photo?"],
+            new ConfirmOptions { OkButtonText = L["Delete"], CancelButtonText = L["Cancel"] });
+        if (confirmed != true || disposed) return;
+        try
+        {
+            MediaLibrary.Delete(item.Path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Logger.LogError(ex, "Media: deleting {Path} failed", item.Path);
+            Notify(NotificationSeverity.Error, $"{L["The file could not be deleted."]} {ex.Message}");
             return;
         }
-
-        List<string> ids = new List<string>();
-        List<double> xs = new List<double>();
-        List<double> ys = new List<double>();
-        List<Guid> defectIds = new List<Guid>();
-        List<string> comments = new List<string>();
-
-
-        await js.InvokeVoidAsync("renderTags", objRef, ids.ToArray(), xs.ToArray(), ys.ToArray(), comments.ToArray(), defectIds.ToArray());
+        var index = active;
+        await ReloadAsync();
+        active = Math.Min(index, Math.Max(0, items.Count - 1));
     }
 
+    private void Notify(NotificationSeverity severity, string detail, string? summary = null) =>
+        Notifications.Notify(new NotificationMessage { Severity = severity, Summary = summary, Detail = detail, Duration = 5000 });
 
-
-    [JSInvokable]
-    public async Task TagClicked(string _id)
+    private void Defects()
     {
-        if (Guid.TryParse(_id, out Guid r))
+        if (selectedObject is Element element)
         {
-
-            await OnTagClicked.InvokeAsync(r);
+            AppData.obj1 = element;
+            navigationManager.NavigateTo("defects/" + element.ElementId);
         }
     }
 
-}
-@*
-<h1>Taggable Image</h1>
-
-<div style="position: relative;">
-    <img src="your-image-source.jpg" alt="Your Image" @ref="imageElement" />
-    @foreach (var tag in tags)
+    public async ValueTask DisposeAsync()
     {
-        <div style="position: absolute; top: @tag.Top; left: @tag.Left;">
-            <button @onclick="@(() => RemoveTag(tag))">X</button>
-            <strong>@tag.Name</strong>
-        </div>
-    }
-</div>
-
-@functions {
-    List<Tag> tags = new List<Tag>();
-    ElementReference imageElement;
-
-    void AddTag(string name, int x, int y)
-    {
-        var rect = imageElement.GetBoundingClientRect();
-        var top = y - rect.Top;
-        var left = x - rect.Left;
-        tags.Add(new Tag { Name = name, Top = top, Left = left });
-    }
-
-    void RemoveTag(Tag tag)
-    {
-        tags.Remove(tag);
-    }
-
-    class Tag
-    {
-        public string Name { get; set; }
-        public int Top { get; set; }
-        public int Left { get; set; }
-    }
-}
-
-
-@using System.ComponentModel
-@using System.Linq
-@using System.Reflection
-
-<div class="image-container">
-    <img src="@ImageUrl" @onclick="@(() => IsEditing = true)" style="width: @Width; height: @Height;" />
-    @if (IsEditing)
-    {
-        <div class="tag-container">
-            @foreach (var tag in Tags)
-            {
-                <div class="tag" style="top: @tag.Top; left: @tag.Left;">
-                    <input type="text" value="@tag.Text" @onchange="@(e => tag.Text = e.Value.ToString())" />
-                    <button @onclick="@(() => Tags.Remove(tag))">X</button>
-                </div>
-            }
-        </div>
-        <button @onclick="@AddTag">Add Tag</button>
-        <button @onclick="@(() => IsEditing = false)">Save</button>
-    }
-@using System.ComponentModel
-@using System.Linq
-@using System.Reflection
-
-<div class="image-container">
-    <img src="@ImageUrl" @onclick="@(() => IsEditing = true)" style="width: @Width; height: @Height;" />
-Copy code
-@if (IsEditing)
-{
-    <div class="tag-container">
-        @foreach (var tag in Tags)
+        disposed = true;
+        var released = module;
+        module = null;
+        if (released != null)
         {
-            <div class="tag" style="top: @tag.Top; left: @tag.Left;">
-                <input type="text" value="@tag.Text" @onchange="@(e => tag.Text = e.Value.ToString())" />
-                <button @onclick="@(() => Tags.Remove(tag))">X</button>
-            </div>
+            try { await released.DisposeAsync(); }
+            catch (Exception ex) when (IsInteropFailure(ex)) { }
         }
-    </div>
-    <button @onclick="@AddTag">Add Tag</button>
-    <button @onclick="@(() => IsEditing = false)">Save</button>
-}
-</div>
-@code {
-private string ImageUrl { get; set; }
-private int Width { get; set; } = 500;
-private int Height { get; set; } = 500;
-private bool IsEditing { get; set; }
-private List<Tag> Tags { get; set; } = new List<Tag>();
+    }
 
-        private void AddTag()
-        {
-            Tags.Add(new Tag { Top = 0, Left = 0, Text = "" });
-        }
-
-        public class Tag
-        {
-            public int Top { get; set; }
-            public int Left { get; set; }
-            public string Text { get; set; }
-        }
+    private static bool IsInteropFailure(Exception ex) =>
+        ex is JSException or JSDisconnectedException or TaskCanceledException or OperationCanceledException or ObjectDisposedException;
 }
-*@

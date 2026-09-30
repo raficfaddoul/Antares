@@ -21,12 +21,15 @@ namespace AliantWebS.Data
     {
         /// <summary>
         /// Per-sensor alarm threshold for one channel, keyed by ElementId. Sensors with no usable
-        /// threshold are simply absent from the result.
+        /// threshold are simply absent from the result. A threshold value with a part that is not
+        /// "channel:number" (see AlarmThresholdFormat) is added to <paramref name="unreadable"/> when one is
+        /// given, whatever channel was asked for.
         /// </summary>
         public static async Task<Dictionary<Guid, double>> LoadThresholdsAsync(
             IDbContextFactory<AliantWebContext> dbContextFactory,
             IReadOnlyCollection<Element> sensors,
-            string channelName)
+            string channelName,
+            ICollection<(Guid ElementId, string Value)> unreadable = null)
         {
             var result = new Dictionary<Guid, double>();
             if (dbContextFactory == null || sensors == null || sensors.Count == 0
@@ -50,19 +53,12 @@ namespace AliantWebS.Data
                 if (!TagMappingResolver.Matches(accepted, row.Name)) continue;
                 if (string.IsNullOrWhiteSpace(row.Value)) continue;
 
-                foreach (var pair in row.Value.Split(';', StringSplitOptions.RemoveEmptyEntries))
-                {
-                    var kv = pair.Split(':');
-                    if (kv.Length != 2) continue;
-                    if (!string.Equals(kv[0].Trim(), channelName, StringComparison.OrdinalIgnoreCase)) continue;
+                var unreadableParts = new List<string>();
+                var thresholds = AlarmThresholdFormat.Parse(row.Value, unreadableParts);
+                if (unreadableParts.Count > 0) unreadable?.Add((row.ElementId, row.Value));
 
-                    if (double.TryParse(kv[1].Trim(), System.Globalization.NumberStyles.Float,
-                                        System.Globalization.CultureInfo.InvariantCulture, out var t)
-                        && t != 0)
-                    {
-                        result[row.ElementId] = t;
-                    }
-                }
+                if (thresholds.TryGetValue(channelName.Trim(), out var t) && t != 0)
+                    result[row.ElementId] = t;
             }
 
             return result;

@@ -273,8 +273,7 @@ public sealed class ScenarioStorageService
         // 2. Nothing tagged: adopt a folder left by the old name-only scheme, so existing trees keep
         //    their contents on first access instead of appearing empty.
         var legacyPath = Path.Combine(parentDir, SanitizeSegment(name));
-        var legacyName = Path.GetFileName(legacyPath);
-        if (Directory.Exists(legacyPath) && !IsReservedFolder(legacyName) && !HasIdSuffix(legacyName))
+        if (IsLegacyFolder(parentDir, legacyPath))
         {
             var adopted = TryMove(legacyPath, desiredPath, "migration");
             if (adopted is not null) return adopted;
@@ -371,14 +370,57 @@ public sealed class ScenarioStorageService
         return Directory.Exists(dir) ? TrashDirectory(dir) : null;
     }
 
-    /// <summary>Moves one scenario's folder to the trash, leaving its event's other scenarios alone.</summary>
-    public string? TrashScenarioFolder(Guid eventId, Guid scenarioId)
+    /// <summary>
+    /// Moves one scenario's folder to the trash, leaving its event's other scenarios alone. Only a folder tagged with the
+    /// scenario's id is moved - it is the scenario's for sure - also under an event folder still in the old name-only
+    /// scheme (found by <paramref name="eventName"/>).
+    /// </summary>
+    public string? TrashScenarioFolder(Guid eventId, Guid scenarioId, string? eventName = null)
     {
-        var eventDir = FindTagged(Root, eventId);
+        var eventDir = FindExisting(Root, eventId, eventName);
         if (eventDir is null) return null;
 
         var dir = FindTagged(eventDir, scenarioId);
         return dir is not null && Directory.Exists(dir) ? TrashDirectory(dir) : null;
+    }
+
+    /// <summary>
+    /// Whether the event has a folder, touching nothing on disk (<see cref="GetEventDir(Guid, string?, bool)"/> renames
+    /// and adopts folders even with create: false): the one tagged with its id, or one left by the old name-only scheme.
+    /// <see cref="TrashEventFolder"/> moves only the tagged one - a name-only folder may be shared by two events of the same
+    /// name - so for the other the caller learns that a folder was left in place.
+    /// </summary>
+    public bool HasEventFolder(Guid eventId, string? eventName) => FindExisting(Root, eventId, eventName) is not null;
+
+    /// <summary>The same for a scenario's folder, under its event's (tagged or name-only).</summary>
+    public bool HasScenarioFolder(Guid eventId, Guid scenarioId, string? eventName, string? scenarioName) =>
+        FindExisting(Root, eventId, eventName) is { } eventDir && FindExisting(eventDir, scenarioId, scenarioName) is not null;
+
+    /// <summary>The folder of an entity, touching nothing: tagged with its id, else one left by the old name-only scheme and
+    /// not adopted yet (<see cref="ResolveSegment"/> adopts it on first access). Null when there is none.</summary>
+    private string? FindExisting(string parentDir, Guid id, string? name)
+    {
+        if (!Directory.Exists(parentDir)) return null;
+        if (FindTagged(parentDir, id) is { } tagged) return tagged;
+        if (string.IsNullOrWhiteSpace(name)) return null;
+        var legacyPath = Path.Combine(parentDir, SanitizeSegment(name));
+        return IsLegacyFolder(parentDir, legacyPath) ? legacyPath : null;
+    }
+
+    /// <summary>
+    /// Whether this folder is one the old name-only scheme left for an entity: it exists, is not one of the storage's own
+    /// folders (_common, _trash), carries no id tag, and - at the root - is not the deployment's data/ or output/
+    /// (docker-compose.portainer.yml creates them): an event named "data" must neither adopt them (ResolveSegment would
+    /// rename them, their files with them) nor take them for its files. Compared as the file system compares names: on
+    /// Linux, Data/ is not data/ and stays a possible event folder.
+    /// </summary>
+    private bool IsLegacyFolder(string parentDir, string legacyPath)
+    {
+        var legacyName = Path.GetFileName(legacyPath);
+        bool deploymentFolder = string.Equals(parentDir, Root, PathComparison)
+            && (string.Equals(legacyName, DataFolderName, PathComparison)
+                || string.Equals(legacyName, OutputFolderName, PathComparison));
+        return Directory.Exists(legacyPath) && !IsReservedFolder(legacyName) && !HasIdSuffix(legacyName) && !deploymentFolder;
     }
 
     /// <summary>Moves a single file to the trash. Returns its new path, or null if it could not move.</summary>

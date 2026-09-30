@@ -16,6 +16,7 @@ using System.Reflection;
 using System.Text.RegularExpressions;
 using AliantWebS.Data;
 using AliantWebS.Models;
+using Microsoft.EntityFrameworkCore;
 using RiggingOptimizer.IO;
 using RiggingOptimizer.Models;
 
@@ -72,8 +73,13 @@ public sealed class ReportDataBuilder
         double point0X = ev.Point0X ?? 0, point0Y = ev.Point0Y ?? 0;
 
         // ── Production loads ─────────────────────────────────────
-        var charges = await _entities.GetFilteredEntitiesAsync<ChargesScenique>(
-            c => c.EventMpscenarioId == scenario.EventMpscenarioId);
+        // Read fresh, through a context of its own: the Charges Scéniques page saves its rows that way, so the circuit's
+        // shared context would hand back the values it read the first time - the study would print loads the page has
+        // since changed, and the totals check could never clear.
+        List<ChargesScenique> charges;
+        await using (var db = _entities.CreateOwnedContext())
+            charges = await db.ChargesSceniques.AsNoTracking()
+                .Where(c => c.EventMpscenarioId == scenario.EventMpscenarioId).ToListAsync();
 
         // In the studies' axes, as a person reads and types them - X along the beams towards point 9, Y
         // across them towards J - for Tableau 1 and the figures. The stored X and Y are the grid's.
@@ -133,8 +139,11 @@ public sealed class ReportDataBuilder
         var venue = await BuildVenueAsync(warnings);
 
         // ── Applied loads per attachment point ───────────────────
-        var charpente = await _entities.GetFilteredFirstEntityAsync<Charpente>(
-            c => c.EventMpscenarioId == scenario.EventMpscenarioId);
+        // Read fresh, as the charges above: the calculation and the Charpente page save it through contexts of their own.
+        Charpente? charpente;
+        await using (var db = _entities.CreateOwnedContext())
+            charpente = await db.Charpentes.AsNoTracking()
+                .FirstOrDefaultAsync(c => c.EventMpscenarioId == scenario.EventMpscenarioId);
 
         if (charpente is null)
         {

@@ -876,13 +876,15 @@
 
         try
         {
-            await entitiesService.DeleteEntityAsync(mapping);
+            // Journaled and announced only once deleted: a refused delete is shown by the service and undone.
+            if (await entitiesService.DeleteEntityAsync(mapping))
+            {
+                await journal.WriteAsync(JournalCategory.Configuration, "tagmapping.delete",
+                    target: mapping.CodeTag, details: $"alias « {mapping.UserTag} » supprimé", severity: 1);
 
-            await journal.WriteAsync(JournalCategory.Configuration, "tagmapping.delete",
-                target: mapping.CodeTag, details: $"alias « {mapping.UserTag} » supprimé", severity: 1);
-
-            await LoadMappings();
-            await js.InvokeVoidAsync("alert", "Mapping deleted successfully!");
+                await LoadMappings();
+                await js.InvokeVoidAsync("alert", "Mapping deleted successfully!");
+            }
         }
         catch (Exception ex)
         {
@@ -892,7 +894,7 @@
 
     private void Cancel()
     {
-        navigationManager.NavigateTo("/settings");
+        navigationManager.NavigateTo("settings");
     }
 
     private string _searchTerm = "";

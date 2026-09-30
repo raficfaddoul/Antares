@@ -1,176 +1,1350 @@
-﻿@page "/Camera"
+@using System.Globalization
+@using System.Threading
 @using Microsoft.AspNetCore.Hosting
-@using AliantWebS.Data;
-@using System.Media;
+@using Microsoft.Extensions.Logging
+@using AliantWebS.Data
+@using AliantWebS.Models
+@implements IAsyncDisposable
 @inject IJSRuntime js
 @inject IWebHostEnvironment Environment
 @inject Blazored.LocalStorage.ILocalStorageService localStorage
 @inject IStringLocalizer<Languages> L
+@inject Radzen.DialogService DialogService
+@inject ILogger<CameraComponent> Logger
+@inject Microsoft.AspNetCore.Mvc.ViewFeatures.IFileVersionProvider fileVersions
 
+@* The camera dialog, opened by MediaComponent. Its browser half is wwwroot/js/camera-studio.js: the stream, the
+   shutter, the recorder, zoom, the stamp and the markup editor run there, without a round trip to the server; this
+   component draws the dialog, keeps the session's shots and streams them into the item's Images folder. *@
 
+<div class="cam" @ref="root" data-mode="@settings.Mode">
+    <header class="cam-top">
+        <button type="button" class="cam-icon-btn" title="@L["Close"] (Esc)" aria-label="@L["Close"]" @onclick="RequestCloseAsync">@MediaIcons.Svg("close")</button>
+        <div class="cam-title">
+            <span class="cam-title-main">@L["Camera"]</span>
+            @if (!string.IsNullOrEmpty(ownerLine))
+            {
+                <span class="cam-title-sub">@ownerLine</span>
+            }
+        </div>
+        <div class="cam-top-actions">
+            @if (stream?.Torch == true)
+            {
+                <button type="button" class="cam-icon-btn @(torchOn ? "is-on" : "")" title="@L["Flash"]" aria-pressed="@(torchOn ? "true" : "false")" @onclick="ToggleTorchAsync">@MediaIcons.Svg(torchOn ? "flash" : "flash-off")</button>
+            }
+            <button type="button" class="cam-icon-btn @(settings.Timer > 0 ? "is-on" : "")" title="@L["Self-timer"] (T)" aria-label="@L["Self-timer"]" @onclick="CycleTimerAsync">
+                @MediaIcons.Svg("timer")
+                @if (settings.Timer > 0)
+                {
+                    <span class="cam-badge">@settings.Timer s</span>
+                }
+            </button>
+            <button type="button" class="cam-icon-btn @(settings.Grid ? "is-on" : "")" title="@L["Grid"] (G)" aria-pressed="@(settings.Grid ? "true" : "false")" @onclick="ToggleGridAsync">@MediaIcons.Svg("grid")</button>
+            <button type="button" class="cam-icon-btn @(settings.Stamp ? "is-on" : "")" title="@L["Date stamp"]" aria-pressed="@(settings.Stamp ? "true" : "false")" @onclick="ToggleStampAsync">@MediaIcons.Svg("stamp")</button>
+            <button type="button" class="cam-icon-btn @(panelOpen ? "is-on" : "")" title="@L["Settings"]" aria-expanded="@(panelOpen ? "true" : "false")" @onclick="TogglePanel">@MediaIcons.Svg("sliders")</button>
+        </div>
+    </header>
 
-<Div style="height:100%">
-<Div>
+    <div class="cam-body">
+        <div class="cam-stage" data-cam="stage">
+            <div class="cam-frame" data-cam="frame">
+                <video class="cam-video" data-cam="video" autoplay muted playsinline></video>
+                @if (settings.Grid)
+                {
+                    <div class="cam-grid" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+                }
+                <div class="cam-stamp" data-cam="stamp" aria-hidden="true"></div>
+            </div>
+            <div class="cam-flash" data-cam="flash" aria-hidden="true"></div>
+            <div class="cam-countdown" data-cam="countdown" aria-live="assertive"></div>
+            <div class="cam-rec" aria-live="polite"><span class="cam-rec-dot"></span><span data-cam="rec-time"></span></div>
 
-    <video id="videoElement" controls autoplay style="opacity:1- @opacity"></video>
+            @if (status == Status.Live && stream != null)
+            {
+                <div class="cam-format" title="@stream.Label">@FormatLabel(stream)</div>
+                @if (settings.Location)
+                {
+                    <div class="cam-gps @(locationState == "ok" ? "is-ok" : "")" title="@L["Location"]">@MediaIcons.Svg("pin")</div>
+                }
+            }
+            <div class="cam-zoom">
+                <input type="range" data-cam="zoom" aria-label="@L["Zoom"]" />
+                <span class="cam-zoom-label" data-cam="zoom-label">1.0×</span>
+            </div>
 
-        <canvas id="canvasPreview" style="opacity:@opacity"></canvas>
+            @if (status == Status.Starting)
+            {
+                <div class="cam-state">
+                    <div class="cam-spinner" aria-hidden="true"></div>
+                    <p>@L["Starting the camera…"]</p>
+                </div>
+            }
+            else if (status == Status.Error || status == Status.Ended)
+            {
+                var (icon, title, text) = ErrorText();
+                <div class="cam-state" role="alert">
+                    <div class="cam-state-icon">@MediaIcons.Svg(icon)</div>
+                    <h3>@title</h3>
+                    <p>@text</p>
+                    @if (!string.IsNullOrEmpty(errorDetail) && errorCode == "other")
+                    {
+                        <p class="cam-state-detail">@errorDetail</p>
+                    }
+                    <div class="cam-state-actions">
+                        @if (errorCode is not "insecure" and not "unsupported")
+                        {
+                            <button type="button" class="cam-btn cam-btn-primary" @onclick="RetryAsync">@MediaIcons.Svg("refresh") @(status == Status.Ended ? L["Restart"] : L["Try again"])</button>
+                        }
+                        <label class="cam-btn @(errorCode is "insecure" or "unsupported" ? "cam-btn-primary" : "")">
+                            @MediaIcons.Svg("phone") @L["Use the device camera app"]
+                            <input type="file" class="cam-hidden-input" data-cam="native" accept="@NativeAccept" capture="environment" />
+                        </label>
+                        <label class="cam-btn">
+                            @MediaIcons.Svg("image-plus") @L["Import from device"]
+                            <input type="file" class="cam-hidden-input" data-cam="import" multiple accept="image/*,video/*" />
+                        </label>
+                    </div>
+                </div>
+            }
+        </div>
 
-</Div>
-
-
-    <Div class="camera-controls" Style="position:absolute; left:40%; bottom:0; display:flex">
-        <button class="round-button" id="capture" @onclick="(() => CaptureVideo())"><i class="fas fa-video-camera"></i></button>
-
-        @if (capturePreview)
+        @if (panelOpen)
         {
-            <button class="miniround-button" id="capture" Style="z-index:3; opacity:@allowSave" @onclick="(() => CancelCapture())"> <i class="fas fa-times"></i></button>
+            <aside class="cam-panel" role="dialog" aria-label="@L["Camera settings"]">
+                <div class="cam-panel-head">
+                    <h3>@L["Camera settings"]</h3>
+                    <button type="button" class="cam-icon-btn cam-icon-btn-sm" aria-label="@L["Close"]" @onclick="TogglePanel">@MediaIcons.Svg("close")</button>
+                </div>
+
+                @if (stream?.Devices?.Count > 0)
+                {
+                    <label class="cam-field">
+                        <span>@L["Camera"]</span>
+                        <select value="@stream.DeviceId" disabled="@recording" @onchange="SelectDeviceAsync">
+                            @foreach (var device in stream.Devices)
+                            {
+                                <option value="@device.Id">@device.Label</option>
+                            }
+                        </select>
+                    </label>
+                }
+
+                <div class="cam-field">
+                    <span>@L["Resolution"]</span>
+                    <div class="cam-segmented" role="radiogroup">
+                        @foreach (var (value, label) in Resolutions)
+                        {
+                            <button type="button" role="radio" aria-checked="@(settings.Resolution == value ? "true" : "false")" class="@(settings.Resolution == value ? "is-active" : "")" disabled="@recording" @onclick="() => SetResolutionAsync(value)">@label</button>
+                        }
+                    </div>
+                    <small>@L["Automatic: the sharpest for photos, Full HD for videos."]</small>
+                </div>
+
+                <label class="cam-switch">
+                    <input type="checkbox" checked="@reviewBeforeSave" @onchange="SetReviewAsync" />
+                    <span class="cam-switch-track"></span>
+                    <span class="cam-switch-text">@L["Review shots before saving"]<small>@L["Off: every shot is saved as soon as it is taken."]</small></span>
+                </label>
+                <label class="cam-switch">
+                    <input type="checkbox" checked="@settings.Location" @onchange="SetLocationAsync" />
+                    <span class="cam-switch-track"></span>
+                    <span class="cam-switch-text">@L["Location"]<small>@L["GPS position in the stamp and in the photo data."]</small></span>
+                </label>
+                <label class="cam-switch">
+                    <input type="checkbox" checked="@settings.Mic" @onchange="SetMicAsync" />
+                    <span class="cam-switch-track"></span>
+                    <span class="cam-switch-text">@L["Record sound with videos"]</span>
+                </label>
+                <label class="cam-switch">
+                    <input type="checkbox" checked="@settings.Sound" @onchange="SetSoundAsync" />
+                    <span class="cam-switch-track"></span>
+                    <span class="cam-switch-text">@L["Shutter sound"]</span>
+                </label>
+
+                @if (support?.Touch == true)
+                {
+                    <label class="cam-btn cam-btn-block">
+                        @MediaIcons.Svg("phone") @L["Use the device camera app"]
+                        <input type="file" class="cam-hidden-input" data-cam="native" accept="@NativeAccept" capture="environment" />
+                    </label>
+                }
+                else
+                {
+                    <div class="cam-keys">
+                        <span>@MediaIcons.Svg("keyboard") @L["Keyboard shortcuts"]</span>
+                        <dl>
+                            <dt>@L["Space"]</dt><dd>@L["Take a photo / start or stop a video"]</dd>
+                            <dt>M</dt><dd>@L["Photo or video"]</dd>
+                            <dt>T</dt><dd>@L["Self-timer"]</dd>
+                            <dt>G</dt><dd>@L["Grid"]</dd>
+                            <dt>+ / −</dt><dd>@L["Zoom"]</dd>
+                            <dt>← →</dt><dd>@L["Previous / next shot"]</dd>
+                            <dt>Esc</dt><dd>@L["Back / close"]</dd>
+                        </dl>
+                    </div>
+                }
+            </aside>
         }
-        <button class="round-button" id="capture" @onclick="(() => Capture())"></button>
-        @if (capturePreview)
+
+        @if (reviewShot != null)
         {
-            <button class="miniround-button" id="capture" Style="z-index:3; opacity:@allowSave" @onclick="(() => SaveImage())"> <i class="fas fa-check"></i></button>
+            var index = shots.IndexOf(reviewShot);
+            <section class="cam-review" aria-label="@L["Review"]">
+                <header class="cam-review-bar">
+                    <button type="button" class="cam-btn cam-btn-ghost" @onclick="CloseReview">@MediaIcons.Svg("back") <span class="cam-hide-sm">@L["Back to camera"]</span></button>
+                    <span class="cam-review-count">@L["{0} of {1}", index + 1, shots.Count]</span>
+                    <div class="cam-review-actions">
+                        @if (reviewShot.Kind == "photo")
+                        {
+                            <button type="button" class="cam-btn" disabled="@(!CanEdit(reviewShot))" @onclick="() => OpenMarkup(reviewShot)">@MediaIcons.Svg("markup") <span class="cam-hide-sm">@L["Markup"]</span></button>
+                        }
+                        <button type="button" class="cam-btn cam-btn-danger" disabled="@(reviewShot.State is ShotState.Saving)" @onclick="() => DeleteShotAsync(reviewShot)">@MediaIcons.Svg("trash") <span class="cam-hide-sm">@L["Delete"]</span></button>
+                    </div>
+                </header>
+                <div class="cam-review-media">
+                    @if (reviewShot.Kind == "video")
+                    {
+                        <video @key="reviewShot.Url" src="@reviewShot.Url" controls playsinline preload="metadata"></video>
+                    }
+                    else
+                    {
+                        <img @key="reviewShot.Url" src="@reviewShot.Url" alt="" />
+                    }
+                    @if (index > 0)
+                    {
+                        <button type="button" class="cam-nav cam-nav-prev" aria-label="@L["Previous"]" @onclick="() => Step(-1)">@MediaIcons.Svg("chevron-left")</button>
+                    }
+                    @if (index < shots.Count - 1)
+                    {
+                        <button type="button" class="cam-nav cam-nav-next" aria-label="@L["Next"]" @onclick="() => Step(1)">@MediaIcons.Svg("chevron-right")</button>
+                    }
+                </div>
+                <footer class="cam-review-info">
+                    <span>@ShotTime(reviewShot).ToString("g", CultureInfo.CurrentCulture)</span>
+                    @if (reviewShot.Width > 0)
+                    {
+                        <span>@reviewShot.Width × @reviewShot.Height</span>
+                    }
+                    @if (reviewShot.Duration > 0)
+                    {
+                        <span>@Clock(reviewShot.Duration)</span>
+                    }
+                    <span>@FormatSize(reviewShot.Size)</span>
+                    <span class="cam-review-state is-@reviewShot.State.ToString().ToLowerInvariant()">@StateText(reviewShot)</span>
+                    @if ((reviewShot.State is ShotState.Failed or ShotState.New or ShotState.Changed) && canStore)
+                    {
+                        <button type="button" class="cam-btn cam-btn-primary cam-btn-sm" @onclick="() => Enqueue(reviewShot)">@MediaIcons.Svg("upload") @(reviewShot.State == ShotState.Failed ? L["Retry"] : L["Save"])</button>
+                    }
+                </footer>
+            </section>
         }
-    </Div>
-        <Div Style="position:absolute; top:0; left:0; display:flex">
-        <select id="videoSource"></select>
-        <select id="audioSource"></select>
-        <select id="resolution"></select>
-    
-</Div>
-</Div>
+
+        @if (markupShot != null)
+        {
+            <section class="cam-markup" aria-label="@L["Markup"]">
+                <header class="cam-markup-bar">
+                    <button type="button" class="cam-btn cam-btn-ghost" disabled="@markupBusy" @onclick="CancelMarkupAsync">@L["Cancel"]</button>
+                    <div class="cam-markup-tools">
+                        <div class="cam-tool-group" role="radiogroup" aria-label="@L["Tool"]">
+                            @foreach (var (value, icon, label) in MarkupTools)
+                            {
+                                <button type="button" role="radio" aria-checked="@(markupTool == value ? "true" : "false")" class="cam-tool @(markupTool == value ? "is-active" : "")" title="@L[label]" aria-label="@L[label]" @onclick="() => MarkupAsync(value)">@MediaIcons.Svg(icon)</button>
+                            }
+                        </div>
+                        <div class="cam-tool-group" role="radiogroup" aria-label="@L["Colour"]">
+                            @foreach (var color in MarkupColors)
+                            {
+                                <button type="button" role="radio" aria-checked="@(markupColor == color ? "true" : "false")" class="cam-swatch @(markupColor == color ? "is-active" : "")" style="--swatch:@color" aria-label="@color" @onclick="() => MarkupColorAsync(color)"></button>
+                            }
+                        </div>
+                        <div class="cam-tool-group" role="radiogroup" aria-label="@L["Thickness"]">
+                            @foreach (var size in new[] { "s", "m", "l" })
+                            {
+                                <button type="button" role="radio" aria-checked="@(markupSize == size ? "true" : "false")" class="cam-tool cam-size cam-size-@size @(markupSize == size ? "is-active" : "")" aria-label="@size.ToUpperInvariant()" @onclick="() => MarkupSizeAsync(size)"><i></i></button>
+                            }
+                        </div>
+                        <div class="cam-tool-group">
+                            <button type="button" class="cam-tool" title="@L["Undo"] (Ctrl+Z)" aria-label="@L["Undo"]" disabled="@(!canUndo)" @onclick="@(() => MarkupCommandAsync("undo"))">@MediaIcons.Svg("undo")</button>
+                            <button type="button" class="cam-tool" title="@L["Redo"] (Ctrl+Y)" aria-label="@L["Redo"]" disabled="@(!canRedo)" @onclick="@(() => MarkupCommandAsync("redo"))">@MediaIcons.Svg("redo")</button>
+                            <button type="button" class="cam-tool" title="@L["Clear"]" aria-label="@L["Clear"]" disabled="@(!canUndo)" @onclick="@(() => MarkupCommandAsync("clear"))">@MediaIcons.Svg("eraser")</button>
+                        </div>
+                    </div>
+                    <button type="button" class="cam-btn cam-btn-primary" disabled="@markupBusy" @onclick="ApplyMarkupAsync">@MediaIcons.Svg("check") @L["Apply"]</button>
+                </header>
+                <div class="cam-markup-host" data-cam="markup-host">
+                    <canvas data-cam="markup-canvas"></canvas>
+                    <input type="text" class="cam-markup-text" data-cam="markup-text" hidden placeholder="@L["Type, then Enter"]" maxlength="120" />
+                </div>
+            </section>
+        }
+    </div>
+
+    <footer class="cam-bottom">
+        <div class="cam-modes" role="tablist" aria-label="@L["Mode"]">
+            <button type="button" role="tab" aria-selected="@(settings.Mode == "photo" ? "true" : "false")" class="@(settings.Mode == "photo" ? "is-active" : "")" disabled="@recording" @onclick="@(() => SetModeAsync("photo"))">@L["Photo"]</button>
+            <button type="button" role="tab" aria-selected="@(settings.Mode == "video" ? "true" : "false")" class="@(settings.Mode == "video" ? "is-active" : "")" disabled="@(recording || support?.Recorder == false)" title="@(support?.Recorder == false ? L["This browser cannot record videos."] : null)" @onclick="@(() => SetModeAsync("video"))">@L["Video"]</button>
+        </div>
+
+        <div class="cam-controls">
+            <label class="cam-round-btn" title="@L["Import from device"]">
+                @MediaIcons.Svg("image-plus")
+                <input type="file" class="cam-hidden-input" data-cam="import" multiple accept="image/*,video/*" aria-label="@L["Import from device"]" />
+            </label>
+            <button type="button" class="cam-shutter" data-cam-action="shutter" disabled="@(status != Status.Live)"
+                    aria-label="@(settings.Mode == "video" ? (recording ? L["Stop recording"] : L["Record a video"]) : L["Take a photo"])"
+                    title="@(settings.Mode == "video" ? (recording ? L["Stop recording"] : L["Record a video"]) : L["Take a photo"]) (@L["Space"])"><span></span></button>
+            <button type="button" class="cam-round-btn" title="@L["Switch camera"]" aria-label="@L["Switch camera"]" disabled="@(!CanFlip)" @onclick="FlipAsync">@MediaIcons.Svg("flip")</button>
+        </div>
+
+        <div class="cam-tray">
+            <div class="cam-tray-list">
+                @if (shots.Count == 0)
+                {
+                    <span class="cam-tray-hint">@TrayHint</span>
+                }
+                @foreach (var shot in shots)
+                {
+                    <button type="button" @key="shot.Id" class="cam-thumb is-@shot.State.ToString().ToLowerInvariant()" style="--p:@((int)(shot.Progress * 100))" title="@StateText(shot)" @onclick="() => OpenReview(shot)">
+                        @if (!string.IsNullOrEmpty(shot.ThumbUrl))
+                        {
+                            <img src="@shot.ThumbUrl" alt="" />
+                        }
+                        else
+                        {
+                            <span class="cam-thumb-icon">@MediaIcons.Svg(shot.Kind == "video" ? "video" : "image")</span>
+                        }
+                        @if (shot.Kind == "video")
+                        {
+                            <span class="cam-thumb-badge">@MediaIcons.Svg("play") @Clock(shot.Duration)</span>
+                        }
+                        @if (shot.Edited)
+                        {
+                            <span class="cam-thumb-edited">@MediaIcons.Svg("markup")</span>
+                        }
+                        <span class="cam-thumb-state" aria-hidden="true">
+                            @if (shot.State == ShotState.Saved)
+                            {
+                                @MediaIcons.Svg("check")
+                            }
+                            else if (shot.State == ShotState.Failed)
+                            {
+                                @MediaIcons.Svg("alert")
+                            }
+                        </span>
+                    </button>
+                }
+            </div>
+            <div class="cam-tray-actions">
+                @if (!canStore)
+                {
+                    <span class="cam-pill cam-pill-warn">@MediaIcons.Svg("alert") @CannotStoreText</span>
+                }
+                else if (SavingCount > 0)
+                {
+                    <div class="cam-progress" role="status">
+                        <span>@L["Saving {0}…", SavingCount]</span>
+                        <div class="cam-progress-bar"><i style="width:@(BatchProgress)%"></i></div>
+                    </div>
+                }
+                else if (PendingCount > 0)
+                {
+                    <button type="button" class="cam-btn cam-btn-primary" @onclick="SaveAllAsync">@MediaIcons.Svg("upload") @L["Save {0}", PendingCount]</button>
+                }
+                else if (shots.Count > 0)
+                {
+                    <span class="cam-pill cam-pill-ok">@MediaIcons.Svg("check") @L["All saved"]</span>
+                    <button type="button" class="cam-btn" @onclick="CloseNow">@L["Done"]</button>
+                }
+            </div>
+        </div>
+    </footer>
+
+    @if (confirm != null)
+    {
+        <div class="cam-confirm-backdrop">
+            <div class="cam-confirm" role="alertdialog" aria-modal="true" aria-labelledby="cam-confirm-title">
+                <h3 id="cam-confirm-title">@confirm.Title</h3>
+                <p>@confirm.Text</p>
+                <div class="cam-confirm-actions">
+                    <button type="button" class="cam-btn" @onclick="() => { confirm = null; }">@confirm.CancelText</button>
+                    @if (confirm.SecondaryText != null)
+                    {
+                        <button type="button" class="cam-btn cam-btn-danger" @onclick="confirm.Secondary">@confirm.SecondaryText</button>
+                    }
+                    <button type="button" class="cam-btn @(confirm.Danger ? "cam-btn-danger" : "cam-btn-primary")" @onclick="confirm.Primary">@confirm.PrimaryText</button>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (toast != null)
+    {
+        <div class="cam-toast is-@toast.Kind" role="status">@toast.Text</div>
+    }
+</div>
 
 @code {
-    bool capturePreview;
-
+    /// <summary>The event, element, structure or site the photos and videos belong to.</summary>
     [Parameter]
     public object obj { get; set; }
 
-    private bool videoShown = true;
+    public enum Status { Starting, Live, Error, Ended }
+    public enum ShotState { New, Queued, Saving, Saved, Failed, Changed }
 
-    private double opacity =0;
-
-    private double allowSave = 0;
-
-    private DotNetObjectReference<CameraComponent> _blazorPageReference;
-
-
-    protected override async Task OnInitializedAsync()
+    public sealed class CameraSettings
     {
+        public string Mode { get; set; } = "photo";
+        public string Resolution { get; set; } = "auto";
+        public string DeviceId { get; set; } = "";
+        public int Timer { get; set; }
+        public bool Grid { get; set; }
+        public bool Stamp { get; set; }
+        public bool Location { get; set; }
+        public bool Mic { get; set; } = true;
+        public bool Sound { get; set; } = true;
+    }
 
+    public sealed class Support
+    {
+        public bool Secure { get; set; }
+        public bool Camera { get; set; }
+        public bool Recorder { get; set; }
+        public bool Touch { get; set; }
+    }
 
+    public sealed class Device
+    {
+        public string Id { get; set; } = "";
+        public string Label { get; set; } = "";
+        public string Facing { get; set; } = "";
+    }
+
+    public sealed class StreamInfo
+    {
+        public bool Ok { get; set; }
+        public bool Stale { get; set; }
+        public string? Error { get; set; }
+        public string? Detail { get; set; }
+        public string DeviceId { get; set; } = "";
+        public string Label { get; set; } = "";
+        public string Facing { get; set; } = "";
+        public int Width { get; set; }
+        public int Height { get; set; }
+        public bool Torch { get; set; }
+        public bool Zoom { get; set; }
+        public List<Device> Devices { get; set; } = new();
+    }
+
+    /// <summary>A photo or video of this session. Its bytes stay in the browser until it is saved.</summary>
+    public sealed class Shot
+    {
+        public string Id { get; set; } = "";
+        public string Kind { get; set; } = "photo";
+        public string Url { get; set; } = "";
+        public string ThumbUrl { get; set; } = "";
+        public int Width { get; set; }
+        public int Height { get; set; }
+        public double Duration { get; set; }
+        public long Size { get; set; }
+        public string Mime { get; set; } = "";
+        public string Ext { get; set; } = "";
+        public long TakenAt { get; set; }
+        public int TzOffset { get; set; }
+        public string Name { get; set; } = "";
+        public string Source { get; set; } = "camera";
+        public double? Lat { get; set; }
+        public double? Lon { get; set; }
+        public bool HasThumb { get; set; }
+        public bool Edited { get; set; }
+
+        [System.Text.Json.Serialization.JsonIgnore] public ShotState State { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore] public double Progress { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore] public string? Error { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore] public string? SavedPath { get; set; }
+    }
+
+    private sealed class ConfirmBox
+    {
+        public string Title { get; init; } = "";
+        public string Text { get; init; } = "";
+        public string PrimaryText { get; init; } = "";
+        public string CancelText { get; init; } = "";
+        public string? SecondaryText { get; init; }
+        public bool Danger { get; init; }
+        public Func<Task> Primary { get; init; } = () => Task.CompletedTask;
+        public Func<Task> Secondary { get; init; } = () => Task.CompletedTask;
+    }
+
+    private sealed record Toast(string Text, string Kind);
+
+    private static readonly (string Value, string Label)[] Resolutions =
+        { ("auto", "Auto"), ("2160", "4K"), ("1080", "1080p"), ("720", "720p") };
+
+    private static readonly (string Value, string Icon, string Label)[] MarkupTools =
+    {
+        ("arrow", "tool-arrow", "Arrow"), ("rect", "tool-rect", "Rectangle"), ("ellipse", "tool-ellipse", "Ellipse"),
+        ("pen", "tool-pen", "Pen"), ("text", "tool-text", "Text"),
+    };
+
+    private static readonly string[] MarkupColors = { "#ff3b30", "#ffcc00", "#34c759", "#0a84ff", "#ffffff", "#111111" };
+
+    private ElementReference root;
+    private IJSObjectReference? module, studio;
+    private DotNetObjectReference<CameraComponent>? selfRef;
+    private readonly CancellationTokenSource lifetime = new();
+    private bool disposed;
+
+    private CameraSettings settings = new();
+    private Support? support;
+    private StreamInfo? stream;
+    private Status status = Status.Starting;
+    private string errorCode = "", errorDetail = "";
+    private bool reviewBeforeSave, panelOpen, recording, torchOn;
+    private string locationState = "";
+    private bool canStore;
+    private string ownerLine = "";
+
+    private readonly List<Shot> shots = new();
+    private readonly Queue<Shot> queue = new();
+    private bool pumping;
+    private int savedCount, deletedCount;
+    private DateTime lastProgressRender;
+
+    private Shot? reviewShot, markupShot;
+    private string? markupPending;
+    private bool markupBusy, canUndo, canRedo;
+    private string markupTool = "arrow", markupColor = "#ff3b30", markupSize = "m";
+
+    private ConfirmBox? confirm;
+    private Toast? toast;
+    private CancellationTokenSource? toastTimer;
+    private string pushedView = "camera";
+
+    private string NativeAccept => settings.Mode == "video" ? "video/*" : "image/*";
+    private bool CanFlip => (status is Status.Live or Status.Error) && !recording && (stream?.Devices?.Count ?? 0) != 1;
+    private int PendingCount => shots.Count(s => s.State is ShotState.New or ShotState.Failed or ShotState.Changed);
+    private int SavingCount => shots.Count(s => s.State is ShotState.Queued or ShotState.Saving);
+    private string CannotStoreText => MediaLibrary.IsSupportedType(obj)
+        ? L["Save this item first to add photos and videos."]
+        : L["Photos and videos cannot be stored for this item."];
+
+    private string TrayHint => !canStore
+        ? L["Shots can be reviewed but not saved here."]
+        : reviewBeforeSave ? L["Shots wait here until you save them."] : L["Shots are saved as soon as they are taken."];
+
+    private int BatchProgress
+    {
+        get
+        {
+            var batch = shots.Where(s => s.State is ShotState.Queued or ShotState.Saving).ToList();
+            if (batch.Count == 0) return 100;
+            var total = batch.Sum(s => Math.Max(1, s.Size));
+            return (int)Math.Round(batch.Sum(s => s.Progress * Math.Max(1, s.Size)) * 100 / total);
+        }
+    }
+
+    private string CurrentView => confirm != null ? "dialog" : markupShot != null ? "markup" : reviewShot != null ? "review" : "camera";
+
+    protected override void OnInitialized()
+    {
+        canStore = MediaLibrary.CanStore(obj);
+        var name = MediaLibrary.NameOf(obj);
+        var kind = obj == null ? null : L[MediaLibrary.KindOf(obj)].Value;
+        ownerLine = string.IsNullOrWhiteSpace(name) ? kind ?? "" : kind == null ? name : $"{kind} · {name}";
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
+            await AttachAsync();
+            return;
+        }
+        if (studio == null || disposed) return;
 
-
-            _blazorPageReference = DotNetObjectReference.Create(this);
-            await js.InvokeAsync<object>("setBlazorPageReference", _blazorPageReference);
-            await js.InvokeVoidAsync("rita");
-            capturePreview = await localStorage.GetItemAsync<bool>("capturePreview");
+        if (markupPending != null)
+        {
+            var id = markupPending;
+            markupPending = null;
+            var opened = await Quietly(() => studio.InvokeAsync<bool>("openMarkup", lifetime.Token, id).AsTask());
+            if (!opened && markupShot?.Id == id)
+            {
+                markupShot = null;
+                StateHasChanged();
+            }
         }
 
-        //  await js.InvokeVoidAsync("EnumerateCameras");
-
-
-        await base.OnAfterRenderAsync(firstRender);
-
-
+        var view = CurrentView;
+        if (view != pushedView)
+        {
+            pushedView = view;
+            await Quietly(() => studio.InvokeVoidAsync("setView", view).AsTask());
+        }
     }
 
+    // ---- start-up and the stream -------------------------------------------------------------------------------
 
-    private async Task CaptureVideo()
-    {
-    }
-
-    private async Task Capture()
+    // The component can be disposed at any await below (the dialog closed while the module was loading or the
+    // permission prompt was open): whatever arrives afterwards is released and nothing is reported.
+    private async Task AttachAsync()
     {
         try
         {
-        await js.InvokeVoidAsync("capture", capturePreview);
+            var path = fileVersions.AddFileVersionToPath(default, "/js/camera-studio.js");
+            module = await js.InvokeAsync<IJSObjectReference>("import", "." + path);
+            if (disposed) return;
 
-        SoundPlayer player = new SoundPlayer();
-        player.SoundLocation = Path.Combine(Environment.WebRootPath,"camera-shutter-click-01.wav");
-        player.Play();
+            // What the browser remembers is the user's to break (another version, a hand edit): defaults then.
+            try
+            {
+                settings = Normalize(await module.InvokeAsync<CameraSettings?>("loadSettings"));
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                settings = Normalize(null);
+            }
+            support = await module.InvokeAsync<Support>("probe");
+            try
+            {
+                reviewBeforeSave = await localStorage.GetItemAsync<bool?>("capturePreview") ?? false;
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                reviewBeforeSave = false;
+            }
+            if (support?.Recorder == false) settings.Mode = "photo";
+            if (disposed) return;
 
-
-
-        if (capturePreview)
+            selfRef = DotNetObjectReference.Create(this);
+            studio = await module.InvokeAsync<IJSObjectReference>("create", root, selfRef,
+                new { settings = JsSettings(), text = new { camera = L["Camera"].Value } });
+            if (disposed) return;
+            StateHasChanged();
+            await StartAsync("start", new { deviceId = settings.DeviceId });
+        }
+        catch (Exception ex) when (IsInteropFailure(ex))
         {
-            opacity = 1;
-            allowSave = 1;
+            if (!disposed && ex is not JSDisconnectedException)
+            {
+                Logger.LogError(ex, "Camera: the camera module did not load");
+                status = Status.Error;
+                errorCode = "other";
+                errorDetail = ex.Message;
+                StateHasChanged();
+            }
         }
-        else
+        finally
         {
-            SaveImage();
+            if (disposed) await ReleaseAsync();
         }
-        }
-        catch(Exception ex)
-        {
-            await js.InvokeVoidAsync("alert", @L["Access to the camera denied"]);
-        }
-
     }
 
-    private async Task SaveImage()
+    // No interop timeout here: the browser's permission prompt can stay open as long as the user needs.
+    private async Task StartAsync(string method, object? request = null)
     {
-        await js.InvokeVoidAsync("SaveImage", DateTime.Now.ToString("yyyy-MM-dd HH-mm-ss"));
-        if (capturePreview)
+        if (studio == null || disposed) return;
+        status = Status.Starting;
+        StateHasChanged();
+        StreamInfo? result;
+        try
         {
-            opacity = 0;
-            allowSave = 0;
+            result = request == null
+                ? await studio.InvokeAsync<StreamInfo>(method, lifetime.Token)
+                : await studio.InvokeAsync<StreamInfo>(method, lifetime.Token, request);
         }
+        catch (Exception ex) when (IsInteropFailure(ex))
+        {
+            if (disposed || ex is JSDisconnectedException) return;
+            status = Status.Error;
+            errorCode = "other";
+            errorDetail = ex.Message;
+            StateHasChanged();
+            return;
+        }
+        ApplyStream(result);
     }
 
-    
-
-    private async Task CancelCapture()
+    private void ApplyStream(StreamInfo? result)
     {
-        if (capturePreview)
+        if (disposed || result == null || result.Stale) return;
+        if (!result.Ok)
         {
-            opacity = 0;
-            allowSave = 0;
+            stream = null;
+            status = Status.Error;
+            errorCode = result.Error ?? "other";
+            errorDetail = result.Detail ?? "";
+            if (errorCode is "other" or "busy") Logger.LogWarning("Camera: the camera did not start ({Code}: {Detail})", errorCode, errorDetail);
+            StateHasChanged();
+            return;
         }
+        stream = result;
+        status = Status.Live;
+        torchOn = false;
+        if (!string.IsNullOrEmpty(result.DeviceId) && result.DeviceId != settings.DeviceId)
+        {
+            settings.DeviceId = result.DeviceId;
+            _ = SaveSettingsAsync();
+        }
+        StateHasChanged();
     }
 
+    private Task RetryAsync() => StartAsync("start", new { deviceId = settings.DeviceId });
 
+    private Task FlipAsync() => recording ? Task.CompletedTask : StartAsync("flip");
+
+    private async Task SelectDeviceAsync(ChangeEventArgs e)
+    {
+        var id = e.Value?.ToString() ?? "";
+        if (recording || id == stream?.DeviceId) return;
+        await StartAsync("start", new { deviceId = id });
+    }
+
+    private async Task ToggleTorchAsync()
+    {
+        if (studio == null) return;
+        torchOn = await Quietly(() => studio.InvokeAsync<bool>("setTorch", !torchOn).AsTask());
+    }
+
+    // ---- settings ----------------------------------------------------------------------------------------------
+
+    private static CameraSettings Normalize(CameraSettings? saved)
+    {
+        var s = saved ?? new CameraSettings();
+        if (s.Mode is not ("photo" or "video")) s.Mode = "photo";
+        if (s.Resolution is not ("auto" or "2160" or "1080" or "720")) s.Resolution = "auto";
+        if (s.Timer is not (0 or 3 or 10)) s.Timer = 0;
+        s.DeviceId ??= "";
+        return s;
+    }
+
+    private object JsSettings() => new
+    {
+        mode = settings.Mode,
+        resolution = settings.Resolution,
+        timer = settings.Timer,
+        grid = settings.Grid,
+        stamp = settings.Stamp,
+        location = settings.Location,
+        mic = settings.Mic,
+        sound = settings.Sound,
+        label = ownerLine,
+        culture = CultureInfo.CurrentCulture.Name,
+    };
+
+    private async Task ChangeAsync(Action change)
+    {
+        change();
+        if (studio != null) await Quietly(() => studio.InvokeVoidAsync("update", JsSettings()).AsTask());
+        await SaveSettingsAsync();
+    }
+
+    private async Task SaveSettingsAsync()
+    {
+        if (module != null) await Quietly(() => module.InvokeVoidAsync("saveSettings", settings).AsTask());
+    }
+
+    private Task SetModeAsync(string mode) => recording || settings.Mode == mode ? Task.CompletedTask : ChangeAsync(() => settings.Mode = mode);
+    private Task CycleTimerAsync() => ChangeAsync(() => settings.Timer = settings.Timer switch { 0 => 3, 3 => 10, _ => 0 });
+    private Task ToggleGridAsync() => ChangeAsync(() => settings.Grid = !settings.Grid);
+    private Task ToggleStampAsync() => ChangeAsync(() => settings.Stamp = !settings.Stamp);
+    private Task SetResolutionAsync(string value) => recording ? Task.CompletedTask : ChangeAsync(() => settings.Resolution = value);
+    private Task SetMicAsync(ChangeEventArgs e) => ChangeAsync(() => settings.Mic = e.Value is true);
+    private Task SetSoundAsync(ChangeEventArgs e) => ChangeAsync(() => settings.Sound = e.Value is true);
+
+    private Task SetLocationAsync(ChangeEventArgs e)
+    {
+        locationState = "";
+        return ChangeAsync(() => settings.Location = e.Value is true);
+    }
+
+    private async Task SetReviewAsync(ChangeEventArgs e)
+    {
+        reviewBeforeSave = e.Value is true;
+        await Quietly(() => localStorage.SetItemAsync("capturePreview", reviewBeforeSave).AsTask());
+        if (!reviewBeforeSave) foreach (var shot in shots.Where(s => s.State is ShotState.New or ShotState.Changed).ToList()) Enqueue(shot);
+    }
+
+    private void TogglePanel() => panelOpen = !panelOpen;
+
+    // ---- callbacks from the browser --------------------------------------------------------------------------
 
     [JSInvokable]
-    public async Task<string> SaveFile(string fileName, string fileType)
+    public Task OnShot(Shot shot) => InvokeAsync(() =>
     {
-        var dataReference =  await js.InvokeAsync<IJSStreamReference>("fileDataStream"); //this is the function we exposed in the javascript above
-        await using var dataReferenceStream =
-            await dataReference.OpenReadStreamAsync(maxAllowedSize: 10_000_000);
+        if (disposed || shot == null) return;
+        shot.State = ShotState.New;
+        shots.Insert(0, shot);
+        if (!reviewBeforeSave && canStore) Enqueue(shot);
+        StateHasChanged();
+    });
 
+    [JSInvokable]
+    public Task OnRecording(bool active) => InvokeAsync(() =>
+    {
+        recording = active;
+        if (active) panelOpen = false;
+        StateHasChanged();
+    });
 
-        string path = Path.Combine(Environment.ContentRootPath, "Images");
+    [JSInvokable]
+    public Task OnStreamInfo(StreamInfo info) => InvokeAsync(() => ApplyStream(info));
 
-        string filePath = FilesUpload.PreparePath(fileName, obj, path);
+    [JSInvokable]
+    public Task OnStreamEnded() => InvokeAsync(() =>
+    {
+        if (status != Status.Live) return;
+        status = Status.Ended;
+        recording = false;
+        StateHasChanged();
+    });
 
+    [JSInvokable]
+    public Task OnLocation(string state) => InvokeAsync(() =>
+    {
+        if (state == locationState) return;
+        locationState = state;
+        if (state == "denied") ShowToast(L["Location is blocked for this site: photos are taken without it."], "warn");
+        StateHasChanged();
+    });
 
+    [JSInvokable]
+    public Task OnMarkupState(bool undo, bool redo) => InvokeAsync(() =>
+    {
+        canUndo = undo;
+        canRedo = redo;
+        StateHasChanged();
+    });
 
-        //  var filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", fileName);
-        FileStream createdFile;
-        try
+    [JSInvokable]
+    public Task OnNotice(string code, string detail) => InvokeAsync(() =>
+    {
+        switch (code)
         {
-            createdFile = File.Create(filePath);
-            await dataReferenceStream.CopyToAsync(createdFile);
-            createdFile.Close();
+            case "not-ready": ShowToast(L["The camera is not ready yet."], "warn"); break;
+            case "mic-unavailable": ShowToast(L["No microphone: the video is recorded without sound."], "warn"); break;
+            case "max-length": ShowToast(L["Recording stopped at the maximum length ({0} min).", int.Parse(detail, CultureInfo.InvariantCulture) / 60], "warn"); break;
+            case "record-unsupported": ShowToast(L["This browser cannot record videos."], "error"); break;
+            case "import-unsupported": ShowToast(L["{0} is not a photo or a video.", detail], "error"); break;
+            default:
+                Logger.LogWarning("Camera: {Code} {Detail}", code, detail);
+                ShowToast(string.IsNullOrEmpty(detail) ? L["Something went wrong with the camera."] : $"{L["Something went wrong with the camera."]} ({detail})", "error");
+                break;
         }
-        catch(Exception ex)
+        StateHasChanged();
+    });
+
+    [JSInvokable]
+    public Task OnKey(string key) => InvokeAsync(async () =>
+    {
+        switch (key)
         {
-            await js.InvokeVoidAsync("alert", "Error: "+ex.Message);
-
+            case "Escape":
+                if (confirm != null) confirm = null;
+                else if (panelOpen) panelOpen = false;
+                else if (markupShot != null) await CancelMarkupAsync();
+                else if (reviewShot != null) CloseReview();
+                else await RequestCloseAsync();
+                break;
+            case "ArrowLeft": if (reviewShot != null && markupShot == null) Step(-1); break;
+            case "ArrowRight": if (reviewShot != null && markupShot == null) Step(1); break;
+            case "Delete": if (reviewShot != null && markupShot == null && confirm == null) await DeleteShotAsync(reviewShot); break;
+            case "g": if (CurrentView == "camera") await ToggleGridAsync(); break;
+            case "t": if (CurrentView == "camera") await CycleTimerAsync(); break;
+            case "m": if (CurrentView == "camera" && support?.Recorder != false) await SetModeAsync(settings.Mode == "photo" ? "video" : "photo"); break;
         }
-        await Task.CompletedTask;
+        StateHasChanged();
+    });
 
+    // ---- review ------------------------------------------------------------------------------------------------
 
-        return $"new file {fileName} created";
+    private void OpenReview(Shot shot)
+    {
+        panelOpen = false;
+        reviewShot = shot;
     }
 
+    private void CloseReview() => reviewShot = null;
 
+    private void Step(int direction)
+    {
+        if (reviewShot == null) return;
+        var index = shots.IndexOf(reviewShot) + direction;
+        if (index >= 0 && index < shots.Count) reviewShot = shots[index];
+    }
 
+    private static bool CanEdit(Shot shot) => shot.Kind == "photo" && shot.State is not (ShotState.Queued or ShotState.Saving);
+
+    private async Task DeleteShotAsync(Shot shot)
+    {
+        if (shot.State == ShotState.Saving) return;
+        if (shot.SavedPath != null)
+        {
+            confirm = new ConfirmBox
+            {
+                Title = shot.Kind == "video" ? L["Delete this video?"] : L["Delete this photo?"],
+                Text = L["It is already saved with {0}. It will be removed from there too.", string.IsNullOrEmpty(ownerLine) ? L["this item"].Value : ownerLine],
+                PrimaryText = L["Delete"],
+                CancelText = L["Cancel"],
+                Danger = true,
+                Primary = async () =>
+                {
+                    confirm = null;
+                    try
+                    {
+                        MediaLibrary.Delete(shot.SavedPath);
+                        deletedCount++;
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    {
+                        Logger.LogError(ex, "Camera: deleting {Path} failed", shot.SavedPath);
+                        ShowToast($"{L["The file could not be deleted."]} {ex.Message}", "error");
+                        return;
+                    }
+                    await ForgetAsync(shot);
+                },
+            };
+            return;
+        }
+        await ForgetAsync(shot);
+    }
+
+    private async Task ForgetAsync(Shot shot)
+    {
+        var index = shots.IndexOf(shot);
+        shots.Remove(shot);
+        if (queue.Contains(shot))
+        {
+            var rest = queue.Where(s => s != shot).ToList();
+            queue.Clear();
+            foreach (var s in rest) queue.Enqueue(s);
+        }
+        if (reviewShot == shot) reviewShot = shots.Count == 0 ? null : shots[Math.Min(index, shots.Count - 1)];
+        if (studio != null) await Quietly(() => studio.InvokeVoidAsync("remove", shot.Id).AsTask());
+    }
+
+    // ---- markup ------------------------------------------------------------------------------------------------
+
+    private void OpenMarkup(Shot shot)
+    {
+        if (!CanEdit(shot)) return;
+        markupShot = shot;
+        markupPending = shot.Id;
+        canUndo = canRedo = false;
+    }
+
+    private async Task MarkupAsync(string tool)
+    {
+        markupTool = tool;
+        if (studio != null) await Quietly(() => studio.InvokeVoidAsync("markup", "tool", tool).AsTask());
+    }
+
+    private async Task MarkupColorAsync(string color)
+    {
+        markupColor = color;
+        if (studio != null) await Quietly(() => studio.InvokeVoidAsync("markup", "color", color).AsTask());
+    }
+
+    private async Task MarkupSizeAsync(string size)
+    {
+        markupSize = size;
+        if (studio != null) await Quietly(() => studio.InvokeVoidAsync("markup", "size", size).AsTask());
+    }
+
+    private async Task MarkupCommandAsync(string command)
+    {
+        if (studio != null) await Quietly(() => studio.InvokeVoidAsync("markup", command, null).AsTask());
+    }
+
+    private async Task ApplyMarkupAsync()
+    {
+        var shot = markupShot;
+        if (studio == null || shot == null || markupBusy) return;
+        markupBusy = true;
+        try
+        {
+            var result = await studio.InvokeAsync<Shot>("applyMarkup", lifetime.Token);
+            markupShot = null;
+            if (result?.Edited == true)
+            {
+                shot.Url = result.Url;
+                shot.ThumbUrl = result.ThumbUrl;
+                shot.Size = result.Size;
+                shot.Width = result.Width;
+                shot.Height = result.Height;
+                shot.Mime = result.Mime;
+                shot.Ext = result.Ext;
+                shot.HasThumb = result.HasThumb;
+                shot.Edited = true;
+                if (shot.State == ShotState.Saved) shot.State = ShotState.Changed;
+                if (!reviewBeforeSave && canStore && shot.State is ShotState.New or ShotState.Changed) Enqueue(shot);
+            }
+        }
+        catch (Exception ex) when (IsInteropFailure(ex))
+        {
+            if (!disposed) ShowToast(L["The markup could not be applied."], "error");
+        }
+        finally
+        {
+            markupBusy = false;
+        }
+    }
+
+    private async Task CancelMarkupAsync()
+    {
+        markupShot = null;
+        markupPending = null;
+        if (studio != null) await Quietly(() => studio.InvokeVoidAsync("closeMarkup").AsTask());
+    }
+
+    // ---- saving ------------------------------------------------------------------------------------------------
+
+    private Task SaveAllAsync()
+    {
+        foreach (var shot in shots.Where(s => s.State is ShotState.New or ShotState.Failed or ShotState.Changed).Reverse().ToList())
+            Enqueue(shot);
+        return Task.CompletedTask;
+    }
+
+    private void Enqueue(Shot shot)
+    {
+        if (!canStore || disposed || shot.State is ShotState.Queued or ShotState.Saving or ShotState.Saved) return;
+        shot.State = ShotState.Queued;
+        shot.Progress = 0;
+        shot.Error = null;
+        queue.Enqueue(shot);
+        _ = PumpAsync();
+    }
+
+    // One file at a time: they share the circuit's connection with everything else the page does.
+    private async Task PumpAsync()
+    {
+        if (pumping) return;
+        pumping = true;
+        int saved = 0, failed = 0;
+        try
+        {
+            while (!disposed && queue.Count > 0)
+            {
+                var shot = queue.Dequeue();
+                if (!shots.Contains(shot) || shot.State != ShotState.Queued) continue;
+                if (await SaveAsync(shot)) saved++;
+                else if (!disposed) failed++;
+                if (!disposed) StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Camera: the upload queue stopped");
+        }
+        finally
+        {
+            pumping = false;
+        }
+        if (disposed) return;
+        if (failed > 0) ShowToast(L["Not saved: {0}. Open a shot to retry.", failed], "error");
+        else if (saved > 0 && reviewBeforeSave) ShowToast(L["Saved: {0}", saved], "ok");
+        if (closeWhenSaved && SavingCount == 0)
+        {
+            closeWhenSaved = false;
+            if (PendingCount == 0) CloseNow();
+        }
+        StateHasChanged();
+    }
+
+    private async Task<bool> SaveAsync(Shot shot)
+    {
+        var kind = shot.Kind == "video" ? MediaKind.Video : MediaKind.Photo;
+        var ext = MediaLibrary.CheckExtension(shot.Ext, kind);
+        if (ext == null) return Fail(shot, L["This file type cannot be stored."]);
+        var limit = MediaLibrary.MaxBytes(kind);
+        if (shot.Size > limit) return Fail(shot, L["Too large (maximum {0}).", FormatSize(limit)]);
+
+        // A shot saved before and marked up since replaces its file, unless the markup changed its type (a PNG comes
+        // back as a JPEG): then it is stored anew and the old file removed.
+        var previous = shot.SavedPath;
+        var replacing = previous != null && File.Exists(previous) &&
+                        string.Equals(Path.GetExtension(previous).TrimStart('.'), ext, StringComparison.OrdinalIgnoreCase)
+            ? previous
+            : null;
+        if (replacing == null && !canStore) return Fail(shot, CannotStoreText);
+
+        shot.State = ShotState.Saving;
+        shot.Progress = 0;
+        StateHasChanged();
+
+        try
+        {
+            var target = await MediaLibrary.StoreAsync(obj, Environment.ContentRootPath, BaseName(shot), ext, async temp =>
+            {
+                await ReceiveAsync("blob", shot.Id, temp, limit, received =>
+                {
+                    shot.Progress = shot.Size > 0 ? Math.Min(1, received / (double)shot.Size) : 0;
+                    if (DateTime.UtcNow - lastProgressRender > TimeSpan.FromMilliseconds(200))
+                    {
+                        lastProgressRender = DateTime.UtcNow;
+                        StateHasChanged();
+                    }
+                });
+                if (kind == MediaKind.Photo && shot.Source == "camera" && ext is "jpg" or "jpeg")
+                {
+                    try
+                    {
+                        MediaLibrary.WriteExif(temp, ShotTime(shot), shot.Lat, shot.Lon);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogWarning(ex, "Camera: the photo is saved without its EXIF date");
+                    }
+                }
+            }, replacing);
+
+            if (previous != null && replacing == null && previous != target)
+            {
+                try { MediaLibrary.Delete(previous); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+            }
+            await SaveThumbnailAsync(shot, target);
+
+            if (shot.SavedPath == null) savedCount++;
+            shot.SavedPath = target;
+            shot.State = ShotState.Saved;
+            shot.Progress = 1;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            if (disposed) return false;
+            Logger.LogError(ex, "Camera: saving {Kind} {Id} failed", shot.Kind, shot.Id);
+            return Fail(shot, ex is JSDisconnectedException or TaskCanceledException
+                ? L["The connection was lost."].Value
+                : ex is MediaStorageException ? CannotStoreText : ex.Message);
+        }
+    }
+
+    private async Task SaveThumbnailAsync(Shot shot, string mediaPath)
+    {
+        var thumbPath = MediaLibrary.ThumbnailPath(mediaPath);
+        if (!shot.HasThumb)
+        {
+            TryDelete(thumbPath);
+            return;
+        }
+        var temp = $"{thumbPath}.{Guid.NewGuid():N}.part";
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(thumbPath)!);
+            await ReceiveAsync("thumb", shot.Id, temp, MediaLibrary.MaxThumbnailBytes, null);
+            File.Move(temp, thumbPath, overwrite: true);
+        }
+        catch (Exception ex)
+        {
+            // The gallery shows the file itself instead: slower, never wrong.
+            TryDelete(temp);
+            if (!disposed) Logger.LogWarning(ex, "Camera: no preview saved for {Path}", mediaPath);
+        }
+    }
+
+    private async Task ReceiveAsync(string method, string id, string path, long limit, Action<long>? progress)
+    {
+        var reference = await studio!.InvokeAsync<IJSStreamReference>(method, lifetime.Token, id);
+        await using (reference)
+        {
+            if (reference.Length > limit) throw new InvalidDataException(L["Too large (maximum {0}).", FormatSize(limit)]);
+            await using var input = await reference.OpenReadStreamAsync(limit, lifetime.Token);
+            await using var output = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous);
+            var buffer = new byte[81920];
+            long total = 0;
+            int read;
+            while ((read = await input.ReadAsync(buffer, lifetime.Token)) > 0)
+            {
+                await output.WriteAsync(buffer.AsMemory(0, read), lifetime.Token);
+                total += read;
+                progress?.Invoke(total);
+            }
+        }
+    }
+
+    private bool Fail(Shot shot, string reason)
+    {
+        shot.State = ShotState.Failed;
+        shot.Error = reason;
+        shot.Progress = 0;
+        return false;
+    }
+
+    private static void TryDelete(string path)
+    {
+        try { if (File.Exists(path)) File.Delete(path); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+    }
+
+    // The camera's own shots are named by the time they were taken, on the user's clock (the server's is UTC in the
+    // container); an imported file keeps its own name.
+    private static string BaseName(Shot shot) =>
+        shot.Source == "import" && MediaLibrary.CleanBaseName(shot.Name) is { } name ? name : MediaLibrary.TimestampName(ShotTime(shot));
+
+    private static DateTime ShotTime(Shot shot)
+    {
+        if (shot.TakenAt <= 946684800000 || shot.TakenAt >= 4102444800000 || Math.Abs(shot.TzOffset) > 14 * 60) return DateTime.Now;
+        return DateTimeOffset.FromUnixTimeMilliseconds(shot.TakenAt).ToOffset(TimeSpan.FromMinutes(-shot.TzOffset)).DateTime;
+    }
+
+    // ---- closing -----------------------------------------------------------------------------------------------
+
+    private bool closeWhenSaved;
+
+    private async Task RequestCloseAsync()
+    {
+        if (recording && studio != null) await Quietly(() => studio.InvokeVoidAsync("shutter").AsTask());
+        var unsaved = shots.Count(s => s.State is not ShotState.Saved);
+        if (unsaved == 0)
+        {
+            CloseNow();
+            return;
+        }
+        var saving = SavingCount > 0;
+        confirm = new ConfirmBox
+        {
+            Title = saving ? L["Saving is not finished"] : L["Unsaved shots: {0}", unsaved],
+            Text = canStore
+                ? (saving ? L["Wait for the files to be saved, or close and lose what is not saved yet."] : L["Save them before closing, or they will be lost."])
+                : L["They cannot be saved for this item and will be lost."],
+            PrimaryText = canStore ? (saving ? L["Close when saved"] : L["Save and close"]) : L["Close"],
+            CancelText = L["Keep editing"],
+            SecondaryText = canStore ? L["Discard"] : null,
+            Danger = !canStore,
+            Primary = () =>
+            {
+                confirm = null;
+                if (!canStore)
+                {
+                    CloseNow();
+                    return Task.CompletedTask;
+                }
+                closeWhenSaved = true;
+                return SaveAllAsync();
+            },
+            Secondary = () =>
+            {
+                confirm = null;
+                CloseNow();
+                return Task.CompletedTask;
+            },
+        };
+    }
+
+    // The dialog's result tells MediaComponent whether to read the folder again.
+    private void CloseNow() => DialogService.Close(savedCount + deletedCount);
+
+    // ---- display -----------------------------------------------------------------------------------------------
+
+    private (string Icon, string Title, string Text) ErrorText()
+    {
+        (string, string, string) Text(string icon, string title, string text) => (icon, L[title].Value, L[text].Value);
+        if (status == Status.Ended)
+            return Text("camera-off", "The camera stopped", "It may have been disconnected, or taken by another application.");
+        return errorCode switch
+        {
+            "insecure" => Text("lock", "The camera needs a secure connection", "Browsers only allow the camera on HTTPS pages (or on the computer running the app). Open the app over HTTPS, or use the device camera app."),
+            "denied" => Text("camera-off", "Camera access is blocked", "Allow the camera for this site (the camera icon in the address bar), then try again."),
+            "notfound" => Text("camera-off", "No camera found", "Connect a camera, or add photos and videos from this device."),
+            "busy" => Text("camera-off", "The camera is in use", "Another application or tab is using the camera. Close it, then try again."),
+            "unsupported" => Text("camera-off", "This browser cannot use the camera", "Use a recent Chrome, Edge, Safari or Firefox, or the device camera app."),
+            _ => Text("alert", "The camera could not start", "Try again. If it keeps failing, reload the page."),
+        };
+    }
+
+    private string StateText(Shot shot) => shot.State switch
+    {
+        ShotState.New => canStore ? L["Not saved yet"] : L["Not saved"],
+        ShotState.Queued => L["Waiting to be saved"],
+        ShotState.Saving => L["Saving… {0}%", (int)(shot.Progress * 100)],
+        ShotState.Saved => L["Saved"],
+        ShotState.Changed => L["Changed, not saved yet"],
+        ShotState.Failed => $"{L["Not saved"]}: {shot.Error}",
+        _ => "",
+    };
+
+    private string FormatLabel(StreamInfo info)
+    {
+        var shortSide = Math.Min(info.Width, info.Height);
+        var tag = shortSide >= 2000 ? "4K" : shortSide >= 1000 ? "Full HD" : shortSide >= 700 ? "HD" : null;
+        return tag == null ? $"{info.Width} × {info.Height}" : $"{tag} · {info.Width} × {info.Height}";
+    }
+
+    private static string Clock(double seconds)
+    {
+        var total = (int)Math.Round(seconds);
+        return $"{total / 60}:{total % 60:00}";
+    }
+
+    public static string FormatSize(long bytes) => bytes switch
+    {
+        >= 1024L * 1024 * 1024 => $"{bytes / (1024.0 * 1024 * 1024):0.0} GB",
+        >= 1024L * 1024 => $"{bytes / (1024.0 * 1024):0.0} MB",
+        >= 1024 => $"{bytes / 1024.0:0} KB",
+        _ => $"{bytes} B",
+    };
+
+    private void ShowToast(string text, string kind)
+    {
+        toast = new Toast(text, kind);
+        toastTimer?.Cancel();
+        var timer = toastTimer = new CancellationTokenSource();
+        _ = HideToastLaterAsync(timer.Token);
+    }
+
+    private async Task HideToastLaterAsync(CancellationToken token)
+    {
+        try
+        {
+            await Task.Delay(4000, token);
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+        if (disposed) return;
+        toast = null;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    // ---- teardown ----------------------------------------------------------------------------------------------
+
+    public async ValueTask DisposeAsync()
+    {
+        if (disposed) return;
+        disposed = true;
+        lifetime.Cancel();
+        toastTimer?.Cancel();
+        await ReleaseAsync();
+    }
+
+    // Safe to run twice (DisposeAsync while AttachAsync is still waiting): each run takes the references off the fields
+    // before its first await, so each releases only what had arrived by then.
+    private async Task ReleaseAsync()
+    {
+        var (releasedStudio, releasedModule, releasedSelf) = (studio, module, selfRef);
+        (studio, module, selfRef) = (null, null, null);
+        if (releasedStudio != null)
+        {
+            await Quietly(() => releasedStudio.InvokeVoidAsync("dispose").AsTask());
+            await Quietly(() => releasedStudio.DisposeAsync().AsTask());
+        }
+        if (releasedModule != null) await Quietly(() => releasedModule.DisposeAsync().AsTask());
+        releasedSelf?.Dispose();
+    }
+
+    private static bool IsInteropFailure(Exception ex) =>
+        ex is JSException or JSDisconnectedException or TaskCanceledException or OperationCanceledException or ObjectDisposedException;
+
+    private static async Task Quietly(Func<Task> interop)
+    {
+        try { await interop(); }
+        catch (Exception ex) when (IsInteropFailure(ex)) { }
+    }
+
+    private static async Task<T> Quietly<T>(Func<Task<T>> interop)
+    {
+        try { return await interop(); }
+        catch (Exception ex) when (IsInteropFailure(ex)) { return default!; }
+    }
 }

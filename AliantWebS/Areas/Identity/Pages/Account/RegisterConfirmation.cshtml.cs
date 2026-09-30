@@ -58,7 +58,7 @@ namespace AliantWebS.Areas.Identity.Pages.Account
         {
             if (email == null)
             {
-                return RedirectToPage("/Index");
+                return LocalRedirect(Url.Content("~/"));   // home; RedirectToPage("/Index") named no page in this area (500)
             }
             returnUrl = returnUrl ?? Url.Content("~/");
 

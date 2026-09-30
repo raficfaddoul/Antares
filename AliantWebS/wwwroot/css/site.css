@@ -254,3 +254,35 @@ canvas {
     z-index: 100;
 }
 
+
+/* Camera and full-screen viewer dialogs (Pages/CameraComponent.razor, Pages/MediaViewer.razor, opened by
+   MediaComponent with CssClass "media-dialog"): full-bleed and dark, without Radzen's padding, and the whole screen
+   on a phone. Global because Radzen renders the dialog frame outside the components' scoped styles. */
+.rz-dialog.media-dialog {
+    max-width: 100vw;
+    max-height: 100vh;
+    border-radius: 18px;
+    background: #070b16;
+    box-shadow: 0 30px 90px rgba(0, 0, 0, 0.6);
+}
+
+.rz-dialog.media-dialog .rz-dialog-content {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    padding: 0;
+    overflow: hidden;
+}
+
+.rz-dialog.media-dialog-full {
+    border-radius: 0;
+}
+
+@media (max-width: 760px), (max-height: 540px) {
+    .rz-dialog.media-dialog {
+        width: 100vw !important;
+        height: 100vh !important;
+        height: 100dvh !important;
+        border-radius: 0;
+    }
+}

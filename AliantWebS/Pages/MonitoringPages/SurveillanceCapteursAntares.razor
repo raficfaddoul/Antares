@@ -311,7 +311,8 @@
                                 }
                                 <AliantWebS.Pages.CADPages.SVGComponent
                                     @ref="svgComponent"
-                                    SvgClicked="@HandleSvgClick"
+                                    Mode="@(isPositioningMode ? AliantWebS.Pages.CADPages.PlanMode.PlaceSensor : AliantWebS.Pages.CADPages.PlanMode.View)"
+                                    PointPlaced="@HandlePointPlaced"
                                     OnSensorClicked="@HandleSensorClickedFromSvg"
 
                                     Point0X="@(selectedEvent?.Point0X ?? 0)"
@@ -320,7 +321,6 @@
                                     EventId="@selectedEvent?.EventId"
                                     Sensors="svgSensors"
                                     SensorChargeRatios="sensorChargeRatios"
-                                    IsPositioningMode="isPositioningMode"
                                     StructureName="@Structure?.Name"
                                     ModuleName="Surveillance des capteurs"
                                     IsSensorSelectionEnabled="true">
@@ -415,18 +415,15 @@
         weightChannelDataType = wc;
         await ComputeChargeRatios();
 
-        // Build initial set of positioned sensor IDs. A sensor counts as positioned when both rows hold a
-        // number the plan can draw, which is the test SVGComponent uses to place it: the mere presence of the
+        // Build initial set of positioned sensor IDs. A sensor counts as positioned when both rows hold a finite
+        // number, the very test the plan uses to place it (PlanData.TrySensorAbsoluteMm): the mere presence of the
         // rows says nothing, since an element is given an empty row for every attribute type its element type
         // expects, and X and Y are now among those types for the sensor types that carry positions.
         if (sensors != null)
         {
             foreach (var sensor in sensors)
             {
-                var xAttr = sensor.AttributeElements?.FirstOrDefault(ae => ae.AttributeType?.Name == "X");
-                var yAttr = sensor.AttributeElements?.FirstOrDefault(ae => ae.AttributeType?.Name == "Y");
-                if (double.TryParse(xAttr?.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out _) &&
-                    double.TryParse(yAttr?.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+                if (AliantWebS.Plan.PlanData.TrySensorAbsoluteMm(sensor, out _, out _))
                 {
                     positionedSensorIds.Add(sensor.ElementId);
                 }
@@ -679,16 +676,14 @@
         StateHasChanged();
     }
 
-    private async Task HandleSvgClick(MouseEventArgs e)
+    // The plan gives the point clicked as sensor positions are stored: absolute millimetres in the grid's axes.
+    private async Task HandlePointPlaced(AliantWebS.Pages.CADPages.PlanPoint point)
     {
         if (isPositioningMode && sensorToPosition != null)
         {
             var currentSensor = sensorToPosition;
-            
-            var clickPoint = await svgComponent.GetSvgCoordinates(e.ClientX, e.ClientY);
-            var realPoint = svgComponent.GetRealCoordinatesFromSVG(clickPoint);
 
-            await SaveSensorPosition(currentSensor, realPoint.X, realPoint.Y);
+            await SaveSensorPosition(currentSensor, point.Xmm, point.Ymm);
             
             // Add to positioned set
             positionedSensorIds.Add(currentSensor.ElementId);

@@ -16,7 +16,7 @@ namespace AliantWebS.Data
 {
 
 
-    public class EntitiesService
+    public partial class EntitiesService
     {
         #region Property
         public AliantWebContext _appDBContext;
@@ -114,7 +114,19 @@ namespace AliantWebS.Data
         {
             try
             {
-                var entry = _appDBContext.Entry(entity);
+                return DescribeChanges(_appDBContext.Entry(entity));
+            }
+            catch
+            {
+                return null;   // never let describing a change break the change
+            }
+        }
+
+        /// <summary>The same, for an entry of any context - an owned one's included (UpdateOwnedAsync).</summary>
+        private static string DescribeChanges(EntityEntry entry)
+        {
+            try
+            {
                 var lines = new List<string>();
 
                 foreach (var p in entry.Properties)
@@ -144,10 +156,12 @@ namespace AliantWebS.Data
             return s.Length <= 200 ? s : s.Substring(0, 200) + "…";
         }
 
-        private async Task JournalEditAsync(string action, string target, string details, byte severity = 0)
+        private async Task JournalEditAsync(string action, string target, string details, byte severity = 0,
+                                            Guid? eventId = null, Guid? structureId = null)
         {
             if (SuppressJournal || journal == null) return;
-            await journal.WriteAsync(JournalCategory.Edition, action, target, details, severity);
+            await journal.WriteAsync(JournalCategory.Edition, action, target, details, severity,
+                                     structureId: structureId, eventId: eventId);
         }
         #endregion
 
@@ -588,6 +602,58 @@ namespace AliantWebS.Data
             return true;
 
         }
+        /// <summary>
+        /// Inserts one row through a context of its own, disposed here: the circuit's shared context never holds it, so
+        /// nothing of this row is left behind when it is deleted later - by this tab or by another one - and a refused
+        /// insert leaves nothing queued for the next save of another page.
+        ///
+        /// The caller keeps its object as plain data, with the key the database gave it. Journals like InsertEntityAsync.
+        /// </summary>
+        public async Task<bool> InsertOwnedAsync<T>(T entity) where T : class
+        {
+            try
+            {
+                await using var db = CreateOwnedContext();
+                db.Add(entity);
+                await db.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                LogSaveFailure("insert", entity?.GetType().Name ?? typeof(T).Name, ex);
+                await js.InvokeVoidAsync("alert", $"L'enregistrement a échoué : {ex.GetBaseException().Message}");
+                return false;
+            }
+            appData.SaveChanges = false;   // as InsertEntityAsync does: the tab has just written something
+
+            await JournalEditAsync("entity.insert", Describe(entity), null);
+
+            return true;
+        }
+
+        /// <summary>
+        /// Inserts rows through a context of its own, in one SaveChanges (one transaction): all of them or none, and the
+        /// shared context never holds them. Like InsertEntitiesAsync it throws when the database refuses them - the caller
+        /// says why - and journals one row for the batch.
+        /// </summary>
+        public async Task<bool> InsertOwnedRangeAsync<T>(IReadOnlyCollection<T> entities) where T : class
+        {
+            try
+            {
+                await using var db = CreateOwnedContext();
+                db.AddRange(entities);
+                await db.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                LogSaveFailure("insert", $"{typeof(T).Name} × {entities.Count}", ex);
+                throw;
+            }
+            appData.SaveChanges = false;
+
+            await JournalEditAsync("entity.insert.bulk", $"{typeof(T).Name} × {entities.Count}", null);
+
+            return true;
+        }
         #endregion
 
 
@@ -657,27 +723,175 @@ namespace AliantWebS.Data
             return true;
 
         }
+
+        /// <summary>
+        /// Saves the values of a row a page holds as plain data (read untracked), through a context of its own: the stored
+        /// row is read there and given the page's values, so only the columns that changed are written and the journal
+        /// says which ("Field: old → new"), as UpdateEntityAsync does for a tracked row. Nothing else is sent: not another
+        /// page's pending edits, not the objects this one points to.
+        ///
+        /// Throws, as UpdateEntityAsync does, when the database refuses the values, and DbUpdateConcurrencyException when
+        /// the row no longer exists (deleted from another tab): the page keeps the row in edit and says why.
+        /// </summary>
+        public async Task<bool> UpdateOwnedAsync<T>(T entity) where T : class
+        {
+            await using var db = CreateOwnedContext();
+            var key = db.Model.FindEntityType(typeof(T))!.FindPrimaryKey()!.Properties
+                .Select(k => k.PropertyInfo!.GetValue(entity)).ToArray();
+            var stored = await db.Set<T>().FindAsync(key)
+                         ?? throw new DbUpdateConcurrencyException(
+                             "cette ligne n'existe plus : elle a été supprimée entre-temps (autre onglet ou autre utilisateur).");
+
+            var entry = db.Entry(stored);
+            entry.CurrentValues.SetValues(entity);
+            string changes = SuppressJournal ? null : DescribeChanges(entry);
+            try
+            {
+                await db.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                LogSaveFailure("update", typeof(T).Name, ex);
+                throw;
+            }
+            appData.SaveChanges = false;
+
+            await JournalEditAsync("entity.update", Describe(entity), changes);
+
+            return true;
+        }
+
+        /// <summary>
+        /// Stores a row a page holds as plain data, through a context of its own: inserted when it has no key yet, updated
+        /// otherwise (UpdateOwnedAsync) - what UpdateEntityAsync did for a new row of the shared context. Throws when the
+        /// database refuses it, DbUpdateConcurrencyException when the row to update no longer exists. A row inserted
+        /// keeps the key the database gave it, so the next save updates it.
+        /// </summary>
+        public async Task<bool> SaveOwnedAsync<T>(T entity) where T : class
+        {
+            await using var db = CreateOwnedContext();
+            var key = db.Model.FindEntityType(typeof(T))!.FindPrimaryKey()!.Properties.Single();
+            var id = key.PropertyInfo!.GetValue(entity);
+            if (id != null && !id.Equals(Activator.CreateInstance(key.ClrType)))
+                return await UpdateOwnedAsync(entity);
+
+            try
+            {
+                db.Add(entity);
+                await db.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                LogSaveFailure("insert", typeof(T).Name, ex);
+                throw;
+            }
+            appData.SaveChanges = false;
+
+            await JournalEditAsync("entity.insert", Describe(entity), null);
+
+            return true;
+        }
+
+        /// <summary>
+        /// Stores a scenario's Charpente row (SaveOwnedAsync), keeping to one row per scenario - the database holds to it
+        /// too (UX_Charpente_EventMPScenarioID). A new object - the scenario had no row when the page or the calculation
+        /// read it - takes the key of a row another tab created meanwhile, and updates it rather than adding a second;
+        /// also when that row appears between this look and the insert, which the index then refuses.
+        /// </summary>
+        public async Task SaveCharpenteAsync(Charpente charpente)
+        {
+            if (charpente.CharpenteId == Guid.Empty)
+                charpente.CharpenteId = await CharpenteIdOfAsync(charpente.EventMpscenarioId);
+
+            try
+            {
+                await SaveOwnedAsync(charpente);
+            }
+            catch (Exception ex) when (IsUniqueViolation(ex))
+            {
+                var id = await CharpenteIdOfAsync(charpente.EventMpscenarioId);
+                if (id == Guid.Empty) throw;
+                charpente.CharpenteId = id;
+                await UpdateOwnedAsync(charpente);
+            }
+        }
+
+        private async Task<Guid> CharpenteIdOfAsync(Guid scenarioId)
+        {
+            await using var db = CreateOwnedContext();
+            return await db.Charpentes.Where(c => c.EventMpscenarioId == scenarioId)
+                .Select(c => c.CharpenteId).FirstOrDefaultAsync();
+        }
         #endregion
 
         #region Delete entity
         public async Task<bool> DeleteEntityAsync(object entity)
         {
- 
+
                 //_appDBContext = await _DBFactory.CreateDbContextAsync();
                 for (int i = 0; i < retrys; i++)
                 {
                     if (!busy) break;
                     await Task.Delay(delay);
                 }
+            TrackerSnapshot? before = null;
             try
             {
                 busy = true;
                 // Described before removal — afterwards the instance may be detached and unreadable.
                 string target = SuppressJournal ? null : Describe(entity);
 
-                _appDBContext.Remove(entity);
-                var t = _appDBContext.SaveChangesAsync();
-                await t;
+                // An object this circuit no longer tracks - deleted a moment ago by a double click, or kept by a page after
+                // another tab deleted it: if its row is gone there is nothing to delete, and Remove would only attach it
+                // again with everything it still holds.
+                var root = _appDBContext.Entry(entity);
+                if (root.State == EntityState.Detached && (await RowsGoneAsync(new[] { root })).Count > 0)
+                {
+                    busy = false;
+                    return true;   // no alert, and no journal row: whoever deleted it has journaled it
+                }
+
+                // A DELETE that affects 0 rows proves only that THAT row is gone - deleted from another tab or by another
+                // user (no table here has a concurrency token); so does an UPDATE that Remove itself caused (a dependent whose
+                // optional foreign key it set to null) and that affects 0 rows. The database is then asked which of the rows
+                // this delete was removing or so changing are gone; they are forgotten all at once (RowsGoneAsync,
+                // ForgetGoneRows), and the delete is tried again only while the row asked for still exists - a row deleted
+                // meanwhile, once more.
+                for (int attempt = 1; ; attempt++)
+                {
+                    // Taken before Remove, which changes the shared context at once (see TrackerSnapshot): a delete the
+                    // database refuses must not stay queued there for every later save of the circuit to send again.
+                    before = TrackerSnapshot.Take(_appDBContext);
+                    _appDBContext.Remove(entity);
+                    try
+                    {
+                        await _appDBContext.SaveChangesAsync();
+                        before = null;   // saved: from here on (the journal) a failure must not bring the deleted rows back
+                        break;
+                    }
+                    catch (DbUpdateConcurrencyException concurrency)
+                        when (attempt < 4 && concurrency.Entries.Count > 0
+                              && concurrency.Entries.All(e => e.State == EntityState.Deleted
+                                                              || (e.State == EntityState.Modified
+                                                                  && before!.StateOf(e.Entity) == EntityState.Unchanged)))
+                    {
+                        // Every row the delete was removing, and every row Remove itself modified - all at once, not only the
+                        // one the database stopped at, so several rows gone elsewhere cost one retry, not one each.
+                        var removing = _appDBContext.ChangeTracker.Entries()
+                            .Where(e => e.State == EntityState.Deleted
+                                        || (e.State == EntityState.Modified && before!.StateOf(e.Entity) == EntityState.Unchanged))
+                            .ToList();
+                        before!.Restore(_appDBContext);
+                        before = null;
+                        var gone = await RowsGoneAsync(removing);
+                        ForgetGoneRows(gone);
+                        if (gone.Any(g => ReferenceEquals(g.Entity, entity)))
+                        {
+                            busy = false;
+                            return true;   // no alert, and no journal row: whoever deleted it has journaled it
+                        }
+                    }
+                }
                 busy = false;
 
                 // Deletions are the hardest to reconstruct after the fact — flagged as a warning.
@@ -687,46 +901,107 @@ namespace AliantWebS.Data
             }
             catch (Exception ex)
             {
-                await js.InvokeVoidAsync("alert", "Error: " + ex.Message + ex.InnerException?.Message);
+                if (before != null)
+                {
+                    try
+                    {
+                        before.Restore(_appDBContext);
+                    }
+                    catch (Exception restoreEx)
+                    {
+                        // Never let the cleanup hide the failure the user is about to be told about.
+                        Console.WriteLine($"[EntitiesService] could not undo a failed delete in the shared context: {restoreEx.Message}");
+                    }
+                }
+                // Before the alert: the other users of the shared context must not wait while it is open.
                 busy = false;
+                await js.InvokeVoidAsync("alert", "Error: " + ex.Message + ex.InnerException?.Message);
                 return false;
             }
 
         }
 
-        public async Task<bool> DeleteElementsAsync(params object[] entities)
+        /// <summary>
+        /// Deletes one row through a context of its own, by its key, in one statement: the database removes what cascades
+        /// from it, and nothing is attached or left queued anywhere. A row already deleted elsewhere (another tab, another
+        /// user) counts as deleted: true, nothing journaled. A refusal is shown and returns false.
+        /// </summary>
+        public async Task<bool> DeleteOwnedAsync<T>(T entity) where T : class
         {
-
-            AliantWebContext zo = await _DBFactory.CreateDbContextAsync();
-                for (int i = 0; i < retrys; i++)
-                {
-                    if (!busy) break;
-                    await Task.Delay(delay);
-                }
-                busy = true;
-
-
-            List<Element> elements = new List<Element>();
-            foreach (var v in entities)
+            string target = Describe(entity);
+            int deleted;
+            try
             {
-                Guid elementID = ((Element)v).ElementId;
-                Element element = new Element();
-                element.ElementId = elementID;
-                elements.Add(element);
+                await using var db = CreateOwnedContext();
+                var key = db.Model.FindEntityType(typeof(T))!.FindPrimaryKey()!.Properties.Single();
+                var id = key.PropertyInfo!.GetValue(entity);
+                // Read through a closure, so that EF sends the key as a parameter: a constant would be written into the
+                // SQL, one query to compile and one plan to cache per row deleted.
+                Expression<Func<object?>> captured = () => id;
+                var row = Expression.Parameter(typeof(T), "row");
+                var sameKey = Expression.Lambda<Func<T, bool>>(
+                    Expression.Equal(Expression.Property(row, key.PropertyInfo!), Expression.Convert(captured.Body, key.ClrType)), row);
+                deleted = await db.Set<T>().Where(sameKey).ExecuteDeleteAsync();
             }
-            zo.RemoveRange(elements);
-            await zo.SaveChangesAsync();
+            catch (Exception ex)
+            {
+                LogSaveFailure("delete", target, ex);
+                await js.InvokeVoidAsync("alert", $"La suppression a échoué : {ex.GetBaseException().Message}");
+                return false;
+            }
 
-                busy = false;
-
-            // Names come from the caller's instances — the stubs above carry only the id.
-            await JournalEditAsync("element.delete",
-                $"{elements.Count} élément(s)",
-                string.Join(", ", entities.OfType<Element>().Select(e => e.Name ?? e.ElementId.ToString())),
-                severity: 1);
+            if (deleted > 0)
+                await JournalEditAsync("entity.delete", target, null, severity: 1);
 
             return true;
+        }
 
+        /// <summary>
+        /// Deletes elements - a branch of the tree - as ONE change, through a context of its own (RunOwnedDeleteAsync), then
+        /// takes them out of the circuit's shared context with everything it holds of them: their attributes, their static
+        /// load links, their equipments and those equipments' attributes, which the database deletes with them (cascade).
+        ///
+        /// It used to delete id-only stand-ins through a context it never disposed: the real Element objects the tree had
+        /// loaded, and their attributes, stayed in the shared context as copies of rows that no longer existed, and the next
+        /// write touching them - deleting their element type, for one - failed. A refused delete escaped with the service
+        /// still marked busy. Now a refused delete changes nothing, is shown, and returns false.
+        /// </summary>
+        public async Task<bool> DeleteElementsAsync(params object[] entities)
+        {
+            var elements = entities.OfType<Element>().ToList();
+            var ids = elements.Select(el => el.ElementId).Distinct().ToList();
+            string target = $"{ids.Count} élément(s)";
+            DeletedRows rows;
+            try
+            {
+                // One statement for the whole branch: the parent links between its elements (FK_Element_Element1, the one
+                // link to an element that does not cascade) are checked once it has run, when both ends are gone - so the
+                // elements need no unhooking first, and none can be left half-deleted.
+                rows = await RunOwnedDeleteAsync(async (db, d) =>
+                    await d.Step(db.Elements.Where(el => ids.Contains(el.ElementId)), el => el.ElementId));
+            }
+            catch (Exception ex)
+            {
+                // Rolled back: nothing deleted, and the shared context was never touched.
+                LogSaveFailure("delete", target, ex);
+                await js.InvokeVoidAsync("alert", $"Les éléments n'ont pas été supprimés : {ex.GetBaseException().Message}");
+                return false;
+            }
+
+            var removed = rows.KeysOf<Element>();                // read before the Includes below
+            foreach (var id in ids) rows.Include<Element>(id);   // an element already deleted elsewhere is forgotten too
+            await AfterOwnedDeleteAsync(rows, null, target);
+
+            // Only what this delete removed, as the scenario and event deletes do: a branch already deleted from another
+            // tab was journaled there. Names come from the caller's instances.
+            int count = rows.Count<Element>();
+            if (count > 0)
+                await JournalEditAsync("element.delete", $"{count} élément(s)",
+                    string.Join(", ", elements.Where(el => removed.Contains(el.ElementId)).DistinctBy(el => el.ElementId)
+                                              .Select(el => el.Name ?? el.ElementId.ToString())),
+                    severity: 1);
+
+            return true;
         }
 
 

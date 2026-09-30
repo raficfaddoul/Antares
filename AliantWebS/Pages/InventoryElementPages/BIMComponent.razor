@@ -617,7 +617,7 @@ else
             return;
         }
         // string pas = Path.GetFileName(wexBimFilename);
-        string pas = Path.Combine("../data/" + Structure.StructureId, wexBimFilename);
+        string pas = $"data/{Structure.StructureId}/{wexBimFilename}";
 
         await js.InvokeVoidAsync("rafic", objRef, pas);
     }
