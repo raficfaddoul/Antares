@@ -174,5 +174,39 @@ namespace AliantWebS.Data
 
             return ratios;
         }
+
+        /// <summary>
+        /// The dashboard's "Charge max manilles / seuil d'alarme" curve: for each week, Monday to Sunday and dated
+        /// by its Monday, the highest reading rated against its own sensor's threshold, and the sensor that gave it.
+        /// <paramref name="rows"/> are InfluxService.GetData rows: [0] time, [1] sensor id, [2] value. A reading
+        /// with no value, or of a sensor with no threshold, is left out; a week with nothing left has no peak. On a
+        /// tie the first reading keeps the peak.
+        /// </summary>
+        public static List<WeeklyPeak> WeeklyPeaks(IEnumerable<object[]> rows, IReadOnlyDictionary<Guid, double> thresholds)
+        {
+            var peaks = new SortedDictionary<DateTime, WeeklyPeak>();
+            foreach (var r in rows)
+            {
+                if (r[0] is not DateTime at || r[2] == null) continue;
+                if (!Guid.TryParse(r[1] as string, out var sensorId)) continue;
+                if (!thresholds.TryGetValue(sensorId, out var threshold) || threshold == 0) continue;
+
+                double ratio = (double)r[2] / threshold;
+                var week = WeekStart(at);
+                if (!peaks.TryGetValue(week, out var peak) || ratio > peak.Ratio)
+                    peaks[week] = new WeeklyPeak(week, ratio, sensorId);
+            }
+            return peaks.Values.ToList();
+        }
+
+        // Monday 00:00 of the week holding the instant, the date the dashboard's weekly graphs file a point under.
+        private static DateTime WeekStart(DateTime at)
+        {
+            int daysSinceMonday = (7 + (at.DayOfWeek - DayOfWeek.Monday)) % 7;
+            return at.Date.AddDays(-daysSinceMonday);
+        }
     }
+
+    /// <summary>One week's peak charge ratio and the sensor that reached it, see SensorChargeRatioHelper.WeeklyPeaks.</summary>
+    public record WeeklyPeak(DateTime Week, double Ratio, Guid SensorId);
 }

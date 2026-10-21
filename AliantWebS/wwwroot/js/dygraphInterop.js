@@ -143,7 +143,7 @@ function attachCurveTooltip(g, divid) {
     const findClosestPoint = g.findClosestPoint;
     g.findClosestPoint = function (domX, domY) {
         const curve = findCurveAt(g, domX, domY);
-        curveOfThisMove = curve ? curve.name : null;
+        curveOfThisMove = curve;
         return curve
             ? { row: curve.point.idx, seriesName: curve.name, point: curve.point }
             : findClosestPoint.call(this, domX, domY);
@@ -153,7 +153,7 @@ function attachCurveTooltip(g, divid) {
         if (dygraphInstances[divid] === g) hideCurveTooltip(divid);
     });
     elem.addEventListener('mousemove', function (e) {
-        const name = curveOfThisMove;
+        const curve = curveOfThisMove;
         curveOfThisMove = null;
 
         // The ids are fixed ("g3", "graphdiv1"): once a newer graph has taken this id, possibly on this
@@ -163,16 +163,19 @@ function attachCurveTooltip(g, divid) {
         // No curve when dygraph did not handle this move itself (the pointer is over its legend box or
         // the roller rather than its canvas), or when a button is pressed: a zoom or pan drag, where the
         // tooltip would sit in the way.
-        if (!name || e.target !== g.canvas_ || e.buttons) {
+        if (!curve || e.target !== g.canvas_ || e.buttons) {
             hideCurveTooltip(divid);
             return;
         }
 
-        // Keyed on the colour too: dygraph recolours every series when the set of series changes.
+        // Keyed on the colour too: dygraph recolours every series when the set of series changes. And on the
+        // point's note, which changes from one point of the curve to the next.
+        const name = curve.name;
         const props = g.getPropertiesForSeries(name);
-        const content = name + '\n' + (props ? props.color : '');
+        const note = pointNote(g, name, curve.point.xval);
+        const content = name + '\n' + (props ? props.color : '') + '\n' + (note || '');
         if (tip.dataset.content !== content) {
-            fillCurveTooltip(tip, name, props);
+            fillCurveTooltip(tip, name, props, note);
             tip.dataset.content = content;
         }
 
@@ -210,8 +213,9 @@ function watchCurveTooltip(tip, elem) {
 }
 
 // Series labels on the surveillance plot are "Sensor|channel": the sensor is the tooltip's title and
-// the channel goes under it. Any other label is shown whole. Built with textContent, never as HTML.
-function fillCurveTooltip(tip, label, props) {
+// the channel goes under it. Any other label is shown whole. The point's note, if any, comes last.
+// Built with textContent, never as HTML.
+function fillCurveTooltip(tip, label, props, note) {
     tip.textContent = '';
     const sep = label.lastIndexOf('|');
 
@@ -231,6 +235,63 @@ function fillCurveTooltip(tip, label, props) {
         channel.textContent = label.substring(sep + 1);
         tip.appendChild(channel);
     }
+
+    if (note) {
+        const noteLine = document.createElement('div');
+        noteLine.style.cssText = 'font-size:11px; padding-left:18px;';
+        noteLine.textContent = note;
+        tip.appendChild(noteLine);
+    }
+}
+
+// Point notes: text shown under a point's value while the pointer is on it, in the legend and in the curve
+// tooltip (the dashboard names the shackle behind each weekly peak). Set by IndicesInTimeComponent.DisplayData,
+// after the data, as [{ series, x, text }]: x is written like the CSV's first column and read with the parser
+// dygraph picked for that column, so it lands on the very instant of the point whatever the browser's time
+// zone. Kept on the graph object, so a graph created again under the same id starts with none. An empty list
+// gives the graph dygraph's own legend back.
+function setDygraphPointNotes(divid, notes) {
+    const g = dygraphInstances[divid];
+    if (!g) return;
+    notes = notes || [];
+
+    const parse = g.getOption('xValueParser');
+    if (notes.length > 0 && !parse) {
+        throw new Error('setDygraphPointNotes: graph ' + divid + ' has no x values to place notes on');
+    }
+
+    const byPoint = new Map();
+    notes.forEach(function (n) {
+        byPoint.set(pointNoteKey(n.series, parse(n.x)), n.text);
+    });
+    g.pointNotes = byPoint;
+    g.updateOptions({ legendFormatter: byPoint.size > 0 ? legendWithPointNotes : null });
+}
+
+function pointNoteKey(series, x) {
+    return series + '\n' + x;
+}
+
+function pointNote(g, series, x) {
+    return g.pointNotes ? g.pointNotes.get(pointNoteKey(series, x)) : undefined;
+}
+
+// dygraph's own legend, then the note of each visible series at the selected point. dygraph calls it with the
+// graph as this. A note is text: written with textContent, never as HTML.
+function legendWithPointNotes(data) {
+    let html = Dygraph.Plugins.Legend.defaultFormatter.call(this, data);
+    if (data.x == null) return html;
+
+    const g = this;
+    data.series.forEach(function (s) {
+        const note = s.isVisible ? pointNote(g, s.label, data.x) : undefined;
+        if (!note) return;
+        const line = document.createElement('div');
+        line.className = 'dygraph-point-note';
+        line.textContent = note;
+        html += line.outerHTML;
+    });
+    return html;
 }
 
 // The visible series whose drawn line passes within CURVE_TOOLTIP_DISTANCE pixels of (x, y), the nearest

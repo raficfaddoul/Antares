@@ -54,6 +54,11 @@
         line-height: 1.5;
         box-sizing: border-box;
     }
+
+    /* A point note (see DisplayData's pointNotes) under the selected point's values. */
+    .dygraph-point-note {
+        font-weight: 600;
+    }
 </style>
 
 <div class="chart-container-with-zoom">
@@ -73,6 +78,15 @@
     [Parameter]
     public List<string> Headers { get; set; }
 
+    // How dygraph is given the first CSV column; point notes name their x the same way.
+    const string CsvDateFormat = "yyyy-MM-dd HH:mm:ss.fff";
+
+    // Whether the graph carries point notes, so that a redraw without notes clears them.
+    bool hasPointNotes;
+
+    // One note as setDygraphPointNotes (dygraphInterop.js) reads it.
+    private sealed record PointNote(string Series, string X, string Text);
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
@@ -82,13 +96,16 @@
         }
     }
 
+    /// <param name="pointNotes">Text shown under a point's value while the pointer is on it, in the legend and the
+    /// curve tooltip: by series header, then by the point's date.</param>
     public async Task DisplayData(
         List<Dictionary<object, double>> Indices,
         List<string> Headers,
         DateTime? startDate = null,
         Dictionary<string, string> seriesAxisMap = null,
         string y1Label = null,
-        string y2Label = null)
+        string y2Label = null,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<DateTime, string>> pointNotes = null)
     {
         try
         {
@@ -103,6 +120,7 @@
                 // so the previous ylabel/y2label lingered when every series was deselected.
                 await JSRuntime.InvokeVoidAsync("updateDygraphWithAxes", GraphId, emptyCsv,
                     new Dictionary<string, string>(), "", "");
+                await SendPointNotesAsync(pointNotes);
                 return;
             }
 
@@ -152,7 +170,7 @@
                 // First column: timestamp/key
                 if (isDateTimeKey)
                 {
-                    rowBuffer[0] = ((DateTime)key).ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture);
+                    rowBuffer[0] = ((DateTime)key).ToString(CsvDateFormat, CultureInfo.InvariantCulture);
                 }
                 else
                 {
@@ -181,7 +199,8 @@
             {
                 await JSRuntime.InvokeVoidAsync("updateDygraphFast", GraphId, csvData);
             }
-            
+            await SendPointNotesAsync(pointNotes);
+
             Console.WriteLine($"Rendered {sortedKeys.Count:N0} data points for graph '{GraphId}'");
             
             // Log CSV preview for debugging
@@ -191,6 +210,21 @@
         {
             Console.Error.WriteLine($"Error while building CSV for Dygraph: {ex.Message}");
         }
+    }
+
+    // Sent after the data, since the browser reads each note's date with the parser dygraph picked for it. Only a
+    // graph that has or had notes is sent anything: the others keep dygraph's own legend untouched.
+    private async Task SendPointNotesAsync(IReadOnlyDictionary<string, IReadOnlyDictionary<DateTime, string>> pointNotes)
+    {
+        var notes = (pointNotes ?? new Dictionary<string, IReadOnlyDictionary<DateTime, string>>())
+            .SelectMany(series => series.Value.Select(point => new PointNote(
+                series.Key, point.Key.ToString(CsvDateFormat, CultureInfo.InvariantCulture), point.Value)))
+            .ToList();
+
+        if (notes.Count == 0 && !hasPointNotes) return;
+
+        await JSRuntime.InvokeVoidAsync("setDygraphPointNotes", GraphId, notes);
+        hasPointNotes = notes.Count > 0;
     }
 
     public async Task RemoveFromJavascript()

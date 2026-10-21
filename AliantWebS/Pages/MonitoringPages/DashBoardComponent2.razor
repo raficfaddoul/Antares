@@ -252,6 +252,11 @@
 
     List<string> headers = new List<string>();
 
+    // The charge curve's series, and for each of its points the shackle that set that week's peak: shown under
+    // the point's value while the pointer is on it.
+    const string ChargeSeries = "Charge max manilles / seuil d'alarme";
+    IReadOnlyDictionary<string, IReadOnlyDictionary<DateTime, string>> chargePeakNotes;
+
     Dictionary<string, DataItem[]> dataItemsLists = new Dictionary<string, DataItem[]>();
     Structural.IdentificationResult ir = new Structural.IdentificationResult();
 
@@ -458,7 +463,7 @@
         // Recompute charge chart
         await LoadWeeklyMaxCharge();
         if (iitc != null)
-            await iitc.DisplayData(indices, headers);
+            await iitc.DisplayData(indices, headers, pointNotes: chargePeakNotes);
 
         StateHasChanged();
     }
@@ -669,6 +674,7 @@
     private async Task LoadWeeklyMaxCharge()
     {
         indices.Clear();
+        chargePeakNotes = null;
         if (headers.Count > 1)
             headers.RemoveRange(1, headers.Count - 1);
 
@@ -695,43 +701,25 @@
 
         if (rawData == null || rawData.Count == 0) return;
 
-        Dictionary<object, double> weeklyMaxCharge = new Dictionary<object, double>();
-
-        var grouped = rawData
-            .Where(r => r[0] is DateTime && r[2] != null)
-            .GroupBy(r =>
-            {
-                var dt = (DateTime)r[0];
-                int diff = (7 + (dt.DayOfWeek - DayOfWeek.Monday)) % 7;
-                return dt.Date.AddDays(-diff);
-            })
-            .OrderBy(g => g.Key);
-
         // Each reading is rated against its own sensor's threshold before taking the weekly peak,
         // so the curve is "worst utilisation that week" rather than raw kilograms.
         var weekThresholds = await SensorChargeRatioHelper.LoadThresholdsAsync(
             dbContextFactory, shackleSensors, weightChannelDataType?.Name);
+        var peaks = SensorChargeRatioHelper.WeeklyPeaks(rawData, weekThresholds);
 
-        foreach (var weekGroup in grouped)
+        if (peaks.Count == 0) return;   // no sensor had a threshold — nothing to plot
+
+        indices.Add(peaks.ToDictionary(p => (object)p.Week, p => Math.Round(p.Ratio, 4)));
+        headers.Add(ChargeSeries);
+
+        // Every queried sensor is one of shackleSensors; the id stands in only for a sensor with no name.
+        var names = shackleSensors.ToDictionary(s => s.ElementId, s => s.Name);
+        string ShackleName(Guid id) => names.TryGetValue(id, out var n) && !string.IsNullOrWhiteSpace(n) ? n : id.ToString();
+
+        chargePeakNotes = new Dictionary<string, IReadOnlyDictionary<DateTime, string>>
         {
-            double? weekMaxRatio = null;
-            foreach (var r in weekGroup)
-            {
-                if (!Guid.TryParse((string)r[1], out var sid)) continue;
-                if (!weekThresholds.TryGetValue(sid, out var t) || t == 0) continue;
-
-                double ratio = (double)r[2] / t;
-                if (!weekMaxRatio.HasValue || ratio > weekMaxRatio.Value) weekMaxRatio = ratio;
-            }
-
-            if (weekMaxRatio.HasValue)
-                weeklyMaxCharge.Add(weekGroup.Key, Math.Round(weekMaxRatio.Value, 4));
-        }
-
-        if (weeklyMaxCharge.Count == 0) return;   // no sensor had a threshold — nothing to plot
-
-        indices.Add(weeklyMaxCharge);
-        headers.Add("Charge max manilles / seuil d'alarme");
+            [ChargeSeries] = peaks.ToDictionary(p => p.Week, p => "Manille : " + ShackleName(p.SensorId)),
+        };
     }
 
     private async Task LoadWeeklyMaxInclination()
@@ -806,7 +794,7 @@
 
         if (iitc != null)
         {
-            await iitc.DisplayData(indices, headers);
+            await iitc.DisplayData(indices, headers, pointNotes: chargePeakNotes);
         }
         if (iitc2 != null)
         {
@@ -862,7 +850,7 @@
         {
             if (iitc != null && indices.Count > 0)
             {
-                await iitc.DisplayData(indices, headers);
+                await iitc.DisplayData(indices, headers, pointNotes: chargePeakNotes);
             }
 
             if (iitc2 != null && indices2.Count > 0)
