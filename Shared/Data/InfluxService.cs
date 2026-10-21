@@ -722,14 +722,22 @@ from(bucket: ""{bucketName}"")
     }
 }
 
-/// <summary>The window of the dashboard's weekly graphs: one point per calendar week, see <see cref="AggregateWindowClause"/>.</summary>
+/// <summary>A weekly window: a calendar week, Monday 00:00 to Sunday 23:59 UTC, dated by its Monday.</summary>
 public const string WeeklyWindow = "1w";
 
 /// <summary>
-/// The Flux aggregateWindow step. Weekly windows are calendar weeks, Monday 00:00 to Sunday 23:59 UTC, each row
-/// dated by its own week's start: Flux counts windows from the Unix epoch, a Thursday, and dates a row by its
-/// window's end, so a plain "1w" gave Thursday-to-Wednesday weeks filed under the following Monday. A first
-/// week cut by the range is dated by the range start, which still falls in that week.
+/// The Monday 00:00 of the calendar week holding the instant: the week a <see cref="WeeklyWindow"/> row belongs
+/// to. Rows are filed with it because a first week cut by the query range is dated by the range start.
+/// </summary>
+public static DateTime WeekStart(DateTime at)
+{
+    int daysSinceMonday = (7 + (at.DayOfWeek - DayOfWeek.Monday)) % 7;
+    return at.Date.AddDays(-daysSinceMonday);
+}
+
+/// <summary>
+/// The Flux aggregateWindow step. Flux counts windows from the Unix epoch, a Thursday, and dates a row by its
+/// window's end, so a weekly window gets offset -3d (Monday) and timeSrc _start (dated by that Monday).
 /// A missing window or function throws: it would otherwise reach InfluxDB as an unreadable query.
 /// </summary>
 public static string AggregateWindowClause(string? every, string? fn)
@@ -781,18 +789,15 @@ static public async Task<List<object[]>> GetData(
     string startDateStr = startDate.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture);
     string endDateStr = endDate.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture);
 
-    // Calculate appropriate aggregation window if maxDataPoints is specified.
-    // aggEvery/aggFn are kept separate (not just the assembled clause) because the calibration
-    // planner needs the function name, and may need to re-emit the aggregation with a flipped fn.
+    // Calculate appropriate aggregation window if maxDataPoints is specified. The calibration planner
+    // needs aggFn, and may re-emit the aggregation with a flipped fn.
     string aggEvery = null;
     string aggFn = null;
-    string aggregationClause = "";
     if (!string.IsNullOrEmpty(aggregateWindowDuration) && !string.IsNullOrEmpty(aggregateFn))
     {
         // Explicit aggregation window and function take priority
         aggEvery = aggregateWindowDuration;
         aggFn = aggregateFn;
-        aggregationClause = AggregateWindowClause(aggregateWindowDuration, aggregateFn);
         Console.WriteLine($"Applying server-side aggregation: every {aggregateWindowDuration}, fn: {aggregateFn}");
     }
     else if (maxDataPoints.HasValue && maxDataPoints.Value > 0)
@@ -831,10 +836,10 @@ static public async Task<List<object[]>> GetData(
         // load spikes survive downsampling and remain visible on the plotted curves.
         aggEvery = windowDuration;
         aggFn = "max";
-        aggregationClause = AggregateWindowClause(windowDuration, "max");
 
         Console.WriteLine($"Applying downsampling: {windowDuration} window for ~{maxDataPoints} points");
     }
+    string aggregationClause = aggEvery == null ? "" : AggregateWindowClause(aggEvery, aggFn);
 
     // Reported-value calibration y = C1·x + C0. The planner decides WHERE it can run: after the
     // aggregation whenever that is mathematically equivalent (cheap — a few hundred rows), and only

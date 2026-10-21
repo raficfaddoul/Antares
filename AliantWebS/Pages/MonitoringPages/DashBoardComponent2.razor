@@ -170,6 +170,7 @@
 
     private bool dataLoaded = false;
     private bool gaugesRendered = false;
+    private bool chartsRendered = false;
 
     private int value1;
     private int value2;
@@ -252,10 +253,9 @@
 
     List<string> headers = new List<string>();
 
-    // The charge curve's series, and for each of its points the shackle that set that week's peak: shown under
-    // the point's value while the pointer is on it.
+    // The charge curve's series, and the shackle behind each of its weekly peaks.
     const string ChargeSeries = "Charge max manilles / seuil d'alarme";
-    IReadOnlyDictionary<string, IReadOnlyDictionary<DateTime, string>> chargePeakNotes;
+    IReadOnlyList<IndicesInTimeComponent.PointNote> chargePeakNotes;
 
     Dictionary<string, DataItem[]> dataItemsLists = new Dictionary<string, DataItem[]>();
     Structural.IdentificationResult ir = new Structural.IdentificationResult();
@@ -266,10 +266,6 @@
     // Filtered subsets used for computations
     List<Element> shackleSensors = new List<Element>();
     ChannelDataType weightChannelDataType = null;
-
-    List<Element> inclinometerSensors = new List<Element>();
-    ChannelDataType xAxisChannelDataType = null;
-    ChannelDataType yAxisChannelDataType = null;
 
     // Color-coding map: ElementId → max charge ratio for the reference period
     Dictionary<Guid, double> sensorChargeRatios = new Dictionary<Guid, double>();
@@ -462,8 +458,7 @@
 
         // Recompute charge chart
         await LoadWeeklyMaxCharge();
-        if (iitc != null)
-            await iitc.DisplayData(indices, headers, pointNotes: chargePeakNotes);
+        await RedrawChargeGraph();
 
         StateHasChanged();
     }
@@ -487,40 +482,6 @@
         shackleSensors = sensors;
         weightChannelDataType = weightChannel;
     }
-
-    // private async Task LoadInclinometerSensors()
-    // {
-    //     if (appData.Structure == null) return;
-
-    //     // Get inclinometer element types under "sensing device" category
-    //     var inclinometerTypes = await entitiesService.GetFilteredEntitiesAsync<ElementType>(
-    //         x => x.Category != null && x.Category.Name.ToLower() == "sensing device"
-    //              && (x.Name.ToLower().Contains("inclin")),
-    //         "Category");
-
-    //     foreach (var it in inclinometerTypes)
-    //     {
-    //         entitiesService.LoadCollection(it, "ChannelDataTypeElementTypes");
-    //         foreach (var cdtet in it.ChannelDataTypeElementTypes)
-    //         {
-    //             entitiesService.LoadReference(cdtet, "ChannelDataType");
-    //         }
-    //     }
-
-    //     // Find the x_axis and y_axis channel data types
-    //     var allChannels = inclinometerTypes
-    //         .SelectMany(it => it.ChannelDataTypeElementTypes)
-    //         .Select(cdtet => cdtet.ChannelDataType)
-    //         .ToList();
-
-    //     xAxisChannelDataType = allChannels.FirstOrDefault(cdt => cdt.Name == "x_axis");
-    //     yAxisChannelDataType = allChannels.FirstOrDefault(cdt => cdt.Name == "y_axis");
-
-    //     var inclinometerTypeIds = inclinometerTypes.Select(x => x.ElementTypeId).ToList();
-
-    //     inclinometerSensors = await entitiesService.GetFilteredEntitiesAsync<Element>(
-    //         x => x.StructureId == appData.Structure.StructureId && inclinometerTypeIds.Contains(x.ElementTypeId ?? Guid.Empty));
-    // }
 
     private DateTime GetStartDateFromRange(string range)
     {
@@ -576,9 +537,7 @@
             LogUnreadableThresholds(unreadableThresholds);
 
             double? RatioFor(string sensorId, double value)
-                => Guid.TryParse(sensorId, out var id) && thresholds.TryGetValue(id, out var t) && t != 0
-                    ? value / t
-                    : (double?)null;
+                => Guid.TryParse(sensorId, out var id) ? SensorChargeRatioHelper.Ratio(thresholds, id, value) : null;
 
             // value1: Taux de travail moyen = average of per-sensor (mean / its own threshold)
             if (meanData != null && meanData.Count > 0)
@@ -649,10 +608,9 @@
     {
         if (unreadable.Count == 0) return;
 
-        var names = shackleSensors.ToDictionary(s => s.ElementId, s => s.Name);
         var examples = unreadable
             .Take(5)
-            .Select(u => $"{(names.TryGetValue(u.ElementId, out var n) ? n : u.ElementId.ToString())} '{u.Value}'");
+            .Select(u => $"{SensorName(u.ElementId)} '{u.Value}'");
 
         Console.WriteLine($"[Dashboard] {unreadable.Count} sensor(s) whose alarm threshold cannot be read in full "
                         + $"(an unreadable part is a threshold for no channel): "
@@ -713,78 +671,20 @@
         headers.Add(ChargeSeries);
 
         // Every queried sensor is one of shackleSensors; the id stands in only for a sensor with no name.
-        var names = shackleSensors.ToDictionary(s => s.ElementId, s => s.Name);
-        string ShackleName(Guid id) => names.TryGetValue(id, out var n) && !string.IsNullOrWhiteSpace(n) ? n : id.ToString();
-
-        chargePeakNotes = new Dictionary<string, IReadOnlyDictionary<DateTime, string>>
-        {
-            [ChargeSeries] = peaks.ToDictionary(p => p.Week, p => "Manille : " + ShackleName(p.SensorId)),
-        };
+        chargePeakNotes = peaks
+            .Select(p => new IndicesInTimeComponent.PointNote(ChargeSeries, p.Week, "Manille : " + SensorName(p.SensorId)))
+            .ToList();
     }
 
-    private async Task LoadWeeklyMaxInclination()
+    // The charge graph with its notes: every redraw goes through here, so none drops the shackle names.
+    private Task RedrawChargeGraph() =>
+        iitc == null ? Task.CompletedTask : iitc.DisplayData(indices, headers, pointNotes: chargePeakNotes);
+
+    // A shackle's name for messages and notes; its id when it has none.
+    private string SensorName(Guid id)
     {
-        indices2.Clear();
-        if (headers2.Count > 1)
-            headers2.RemoveRange(1, headers2.Count - 1);
-
-        if (inclinometerSensors.Count == 0 || xAxisChannelDataType == null || yAxisChannelDataType == null) return;
-
-        DateTime startDate = GetStartDateFromRange(selectedTimeRange);
-        DateTime endDate = DateTime.UtcNow;
-
-        var sensorIds = inclinometerSensors.Select(s => s.ElementId.ToString()).ToList();
-        // Query both x_axis and y_axis — weekly max computed server-side by InfluxDB
-        var channelIds = new List<string>
-        {
-            xAxisChannelDataType.ChannelDataTypeId.ToString(),
-            yAxisChannelDataType.ChannelDataTypeId.ToString()
-        };
-
-        List<object[]> rawData;
-        try
-        {
-            var bucketName = ReportsService.BucketName;
-            rawData = await InfluxService.GetData(sensorIds, channelIds, startDate, endDate, bucketName,
-                aggregateWindowDuration: InfluxService.WeeklyWindow, aggregateFn: "max", cancellationToken: _cts.Token);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error querying InfluxDB for inclinometer data: {ex.Message}");
-            return;
-        }
-
-        if (rawData == null || rawData.Count == 0) return;
-
-        // rawData layout: [0]=DateTime, [1]=sensorId, [2]=x_axis, [3]=y_axis
-        // Compute inclination magnitude = sqrt(x² + y²) per row,
-        // then group by week across all sensors and take the max, divided by 0.10°.
-        Dictionary<object, double> weeklyMaxInclination = new Dictionary<object, double>();
-
-        var grouped = rawData
-            .Where(r => r[0] is DateTime && r[2] != null && r[3] != null)
-            .GroupBy(r =>
-            {
-                var dt = (DateTime)r[0];
-                int diff = (7 + (dt.DayOfWeek - DayOfWeek.Monday)) % 7;
-                return dt.Date.AddDays(-diff);
-            })
-            .OrderBy(g => g.Key);
-
-        foreach (var weekGroup in grouped)
-        {
-            double maxMagnitude = weekGroup.Max(r =>
-            {
-                double x = (double)r[2];
-                double y = (double)r[3];
-                return Math.Sqrt(x * x + y * y);
-            });
-            double normalized = maxMagnitude / 0.10;
-            weeklyMaxInclination.Add(weekGroup.Key, Math.Round(normalized, 4));
-        }
-
-        indices2.Add(weeklyMaxInclination);
-        headers2.Add("Inclinaison max / 0.10°");
+        var name = shackleSensors.FirstOrDefault(s => s.ElementId == id)?.Name;
+        return string.IsNullOrWhiteSpace(name) ? id.ToString() : name;
     }
 
     private async Task OnTimeRangeChanged()
@@ -792,10 +692,7 @@
         await LoadWeeklyMaxCharge();
         await LoadGraph3Data();
 
-        if (iitc != null)
-        {
-            await iitc.DisplayData(indices, headers, pointNotes: chargePeakNotes);
-        }
+        await RedrawChargeGraph();
         if (iitc2 != null)
         {
             await iitc2.DisplayData(indices2, headers2);
@@ -845,12 +742,15 @@
             await js.InvokeVoidAsync("renderChart", value1, value2, value3);
         }
 
-        // Update charts after components are rendered and data is loaded
-        if (dataLoaded)
+        // The charts' first data, once loaded. Sent once: every handler that changes their data afterwards
+        // (sensor type, inclination type, period) redraws them itself, and a render changes nothing in them.
+        if (dataLoaded && !chartsRendered)
         {
-            if (iitc != null && indices.Count > 0)
+            chartsRendered = true;
+
+            if (indices.Count > 0)
             {
-                await iitc.DisplayData(indices, headers, pointNotes: chargePeakNotes);
+                await RedrawChargeGraph();
             }
 
             if (iitc2 != null && indices2.Count > 0)
@@ -921,12 +821,7 @@
 
             var grouped = rawData
                 .Where(r => r[0] is DateTime && r.Length > dataIndex && r[dataIndex] != null)
-                .GroupBy(r =>
-                {
-                    var dt = (DateTime)r[0];
-                    int diff = (7 + (dt.DayOfWeek - DayOfWeek.Monday)) % 7;
-                    return dt.Date.AddDays(-diff);
-                })
+                .GroupBy(r => InfluxService.WeekStart((DateTime)r[0]))
                 .OrderBy(g => g.Key);
 
             foreach (var weekGroup in grouped)

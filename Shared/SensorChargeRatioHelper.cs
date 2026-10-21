@@ -169,11 +169,19 @@ namespace AliantWebS.Data
 
             var ratios = new Dictionary<Guid, double>();
             foreach (var kv in maxWeights)
-                if (thresholds.TryGetValue(kv.Key, out var threshold))
-                    ratios[kv.Key] = kv.Value / threshold;
+                if (Ratio(thresholds, kv.Key, kv.Value) is double ratio)
+                    ratios[kv.Key] = ratio;
 
             return ratios;
         }
+
+        /// <summary>
+        /// A reading rated against its own sensor's alarm threshold: value / threshold, or null for a sensor with no
+        /// threshold, since nothing is assumed for it. The one rule behind the gauges, the plan's colours and the
+        /// weekly peaks.
+        /// </summary>
+        public static double? Ratio(IReadOnlyDictionary<Guid, double> thresholds, Guid sensorId, double value)
+            => thresholds.TryGetValue(sensorId, out var threshold) && threshold != 0 ? value / threshold : null;
 
         /// <summary>
         /// The dashboard's "Charge max manilles / seuil d'alarme" curve: for each week, Monday to Sunday and dated
@@ -189,21 +197,13 @@ namespace AliantWebS.Data
             {
                 if (r[0] is not DateTime at || r[2] == null) continue;
                 if (!Guid.TryParse(r[1] as string, out var sensorId)) continue;
-                if (!thresholds.TryGetValue(sensorId, out var threshold) || threshold == 0) continue;
+                if (Ratio(thresholds, sensorId, (double)r[2]) is not double ratio) continue;
 
-                double ratio = (double)r[2] / threshold;
-                var week = WeekStart(at);
+                var week = InfluxService.WeekStart(at);
                 if (!peaks.TryGetValue(week, out var peak) || ratio > peak.Ratio)
                     peaks[week] = new WeeklyPeak(week, ratio, sensorId);
             }
             return peaks.Values.ToList();
-        }
-
-        // Monday 00:00 of the week holding the instant, the date the dashboard's weekly graphs file a point under.
-        private static DateTime WeekStart(DateTime at)
-        {
-            int daysSinceMonday = (7 + (at.DayOfWeek - DayOfWeek.Monday)) % 7;
-            return at.Date.AddDays(-daysSinceMonday);
         }
     }
 

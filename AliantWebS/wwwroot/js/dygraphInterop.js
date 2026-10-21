@@ -245,27 +245,21 @@ function fillCurveTooltip(tip, label, props, note) {
 }
 
 // Point notes: text shown under a point's value while the pointer is on it, in the legend and in the curve
-// tooltip (the dashboard names the shackle behind each weekly peak). Set by IndicesInTimeComponent.DisplayData,
-// after the data, as [{ series, x, text }]: x is written like the CSV's first column and read with the parser
-// dygraph picked for that column, so it lands on the very instant of the point whatever the browser's time
-// zone. Kept on the graph object, so a graph created again under the same id starts with none. An empty list
-// gives the graph dygraph's own legend back.
-function setDygraphPointNotes(divid, notes) {
-    const g = dygraphInstances[divid];
-    if (!g) return;
-    notes = notes || [];
+// tooltip (the dashboard names the shackle behind each weekly peak). They come with the data from
+// IndicesInTimeComponent.DisplayData as [{ series, x, text }], so the graph redraws once: x is written like the
+// CSV's first column and read with the parser dygraph picked for it, so it lands on the very instant of the
+// point whatever the browser's time zone. Kept on the graph object, so a graph created again under the same id
+// starts with none. No notes (an empty list, or none passed) puts dygraph's own legend back.
+function updateWithPointNotes(g, divid, options, notes) {
+    const hasNotes = Array.isArray(notes) && notes.length > 0;
+    g.pointNotes = null;   // the old data's notes are never shown against the new data
+    options.legendFormatter = hasNotes ? legendWithPointNotes : null;
+    g.updateOptions(options);
+    if (!hasNotes) return;
 
     const parse = g.getOption('xValueParser');
-    if (notes.length > 0 && !parse) {
-        throw new Error('setDygraphPointNotes: graph ' + divid + ' has no x values to place notes on');
-    }
-
-    const byPoint = new Map();
-    notes.forEach(function (n) {
-        byPoint.set(pointNoteKey(n.series, parse(n.x)), n.text);
-    });
-    g.pointNotes = byPoint;
-    g.updateOptions({ legendFormatter: byPoint.size > 0 ? legendWithPointNotes : null });
+    if (!parse) throw new Error('graph ' + divid + ' has no x values to place notes on');
+    g.pointNotes = new Map(notes.map(function (n) { return [pointNoteKey(n.series, parse(n.x)), n.text]; }));
 }
 
 function pointNoteKey(series, x) {
@@ -613,14 +607,12 @@ function updateDygraph(divid, data, startTime) {
     }
 }
 
-function updateDygraphFast(divid, csvData) {
+function updateDygraphFast(divid, csvData, notes) {
     try {
         const g = dygraphInstances[divid];
         if (g) {
             // Keep zoom functionality, just update data efficiently
-            g.updateOptions({
-                file: csvData
-            });
+            updateWithPointNotes(g, divid, { file: csvData }, notes);
         }
     } catch (error) {
         console.error("Failed to update dygraph:", error);
@@ -677,7 +669,7 @@ function unzoomGraph() {
     });
 }
 
-function updateDygraphWithAxes(divid, csvData, seriesAxisMap, y1Label, y2Label) {
+function updateDygraphWithAxes(divid, csvData, seriesAxisMap, y1Label, y2Label, notes) {
     try {
         const g = dygraphInstances[divid];
         if (g) {
@@ -706,7 +698,7 @@ function updateDygraphWithAxes(divid, csvData, seriesAxisMap, y1Label, y2Label) 
                 ? { y: { independentTicks: true }, y2: { independentTicks: true } }
                 : { y: { independentTicks: true } };
 
-            g.updateOptions(options);
+            updateWithPointNotes(g, divid, options, notes);
         }
     } catch (error) {
         console.error("Failed to update dygraph with axes:", error);

@@ -81,11 +81,8 @@
     // How dygraph is given the first CSV column; point notes name their x the same way.
     const string CsvDateFormat = "yyyy-MM-dd HH:mm:ss.fff";
 
-    // Whether the graph carries point notes, so that a redraw without notes clears them.
-    bool hasPointNotes;
-
-    // One note as setDygraphPointNotes (dygraphInterop.js) reads it.
-    private sealed record PointNote(string Series, string X, string Text);
+    /// <summary>Text shown under the value of a series' point at a date, see DisplayData.</summary>
+    public sealed record PointNote(string Series, DateTime At, string Text);
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -96,8 +93,8 @@
         }
     }
 
-    /// <param name="pointNotes">Text shown under a point's value while the pointer is on it, in the legend and the
-    /// curve tooltip: by series header, then by the point's date.</param>
+    /// <param name="pointNotes">Shown under a point's value, in the legend and the curve tooltip, while the pointer
+    /// is on it. They go with the data, so the graph redraws once; none puts dygraph's own legend back.</param>
     public async Task DisplayData(
         List<Dictionary<object, double>> Indices,
         List<string> Headers,
@@ -105,8 +102,13 @@
         Dictionary<string, string> seriesAxisMap = null,
         string y1Label = null,
         string y2Label = null,
-        IReadOnlyDictionary<string, IReadOnlyDictionary<DateTime, string>> pointNotes = null)
+        IReadOnlyList<PointNote> pointNotes = null)
     {
+        // x written like the CSV's first column, which dygraphInterop.js parses the same way.
+        var notes = (pointNotes ?? Array.Empty<PointNote>())
+            .Select(n => new { series = n.Series, x = n.At.ToString(CsvDateFormat, CultureInfo.InvariantCulture), text = n.Text })
+            .ToList();
+
         try
         {
             // If no data, send minimal CSV
@@ -118,9 +120,9 @@
                 string emptyCsv = string.Join(",", Headers) + "\n";
                 // Clear the data AND the axis labels. updateDygraphFast only updates the data,
                 // so the previous ylabel/y2label lingered when every series was deselected.
+                // No points, so no notes: the empty list also clears any the graph had.
                 await JSRuntime.InvokeVoidAsync("updateDygraphWithAxes", GraphId, emptyCsv,
-                    new Dictionary<string, string>(), "", "");
-                await SendPointNotesAsync(pointNotes);
+                    new Dictionary<string, string>(), "", "", Array.Empty<object>());
                 return;
             }
 
@@ -193,13 +195,12 @@
             // Use axis-aware update when dual axes are needed
             if (seriesAxisMap != null && seriesAxisMap.Count > 0)
             {
-                await JSRuntime.InvokeVoidAsync("updateDygraphWithAxes", GraphId, csvData, seriesAxisMap, y1Label ?? "", y2Label ?? "");
+                await JSRuntime.InvokeVoidAsync("updateDygraphWithAxes", GraphId, csvData, seriesAxisMap, y1Label ?? "", y2Label ?? "", notes);
             }
             else
             {
-                await JSRuntime.InvokeVoidAsync("updateDygraphFast", GraphId, csvData);
+                await JSRuntime.InvokeVoidAsync("updateDygraphFast", GraphId, csvData, notes);
             }
-            await SendPointNotesAsync(pointNotes);
 
             Console.WriteLine($"Rendered {sortedKeys.Count:N0} data points for graph '{GraphId}'");
             
@@ -210,21 +211,6 @@
         {
             Console.Error.WriteLine($"Error while building CSV for Dygraph: {ex.Message}");
         }
-    }
-
-    // Sent after the data, since the browser reads each note's date with the parser dygraph picked for it. Only a
-    // graph that has or had notes is sent anything: the others keep dygraph's own legend untouched.
-    private async Task SendPointNotesAsync(IReadOnlyDictionary<string, IReadOnlyDictionary<DateTime, string>> pointNotes)
-    {
-        var notes = (pointNotes ?? new Dictionary<string, IReadOnlyDictionary<DateTime, string>>())
-            .SelectMany(series => series.Value.Select(point => new PointNote(
-                series.Key, point.Key.ToString(CsvDateFormat, CultureInfo.InvariantCulture), point.Value)))
-            .ToList();
-
-        if (notes.Count == 0 && !hasPointNotes) return;
-
-        await JSRuntime.InvokeVoidAsync("setDygraphPointNotes", GraphId, notes);
-        hasPointNotes = notes.Count > 0;
     }
 
     public async Task RemoveFromJavascript()
