@@ -563,8 +563,7 @@
             
             foreach (var key in plottedKeys)
             {
-                var parts = key.Split('|');
-                if (parts.Length == 2 && Guid.TryParse(parts[0], out var elementId) && Guid.TryParse(parts[1], out var channelDataTypeId))
+                if (TryParseSeriesKey(key, out var elementId, out var channelDataTypeId))
                 {
                     var sensor = sensors?.FirstOrDefault(s => s.ElementId == elementId);
                     var channelDataType = await context.ChannelDataTypes
@@ -1070,17 +1069,13 @@
         // Build list of sensor/channel pairs for this sensor
         var sensorChannelPairs = new List<(Element sensor, ChannelDataType channelDataType)>();
         
-        foreach (var cdtet in sensor.ElementType.ChannelDataTypeElementTypes.OrderBy(x => x.SortOrder ?? int.MaxValue))
+        foreach (var channelDataType in ChannelsOf(sensor))
         {
-            var channelDataType = cdtet.ChannelDataType;
-            if (channelDataType != null)
-            {
-                sensorChannelPairs.Add((sensor, channelDataType));
-                
-                // Update checkbox states
-                var checkboxKey = $"{sensor.ElementId}_{channelDataType.ChannelDataTypeId}";
-                checkboxStates[checkboxKey] = true;
-            }
+            sensorChannelPairs.Add((sensor, channelDataType));
+
+            // Update checkbox states
+            var checkboxKey = $"{sensor.ElementId}_{channelDataType.ChannelDataTypeId}";
+            checkboxStates[checkboxKey] = true;
         }
         
         if (sensorChannelPairs.Any())
@@ -1096,6 +1091,59 @@
     private async Task<bool> IsDeveloperNowAsync()
         => (await authenticationStateProvider.GetAuthenticationStateAsync()).User.IsInRole(DeveloperRole);
 
+    // A plotted series' key, "sensorId|channelId", as HandleBatchPlot builds it.
+    private static bool TryParseSeriesKey(string key, out Guid sensorId, out Guid channelId)
+    {
+        sensorId = channelId = Guid.Empty;
+        var parts = key.Split('|');
+        return parts.Length == 2 && Guid.TryParse(parts[0], out sensorId) && Guid.TryParse(parts[1], out channelId);
+    }
+
+    // A sensor's channels, in their configured order.
+    private static IEnumerable<ChannelDataType> ChannelsOf(Element sensor) =>
+        sensor.ElementType.ChannelDataTypeElementTypes
+            .OrderBy(c => c.SortOrder ?? int.MaxValue)
+            .Select(c => c.ChannelDataType)
+            .Where(c => c != null);
+
+    // A point of the plot, with its sensor and channel, the instant the plot drew it at and its value.
+    private sealed record TracedPoint(Element Sensor, ChannelDataType Channel, DateTime At, double Value);
+
+    // The point of the displayed plot the browser named, or null with the reason: the curve must be one series of
+    // the plot, of a sensor of this page, holding a point at exactly that x with exactly that value.
+    private TracedPoint TracePlottedPoint(IndicesInTimeComponent.ChosenPoint point, out string refusal)
+    {
+        refusal = null;
+
+        // headers[0] is "Date", indices[i] is headers[i + 1].
+        int column = headers.IndexOf(point.Series);
+        if (column < 1 || headers.LastIndexOf(point.Series) != column)
+        {
+            refusal = $"La courbe « {point.Series} » ne peut pas être identifiée sans ambiguïté.";
+            return null;
+        }
+
+        var (seriesKey, seriesData) = indices[column - 1];
+        var sensor = TryParseSeriesKey(seriesKey, out var sensorId, out var channelId)
+            ? sensors?.FirstOrDefault(s => s.ElementId == sensorId)
+            : null;
+        var channel = sensor == null ? null : ChannelsOf(sensor).FirstOrDefault(c => c.ChannelDataTypeId == channelId);
+        if (channel == null)
+        {
+            refusal = $"La courbe « {point.Series} » ne correspond à aucun capteur de cette page.";
+            return null;
+        }
+
+        var keys = seriesData.Keys.Where(k => IndicesInTimeComponent.CsvX(k) == point.X).ToList();
+        if (keys.Count != 1 || seriesData[keys[0]] != point.Y)
+        {
+            refusal = "Ce point ne correspond plus aux données affichées : rechargez la courbe et recommencez.";
+            return null;
+        }
+
+        return new TracedPoint(sensor, channel, (DateTime)keys[0], point.Y);
+    }
+
     // A point right-clicked on the plot (Developer role): traced back to the raw readings behind it, which are
     // deleted from InfluxDB once the developer confirms. A point that cannot be traced exactly is never deleted:
     // every check refuses aloud.
@@ -1108,7 +1156,8 @@
         }
 
         isDeletingPoint = true;
-        bool deleteStarted = false, deleted = false;
+        // What a failure at the current step means for the data: set before each step, said before the error.
+        string failure = "Rien n'a été supprimé";
         try
         {
             if (!await IsDeveloperNowAsync())
@@ -1124,54 +1173,35 @@
                 return;
             }
 
-            // The curve: its header must name one series only (headers[0] is "Date", indices[i] is headers[i + 1]).
-            int column = headers.IndexOf(point.Series);
-            if (column < 1 || headers.LastIndexOf(point.Series) != column)
+            var traced = TracePlottedPoint(point, out string refusal);
+            if (traced == null)
             {
-                await js.InvokeVoidAsync("alert", $"La courbe « {point.Series} » ne peut pas être identifiée sans ambiguïté : rien n'a été supprimé.");
+                await js.InvokeVoidAsync("alert", $"{refusal} Rien n'a été supprimé.");
                 return;
             }
-            var (seriesKey, seriesData) = indices[column - 1];
-            var ids = seriesKey.Split('|');   // "sensorId|channelId", as HandleBatchPlot keys a series
-            var sensorId = Guid.Parse(ids[0]);
-            var channelId = Guid.Parse(ids[1]);
 
-            // The point: the instant the plot drew it at, holding the value the chart showed.
-            var instants = seriesData.Keys.Where(k => IndicesInTimeComponent.CsvX(k) == point.X).ToList();
-            if (instants.Count != 1 || seriesData[instants[0]] != point.Y)
-            {
-                await js.InvokeVoidAsync("alert", "Ce point ne correspond plus aux données affichées : rechargez la courbe et recommencez. Rien n'a été supprimé.");
-                return;
-            }
-            var pointTime = (DateTime)instants[0];
-            double pointValue = seriesData[instants[0]];
-
-            var found = await OutlierReadings.FindAsync(sensorId, channelId, pointTime, pointValue, plot);
+            var sensorId = traced.Sensor.ElementId;
+            var channelId = traced.Channel.ChannelDataTypeId;
+            var found = await OutlierReadings.FindAsync(sensorId, channelId, traced.At, traced.Value, plot);
             if (found.Instants.Count == 0)
             {
                 await js.InvokeVoidAsync("alert", "Aucune lecture de la base ne donne ce point (elle a peut-être déjà été supprimée) : rechargez la courbe.");
                 return;
             }
 
-            var sensor = sensors?.FirstOrDefault(s => s.ElementId == sensorId);
-            var channels = sensor?.ElementType?.ChannelDataTypeElementTypes?
-                .OrderBy(c => c.SortOrder ?? int.MaxValue)
-                .Select(c => c.ChannelDataType).Where(c => c != null).ToList() ?? new List<ChannelDataType>();
-            string sensorName = sensor?.Name ?? sensorId.ToString();
-            string channelName = channels.FirstOrDefault(c => c.ChannelDataTypeId == channelId)?.Name ?? channelId.ToString();
-
-            if (!await js.InvokeAsync<bool>("confirm", DeleteConfirmText(sensorName, channelName, channels, pointTime, pointValue, found)))
+            failure = "La confirmation n'a pas abouti : rien n'a été supprimé";
+            if (!await js.InvokeAsync<bool>("confirm", DeleteConfirmText(traced, found)))
                 return;
 
-            deleteStarted = true;
+            failure = "La suppression n'a pas abouti ; rechargez la courbe pour voir ce qui reste";
             await OutlierReadings.DeleteAsync(sensorId, channelId, found.Instants, plot.Bucket);
-            deleted = true;
 
+            failure = "La lecture a été supprimée, mais la suite a échoué";
             await journal.WriteAsync(JournalCategory.Donnees, "influx.reading.delete",
-                target: $"{sensorName} / {channelName}",
+                target: $"{traced.Sensor.Name} / {traced.Channel.Name}",
                 details: $"{found.Instants.Count} lecture(s) entière(s) supprimée(s) du bucket {plot.Bucket}, toutes les voies du capteur : "
                        + string.Join(", ", found.Instants.Select(at => at.ToString("o", CultureInfo.InvariantCulture)))
-                       + $". Point du graphique : {channelName} = {pointValue.ToString("G6", CultureInfo.InvariantCulture)} le {Utc(pointTime)}.",
+                       + $". Point du graphique : {traced.Channel.Name} = {traced.Value.ToString("G6", CultureInfo.InvariantCulture)} le {Utc(traced.At)}.",
                 severity: 2,
                 structureId: Structure?.StructureId);
 
@@ -1180,13 +1210,8 @@
         }
         catch (Exception ex)
         {
-            string message =
-                deleted ? $"La lecture a été supprimée, mais la suite a échoué : {ex.Message}"
-                : deleteStarted ? $"La suppression n'a pas abouti ; rechargez la courbe pour voir ce qui reste. {ex.Message}"
-                : ex is TaskCanceledException ? "Pas de réponse à la confirmation dans le délai : rien n'a été supprimé."
-                : $"Rien n'a été supprimé : {ex.Message}";
             Console.WriteLine($"[SurveillanceCapteurs] point delete ({point.Series} @ {point.X}): {ex}");
-            await js.InvokeVoidAsync("alert", message);
+            await js.InvokeVoidAsync("alert", $"{failure} : {ex.Message}");
         }
         finally
         {
@@ -1195,15 +1220,14 @@
     }
 
     // What the developer is asked before anything is deleted, InfluxDB's whole-reading rule included.
-    private static string DeleteConfirmText(string sensorName, string channelName, IReadOnlyList<ChannelDataType> channels,
-                                            DateTime pointTime, double pointValue, OutlierReadings.Found found)
+    private static string DeleteConfirmText(TracedPoint point, OutlierReadings.Found found)
     {
         const int Listed = 10;
         var text = new System.Text.StringBuilder();
         text.AppendLine("Supprimer définitivement de la base InfluxDB ?");
         text.AppendLine();
-        text.AppendLine($"Capteur : {sensorName}");
-        text.AppendLine($"Point : {channelName} = {pointValue.ToString("G6", CultureInfo.InvariantCulture)}, le {Utc(pointTime)}");
+        text.AppendLine($"Capteur : {point.Sensor.Name}");
+        text.AppendLine($"Point : {point.Channel.Name} = {point.Value.ToString("G6", CultureInfo.InvariantCulture)}, le {Utc(point.At)}");
         if (found.ReadingsInWindow > 1)
             text.AppendLine($"Ce point est le maximum de {found.ReadingsInWindow} lectures, du {Utc(found.WindowStart)} au {Utc(found.WindowStop)}.");
         text.AppendLine();
@@ -1213,8 +1237,8 @@
         if (found.Instants.Count > Listed)
             text.AppendLine($"   … et {found.Instants.Count - Listed} autre(s)");
         text.AppendLine();
-        string others = channels.Count > 0 ? $" ({string.Join(", ", channels.Select(c => c.Name))})" : "";
-        text.AppendLine($"InfluxDB efface chaque lecture entière : toutes les voies du capteur à cet instant{others}, pas seulement {channelName}.");
+        text.AppendLine("InfluxDB efface chaque lecture entière : toutes les voies du capteur à cet instant "
+                      + $"({string.Join(", ", ChannelsOf(point.Sensor).Select(c => c.Name))}), pas seulement {point.Channel.Name}.");
         text.Append("Cette suppression est définitive.");
         return text.ToString();
     }

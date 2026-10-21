@@ -86,6 +86,7 @@ function initializeDygraph(divid,xlabel, ylabel) {
     g = new Dygraph(document.getElementById(divid), headers, options);
     dygraphInstances[divid] = g;
     attachCurveTooltip(g, divid);
+    attachPointMenu(g, divid);
 
     // Observe the *parent* container � it is sized by the splitter layout,
     // not by Dygraph's canvas, so its width is always the correct available space.
@@ -182,16 +183,29 @@ function attachCurveTooltip(g, divid) {
         }
 
         tip.style.display = 'block';
-        const offset = 14;
-        let left = e.clientX + offset;
-        let top = e.clientY + offset;
-        if (left + tip.offsetWidth > window.innerWidth - 4) left = e.clientX - offset - tip.offsetWidth;
-        if (top + tip.offsetHeight > window.innerHeight - 4) top = e.clientY - offset - tip.offsetHeight;
-        tip.style.left = Math.max(4, left) + 'px';
-        tip.style.top = Math.max(4, top) + 'px';
+        placeOnScreen(tip, e.clientX, e.clientY, 14);
 
         watchCurveTooltip(tip, elem);
     });
+}
+
+// Puts a shown position:fixed element offset pixels right of and below (clientX, clientY), or on the other side
+// where it would leave the window, and at least 4 pixels inside it.
+function placeOnScreen(el, clientX, clientY, offset) {
+    let left = clientX + offset;
+    let top = clientY + offset;
+    if (left + el.offsetWidth > window.innerWidth - 4) left = clientX - offset - el.offsetWidth;
+    if (top + el.offsetHeight > window.innerHeight - 4) top = clientY - offset - el.offsetHeight;
+    el.style.left = Math.max(4, left) + 'px';
+    el.style.top = Math.max(4, top) + 'px';
+}
+
+// Series labels on the surveillance plot are "Sensor|channel"; any other label is all sensor, with no channel.
+function splitSeriesLabel(label) {
+    const sep = label.lastIndexOf('|');
+    return sep < 0
+        ? { sensor: label, channel: null }
+        : { sensor: label.substring(0, sep), channel: label.substring(sep + 1) };
 }
 
 // A chart removed while the pointer rests on one of its curves (browser Back, a tab switched from the
@@ -214,27 +228,26 @@ function watchCurveTooltip(tip, elem) {
     requestAnimationFrame(check);
 }
 
-// Series labels on the surveillance plot are "Sensor|channel": the sensor is the tooltip's title and
-// the channel goes under it. Any other label is shown whole. The point's note, if any, comes last.
-// Built with textContent, never as HTML.
+// The sensor is the tooltip's title and the channel, if the label names one (splitSeriesLabel), goes under it.
+// The point's note, if any, comes last. Built with textContent, never as HTML.
 function fillCurveTooltip(tip, label, props, note) {
     tip.textContent = '';
-    const sep = label.lastIndexOf('|');
+    const parts = splitSeriesLabel(label);
 
     const title = document.createElement('div');
     const swatch = document.createElement('span');
     swatch.style.cssText = 'display:inline-block; width:12px; height:3px; margin-right:6px; vertical-align:middle;'
         + ' background:' + ((props && props.color) || '#fff') + ';';
     const sensor = document.createElement('strong');
-    sensor.textContent = sep < 0 ? label : label.substring(0, sep);
+    sensor.textContent = parts.sensor;
     title.appendChild(swatch);
     title.appendChild(sensor);
     tip.appendChild(title);
 
-    if (sep >= 0) {
+    if (parts.channel !== null) {
         const channel = document.createElement('div');
         channel.style.cssText = 'opacity:0.8; font-size:11px; padding-left:18px;';
-        channel.textContent = label.substring(sep + 1);
+        channel.textContent = parts.channel;
         tip.appendChild(channel);
     }
 
@@ -249,16 +262,16 @@ function fillCurveTooltip(tip, label, props, note) {
 // Right-click menu on a curve, offering to delete the point under the pointer from InfluxDB (the Surveillance plot,
 // Developer role). IndicesInTimeComponent turns it on for a graph with the .NET object that takes the choice, or off
 // with null. The menu only offers: the server traces the point back to its readings, checks the role and asks for
-// confirmation. Away from the curves, with Shift, or with the menu already open, the right-click is left to the
+// confirmation. Off, away from the curves, with Shift, or with the menu already open, the right-click is left to the
 // browser, whose own menu copies or saves the image.
 function setPointDeleteMenu(divid, dotnetRef) {
     const g = dygraphInstances[divid];
     if (!g) throw new Error('graph ' + divid + ' does not exist');
     g.pointDeleteTarget = dotnetRef || null;
     if (!g.pointDeleteTarget) hidePointMenu(divid);
-    if (g.pointDeleteMenuWired) return;
-    g.pointDeleteMenuWired = true;
+}
 
+function attachPointMenu(g, divid) {
     const elem = document.getElementById(divid);
     elem.addEventListener('contextmenu', function (e) {
         if (dygraphInstances[divid] !== g || !g.pointDeleteTarget) return;
@@ -283,9 +296,12 @@ function pointMenuOpen(divid) {
     return !!menu && menu.style.display !== 'none';
 }
 
+// Emptied as well, so its item's handler lets go of the graph it was opened on.
 function hidePointMenu(divid) {
     const menu = document.getElementById(divid + '_point_menu');
-    if (menu) menu.style.display = 'none';
+    if (!menu) return;
+    menu.style.display = 'none';
+    menu.replaceChildren();
 }
 
 // The x of a date axis as the CSV's first column wrote it (IndicesInTimeComponent.CsvX, "yyyy-MM-dd HH:mm:ss.fff").
@@ -327,16 +343,15 @@ function showPointMenu(g, divid, curve, clientX, clientY) {
     }
 
     const name = curve.name;
-    const sep = name.lastIndexOf('|');
+    const parts = splitSeriesLabel(name);
     const x = csvDateText(curve.point.xval);
     const y = curve.point.yval;
     const parse = g.getOption('xValueParser');
 
-    menu.textContent = '';
     const title = document.createElement('div');
     title.className = 'dygraph-point-menu-title';
     const label = document.createElement('strong');
-    label.textContent = sep < 0 ? name : name.substring(0, sep) + ' — ' + name.substring(sep + 1);
+    label.textContent = parts.channel === null ? parts.sensor : parts.sensor + ' — ' + parts.channel;
     const at = document.createElement('div');
     at.textContent = x.substring(8, 10) + '/' + x.substring(5, 7) + '/' + x.substring(0, 4) + ' ' + x.substring(11, 19)
         + '  ·  ' + Number(y.toPrecision(6));
@@ -376,11 +391,7 @@ function showPointMenu(g, divid, curve, clientX, clientY) {
     menu.appendChild(hint);
 
     menu.style.display = 'block';
-    let left = clientX, top = clientY;
-    if (left + menu.offsetWidth > window.innerWidth - 4) left = clientX - menu.offsetWidth;
-    if (top + menu.offsetHeight > window.innerHeight - 4) top = clientY - menu.offsetHeight;
-    menu.style.left = Math.max(4, left) + 'px';
-    menu.style.top = Math.max(4, top) + 'px';
+    placeOnScreen(menu, clientX, clientY, 0);
     item.focus({ preventScroll: true });
 }
 
@@ -430,29 +441,32 @@ function legendWithPointNotes(data) {
 
 // The visible series whose drawn line passes within CURVE_TOOLTIP_DISTANCE pixels of (x, y), the nearest
 // one if several do, as { name, point }: point is that series' sample nearest along its line, a layout
-// point whose idx is the row. null when no line is that close or (x, y) is more than CURVE_TOOLTIP_DISTANCE
-// outside the plotting area (axes, range selector): a range's first and last points lie on the area's edges,
-// and are reached from outside too. x and y are pixels from the top-left corner of dygraph's canvas, as its
-// layout points and the coordinates it hands to findClosestPoint are.
+// point whose idx is the row. Only a point inside the plotting area counts: zoomed in, dygraph keeps a sample
+// beyond each edge to draw the line to it, and a range's first and last points lie on the edges themselves, so
+// they are found from either side. null when no line is that close. x and y are pixels from the top-left corner
+// of dygraph's canvas, as its layout points and the coordinates it hands to findClosestPoint are.
 function findCurveAt(g, x, y) {
     const layout = g.layout_;
     if (!layout || !layout.points) return null;
 
     const area = g.getArea();
-    const margin = CURVE_TOOLTIP_DISTANCE;
-    if (x < area.x - margin || x > area.x + area.w + margin || y < area.y - margin || y > area.y + area.h + margin) return null;
-
     let best = null;
     for (let s = 0; s < layout.points.length; s++) {
         const name = layout.setNames[s];
         const hit = nearestOnDrawnSeries(layout.points[s], x, y, CURVE_TOOLTIP_DISTANCE,
             g.getBooleanOption('connectSeparatedPoints', name));
         // "<=": on a tie the series drawn later, i.e. on top, wins.
-        if (hit && hit.distance <= (best ? best.distance : CURVE_TOOLTIP_DISTANCE)) {
+        if (hit && inPlottingArea(hit.point, area) && hit.distance <= (best ? best.distance : CURVE_TOOLTIP_DISTANCE)) {
             best = { name: name, point: hit.point, distance: hit.distance };
         }
     }
     return best;
+}
+
+// Half a pixel of slack: an edge point's position comes out of a multiplication by the area's size.
+function inPlottingArea(p, area) {
+    return p.canvasx >= area.x - 0.5 && p.canvasx <= area.x + area.w + 0.5
+        && p.canvasy >= area.y - 0.5 && p.canvasy <= area.y + area.h + 0.5;
 }
 
 // Distance from (x, y) to one series' line as dygraph draws it, with the sample at the nearer end of the
