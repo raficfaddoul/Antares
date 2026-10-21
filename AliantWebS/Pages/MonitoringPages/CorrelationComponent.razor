@@ -38,7 +38,7 @@
     }
 </style>
 
-<ReadFailureNotice Message="@readError" Cover="false" />
+<ReadFailureNotice Message="@readError" />
 
 <div style="margin-bottom: 1rem; padding: 1rem; background: white; border-radius: 8px;">
     <div style="display: flex; gap: 1rem; align-items: end;">
@@ -157,21 +157,17 @@
     {
         var (sensorChannelPairs, receivedStartDate, receivedEndDate) = args;
         
-        if (!sensorChannelPairs.Any())
-        {
-            headers.Clear();
-            indices.Clear();
-            correlationMatrix = null;
-            excludedSensors.Clear();
-            readError = null;
-            StateHasChanged();
-            return;
-        }
-
         headers.Clear();
         indices.Clear();
         excludedSensors.Clear();
+        correlationMatrix = null;
         readError = null;
+
+        if (!sensorChannelPairs.Any())
+        {
+            StateHasChanged();
+            return;
+        }
 
         // Fetch each sensor separately to ensure we get all data
         foreach (var (sensor, channelDataType) in sensorChannelPairs)
@@ -189,13 +185,11 @@
                     maxDataPoints: 1000
                 );
             }
-            catch (Exception ex)
+            catch (InfluxReadException ex)
             {
-                // A sensor that could not be read is not one with no data: no matrix rather than one without it.
-                headers.Clear();
-                indices.Clear();
+                // A sensor that could not be read is not one with no data: no matrix rather than one without it
+                // (the matrix is still null, so the series read so far are not shown).
                 excludedSensors.Clear();
-                correlationMatrix = null;
                 readError = $"{sensor.Name} : {ex.Message}";
                 StateHasChanged();
                 return;

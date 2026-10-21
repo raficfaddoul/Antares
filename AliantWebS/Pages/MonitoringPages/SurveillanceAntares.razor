@@ -59,6 +59,7 @@
                     </button>
                     <span style="color:#666;">@statusMessage</span>
                 </div>
+                <ReadFailureNotice Message="@readError" />
                 <BIMComponent @ref="bimRef" Structure="appData.Structure"
                               ColorMapping="@colorMapping" TauxMap="@tauxByBimId"></BIMComponent>
             }
@@ -78,6 +79,7 @@
     private Dictionary<long, double> tauxByBimId = new();
     private bool isCalculating = false;
     private string statusMessage = "";
+    private string readError;   // the measured loads could not be read (null when they were)
 
     private string selectedPeriod = "day";
     private List<PeriodOption> periodOptions = new()
@@ -227,6 +229,7 @@
 
         isCalculating = true;
         statusMessage = "";
+        readError = null;
         StateHasChanged();
         await Task.Yield(); // let the spinner paint before the (synchronous) FE solve
 
@@ -239,10 +242,10 @@
             {
                 chargeNodale = await BuildMeasuredChargeNodaleAsync(start, end);
             }
-            catch (Exception ex)
+            catch (InfluxReadException ex)
             {
-                // Unreadable is not "no load": say so instead of "Aucune charge mesurée".
-                statusMessage = $"Les mesures n'ont pas pu être lues : {ex.Message}";
+                // Unreadable is not "no load": the notice says so instead of "Aucune charge mesurée".
+                readError = ex.Message;
                 return;
             }
             if (chargeNodale.Count == 0)

@@ -309,7 +309,7 @@
                                         🎯 Click on SVG to position sensor
                                     </div>
                                 }
-                                <ReadFailureNotice Title="Couleurs de charge indisponibles : les mesures n'ont pas pu être lues" Message="@chargeRatiosError" Cover="false" />
+                                <ReadFailureNotice Title="@ReadFailureNotice.ChargeColoursTitle" Message="@chargeRatiosError" />
                                 <AliantWebS.Pages.CADPages.SVGComponent
                                     @ref="svgComponent"
                                     Mode="@(isPositioningMode ? AliantWebS.Pages.CADPages.PlanMode.PlaceSensor : AliantWebS.Pages.CADPages.PlanMode.View)"
@@ -459,7 +459,7 @@
             sensorChargeRatios = await SensorChargeRatioHelper.ComputeAsync(
                 dbContextFactory, shackleSensors, weightChannelDataType, startDate, endDate);
         }
-        catch (Exception ex)
+        catch (InfluxReadException ex)
         {
             // Also runs while the page is prerendered, where no alert can be shown: the notice above the plan says it.
             Console.WriteLine($"Error computing shackle charge ratios: {ex.Message}");

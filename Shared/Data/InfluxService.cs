@@ -750,9 +750,28 @@ public static string AggregateWindowClause(string? every, string? fn)
 }
 
 /// <summary>
+/// The id of the organisation GetData queries. InfluxReadException when InfluxDB cannot be reached or refuses the
+/// token, and when the organisation does not exist (a query without one fails later with a confusing message).
+/// </summary>
+private static async Task<string> ReadOrgIdAsync(InfluxDBClient client)
+{
+    List<Organization> organizations;
+    try
+    {
+        organizations = await client.GetOrganizationsApi().FindOrganizationsAsync();
+    }
+    catch (Exception ex)
+    {
+        throw new InfluxReadException($"InfluxDB could not be reached: {ex.Message}", ex);
+    }
+
+    return organizations?.FirstOrDefault(o => o.Name == orgName)?.Id
+        ?? throw new InfluxReadException($"InfluxDB has no organisation \"{orgName}\".");
+}
+
+/// <summary>
 /// One row per time and sensor: [0] time (UTC), [1] sensor id, [2..] the channels' values. Throws
-/// InvalidOperationException when InfluxDB cannot be read (timeout, refused token, failed query): callers show that
-/// the data could not be read, never an empty result.
+/// <see cref="InfluxReadException"/> when InfluxDB cannot be read, never an empty result in its place.
 /// </summary>
 static public async Task<List<object[]>> GetData(
     List<string> sensorsIds,
@@ -779,14 +798,7 @@ static public async Task<List<object[]>> GetData(
 
     using var client = new InfluxDBClient(options);
 
-    string orgId = string.Empty;
-    var organizations = await client.GetOrganizationsApi().FindOrganizationsAsync();
-
-    if (organizations != null && organizations.Count > 0)
-    {
-        var org = organizations.FirstOrDefault(o => o.Name == "Aliant");
-        orgId = org?.Id; // Get the orgID
-    }
+    string orgId = await ReadOrgIdAsync(client);
 
     string filterClause = string.Join(" or ", channelsIds.Select(key => $"r._field == \"{key}\""));
     string sensorFilterClause = string.Join(" or ", sensorsIds.Select(id => $"r.sensor == \"{id}\""));
@@ -940,11 +952,10 @@ static public async Task<List<object[]>> GetData(
         // Query completed
     }, orgId, cancellationToken);
 
-    // A failed read is not an empty one: InfluxDB's error (a timeout, a refused token, a bad query) goes to the
-    // caller, never a short or empty list that would pass for "no measurements".
+    // Cancellation first: a cancel reported through onError stays a cancellation.
     cancellationToken.ThrowIfCancellationRequested();
     if (failure != null)
-        throw new InvalidOperationException($"InfluxDB query failed: {failure.Message}", failure);
+        throw new InfluxReadException($"InfluxDB query failed: {failure.Message}", failure);
 
     Console.WriteLine($"Influx returned {ll.Count} row(s) for {sensorsIds.Count} sensor(s) / {channelsIds.Count} channel(s).");
 

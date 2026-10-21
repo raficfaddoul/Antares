@@ -35,7 +35,7 @@
 
 <NavigationLock OnBeforeInternalNavigation="appData.OnBeforeInternalNavigation" ConfirmExternalNavigation="appData.SaveConfirmation&& appData.SaveChanges" />
 
-<ReadFailureNotice Message="@readError" Cover="false" />
+<ReadFailureNotice Message="@UnreadSensorsText" />
 
 @if (somethingToPresent)
 {
@@ -631,25 +631,31 @@
 
     }
 
-    // The sensor's readings, or null when InfluxDB could not give them: the banner says so and nothing is plotted.
+    // The sensor's readings, or null when InfluxDB could not give them: the banner names it and nothing is plotted.
     // A banner, not an alert: re-plotting every selected sensor would raise one alert per sensor.
     private async Task<List<object[]>> GetLa(Element element, ChannelDataType channelDataType, DateTime startDate, DateTime endDate)
     {
+        string key = UnreadKey(element, channelDataType);
         try
         {
             var readings = await InfluxService.GetData(new List<string>() { element.ElementId.ToString() }, new List<string>() { channelDataType.ChannelDataTypeId.ToString() }, startDate, endDate);
-            readError = null;
+            unreadSensors.Remove(key);
             return readings;
         }
-        catch (Exception ex)
+        catch (InfluxReadException ex)
         {
-            readError = $"{element.Name} : {ex.Message}";
-            await InvokeAsync(StateHasChanged);
+            unreadSensors[key] = ex.Message;
+            await InvokeAsync(StateHasChanged);   // OnChangeSelectedChartTypes is async void
             return null;
         }
     }
 
-    string readError;   // the last reading that failed (cleared by the next one that succeeds)
+    // Each sensor channel that could not be read, and why. It stays in the banner until it reads again or is unticked,
+    // so another sensor's successful read never hides it.
+    readonly Dictionary<string, string> unreadSensors = new();
+    static string UnreadKey(Element sensor, ChannelDataType channel) => $"{sensor.Name} ({channel.Name})";
+    string UnreadSensorsText => unreadSensors.Count == 0 ? null
+        : string.Join(" · ", unreadSensors.GroupBy(u => u.Value).Select(g => $"{string.Join(", ", g.Select(u => u.Key))} : {g.Key}"));
 
     private async Task<(IList<object> X, IList<object> Y)> GetXY(Element sensor, ChannelDataType channelDataType)
     {
@@ -687,6 +693,7 @@
         else
         {
             selectedSensorsChannelDataTypes.Remove((sensor, channelDataType));
+            unreadSensors.Remove(UnreadKey(sensor, channelDataType));
             await ploti(args, sensor, channelDataType);
             // Selected = !Selected;
             // this.StateHasChanged();
