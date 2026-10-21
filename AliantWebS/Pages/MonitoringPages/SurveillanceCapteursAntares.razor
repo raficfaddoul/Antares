@@ -9,6 +9,8 @@
 @inject IStringLocalizer<Languages> L
 @inject IJSRuntime js
 @inject Radzen.DialogService dialogService
+@inject AuthenticationStateProvider authenticationStateProvider
+@inject JournalService journal
 
 <style>
     .page-container {
@@ -192,8 +194,9 @@
                             <IndicesInTimeComponent 
                                 GraphId="g3" 
                                 @ref="iitc" 
-                                Headers="headers" 
-                                Indices="indices.Select(x => x.Item2).ToList()">
+                                Headers="headers"
+                                Indices="indices.Select(x => x.Item2).ToList()"
+                                PointDeleteRequested="pointDeleteRequested">
                             </IndicesInTimeComponent>
                         </div>
                         
@@ -395,10 +398,22 @@
     private Guid? positioningSensorId = null;
     private HashSet<Guid> positionedSensorIds = new();
 
+    // Deleting an outlier from InfluxDB is the Developer role's alone: only for it does the plot offer the menu.
+    private const string DeveloperRole = "Developer";
+    private EventCallback<IndicesInTimeComponent.ChosenPoint> pointDeleteRequested;
+
+    // What the plot shows comes from this GetData call: needed to trace a point back to its readings. Null while
+    // the plot is being rebuilt, or when it failed.
+    private OutlierReadings.Plot plotted;
+    private bool isDeletingPoint;
+
     protected override async Task OnInitializedAsync()
     {
         System.Threading.Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
         System.Threading.Thread.CurrentThread.CurrentUICulture = CultureInfo.InvariantCulture;
+
+        if (await IsDeveloperNowAsync())
+            pointDeleteRequested = EventCallback.Factory.Create<IndicesInTimeComponent.ChosenPoint>(this, DeletePlottedPoint);
 
         // Set date range first (no DB call)
         var now = DateTime.UtcNow;
@@ -847,7 +862,8 @@
     private async Task HandleBatchPlot((List<(Element sensor, ChannelDataType channelDataType)> pairs, DateTime startDate, DateTime endDate) args)
     {
         var (sensorChannelPairs, receivedStartDate, receivedEndDate) = args;
-        
+        plotted = null;
+
         if (!sensorChannelPairs.Any())
         {
             headers.Clear();
@@ -970,6 +986,7 @@
             if (iitc != null)
             {
                 await iitc.DisplayData(indices.Select(x => x.Item2).ToList(), headers, null, seriesAxisMap, y1Label, y2Label);
+                plotted = new OutlierReadings.Plot(receivedStartDate, receivedEndDate, maxDataPoints, bucketName);
             }
 
             await PushGraphExportMetaAsync();
@@ -1075,4 +1092,132 @@
             StateHasChanged();
         }
     }
+
+    private async Task<bool> IsDeveloperNowAsync()
+        => (await authenticationStateProvider.GetAuthenticationStateAsync()).User.IsInRole(DeveloperRole);
+
+    // A point right-clicked on the plot (Developer role): traced back to the raw readings behind it, which are
+    // deleted from InfluxDB once the developer confirms. A point that cannot be traced exactly is never deleted:
+    // every check refuses aloud.
+    private async Task DeletePlottedPoint(IndicesInTimeComponent.ChosenPoint point)
+    {
+        if (isDeletingPoint)
+        {
+            await js.InvokeVoidAsync("alert", "Une suppression est déjà en cours.");
+            return;
+        }
+
+        isDeletingPoint = true;
+        bool deleteStarted = false, deleted = false;
+        try
+        {
+            if (!await IsDeveloperNowAsync())
+            {
+                await js.InvokeVoidAsync("alert", "La suppression de mesures est réservée au rôle Developer.");
+                return;
+            }
+
+            var plot = plotted;
+            if (isLoadingData || plot == null)
+            {
+                await js.InvokeVoidAsync("alert", "La courbe est en cours de chargement : réessayez une fois qu'elle est affichée.");
+                return;
+            }
+
+            // The curve: its header must name one series only (headers[0] is "Date", indices[i] is headers[i + 1]).
+            int column = headers.IndexOf(point.Series);
+            if (column < 1 || headers.LastIndexOf(point.Series) != column)
+            {
+                await js.InvokeVoidAsync("alert", $"La courbe « {point.Series} » ne peut pas être identifiée sans ambiguïté : rien n'a été supprimé.");
+                return;
+            }
+            var (seriesKey, seriesData) = indices[column - 1];
+            var ids = seriesKey.Split('|');   // "sensorId|channelId", as HandleBatchPlot keys a series
+            var sensorId = Guid.Parse(ids[0]);
+            var channelId = Guid.Parse(ids[1]);
+
+            // The point: the instant the plot drew it at, holding the value the chart showed.
+            var instants = seriesData.Keys.Where(k => IndicesInTimeComponent.CsvX(k) == point.X).ToList();
+            if (instants.Count != 1 || seriesData[instants[0]] != point.Y)
+            {
+                await js.InvokeVoidAsync("alert", "Ce point ne correspond plus aux données affichées : rechargez la courbe et recommencez. Rien n'a été supprimé.");
+                return;
+            }
+            var pointTime = (DateTime)instants[0];
+            double pointValue = seriesData[instants[0]];
+
+            var found = await OutlierReadings.FindAsync(sensorId, channelId, pointTime, pointValue, plot);
+            if (found.Instants.Count == 0)
+            {
+                await js.InvokeVoidAsync("alert", "Aucune lecture de la base ne donne ce point (elle a peut-être déjà été supprimée) : rechargez la courbe.");
+                return;
+            }
+
+            var sensor = sensors?.FirstOrDefault(s => s.ElementId == sensorId);
+            var channels = sensor?.ElementType?.ChannelDataTypeElementTypes?
+                .OrderBy(c => c.SortOrder ?? int.MaxValue)
+                .Select(c => c.ChannelDataType).Where(c => c != null).ToList() ?? new List<ChannelDataType>();
+            string sensorName = sensor?.Name ?? sensorId.ToString();
+            string channelName = channels.FirstOrDefault(c => c.ChannelDataTypeId == channelId)?.Name ?? channelId.ToString();
+
+            if (!await js.InvokeAsync<bool>("confirm", DeleteConfirmText(sensorName, channelName, channels, pointTime, pointValue, found)))
+                return;
+
+            deleteStarted = true;
+            await OutlierReadings.DeleteAsync(sensorId, channelId, found.Instants, plot.Bucket);
+            deleted = true;
+
+            await journal.WriteAsync(JournalCategory.Donnees, "influx.reading.delete",
+                target: $"{sensorName} / {channelName}",
+                details: $"{found.Instants.Count} lecture(s) entière(s) supprimée(s) du bucket {plot.Bucket}, toutes les voies du capteur : "
+                       + string.Join(", ", found.Instants.Select(at => at.ToString("o", CultureInfo.InvariantCulture)))
+                       + $". Point du graphique : {channelName} = {pointValue.ToString("G6", CultureInfo.InvariantCulture)} le {Utc(pointTime)}.",
+                severity: 2,
+                structureId: Structure?.StructureId);
+
+            await RefreshChart();
+            await js.InvokeVoidAsync("alert", $"{found.Instants.Count} lecture(s) supprimée(s) de la base.");
+        }
+        catch (Exception ex)
+        {
+            string message =
+                deleted ? $"La lecture a été supprimée, mais la suite a échoué : {ex.Message}"
+                : deleteStarted ? $"La suppression n'a pas abouti ; rechargez la courbe pour voir ce qui reste. {ex.Message}"
+                : ex is TaskCanceledException ? "Pas de réponse à la confirmation dans le délai : rien n'a été supprimé."
+                : $"Rien n'a été supprimé : {ex.Message}";
+            Console.WriteLine($"[SurveillanceCapteurs] point delete ({point.Series} @ {point.X}): {ex}");
+            await js.InvokeVoidAsync("alert", message);
+        }
+        finally
+        {
+            isDeletingPoint = false;
+        }
+    }
+
+    // What the developer is asked before anything is deleted, InfluxDB's whole-reading rule included.
+    private static string DeleteConfirmText(string sensorName, string channelName, IReadOnlyList<ChannelDataType> channels,
+                                            DateTime pointTime, double pointValue, OutlierReadings.Found found)
+    {
+        const int Listed = 10;
+        var text = new System.Text.StringBuilder();
+        text.AppendLine("Supprimer définitivement de la base InfluxDB ?");
+        text.AppendLine();
+        text.AppendLine($"Capteur : {sensorName}");
+        text.AppendLine($"Point : {channelName} = {pointValue.ToString("G6", CultureInfo.InvariantCulture)}, le {Utc(pointTime)}");
+        if (found.ReadingsInWindow > 1)
+            text.AppendLine($"Ce point est le maximum de {found.ReadingsInWindow} lectures, du {Utc(found.WindowStart)} au {Utc(found.WindowStop)}.");
+        text.AppendLine();
+        text.AppendLine($"Lecture(s) donnant cette valeur, à supprimer : {found.Instants.Count}");
+        foreach (var at in found.Instants.Take(Listed))
+            text.AppendLine($"   {Utc(at)}");
+        if (found.Instants.Count > Listed)
+            text.AppendLine($"   … et {found.Instants.Count - Listed} autre(s)");
+        text.AppendLine();
+        string others = channels.Count > 0 ? $" ({string.Join(", ", channels.Select(c => c.Name))})" : "";
+        text.AppendLine($"InfluxDB efface chaque lecture entière : toutes les voies du capteur à cet instant{others}, pas seulement {channelName}.");
+        text.Append("Cette suppression est définitive.");
+        return text.ToString();
+    }
+
+    private static string Utc(DateTime at) => at.ToString("dd/MM/yyyy HH:mm:ss", CultureInfo.InvariantCulture) + " UTC";
 }

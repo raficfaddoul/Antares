@@ -750,6 +750,69 @@ public static string AggregateWindowClause(string? every, string? fn)
 }
 
 /// <summary>
+/// The aggregateWindow step GetData takes to bring [startDate, endDate] down to about maxDataPoints rows: the span
+/// divided by maxDataPoints, cut down to whole milliseconds, seconds, minutes, hours or days. Flux is the step as
+/// the query writes it, Every the same step as a duration (see <see cref="AggregatedWindowOf"/>).
+/// </summary>
+public static (string Flux, TimeSpan Every) DownsampleWindow(DateTime startDate, DateTime endDate, int maxDataPoints)
+{
+    if (maxDataPoints <= 0)
+        throw new ArgumentOutOfRangeException(nameof(maxDataPoints), maxDataPoints, "A plot needs at least one point.");
+
+    double windowSeconds = (endDate - startDate).TotalSeconds / maxDataPoints;
+
+    if (windowSeconds < 1) return Step((int)(windowSeconds * 1000), "ms", TimeSpan.FromMilliseconds(1));
+    if (windowSeconds < 60) return Step((int)windowSeconds, "s", TimeSpan.FromSeconds(1));
+    if (windowSeconds < 3600) return Step((int)(windowSeconds / 60), "m", TimeSpan.FromMinutes(1));
+    if (windowSeconds < 86400) return Step((int)(windowSeconds / 3600), "h", TimeSpan.FromHours(1));
+    return Step((int)(windowSeconds / 86400), "d", TimeSpan.FromDays(1));
+
+    static (string, TimeSpan) Step(int count, string unit, TimeSpan unitLength) => ($"{count}{unit}", unitLength * count);
+}
+
+/// <summary>
+/// The window [Start, Stop) of raw readings behind a row that aggregateWindow(every) dated at rowTime, in a query
+/// whose range starts at rangeStart (both UTC). Flux lays its windows end to end from the Unix epoch, cuts the
+/// first and the last at the range, and dates a row by its window's stop: so the window ends at the row's time,
+/// which for a last window cut by the range is the range's stop rather than a whole step.
+/// </summary>
+public static (DateTime Start, DateTime Stop) AggregatedWindowOf(DateTime rowTime, TimeSpan every, DateTime rangeStart)
+{
+    if (every <= TimeSpan.Zero)
+        throw new ArgumentOutOfRangeException(nameof(every), every, "A window must last.");
+    if (rowTime.Kind != DateTimeKind.Utc || rangeStart.Kind != DateTimeKind.Utc)
+        throw new ArgumentException("A row's time and the range's start must be UTC.");
+    if (rowTime <= rangeStart || rowTime <= DateTime.UnixEpoch)
+        throw new ArgumentOutOfRangeException(nameof(rowTime), rowTime, $"No window of a range starting {rangeStart:o} ends there.");
+
+    // The step holding the last instant before the row's time is the row's window.
+    long beforeStop = (rowTime - DateTime.UnixEpoch).Ticks - 1;
+    var start = DateTime.UnixEpoch.AddTicks(beforeStop / every.Ticks * every.Ticks);
+    return (start < rangeStart ? rangeStart : start, rowTime);
+}
+
+/// <summary>
+/// Deletes a sensor's readings at the given instants (UTC) from the bucket: each one whole, with every channel the
+/// sensor reported at that instant, since InfluxDB deletes by tag and time, never by field. Throws when InfluxDB
+/// refuses or cannot be reached. InfluxDB answers a delete that matched nothing as it answers one that worked:
+/// <see cref="OutlierReadings.DeleteAsync"/> reads the readings back.
+/// </summary>
+public static async Task DeleteSensorReadingsAsync(string bucketName, Guid sensorId, IReadOnlyCollection<DateTime> instants)
+{
+    ArgumentException.ThrowIfNullOrEmpty(bucketName);
+    if (instants.Any(at => at.Kind != DateTimeKind.Utc))
+        throw new ArgumentException("Instants must be UTC.", nameof(instants));
+
+    using var client = new InfluxDBClient(url, token);
+    var deleteApi = client.GetDeleteApi();
+
+    // The sensor tag alone, the way GetData selects a sensor's readings: what was plotted is what goes.
+    string predicate = $"sensor=\"{sensorId}\"";
+    foreach (var at in instants)
+        await deleteApi.Delete(at, at, predicate, bucketName, orgName);   // start and stop are both included
+}
+
+/// <summary>
 /// The id of the organisation GetData queries. InfluxReadException when InfluxDB cannot be reached or refuses the
 /// token, and when the organisation does not exist (a query without one fails later with a confusing message).
 /// </summary>
@@ -819,35 +882,7 @@ static public async Task<List<object[]>> GetData(
     }
     else if (maxDataPoints.HasValue && maxDataPoints.Value > 0)
     {
-        // Calculate time span and determine window size
-        TimeSpan timeRange = endDate - startDate;
-        double totalSeconds = timeRange.TotalSeconds;
-        
-        // Calculate window size to achieve target data points
-        double windowSeconds = totalSeconds / maxDataPoints.Value;
-        
-        // Convert to appropriate time unit
-        string windowDuration;
-        if (windowSeconds < 1)
-        {
-            windowDuration = $"{(int)(windowSeconds * 1000)}ms";
-        }
-        else if (windowSeconds < 60)
-        {
-            windowDuration = $"{(int)windowSeconds}s";
-        }
-        else if (windowSeconds < 3600)
-        {
-            windowDuration = $"{(int)(windowSeconds / 60)}m";
-        }
-        else if (windowSeconds < 86400)
-        {
-            windowDuration = $"{(int)(windowSeconds / 3600)}h";
-        }
-        else
-        {
-            windowDuration = $"{(int)(windowSeconds / 86400)}d";
-        }
+        string windowDuration = DownsampleWindow(startDate, endDate, maxDataPoints.Value).Flux;
 
         // Use aggregateWindow to downsample at the query level. fn: max (not mean) so brief
         // load spikes survive downsampling and remain visible on the plotted curves.

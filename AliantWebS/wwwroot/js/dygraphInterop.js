@@ -71,9 +71,11 @@ function initializeDygraph(divid,xlabel, ylabel) {
             strokeBorderWidth: 1,
             highlightCircleSize: 5
         },
-        // A redraw (new data, zoom, resize) clears dygraph's highlight, so the curve tooltip goes too.
+        // A redraw (new data, zoom, resize) clears dygraph's highlight, so the curve tooltip goes too, and the
+        // point menu, whose point may no longer be drawn.
         drawCallback: function () {
             hideCurveTooltip(divid);
+            hidePointMenu(divid);
         }
     };
 
@@ -242,6 +244,144 @@ function fillCurveTooltip(tip, label, props, note) {
         noteLine.textContent = note;
         tip.appendChild(noteLine);
     }
+}
+
+// Right-click menu on a curve, offering to delete the point under the pointer from InfluxDB (the Surveillance plot,
+// Developer role). IndicesInTimeComponent turns it on for a graph with the .NET object that takes the choice, or off
+// with null. The menu only offers: the server traces the point back to its readings, checks the role and asks for
+// confirmation. Away from the curves, with Shift, or with the menu already open, the right-click is left to the
+// browser, whose own menu copies or saves the image.
+function setPointDeleteMenu(divid, dotnetRef) {
+    const g = dygraphInstances[divid];
+    if (!g) throw new Error('graph ' + divid + ' does not exist');
+    g.pointDeleteTarget = dotnetRef || null;
+    if (!g.pointDeleteTarget) hidePointMenu(divid);
+    if (g.pointDeleteMenuWired) return;
+    g.pointDeleteMenuWired = true;
+
+    const elem = document.getElementById(divid);
+    elem.addEventListener('contextmenu', function (e) {
+        if (dygraphInstances[divid] !== g || !g.pointDeleteTarget) return;
+        if (e.shiftKey || pointMenuOpen(divid)) {
+            hidePointMenu(divid);
+            return;
+        }
+        if (e.target !== g.canvas_) return;
+
+        const pos = g.eventToDomCoords(e);
+        const curve = findCurveAt(g, pos[0], pos[1]);
+        if (!curve) return;
+
+        e.preventDefault();
+        hideCurveTooltip(divid);
+        showPointMenu(g, divid, curve, e.clientX, e.clientY);
+    });
+}
+
+function pointMenuOpen(divid) {
+    const menu = document.getElementById(divid + '_point_menu');
+    return !!menu && menu.style.display !== 'none';
+}
+
+function hidePointMenu(divid) {
+    const menu = document.getElementById(divid + '_point_menu');
+    if (menu) menu.style.display = 'none';
+}
+
+// The x of a date axis as the CSV's first column wrote it (IndicesInTimeComponent.CsvX, "yyyy-MM-dd HH:mm:ss.fff").
+// dygraph read that text as local time, so local time writes it back.
+function csvDateText(ms) {
+    const d = new Date(ms);
+    const p = function (n, width) { return String(n).padStart(width || 2, '0'); };
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' '
+        + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds()) + '.' + p(d.getMilliseconds(), 3);
+}
+
+// The menu for one curve's point, in <body> like the curve tooltip so the splitter panes cannot clip it. Its text
+// is set with textContent, never as HTML.
+function showPointMenu(g, divid, curve, clientX, clientY) {
+    const menuId = divid + '_point_menu';
+    let menu = document.getElementById(menuId);
+    if (!menu) {
+        menu = document.createElement('div');
+        menu.id = menuId;
+        menu.className = 'dygraph-point-menu';
+        menu.setAttribute('role', 'menu');
+        document.body.appendChild(menu);
+
+        // Closed by a press anywhere else, Escape, a scroll or leaving the window. Capture, so that a handler
+        // stopping the event further down cannot keep it open. A right press on the chart is left to its
+        // contextmenu handler, which must still see the menu open to hand that right-click to the browser.
+        document.addEventListener('mousedown', function (e) {
+            if (menu.contains(e.target)) return;
+            const chart = document.getElementById(divid);
+            if (e.button === 2 && chart && chart.contains(e.target)) return;
+            hidePointMenu(divid);
+        }, true);
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') hidePointMenu(divid);
+        }, true);
+        document.addEventListener('wheel', function () { hidePointMenu(divid); }, true);
+        document.addEventListener('scroll', function () { hidePointMenu(divid); }, true);
+        window.addEventListener('blur', function () { hidePointMenu(divid); });
+    }
+
+    const name = curve.name;
+    const sep = name.lastIndexOf('|');
+    const x = csvDateText(curve.point.xval);
+    const y = curve.point.yval;
+    const parse = g.getOption('xValueParser');
+
+    menu.textContent = '';
+    const title = document.createElement('div');
+    title.className = 'dygraph-point-menu-title';
+    const label = document.createElement('strong');
+    label.textContent = sep < 0 ? name : name.substring(0, sep) + ' — ' + name.substring(sep + 1);
+    const at = document.createElement('div');
+    at.textContent = x.substring(8, 10) + '/' + x.substring(5, 7) + '/' + x.substring(0, 4) + ' ' + x.substring(11, 19)
+        + '  ·  ' + Number(y.toPrecision(6));
+    title.appendChild(label);
+    title.appendChild(at);
+    menu.appendChild(title);
+
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'dygraph-point-menu-item';
+    item.setAttribute('role', 'menuitem');
+    item.textContent = 'Supprimer ce point de la base…';
+    item.addEventListener('click', function () {
+        hidePointMenu(divid);
+        const target = g.pointDeleteTarget;
+        // The graph replaced or turned off since the menu opened: its point is gone with it.
+        if (!target || dygraphInstances[divid] !== g || !g.graphDiv.isConnected) {
+            alert("Le graphique a changé depuis l'ouverture du menu : rien n'a été supprimé.");
+            return;
+        }
+        // Only a date axis names its points this way. A point whose text still names another instant (a CSV time
+        // in the hour a clock change skips) is refused by the server, which wants that text and that value.
+        if (!parse || parse(x) !== curve.point.xval) {
+            alert("Ce point ne peut pas être désigné sans ambiguïté : rien n'a été supprimé.");
+            return;
+        }
+        target.invokeMethodAsync('OnPointDeleteChosen', name, x, y).catch(function (err) {
+            console.error('Point delete request failed:', err);
+            alert("La demande de suppression n'a pas pu être envoyée : rien n'a été supprimé.");
+        });
+    });
+    menu.appendChild(item);
+
+    const hint = document.createElement('div');
+    hint.className = 'dygraph-point-menu-hint';
+    hint.textContent = "Clic droit à nouveau (ou Maj + clic droit) : menu du navigateur, pour copier ou enregistrer l'image.";
+    menu.appendChild(hint);
+
+    menu.style.display = 'block';
+    let left = clientX, top = clientY;
+    if (left + menu.offsetWidth > window.innerWidth - 4) left = clientX - menu.offsetWidth;
+    if (top + menu.offsetHeight > window.innerHeight - 4) top = clientY - menu.offsetHeight;
+    menu.style.left = Math.max(4, left) + 'px';
+    menu.style.top = Math.max(4, top) + 'px';
+    item.focus({ preventScroll: true });
 }
 
 // Point notes: text shown under a point's value while the pointer is on it, in the legend and in the curve

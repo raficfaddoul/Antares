@@ -5,6 +5,7 @@
 @inject NavigationManager navigationManager
 @inject IJSRuntime JSRuntime
 @inject DataUpdateService DataUpdateService
+@implements IDisposable
 
 <style>
     #darkbg .dygraph-axis-label {
@@ -59,6 +60,52 @@
     .dygraph-point-note {
         font-weight: 600;
     }
+
+    /* The right-click menu on a curve (see PointDeleteRequested), built by dygraphInterop.js in the document body. */
+    .dygraph-point-menu {
+        position: fixed;
+        z-index: 10001;
+        min-width: 220px;
+        max-width: 340px;
+        background: #fff;
+        border: 1px solid #d0d0d8;
+        border-radius: 6px;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+        padding: 4px 0;
+        font: 13px "Segoe UI", Arial, sans-serif;
+        color: #212529;
+    }
+
+    .dygraph-point-menu-title {
+        padding: 4px 12px 6px;
+        border-bottom: 1px solid #ececf0;
+        font-size: 12px;
+        color: #555;
+    }
+
+    .dygraph-point-menu-item {
+        display: block;
+        width: 100%;
+        padding: 6px 12px;
+        border: 0;
+        background: none;
+        text-align: left;
+        color: #b02a37;
+        cursor: pointer;
+    }
+
+    .dygraph-point-menu-item:hover,
+    .dygraph-point-menu-item:focus {
+        background: #f8e6e8;
+        outline: none;
+    }
+
+    .dygraph-point-menu-hint {
+        padding: 4px 12px 2px;
+        border-top: 1px solid #ececf0;
+        font-size: 11px;
+        color: #777;
+    }
 </style>
 
 <div class="chart-container-with-zoom">
@@ -84,14 +131,49 @@
     /// <summary>Text shown under the value of a series' point at a date, see DisplayData.</summary>
     public sealed record PointNote(string Series, DateTime At, string Text);
 
+    /// <summary>A point right-clicked on a curve: its series' header, its x as <see cref="CsvX"/> writes it, its y.</summary>
+    public sealed record ChosenPoint(string Series, string X, double Y);
+
+    /// <summary>
+    /// Set, right-clicking on a curve opens a menu offering to delete the point under the pointer, and the choice
+    /// comes here. The browser's own menu (copy or save the image) stays a second right-click away, and is the one
+    /// shown away from the curves. Unset, the chart keeps the browser's menu only.
+    /// </summary>
+    [Parameter]
+    public EventCallback<ChosenPoint> PointDeleteRequested { get; set; }
+
+    DotNetObjectReference<IndicesInTimeComponent> selfRef;
+    bool graphCreated;
+    bool pointDeleteMenuOn;
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
             await JSRuntime.InvokeVoidAsync("initializeDygraph", GraphId, "Date", "");
+            graphCreated = true;
             await DisplayData(Indices, Headers);
         }
+
+        // Followed on every render: a parent may learn after its first render that it handles deletions.
+        if (graphCreated && PointDeleteRequested.HasDelegate != pointDeleteMenuOn)
+        {
+            pointDeleteMenuOn = PointDeleteRequested.HasDelegate;
+            selfRef ??= DotNetObjectReference.Create(this);
+            await JSRuntime.InvokeVoidAsync("setPointDeleteMenu", GraphId, pointDeleteMenuOn ? selfRef : null);
+        }
     }
+
+    [JSInvokable]
+    public Task OnPointDeleteChosen(string series, string x, double y) =>
+        PointDeleteRequested.InvokeAsync(new ChosenPoint(series, x, y));
+
+    /// <summary>A key of the data as the CSV's first column writes it, which is how a ChosenPoint names its x.</summary>
+    public static string CsvX(object key) => key is DateTime at
+        ? at.ToString(CsvDateFormat, CultureInfo.InvariantCulture)
+        : Convert.ToDouble(key, CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture);
+
+    public void Dispose() => selfRef?.Dispose();
 
     /// <param name="pointNotes">Shown under a point's value, in the legend and the curve tooltip, while the pointer
     /// is on it. They go with the data, so the graph redraws once; none puts dygraph's own legend back.</param>
@@ -106,7 +188,7 @@
     {
         // x written like the CSV's first column, which dygraphInterop.js parses the same way.
         var notes = (pointNotes ?? Array.Empty<PointNote>())
-            .Select(n => new { series = n.Series, x = n.At.ToString(CsvDateFormat, CultureInfo.InvariantCulture), text = n.Text })
+            .Select(n => new { series = n.Series, x = CsvX(n.At), text = n.Text })
             .ToList();
 
         try
@@ -170,14 +252,7 @@
             foreach (var key in sortedKeys)
             {
                 // First column: timestamp/key
-                if (isDateTimeKey)
-                {
-                    rowBuffer[0] = ((DateTime)key).ToString(CsvDateFormat, CultureInfo.InvariantCulture);
-                }
-                else
-                {
-                    rowBuffer[0] = Convert.ToDouble(key, CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture);
-                }
+                rowBuffer[0] = CsvX(key);
 
                 // Value columns
                 for (int i = 0; i < seriesCount; i++)
