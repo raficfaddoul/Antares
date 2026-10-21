@@ -10,6 +10,9 @@
 // Now a scenario - and an event, which failed the same way - is deleted through a context of its own, children first, in
 // one transaction (DeleteScenarioAsync, DeleteEventAsync), and any other delete that fails puts the shared context back as
 // it was (TrackerSnapshot, DeleteEntityAsync).
+//
+// Since step 4 (2026-10) nothing reads the scenario's tables through the shared context, so the scenario delete leaves it
+// alone; the event and tree deletes still make it forget their rows (ForgetDeleted).
 // =============================================================
 
 #nullable enable
@@ -44,28 +47,32 @@ namespace AliantWebS.Data
         /// ACTION in the database); the mothergrids and palonniers go in one statement (their mother links stay within a
         /// scenario and have no foreign key).
         ///
-        /// If the database refuses, nothing is deleted, the shared context is untouched, the user is told and null is
-        /// returned. Once the transaction has committed nothing reports a failure: <paramref name="afterDelete"/> runs
-        /// at once, with no await before it (the layout takes the scenario off its list there, so nothing resolves it in
-        /// the meantime, and moves its folder to the trash - only once the row is gone), and returns what to journal
-        /// about it; then the shared context forgets the rows, and one journal row records the delete. A scenario already
-        /// gone (deleted from another tab) counts as deleted, and is not journaled a second time.
+        /// If the database refuses, nothing is deleted, the user is told and null is returned. Once the transaction has
+        /// committed nothing reports a failure: <paramref name="afterDelete"/> runs at once, with no await before it (the
+        /// layout takes the scenario off its list there, so nothing resolves it in the meantime, and moves its folder to
+        /// the trash - only once the row is gone), and returns what to journal about it; then one journal row records the
+        /// delete. A scenario already gone (deleted from another tab) counts as deleted, and is not journaled a second time.
+        ///
+        /// The circuit's shared context is never touched, on success as on refusal. That holds because every page reads
+        /// and saves the scenario area (the scenario, its charges scéniques, its Charpente, its elements and their ChargeMP)
+        /// through contexts of its own: a page that read these tables through the shared context again would keep a
+        /// deleted scenario's rows there.
         /// </summary>
         public async Task<ScenarioDeletion?> DeleteScenarioAsync(EventMpscenario scenario, Func<string?>? afterDelete = null)
         {
             Guid scenarioId = scenario.EventMpscenarioId;
             Guid eventId = scenario.EventId;
-            string target = Describe(scenario);   // before: afterwards the instance is detached
+            string target = Describe(scenario);   // the journal's name for it
             DeletedRows rows;
             try
             {
                 rows = await RunOwnedDeleteAsync(async (db, d) =>
                 {
-                    await d.Step(db.ChargeMps.Where(c => c.MotherGridPalonnier.EventMpscenarioId == scenarioId), c => c.ChargeMpid);
-                    await d.Step(db.MotherGridPalonniers.Where(m => m.EventMpscenarioId == scenarioId), m => m.MotherGridPalonnierId);
-                    await d.Step(db.ChargesSceniques.Where(c => c.EventMpscenarioId == scenarioId), c => c.ChargesSceniqueId);
-                    await d.Step(db.Charpentes.Where(c => c.EventMpscenarioId == scenarioId), c => c.CharpenteId);
-                    await d.Step(db.EventMpscenarios.Where(s => s.EventMpscenarioId == scenarioId), s => s.EventMpscenarioId);
+                    await d.Delete(db.ChargeMps.Where(c => c.MotherGridPalonnier.EventMpscenarioId == scenarioId));
+                    await d.Delete(db.MotherGridPalonniers.Where(m => m.EventMpscenarioId == scenarioId));
+                    await d.Delete(db.ChargesSceniques.Where(c => c.EventMpscenarioId == scenarioId));
+                    await d.Delete(db.Charpentes.Where(c => c.EventMpscenarioId == scenarioId));
+                    await d.Delete(db.EventMpscenarios.Where(s => s.EventMpscenarioId == scenarioId));
                 });
             }
             catch (Exception ex)
@@ -77,11 +84,9 @@ namespace AliantWebS.Data
                 return null;
             }
 
-            // Forgotten even when it was already gone (deleted from another tab): what this circuit still holds of it goes too.
-            rows.Include<EventMpscenario>(scenarioId);
             var deleted = new ScenarioDeletion(rows.Count<ChargesScenique>(), rows.Count<MotherGridPalonnier>(),
                                                rows.Count<ChargeMp>(), rows.Count<Charpente>());
-            string? afterwards = await AfterOwnedDeleteAsync(rows, afterDelete, target);
+            string? afterwards = RunAfterDelete(afterDelete, target);
 
             // One row for the scenario and what went with it - the cascade is part of the one user action - under its
             // event. None when the scenario was already gone: whoever deleted it has journaled it.
@@ -100,9 +105,10 @@ namespace AliantWebS.Data
         /// equipments (each placed for this event) with their attributes, its axes and its links to load cases - as ONE
         /// change, children first, through a context of its own, as DeleteScenarioAsync does; the old single DELETE was
         /// refused as soon as one scenario had charges scéniques. Not the event's, and left alone: its structure, the
-        /// load cases themselves, the elements, the types, the journal. Same contract as DeleteScenarioAsync: null and
-        /// nothing changed when refused; once committed, <paramref name="afterDelete"/> (the event's folder to the trash),
-        /// then the shared context forgets the rows, then one journal row - none when the event was already gone.
+        /// load cases themselves, the elements, the types, the journal. Null and nothing changed when refused; once
+        /// committed, <paramref name="afterDelete"/> (the event's folder to the trash), then the shared context forgets
+        /// the rows, then one journal row - none when the event was already gone. Unlike a scenario delete, the rows are
+        /// forgotten by the shared context, because pages still read the event, its equipments and its axes through it.
         /// </summary>
         public async Task<EventDeletion?> DeleteEventAsync(Event eventt, Func<string?>? afterDelete = null)
         {
@@ -114,7 +120,8 @@ namespace AliantWebS.Data
             {
                 rows = await RunOwnedDeleteAsync(async (db, d) =>
                 {
-                    // Its scenarios: DeleteScenarioAsync's statements, for every scenario of the event at once.
+                    // Its scenarios: DeleteScenarioAsync's statements, for every scenario of the event at once, with the
+                    // keys of their rows for the shared context to forget.
                     await d.Step(db.ChargeMps.Where(c => c.MotherGridPalonnier.EventMpscenario.EventId == eventId), c => c.ChargeMpid);
                     await d.Step(db.MotherGridPalonniers.Where(m => m.EventMpscenario.EventId == eventId), m => m.MotherGridPalonnierId);
                     await d.Step(db.ChargesSceniques.Where(c => c.EventMpscenario.EventId == eventId), c => c.ChargesSceniqueId);
@@ -136,7 +143,7 @@ namespace AliantWebS.Data
                 return null;
             }
 
-            rows.Include<Event>(eventId);   // forgotten even when it was already gone, as for a scenario
+            rows.Include<Event>(eventId);   // forgotten even when it was already gone (deleted from another tab)
             var deleted = new EventDeletion(rows.Count<EventMpscenario>(), rows.Count<ChargesScenique>(),
                                             rows.Count<MotherGridPalonnier>(), rows.Count<ChargeMp>(), rows.Count<Charpente>(),
                                             rows.Count<Equipement>(), rows.Count<AttributeEquipement>(), rows.Count<Axe>(),
@@ -155,9 +162,10 @@ namespace AliantWebS.Data
             return deleted;
         }
 
-        /// <summary>What an owned delete removed: how many rows per table, and the keys of those rows per entity type, read
-        /// in the transaction just before each DELETE (rows this circuit never loaded included - their tracked dependents
-        /// must go too).</summary>
+        /// <summary>What an owned delete removed: how many rows per table and, for the deletes whose rows the shared context
+        /// must forget (Step: the event and tree deletes), the keys of those rows per entity type, read in the transaction
+        /// just before each DELETE (rows this circuit never loaded included - their tracked dependents must go too).
+        /// Delete only counts.</summary>
         private sealed class DeletedRows
         {
             private readonly IModel model;
@@ -173,10 +181,15 @@ namespace AliantWebS.Data
             public HashSet<object> KeysOf<T>() =>
                 Keys.TryGetValue(model.FindEntityType(typeof(T))!.Name, out var set) ? new HashSet<object>(set) : new HashSet<object>();
 
+            /// <summary>Deletes these rows and counts them.</summary>
+            public async Task Delete<T>(IQueryable<T> rows) where T : class =>
+                counts[typeof(T)] = Count<T>() + await rows.ExecuteDeleteAsync();
+
+            /// <summary>Reads the keys of these rows, for the shared context to forget, then deletes them (Delete).</summary>
             public async Task Step<T>(IQueryable<T> rows, System.Linq.Expressions.Expression<Func<T, Guid>> key) where T : class
             {
                 foreach (var k in await rows.Select(key).ToListAsync()) Include<T>(k);
-                counts[typeof(T)] = Count<T>() + await rows.ExecuteDeleteAsync();
+                await Delete(rows);
             }
 
             /// <summary>A row the shared context must forget as deleted - also when this delete found it already gone.</summary>
@@ -194,10 +207,11 @@ namespace AliantWebS.Data
         /// unit runs inside it, and a retry replays it from the start with fresh keys.
         ///
         /// Off the circuit's thread, as « Générer l'implantation » runs (AntaresConceptionLayout.GenerateLayout): while the
-        /// transaction holds its locks, a page redrawn on the circuit reads these tables synchronously through the shared
-        /// context and would block on them, and the transaction's next step would be queued behind that read on the same
-        /// thread - a freeze until the command timeout, then the circuit ends. Off the thread, such a read simply waits
-        /// the few milliseconds until the commit. Only the owned context is touched in there.
+        /// transaction holds its locks, a page redrawn on the circuit reads the tables an event or tree delete removes
+        /// synchronously through the shared context and would block on them, and the transaction's next step would be
+        /// queued behind that read on the same thread - a freeze until the command timeout, then the circuit ends. Off the
+        /// thread, such a read simply waits the few milliseconds until the commit. Only the owned context is touched in
+        /// there. The scenario delete, whose tables no page reads that way any more, shares the path.
         /// </summary>
         private Task<DeletedRows> RunOwnedDeleteAsync(Func<AliantWebContext, DeletedRows, Task> statements) =>
             Task.Run(async () =>
@@ -215,21 +229,32 @@ namespace AliantWebS.Data
             });
 
         /// <summary>
-        /// After an owned delete committed - nothing here reports a failure: <paramref name="afterDelete"/> at once, then
-        /// the shared context forgets the deleted rows, like every other method here touches it: after the other users of
-        /// it. Returns what afterDelete said, to journal.
+        /// After an owned delete committed - nothing here reports a failure: <paramref name="afterDelete"/> at once, and
+        /// what it said, to journal. Its failure is only logged: the rows are gone whatever it does, and the journal then
+        /// says nothing of it.
         /// </summary>
-        private async Task<string?> AfterOwnedDeleteAsync(DeletedRows rows, Func<string?>? afterDelete, string target)
+        private static string? RunAfterDelete(Func<string?>? afterDelete, string target)
         {
-            string? afterwards = null;
             try
             {
-                afterwards = afterDelete?.Invoke();
+                return afterDelete?.Invoke();
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[EntitiesService] {target} deleted; what follows the delete failed: {ex.Message}");
+                return null;
             }
+        }
+
+        /// <summary>
+        /// After an owned event or tree delete committed (DeleteEventAsync, DeleteElementsAsync) - nothing here reports a
+        /// failure: <paramref name="afterDelete"/> at once (RunAfterDelete), then the shared context forgets the deleted
+        /// rows, like every other method here touches it: after the other users of it. Returns what afterDelete said, to
+        /// journal.
+        /// </summary>
+        private async Task<string?> AfterOwnedDeleteAsync(DeletedRows rows, Func<string?>? afterDelete, string target)
+        {
+            string? afterwards = RunAfterDelete(afterDelete, target);
 
             for (int i = 0; i < retrys; i++)
             {
