@@ -1,0 +1,16 @@
+@* What could not be read, and why, where an empty graph, a 0 % gauge or an uncoloured plan would otherwise pass for
+   real values. Renders nothing without a message. Cover lays it over its whole area (the parent must be position:
+   relative), so the stale or empty content under it cannot be read; otherwise it is a banner in the page's flow. *@
+@if (!string.IsNullOrEmpty(Message))
+{
+    <div class="read-failure @(Cover ? "cover" : "banner")" role="alert">
+        <strong>⚠ @Title</strong>
+        <span>@Message</span>
+    </div>
+}
+
+@code {
+    [Parameter] public string Title { get; set; } = "Les mesures n'ont pas pu être lues";
+    [Parameter] public string Message { get; set; }
+    [Parameter] public bool Cover { get; set; } = true;
+}

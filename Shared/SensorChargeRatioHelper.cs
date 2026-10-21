@@ -106,6 +106,7 @@ namespace AliantWebS.Data
         /// <summary>
         /// Per-sensor MAX weight over [startDate, endDate], keyed by ElementId (raw measured value,
         /// same units as the channel). Empty when there are no sensors / no weight channel / no data.
+        /// Throws when InfluxDB cannot be read: an empty map would pass for "nothing measured".
         /// </summary>
         public static async Task<Dictionary<Guid, double>> MaxWeightsAsync(
             IReadOnlyCollection<Element> shackleSensors,
@@ -122,29 +123,20 @@ namespace AliantWebS.Data
             var sensorIds = shackleSensors.Select(s => s.ElementId.ToString()).ToList();
             var channelIds = new List<string> { weightChannelDataType.ChannelDataTypeId.ToString() };
 
-            try
-            {
-                // One aggregated max per sensor over the whole [startDate, endDate] window.
-                var maxData = await InfluxService.GetData(
-                    sensorIds, channelIds, startDate, endDate, ReportsService.BucketName,
-                    aggregateWindowDuration: "36500d", aggregateFn: "max",
-                    cancellationToken: cancellationToken);
+            // One aggregated max per sensor over the whole [startDate, endDate] window.
+            var maxData = await InfluxService.GetData(
+                sensorIds, channelIds, startDate, endDate, ReportsService.BucketName,
+                aggregateWindowDuration: "36500d", aggregateFn: "max",
+                cancellationToken: cancellationToken);
 
-                if (maxData == null || maxData.Count == 0) return maxWeights;
+            var perSensorMax = maxData
+                .Where(r => r[2] != null)
+                .GroupBy(r => (string)r[1])
+                .ToDictionary(g => g.Key, g => g.Max(r => (double)r[2]));
 
-                var perSensorMax = maxData
-                    .Where(r => r[2] != null)
-                    .GroupBy(r => (string)r[1])
-                    .ToDictionary(g => g.Key, g => g.Max(r => (double)r[2]));
-
-                foreach (var kvp in perSensorMax)
-                    if (Guid.TryParse(kvp.Key, out var sensorId))
-                        maxWeights[sensorId] = kvp.Value;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error computing sensor max weights: {ex.Message}");
-            }
+            foreach (var kvp in perSensorMax)
+                if (Guid.TryParse(kvp.Key, out var sensorId))
+                    maxWeights[sensorId] = kvp.Value;
 
             return maxWeights;
         }
@@ -152,7 +144,7 @@ namespace AliantWebS.Data
         /// <summary>
         /// Per-sensor charge ratio = (max value over [startDate, endDate]) / that sensor's own alarm
         /// threshold for the channel, keyed by ElementId. Sensors with no threshold are omitted —
-        /// there is no default rated load to fall back on.
+        /// there is no default rated load to fall back on. Throws when InfluxDB cannot be read.
         /// </summary>
         public static async Task<Dictionary<Guid, double>> ComputeAsync(
             IDbContextFactory<AliantWebContext> dbContextFactory,

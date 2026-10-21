@@ -234,7 +234,17 @@
         {
             var (start, end) = GetPeriodRange(selectedPeriod);
 
-            var chargeNodale = await BuildMeasuredChargeNodaleAsync(start, end);
+            Dictionary<Guid, (int dof, double value)> chargeNodale;
+            try
+            {
+                chargeNodale = await BuildMeasuredChargeNodaleAsync(start, end);
+            }
+            catch (Exception ex)
+            {
+                // Unreadable is not "no load": say so instead of "Aucune charge mesurée".
+                statusMessage = $"Les mesures n'ont pas pu être lues : {ex.Message}";
+                return;
+            }
             if (chargeNodale.Count == 0)
             {
                 statusMessage = "Aucune charge mesurée sur la période.";

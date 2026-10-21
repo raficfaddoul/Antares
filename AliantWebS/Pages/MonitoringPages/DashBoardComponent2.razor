@@ -78,6 +78,8 @@
                                         @bind-Value="@selectedSensorTypeId" Change="@OnSensorTypeChanged"
                                         Style="width: 220px;" />
                     </div>
+                    @* The gauges and their notice; the dropdowns above stay usable to try another period. *@
+                    <div style="flex: 1; position: relative; display: flex; min-height: 0;">
                     <RadzenSplitter Orientation="Radzen.Orientation.Horizontal" style="flex: 1; border: 1px solid rgba(0,0,0,.08);">
                         <RadzenSplitterPane Size="33%">
                             <div style="display: flex; flex-direction: column; align-items: center; width: 100%; height: 100%;">
@@ -100,6 +102,8 @@
                             </div>
                         </RadzenSplitterPane>
                     </RadzenSplitter>
+                    <ReadFailureNotice Message="@gaugesError" />
+                    </div>
                 </div>
 
             </RadzenSplitterPane>
@@ -107,6 +111,7 @@
             <RadzenSplitterPane Size="70%">
                 <div class="svg-container" style="height: 100%;">
 
+                    <ReadFailureNotice Title="Couleurs de charge indisponibles : les mesures n'ont pas pu être lues" Message="@ratiosError" Cover="false" />
                     <AliantWebS.Pages.CADPages.SVGComponent
                         @ref="svgComponent"
                         Mode="AliantWebS.Pages.CADPages.PlanMode.View"
@@ -143,6 +148,7 @@
                 </div>
                 <div style="flex: 1; min-height: 320px; position: relative;">
                     <IndicesInTimeComponent GraphId="g2" @ref="iitc" Headers="headers" Indices="indices"></IndicesInTimeComponent>
+                    <ReadFailureNotice Message="@chargeError" />
                 </div>
             </RadzenSplitterPane>
 
@@ -156,6 +162,7 @@
                 </div>
                 <div style="flex: 1; min-height: 320px; position: relative;">
                     <IndicesInTimeComponent GraphId="g3" @ref="iitc2" Headers="headers2" Indices="indices2"></IndicesInTimeComponent>
+                    <ReadFailureNotice Message="@graph3Error" />
                 </div>
             </RadzenSplitterPane>
 
@@ -171,6 +178,9 @@
     private bool dataLoaded = false;
     private bool gaugesRendered = false;
     private bool chartsRendered = false;
+
+    // What could not be read, per area, shown over it instead of 0 % or an empty graph (null when it was read).
+    string gaugesError, chargeError, graph3Error, ratiosError;
 
     private int value1;
     private int value2;
@@ -276,10 +286,20 @@
     /// </summary>
     private async Task ComputeSensorChargeRatios()
     {
-        // Fixed reference period (e.g. 1y) → "worst case" colour. See SensorChargeRatioHelper.
-        sensorChargeRatios = await SensorChargeRatioHelper.ComputeAsync(
-            dbContextFactory, shackleSensors, weightChannelDataType,
-            GetStartDateFromRange(selectedRefPeriod), DateTime.UtcNow, _cts.Token);
+        ratiosError = null;
+        try
+        {
+            // Fixed reference period (e.g. 1y) → "worst case" colour. See SensorChargeRatioHelper.
+            sensorChargeRatios = await SensorChargeRatioHelper.ComputeAsync(
+                dbContextFactory, shackleSensors, weightChannelDataType,
+                GetStartDateFromRange(selectedRefPeriod), DateTime.UtcNow, _cts.Token);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error computing shackle charge ratios: {ex.Message}");
+            sensorChargeRatios = new Dictionary<Guid, double>();
+            ratiosError = ex.Message;
+        }
     }
 
     // Heavy data load — invoked from OnAfterRenderAsync(firstRender), NOT OnInitializedAsync, because
@@ -504,6 +524,7 @@
     /// </summary>
     private async Task ComputeGaugeIndicators()
     {
+        gaugesError = null;
         if (shackleSensors.Count == 0 || weightChannelDataType == null)
         {
             value1 = 0; value2 = 0; value3 = 0;
@@ -598,7 +619,8 @@
         catch (Exception ex)
         {
             Console.WriteLine($"Error computing gauge indicators: {ex.Message}");
-            value1 = 0; value2 = 0; value3 = 0;
+            value1 = 0; value2 = 0; value3 = 0;   // drawn under gaugesError's notice, never read as 0 %
+            gaugesError = ex.Message;
         }
     }
 
@@ -633,6 +655,7 @@
     {
         indices.Clear();
         chargePeakNotes = null;
+        chargeError = null;
         if (headers.Count > 1)
             headers.RemoveRange(1, headers.Count - 1);
 
@@ -654,6 +677,7 @@
         catch (Exception ex)
         {
             Console.WriteLine($"Error querying InfluxDB for shackle data: {ex.Message}");
+            chargeError = ex.Message;
             return;
         }
 
@@ -767,6 +791,7 @@
     private async Task LoadGraph3Data()
     {
         indices2.Clear();
+        graph3Error = null;
         if (headers2.Count > 1)
             headers2.RemoveRange(1, headers2.Count - 1);
 
@@ -806,6 +831,7 @@
         catch (Exception ex)
         {
             Console.WriteLine($"Error querying InfluxDB for graph3 data: {ex.Message}");
+            graph3Error = ex.Message;
             return;
         }
 

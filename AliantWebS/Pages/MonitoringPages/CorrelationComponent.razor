@@ -38,6 +38,8 @@
     }
 </style>
 
+<ReadFailureNotice Message="@readError" Cover="false" />
+
 <div style="margin-bottom: 1rem; padding: 1rem; background: white; border-radius: 8px;">
     <div style="display: flex; gap: 1rem; align-items: end;">
         <div>
@@ -148,6 +150,7 @@
     public List<(string, Dictionary<DateTime, double>)> indices = new List<(string, Dictionary<DateTime, double>)>();
     private List<List<double>> correlationMatrix;
     private List<string> excludedSensors = new List<string>();
+    private string readError;   // a sensor whose readings could not be read (null when all were)
     private string selectedDateRange { get; set; } = "LastWeek";
 
     private async Task HandleBatchPlot((List<(Element sensor, ChannelDataType channelDataType)> pairs, DateTime startDate, DateTime endDate) args)
@@ -160,6 +163,7 @@
             indices.Clear();
             correlationMatrix = null;
             excludedSensors.Clear();
+            readError = null;
             StateHasChanged();
             return;
         }
@@ -167,19 +171,35 @@
         headers.Clear();
         indices.Clear();
         excludedSensors.Clear();
+        readError = null;
 
         // Fetch each sensor separately to ensure we get all data
         foreach (var (sensor, channelDataType) in sensorChannelPairs)
         {
             var bucketName = ReportsService.BucketName;
-            var rawData = await InfluxService.GetData(
-                new List<string> { sensor.ElementId.ToString() },
-                new List<string> { channelDataType.ChannelDataTypeId.ToString() },
-                receivedStartDate,
-                receivedEndDate,
-                bucketName,
-                maxDataPoints: 1000
-            );
+            List<object[]> rawData;
+            try
+            {
+                rawData = await InfluxService.GetData(
+                    new List<string> { sensor.ElementId.ToString() },
+                    new List<string> { channelDataType.ChannelDataTypeId.ToString() },
+                    receivedStartDate,
+                    receivedEndDate,
+                    bucketName,
+                    maxDataPoints: 1000
+                );
+            }
+            catch (Exception ex)
+            {
+                // A sensor that could not be read is not one with no data: no matrix rather than one without it.
+                headers.Clear();
+                indices.Clear();
+                excludedSensors.Clear();
+                correlationMatrix = null;
+                readError = $"{sensor.Name} : {ex.Message}";
+                StateHasChanged();
+                return;
+            }
 
             var dic = new Dictionary<DateTime, double>();
             foreach (var row in rawData)

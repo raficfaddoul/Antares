@@ -309,6 +309,7 @@
                                         🎯 Click on SVG to position sensor
                                     </div>
                                 }
+                                <ReadFailureNotice Title="Couleurs de charge indisponibles : les mesures n'ont pas pu être lues" Message="@chargeRatiosError" Cover="false" />
                                 <AliantWebS.Pages.CADPages.SVGComponent
                                     @ref="svgComponent"
                                     Mode="@(isPositioningMode ? AliantWebS.Pages.CADPages.PlanMode.PlaceSensor : AliantWebS.Pages.CADPages.PlanMode.View)"
@@ -380,6 +381,7 @@
     private string selectedDateRange { get; set; } = "LastDay";
     private bool isLoadingData = false;
     private string loadingMessage = "";
+    private string chargeRatiosError;   // the plan's charge colours could not be read (null when they were)
     private int maxDataPoints { get; set; } = 1000;
 
     DateTime startDate { get; set; } = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc);
@@ -451,8 +453,19 @@
     // Recompute the manille charge-ratio colour map over the page's current date range.
     private async Task ComputeChargeRatios()
     {
-        sensorChargeRatios = await SensorChargeRatioHelper.ComputeAsync(
-            dbContextFactory, shackleSensors, weightChannelDataType, startDate, endDate);
+        chargeRatiosError = null;
+        try
+        {
+            sensorChargeRatios = await SensorChargeRatioHelper.ComputeAsync(
+                dbContextFactory, shackleSensors, weightChannelDataType, startDate, endDate);
+        }
+        catch (Exception ex)
+        {
+            // Also runs while the page is prerendered, where no alert can be shown: the notice above the plan says it.
+            Console.WriteLine($"Error computing shackle charge ratios: {ex.Message}");
+            sensorChargeRatios = new Dictionary<Guid, double>();
+            chargeRatiosError = ex.Message;
+        }
         StateHasChanged();                                  // parent re-renders → SVG gets new ratios
         if (svgComponent != null)
             await svgComponent.RefreshVisualization();      // force the SVG to repaint the colours

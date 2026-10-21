@@ -749,6 +749,11 @@ public static string AggregateWindowClause(string? every, string? fn)
     return $"|> aggregateWindow(every: {every}{calendarWeek}, fn: {fn}, createEmpty: false)";
 }
 
+/// <summary>
+/// One row per time and sensor: [0] time (UTC), [1] sensor id, [2..] the channels' values. Throws
+/// InvalidOperationException when InfluxDB cannot be read (timeout, refused token, failed query): callers show that
+/// the data could not be read, never an empty result.
+/// </summary>
 static public async Task<List<object[]>> GetData(
     List<string> sensorsIds,
     List<string> channelsIds,
@@ -908,6 +913,7 @@ static public async Task<List<object[]>> GetData(
 
     var queryApi = client.GetQueryApi();
 
+    Exception? failure = null;
     await queryApi.QueryAsync(flux, record =>
     {
         var array = new object[channelsIds.Count() + 2];
@@ -928,11 +934,17 @@ static public async Task<List<object[]>> GetData(
 
     }, exception =>
     {
-        Console.WriteLine($"Error occurred: {exception.Message}");
+        failure = exception;
     }, () =>
     {
         // Query completed
     }, orgId, cancellationToken);
+
+    // A failed read is not an empty one: InfluxDB's error (a timeout, a refused token, a bad query) goes to the
+    // caller, never a short or empty list that would pass for "no measurements".
+    cancellationToken.ThrowIfCancellationRequested();
+    if (failure != null)
+        throw new InvalidOperationException($"InfluxDB query failed: {failure.Message}", failure);
 
     Console.WriteLine($"Influx returned {ll.Count} row(s) for {sensorsIds.Count} sensor(s) / {channelsIds.Count} channel(s).");
 

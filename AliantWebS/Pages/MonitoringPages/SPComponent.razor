@@ -35,6 +35,8 @@
 
 <NavigationLock OnBeforeInternalNavigation="appData.OnBeforeInternalNavigation" ConfirmExternalNavigation="appData.SaveConfirmation&& appData.SaveChanges" />
 
+<ReadFailureNotice Message="@readError" Cover="false" />
+
 @if (somethingToPresent)
 {
     @if (channelDataTypeList is null)
@@ -607,10 +609,25 @@
 
     }
 
+    // The sensor's readings, or null when InfluxDB could not give them: the banner says so and nothing is plotted.
+    // A banner, not an alert: re-plotting every selected sensor would raise one alert per sensor.
     private async Task<List<object[]>> GetLa(Element element, ChannelDataType channelDataType)
     {
-        return await InfluxService.GetData(new List<string>() { element.ElementId.ToString() }, new List<string>() { channelDataType.ChannelDataTypeId.ToString() }, startDate, endDate);
+        try
+        {
+            var readings = await InfluxService.GetData(new List<string>() { element.ElementId.ToString() }, new List<string>() { channelDataType.ChannelDataTypeId.ToString() }, startDate, endDate);
+            readError = null;
+            return readings;
+        }
+        catch (Exception ex)
+        {
+            readError = $"{element.Name} : {ex.Message}";
+            await InvokeAsync(StateHasChanged);   // one caller does not await ploti
+            return null;
+        }
     }
+
+    string readError;   // the last reading that failed (cleared by the next one that succeeds)
 
     private async Task<(IList<object> X, IList<object> Y)> GetXY(Element sensor, ChannelDataType channelDataType)
     {
@@ -668,6 +685,7 @@
             if (selectedChartsTypes.Contains("TimeDomain") && selectedSourceTypes.Contains("History"))
             {
                 List<object[]> la = await GetLa(sensor, channelDataType);
+                if (la == null) return;
 
                 IList<object> X = la.Select(x => x[0]).ToList();
                 IList<object> Y = la.Select(x => x[2]).ToList();
@@ -709,6 +727,7 @@
             if (selectedChartsTypes.Contains("Fourier") && selectedSourceTypes.Contains("History"))
             {
                 List<object[]> la = await GetLa(sensor, channelDataType);
+                if (la == null) return;
 
                 IList<object> Y = la.Select(x => x[2]).ToList();
                 IList<object> X = Enumerable.Range(1, Y.Count()).Select(i => (object)i).ToList();

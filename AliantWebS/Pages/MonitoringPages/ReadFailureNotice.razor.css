@@ -1,0 +1,27 @@
+.read-failure {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    background: #fff5f5;
+    color: #742a2a;
+    border: 1px solid #fc8181;
+    border-left: 5px solid #c53030;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+/* Over the area, under the page's loading overlay (z-index 1000). */
+.read-failure.cover {
+    position: absolute;
+    inset: 0;
+    z-index: 900;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+
+.read-failure.banner {
+    margin: 6px 8px;
+}
