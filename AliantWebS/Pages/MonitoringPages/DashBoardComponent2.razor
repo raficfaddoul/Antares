@@ -685,7 +685,7 @@
         {
             var bucketName = ReportsService.BucketName;
             rawData = await InfluxService.GetData(sensorIds, channelIds, startDate, endDate, bucketName,
-                aggregateWindowDuration: "1w", aggregateFn: "max", cancellationToken: _cts.Token);
+                aggregateWindowDuration: InfluxService.WeeklyWindow, aggregateFn: "max", cancellationToken: _cts.Token);
         }
         catch (Exception ex)
         {
@@ -758,7 +758,7 @@
         {
             var bucketName = ReportsService.BucketName;
             rawData = await InfluxService.GetData(sensorIds, channelIds, startDate, endDate, bucketName,
-                aggregateWindowDuration: "1w", aggregateFn: "max", cancellationToken: _cts.Token);
+                aggregateWindowDuration: InfluxService.WeeklyWindow, aggregateFn: "max", cancellationToken: _cts.Token);
         }
         catch (Exception ex)
         {
@@ -913,7 +913,7 @@
         {
             var bucketName = ReportsService.BucketName;
             rawData = await InfluxService.GetData(sensorIds, channelIds, startDate, endDate, bucketName,
-                aggregateWindowDuration: "1w", aggregateFn: "max", cancellationToken: _cts.Token);
+                aggregateWindowDuration: InfluxService.WeeklyWindow, aggregateFn: "max", cancellationToken: _cts.Token);
         }
         catch (Exception ex)
         {

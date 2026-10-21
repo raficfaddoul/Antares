@@ -722,6 +722,25 @@ from(bucket: ""{bucketName}"")
     }
 }
 
+/// <summary>The window of the dashboard's weekly graphs: one point per calendar week, see <see cref="AggregateWindowClause"/>.</summary>
+public const string WeeklyWindow = "1w";
+
+/// <summary>
+/// The Flux aggregateWindow step. Weekly windows are calendar weeks, Monday 00:00 to Sunday 23:59 UTC, each row
+/// dated by its own week's start: Flux counts windows from the Unix epoch, a Thursday, and dates a row by its
+/// window's end, so a plain "1w" gave Thursday-to-Wednesday weeks filed under the following Monday. A first
+/// week cut by the range is dated by the range start, which still falls in that week.
+/// A missing window or function throws: it would otherwise reach InfluxDB as an unreadable query.
+/// </summary>
+public static string AggregateWindowClause(string? every, string? fn)
+{
+    ArgumentException.ThrowIfNullOrEmpty(every);
+    ArgumentException.ThrowIfNullOrEmpty(fn);
+
+    string calendarWeek = every == WeeklyWindow ? @", offset: -3d, timeSrc: ""_start""" : "";
+    return $"|> aggregateWindow(every: {every}{calendarWeek}, fn: {fn}, createEmpty: false)";
+}
+
 static public async Task<List<object[]>> GetData(
     List<string> sensorsIds,
     List<string> channelsIds,
@@ -773,7 +792,7 @@ static public async Task<List<object[]>> GetData(
         // Explicit aggregation window and function take priority
         aggEvery = aggregateWindowDuration;
         aggFn = aggregateFn;
-        aggregationClause = $@"|> aggregateWindow(every: {aggregateWindowDuration}, fn: {aggregateFn}, createEmpty: false)";
+        aggregationClause = AggregateWindowClause(aggregateWindowDuration, aggregateFn);
         Console.WriteLine($"Applying server-side aggregation: every {aggregateWindowDuration}, fn: {aggregateFn}");
     }
     else if (maxDataPoints.HasValue && maxDataPoints.Value > 0)
@@ -812,7 +831,7 @@ static public async Task<List<object[]>> GetData(
         // load spikes survive downsampling and remain visible on the plotted curves.
         aggEvery = windowDuration;
         aggFn = "max";
-        aggregationClause = $@"|> aggregateWindow(every: {windowDuration}, fn: max, createEmpty: false)";
+        aggregationClause = AggregateWindowClause(windowDuration, "max");
 
         Console.WriteLine($"Applying downsampling: {windowDuration} window for ~{maxDataPoints} points");
     }
@@ -838,7 +857,7 @@ static public async Task<List<object[]>> GetData(
         string BranchQuery(SensorCalibration.SplitBranch b) => $@"from(bucket:""{bucket}"")
         |> range(start: {startDateStr}, stop: {endDateStr})
         |> filter(fn: (r) => {b.Filter})
-        |> aggregateWindow(every: {aggEvery}, fn: {b.Fn}, createEmpty: false)";
+        {AggregateWindowClause(aggEvery, b.Fn)}";
 
         if (plan.Branches.Count == 1)
         {
