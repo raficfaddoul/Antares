@@ -430,15 +430,17 @@ function legendWithPointNotes(data) {
 
 // The visible series whose drawn line passes within CURVE_TOOLTIP_DISTANCE pixels of (x, y), the nearest
 // one if several do, as { name, point }: point is that series' sample nearest along its line, a layout
-// point whose idx is the row. null when no line is that close or (x, y) is outside the plotting area
-// (axes, range selector). x and y are pixels from the top-left corner of dygraph's canvas, as its layout
-// points and the coordinates it hands to findClosestPoint are.
+// point whose idx is the row. null when no line is that close or (x, y) is more than CURVE_TOOLTIP_DISTANCE
+// outside the plotting area (axes, range selector): a range's first and last points lie on the area's edges,
+// and are reached from outside too. x and y are pixels from the top-left corner of dygraph's canvas, as its
+// layout points and the coordinates it hands to findClosestPoint are.
 function findCurveAt(g, x, y) {
     const layout = g.layout_;
     if (!layout || !layout.points) return null;
 
     const area = g.getArea();
-    if (x < area.x || x > area.x + area.w || y < area.y || y > area.y + area.h) return null;
+    const margin = CURVE_TOOLTIP_DISTANCE;
+    if (x < area.x - margin || x > area.x + area.w + margin || y < area.y - margin || y > area.y + area.h + margin) return null;
 
     let best = null;
     for (let s = 0; s < layout.points.length; s++) {
