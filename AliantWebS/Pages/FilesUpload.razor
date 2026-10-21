@@ -1,5 +1,4 @@
-﻿@page "/FilesUpload/{j:int}"
-@using System
+﻿@using System
 @using System.IO
 @using Microsoft.AspNetCore.Hosting
 @using Microsoft.Extensions.Logging
@@ -8,6 +7,7 @@
 @inject ILogger<FilesUpload> Logger
 @inject IWebHostEnvironment Environment
 @inject AliantWebS.Data.AppData AppData
+@inject IStringLocalizer<Languages> L
 
 <h3>Upload Files</h3>
 
@@ -50,6 +50,16 @@ else
     </ul>
 }
 
+@if (problems.Count > 0)
+{
+    <ul class="text-danger">
+        @foreach (var problem in problems)
+        {
+            <li>@problem</li>
+        }
+    </ul>
+}
+
 @code {
     private List<IBrowserFile> loadedFiles = new();
     private long maxFileSize = 1024 * 1024 * 15;
@@ -71,7 +81,6 @@ else
     protected override async Task OnInitializedAsync()
     {
 
-
         await LoadFiles(e);
 
     }
@@ -79,8 +88,11 @@ else
 
     static public string PreparePath(string fileName, object obj, string path)
     {
-        const int charactersFromGuid = 10; 
+        const int charactersFromGuid = 10;
 
+        // The name comes from the browser: keep only its last segment, so "../x" or "/app/x" cannot leave the folder.
+        fileName = Path.GetFileName((fileName ?? "").Replace('\\', '/'));
+        if (fileName.Length == 0 || fileName == "." || fileName == "..") return string.Empty;
 
         var tupleResult = FileManagementService.GetFilesLocation(obj, path);
 
@@ -120,52 +132,104 @@ else
 
         }
 
+        // Belt and braces: whatever the name, the file must end up inside the item's folder.
+        if (fullPath.Length > 0 &&
+            !Path.GetFullPath(fullPath).StartsWith(Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.Ordinal))
+            return string.Empty;
 
         return fullPath;
     }
 
+    // What each folder may receive. wwwroot/data is served by the site itself: an .html, .svg or .js put there would run
+    // in the app's own origin for anyone who opens its link (stored XSS). So each folder takes only the types its pages
+    // read - the BIM viewer's models, the sensor pages' CSV files - and a folder not listed takes nothing.
+    public static readonly IReadOnlyDictionary<string, string[]> AllowedExtensions =
+        new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["wwwroot/data"] = new[] { ".ifc", ".ifczip", ".ifcxml", ".wexbim" },
+            ["CSVs"] = new[] { ".csv" },
+        };
+
+    public static string[] AllowedIn(string folder) =>
+        folder != null && AllowedExtensions.TryGetValue(folder.Replace('\\', '/').Trim('/'), out var allowed) ? allowed : Array.Empty<string>();
+
+    public static bool IsAllowed(string folder, string fileName) =>
+        AllowedIn(folder).Contains(Path.GetExtension(fileName ?? ""), StringComparer.OrdinalIgnoreCase);
+
+    private readonly List<string> problems = new();
+
     public async Task LoadFiles(InputFileChangeEventArgs e)
     {
-      
-
         isLoading = true;
         loadedFiles.Clear();
+        problems.Clear();
         progressPercent = 0;
 
-
-        foreach (var file in e.GetMultipleFiles(maxAllowedFiles))
+        IReadOnlyList<IBrowserFile> files;
+        try
         {
+            files = e.GetMultipleFiles(maxAllowedFiles);
+        }
+        catch (InvalidOperationException)
+        {
+            problems.Add(L["At most {0} files at a time.", maxAllowedFiles]);
+            isLoading = false;
+            return;
+        }
+
+        foreach (var file in files)
+        {
+            if (!IsAllowed(Folder, file.Name))
+            {
+                Logger.LogWarning("Upload refused: {File} is not a type the folder {Folder} accepts", file.Name, Folder);
+                problems.Add(L["{0}: this type of file is not accepted here (only {1}).", file.Name, string.Join(", ", AllowedIn(Folder))]);
+                continue;
+            }
+            string temp = string.Empty;
             try
             {
                 string path = Path.Combine(Environment.ContentRootPath, Folder);
 
-                string fullPath = PreparePath(file.Name,obj,path);
-
-
-                await using FileStream writeStream = new(fullPath, FileMode.Create);
-                using var readStream = file.OpenReadStream(maxFileSize);
-                var bytesRead = 0;
-                var totalRead = 0;
-                var buffer = new byte[1024 * 10];
-
-                while ((bytesRead = await readStream.ReadAsync(buffer)) != 0)
+                var fullPath = PreparePath(file.Name,obj,path);
+                if (string.IsNullOrEmpty(fullPath))
                 {
-                    totalRead += bytesRead;
-
-                    await writeStream.WriteAsync(buffer, 0, bytesRead);
-
-                    progressPercent = Decimal.Divide(totalRead, file.Size);
-
-                    StateHasChanged();
+                    problems.Add(L["{0}: this file name cannot be stored.", file.Name]);
+                    continue;
                 }
+
+                // Written aside first and moved in place once complete: a failed upload (too big, connection lost) leaves
+                // the file already stored under that name as it was. ".upload" is not listed with the item's files.
+                var uploadFolder = Path.Combine(Path.GetDirectoryName(fullPath), ".upload");
+                Directory.CreateDirectory(uploadFolder);
+                temp = Path.Combine(uploadFolder, Guid.NewGuid().ToString("N") + ".part");
+                await using (FileStream writeStream = new(temp, FileMode.CreateNew))
+                {
+                    using var readStream = file.OpenReadStream(maxFileSize);
+                    var bytesRead = 0;
+                    var totalRead = 0;
+                    var buffer = new byte[1024 * 10];
+
+                    while ((bytesRead = await readStream.ReadAsync(buffer)) != 0)
+                    {
+                        totalRead += bytesRead;
+
+                        await writeStream.WriteAsync(buffer, 0, bytesRead);
+
+                        progressPercent = Decimal.Divide(totalRead, file.Size);
+
+                        StateHasChanged();
+                    }
+                }
+                File.Move(temp, fullPath, overwrite: true);
 
                 loadedFiles.Add(file);
             }
             catch (Exception ex)
             {
-                throw new Exception("some exeption in Files Upload");//???rafic deveopement mode
-                Logger.LogError("File: {Filename} Error: {Error}",
-                    file.Name, ex.Message);
+                // Said in the dialog, not thrown: an exception here would end the user's whole session (the circuit).
+                Logger.LogError(ex, "Upload of {File} into {Folder} failed", file.Name, Folder);
+                problems.Add($"{file.Name}: {ex.Message}");
+                try { if (temp.Length > 0 && File.Exists(temp)) File.Delete(temp); } catch (IOException) { } catch (UnauthorizedAccessException) { }
             }
         }
 

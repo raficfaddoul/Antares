@@ -778,40 +778,8 @@ Scaffold-DbContext "Data Source=CSTFI-DGC04; Initial Catalog=AliantWeb; Integrat
     //Guid.Parse("9245fe4a-d402-451c-b9ed-9c1a04247482") = -1
     //Guid.Parse("7c9e6679-7425-40de-944b-e07fc1f90ae7") =-2
 
-    //Server=localhost\MSSQLSERVER01;Database=master;Trusted_Connection=True;
-
-    //influxdb operator token =  ***REMOVED***
-    // all access token = ***REMOVED***
-    //from(bucket: "AliantWebT") |> range(start: 0)
-
-
-   // Client ID
-//***REMOVED***
-
-  //  client secret:
-    //    ***REMOVED***
-
+    // Credentials, tokens and connection strings once noted here were moved out of the repository (2026-09-30).
 }
-///influxDB
-///username Rafic password same as my laptop
-///operator ap token: ***REMOVED***
-///api token :***REMOVED***
-///organizationID:  ***REMOVED***
-///from(bucket: "AliantWebT") |> range(start: 0)
-///
-
-
-///dockerhub sign in via google account
-///Repository: raficfaddoul/antares
-///token : ***REMOVED***
-///
-
-//SWAN_BREVO_API_KEY = ***REMOVED***
-//INFLUXDB_USERNAME = Rafic
-//INFLUXDB_PASSWORD = ***REMOVED***
-//INFLUXDB_ADMIN_TOKEN = ***REMOVED***
-
-//echo ***REMOVED*** | docker login -u raficfaddoul --password-stdin
 
 //# Stay in: C:\Users\Rafic\Desktop\Antares\AntaresNetwork\AliantWebS
 //docker build -t raficfaddoul/antares:latest -f AliantWebS/Dockerfile .

@@ -961,7 +961,7 @@
     <value>Importer depuis l'appareil</value>
   </data>
   <data name="Camera settings" xml:space="preserve">
-    <value>Réglages de la caméra</value>
+    <value>Paramètres de la caméra</value>
   </data>
   <data name="Resolution" xml:space="preserve">
     <value>Résolution</value>
@@ -1075,7 +1075,7 @@
     <value>Changer de caméra</value>
   </data>
   <data name="Saving {0}…" xml:space="preserve">
-    <value>Enregistrement de {0}…</value>
+    <value>Enregistrement ({0})…</value>
   </data>
   <data name="Save {0}" xml:space="preserve">
     <value>Enregistrer ({0})</value>
@@ -1087,10 +1087,10 @@
     <value>Terminé</value>
   </data>
   <data name="Save this item first to add photos and videos." xml:space="preserve">
-    <value>Enregistrez d'abord cet élément pour y ajouter des photos et des vidéos.</value>
+    <value>Enregistrez d'abord cette fiche pour y ajouter des photos et des vidéos.</value>
   </data>
   <data name="Photos and videos cannot be stored for this item." xml:space="preserve">
-    <value>Impossible de stocker des photos et des vidéos pour cet élément.</value>
+    <value>Impossible de stocker des photos et des vidéos pour cette fiche.</value>
   </data>
   <data name="Shots can be reviewed but not saved here." xml:space="preserve">
     <value>Les prises peuvent être vérifiées, mais pas enregistrées ici.</value>
@@ -1129,7 +1129,7 @@
     <value>Elle est déjà enregistrée avec {0}. Elle y sera aussi supprimée.</value>
   </data>
   <data name="this item" xml:space="preserve">
-    <value>cet élément</value>
+    <value>cette fiche</value>
   </data>
   <data name="The file could not be deleted." xml:space="preserve">
     <value>Le fichier n'a pas pu être supprimé.</value>
@@ -1165,7 +1165,7 @@
     <value>Enregistrez-les avant de fermer, sinon elles seront perdues.</value>
   </data>
   <data name="They cannot be saved for this item and will be lost." xml:space="preserve">
-    <value>Elles ne peuvent pas être enregistrées pour cet élément et seront perdues.</value>
+    <value>Elles ne peuvent pas être enregistrées pour cette fiche et seront perdues.</value>
   </data>
   <data name="Close when saved" xml:space="preserve">
     <value>Fermer une fois enregistré</value>
@@ -1225,7 +1225,7 @@
     <value>La caméra est déjà utilisée</value>
   </data>
   <data name="Another application or tab is using the camera. Close it, then try again." xml:space="preserve">
-    <value>Une autre application ou un autre onglet utilise la caméra. Fermez-le, puis réessayez.</value>
+    <value>La caméra est utilisée par une autre application ou un autre onglet. Fermez-les, puis réessayez.</value>
   </data>
   <data name="This browser cannot use the camera" xml:space="preserve">
     <value>Ce navigateur ne peut pas utiliser la caméra</value>
@@ -1246,7 +1246,7 @@
     <value>Ajouter des fichiers</value>
   </data>
   <data name="Adding {0} of {1}…" xml:space="preserve">
-    <value>Ajout de {0} sur {1}…</value>
+    <value>Ajout du fichier {0} sur {1}…</value>
   </data>
   <data name="No photos or videos yet" xml:space="preserve">
     <value>Aucune photo ni vidéo pour l'instant</value>
@@ -1309,6 +1309,84 @@
     <value>Équipement</value>
   </data>
   <data name="Item" xml:space="preserve">
-    <value>Élément</value>
+    <value>Fiche</value>
+  </data>
+  <data name="It is being saved: delete it once that is done." xml:space="preserve">
+    <value>Elle est en cours d'enregistrement : supprimez-la ensuite.</value>
+  </data>
+  <data name="Apply or cancel the markup first." xml:space="preserve">
+    <value>Appliquez ou annulez d'abord l'annotation.</value>
+  </data>
+  <data name="Red" xml:space="preserve">
+    <value>Rouge</value>
+  </data>
+  <data name="Yellow" xml:space="preserve">
+    <value>Jaune</value>
+  </data>
+  <data name="Green" xml:space="preserve">
+    <value>Vert</value>
+  </data>
+  <data name="Blue" xml:space="preserve">
+    <value>Bleu</value>
+  </data>
+  <data name="White" xml:space="preserve">
+    <value>Blanc</value>
+  </data>
+  <data name="Black" xml:space="preserve">
+    <value>Noir</value>
+  </data>
+  <data name="Thin" xml:space="preserve">
+    <value>Fin</value>
+  </data>
+  <data name="Medium" xml:space="preserve">
+    <value>Moyen</value>
+  </data>
+  <data name="Thick" xml:space="preserve">
+    <value>Épais</value>
+  </data>
+  <data name="Delete this equipment?" xml:space="preserve">
+    <value>Supprimer cet équipement ?</value>
+  </data>
+  <data name="{0}: this type of file is not accepted here (only {1})." xml:space="preserve">
+    <value>{0} : ce type de fichier n'est pas accepté ici (seulement {1}).</value>
+  </data>
+  <data name="{0}: this file name cannot be stored." xml:space="preserve">
+    <value>{0} : ce nom de fichier ne peut pas être enregistré.</value>
+  </data>
+  <data name="Equipment Name" xml:space="preserve">
+    <value>Nom de l'équipement</value>
+  </data>
+  <data name="Equipment type" xml:space="preserve">
+    <value>Type d'équipement</value>
+  </data>
+  <data name="Choose a type" xml:space="preserve">
+    <value>Choisir un type</value>
+  </data>
+  <data name="Choose the equipment's type." xml:space="preserve">
+    <value>Choisissez le type de l'équipement.</value>
+  </data>
+  <data name="There is no equipment type yet: create one in Equipement Types first." xml:space="preserve">
+    <value>Il n'y a encore aucun type d'équipement : créez-en un d'abord dans Types d'équipement.</value>
+  </data>
+  <data name="Add equipment" xml:space="preserve">
+    <value>Ajouter un équipement</value>
+  </data>
+  <data name="Edit equipment" xml:space="preserve">
+    <value>Modifier l'équipement</value>
+  </data>
+  <data name="The equipment could not be saved. Check that its type still exists, then try again." xml:space="preserve">
+    <value>L'équipement n'a pas pu être enregistré. Vérifiez que son type existe toujours, puis réessayez.</value>
+  </data>
+  <data name="This equipment no longer exists." xml:space="preserve">
+    <value>Cet équipement n'existe plus.</value>
+  </data>
+  <data name="Equipment list" xml:space="preserve">
+    <value>Liste des équipements</value>
+  </data>
+  <data name="Back to the equipment list" xml:space="preserve">
+    <value>Retour à la liste des équipements</value>
+  </data>
+  <data name="(no name)" xml:space="preserve">
+    <value>(sans nom)</value>
   </data>
 </root>

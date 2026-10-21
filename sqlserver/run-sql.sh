@@ -3,4 +3,4 @@
 sleep 30s
 
 # Run your SQL script
-/opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P 'password@12345#' -i /var/opt/mssql/data/list-databases.sql
+/opt/mssql-tools/bin/sqlcmd -S localhost -U SA -P "$MSSQL_SA_PASSWORD" -i /var/opt/mssql/data/list-databases.sql

@@ -22,7 +22,7 @@
                 <NavLink title="BIM" class="nav-link" href="dgfrdgh" @onclick:preventDefault="true">
                     <span align="center" style="width:30px" class="fa fa-cube" aria-hidden="true"></span>
                 </NavLink>
-                <InputFile OnChange="@LoadFiles" />
+                <InputFile OnChange="@LoadFiles" accept=".ifc,.ifczip,.ifcxml,.wexbim" />
             </div>
             <div class="file-input-zone">
                 <a title="Create BIM" class="nav-link" @onclick="@CreateIFC" href="dgfrdgh" @onclick:preventDefault="true">

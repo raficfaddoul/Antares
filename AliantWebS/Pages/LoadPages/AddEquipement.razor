@@ -4,30 +4,51 @@
 @inject EntitiesService entitiesService
 @inject NavigationManager NavigationManager
 @inject AppData appData
+@inject IStringLocalizer<Languages> L
 
 <NavigationLock OnBeforeInternalNavigation="appData.OnBeforeInternalNavigation" ConfirmExternalNavigation="appData.SaveConfirmation&& appData.SaveChanges" />
 
 
-<EquipementForm EditContext="@EditContext" ButtonText="Create" Equipement="@equipement"
-           OnValidSubmit="@CreateEquipement"
-           Title="Add Equipement" />
+<EquipementForm @ref="form" EditContext="@EditContext" ButtonText="Create" Equipement="@equipement"
+           OnValidSubmit="@CreateEquipement" Error="@error"
+           Title="@L["Add equipment"]" />
 
 @code {
-    [Parameter]
-    public EditContext EditContext { get; set; }
+    EditContext EditContext;
 
+    // Plain data, inserted through a context of its own (SaveOwnedAsync): the circuit's shared context never holds it,
+    // so a refused insert leaves nothing queued for another page's next save.
     Equipement equipement = new Equipement();
 
-    protected override async Task OnInitializedAsync()
+    EquipementForm form;
+    string error;
+    bool saving;
+
+    protected override void OnInitialized()
     {
         EditContext = new EditContext(equipement);
     }
 
-    protected async void CreateEquipement()
+    private async Task CreateEquipement()
     {
-        await entitiesService.InsertEntityAsync(equipement);
-
-        NavigationManager.NavigateTo("Equipements");
+        if (saving) return;   // a second click while the first one is saving
+        saving = true;
+        error = null;
+        try
+        {
+            await entitiesService.SaveOwnedAsync(equipement);
+            NavigationManager.NavigateTo("Equipements");
+        }
+        catch (Exception)
+        {
+            // Refused by the database (SaveOwnedAsync has logged why): said here, the form keeps what was typed.
+            error = L["The equipment could not be saved. Check that its type still exists, then try again."];
+            await form.ReloadTypesAsync();
+        }
+        finally
+        {
+            saving = false;
+        }
     }
 
 }

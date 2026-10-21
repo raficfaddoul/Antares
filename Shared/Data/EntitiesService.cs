@@ -793,6 +793,32 @@ namespace AliantWebS.Data
         }
 
         /// <summary>
+        /// After a row was saved through a context of its own (UpdateOwnedAsync), gives its saved values to the circuit's
+        /// shared context too, when that context tracks the row (a list or a calculation of this tab read it earlier): a
+        /// tracking query never overwrites a tracked row, so the tab would go on showing and computing with the old
+        /// values. The tracked row ends Unchanged - nothing is sent again - and a changed foreign key moves its navigation.
+        /// </summary>
+        public async Task RefreshTrackedAsync<T>(T saved) where T : class
+        {
+            for (int i = 0; i < retrys; i++)
+            {
+                if (!busy) break;
+                await Task.Delay(delay);
+            }
+
+            var key = _appDBContext.Model.FindEntityType(typeof(T))!.FindPrimaryKey()!.Properties;
+            object?[] KeyOf(object entity) => key.Select(p => p.PropertyInfo!.GetValue(entity)).ToArray();
+            var wanted = KeyOf(saved);
+            var entry = _appDBContext.ChangeTracker.Entries<T>().FirstOrDefault(e => KeyOf(e.Entity).SequenceEqual(wanted));
+            if (entry == null || ReferenceEquals(entry.Entity, saved) || entry.State is EntityState.Added or EntityState.Deleted)
+                return;
+
+            entry.CurrentValues.SetValues(saved);
+            entry.OriginalValues.SetValues(saved);
+            entry.State = EntityState.Unchanged;
+        }
+
+        /// <summary>
         /// Stores a scenario's Charpente row (SaveOwnedAsync), keeping to one row per scenario - the database holds to it
         /// too (UX_Charpente_EventMPScenarioID). A new object - the scenario had no row when the page or the calculation
         /// read it - takes the key of a row another tab created meanwhile, and updates it rather than adding a second;

@@ -22,18 +22,30 @@ namespace AliantWebS.Data
 
     public class InfluxService
     {
-         private static readonly string token = "nj1b923x3pWuVrV7WT_DV0mBe3N8fGfZzj9zhDLV0Uy4CfsR06D-e4DB08zKNxwwoiKWYeBj6yY9WWvrLZdVCA==";
+        // The token is configuration, not code: INFLUXDB_TOKEN, or INFLUXDB_TOKEN_FILE naming a file that holds it
+        // (docker-compose.yml mounts the InfluxDB admin-token secret there; Portainer passes INFLUXDB_TOKEN). The
+        // literal that used to be here is in the git history: rotate it.
+        private static readonly Lazy<string> Token = new(ReadToken);
+        private static string token => Token.Value;
 
-       // private static readonly string orgId = "***REMOVED***";
+        /// <summary>False when neither INFLUXDB_TOKEN nor INFLUXDB_TOKEN_FILE gives a token (Startup warns).</summary>
+        public static bool IsConfigured => Token.Value.Length > 0;
 
-        //  private static readonly string token = "***REMOVED***";
+        private static string ReadToken()
+        {
+            var value = Environment.GetEnvironmentVariable("INFLUXDB_TOKEN");
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                var file = Environment.GetEnvironmentVariable("INFLUXDB_TOKEN_FILE");
+                if (!string.IsNullOrWhiteSpace(file) && System.IO.File.Exists(file)) value = System.IO.File.ReadAllText(file);
+            }
+            return (value ?? "").Trim();
+        }
 
-        //   private static readonly string orgId = "***REMOVED***";
+        // The compose service name by default; INFLUXDB_URL for anything else (e.g. http://localhost:8086 outside Docker).
+        private static readonly string url =
+            Environment.GetEnvironmentVariable("INFLUXDB_URL") is { Length: > 0 } configuredUrl ? configuredUrl : "http://influxdb2:8086";
 
-        //   private static readonly string url = "http://localhost:8086";
-
-        private static readonly string url = "http://influxdb2:8086"; // Use the service name defined in docker-compose.yaml
-    
 
 
         private static readonly string bucket = "AliantWebT";

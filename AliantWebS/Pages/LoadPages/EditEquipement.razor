@@ -1,19 +1,34 @@
 ﻿@page "/EditEquipement/{EquipementID:guid}"
 @using AliantWebS.Data
 @using AliantWebS.Models
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.Extensions.Logging
 @inject EntitiesService entitiesService
 @inject NavigationManager navigationManager
 @inject AppData appData
 @inject IJSRuntime js
+@inject IStringLocalizer<Languages> L
+@inject ILogger<EditEquipement> Logger
 
 
 <NavigationLock OnBeforeInternalNavigation="appData.OnBeforeInternalNavigation" ConfirmExternalNavigation="appData.SaveConfirmation&& appData.SaveChanges" />
 
-<h2>Edit Equipement</h2>
-<hr />
-<EquipementForm EditContext="@EditContext" ButtonText=@buttonText Equipement="@equipement"
-           OnValidSubmit="@UpdateEvent" />
-
+@if (notFound)
+{
+    <h2>@L["Edit equipment"]</h2>
+    <hr />
+    <p class="text-danger equipement-not-found">@L["This equipment no longer exists."] <a href="Equipements">@L["Back to the equipment list"]</a></p>
+}
+else if (EditContext == null)
+{
+    <p><em>@L["Loading"]... !</em></p>
+}
+else
+{
+    @* Rendered only once the equipment is loaded: in a new tab (or after F5) it is read from the database first. *@
+    <EquipementForm @ref="form" EditContext="@EditContext" ButtonText=@buttonText Equipement="@equipement"
+               OnValidSubmit="@UpdateEquipement" Error="@error" Title="@L["Edit equipment"]" />
+}
 
 
 
@@ -22,27 +37,70 @@
     string buttonText = "Updated";
 
     [Parameter]
-    public EditContext EditContext { get; set; }
-
-    [Parameter]
     public Guid EquipementID { get; set; }
 
-    Equipement equipement = new Equipement();
+    EditContext EditContext;
 
-    public override async Task SetParametersAsync(ParameterView parameters)
+    // Plain data, read and saved through contexts of their own (UpdateOwnedAsync): what is typed and then abandoned
+    // (Cancel, leaving the page) stays here and never reaches the circuit's shared context - neither its next save,
+    // whatever page makes it, nor the calculations of this tab, which read equipment and their types from it.
+    Equipement equipement;
+    EquipementForm form;
+    Guid loadedId;
+    bool notFound;
+    string error;
+    bool saving;
+
+    protected override async Task OnParametersSetAsync()
     {
-        await base.SetParametersAsync(parameters);
+        if (EquipementID == loadedId && (equipement != null || notFound)) return;   // same equipment: keep the edits
+
+        loadedId = EquipementID;
+        EditContext = null;
+        notFound = false;
+        error = null;
 
         await Task.WhenAll(entitiesService.tasksList);
-        equipement = await entitiesService.GetEntityAsync<Equipement>(EquipementID);
+        equipement = null;
+        await using (var db = entitiesService.CreateOwnedContext())
+            equipement = await db.Equipements.AsNoTracking().SingleOrDefaultAsync(e => e.EquipementId == EquipementID);
+        if (equipement == null)
+        {
+            notFound = true;
+            return;
+        }
         EditContext = new EditContext(equipement);
     }
 
 
-    protected async void UpdateEvent()
+    private async Task UpdateEquipement()
     {
-        await entitiesService.UpdateEntityAsync(equipement);
-        //navigationManager.NavigateTo("Structures");
+        if (saving) return;   // a second click while the first one is saving
+        saving = true;
+        error = null;
+        try
+        {
+            await entitiesService.UpdateOwnedAsync(equipement);
+            // A list or a calculation of this tab may hold the equipment already: it gets the saved values too.
+            await entitiesService.RefreshTrackedAsync(equipement);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Deleted meanwhile, by another tab or user: there is nothing left to save, and nothing to ask about when leaving.
+            notFound = true;
+            appData.SaveChanges = false;
+        }
+        catch (Exception ex)
+        {
+            // Said on the page rather than thrown: an exception here would end the user's whole session (the circuit).
+            Logger.LogError(ex, "Update of equipment {Id} failed", EquipementID);
+            error = L["The equipment could not be saved. Check that its type still exists, then try again."];
+            await form.ReloadTypesAsync();
+        }
+        finally
+        {
+            saving = false;
+        }
     }
 
 

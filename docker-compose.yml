@@ -32,13 +32,15 @@ services:
       - ../data/backups:/backups     # ← SMO writes the .bak here
     environment:
       - ACCEPT_EULA=Y
-      - MSSQL_SA_PASSWORD=password@12345#
+      # The sa password comes from the git-ignored .env file beside this file (never from the repo). SQL Server uses it
+      # only when it creates its data the first time: to change the password later, ALTER LOGIN sa first, then .env.
+      - MSSQL_SA_PASSWORD=${MSSQL_SA_PASSWORD:?set MSSQL_SA_PASSWORD in the .env file beside docker-compose.yml}
       - MSSQL_PID=Developer
       - MSSQL_SSL_CERTIFICATE_CREATION=disabled
     networks:
       - AliantNetwork
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'password@12345#' -Q 'SELECT 1' -C"]
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q 'SELECT 1' -C"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -56,7 +58,7 @@ services:
       - ../data/sql/Aliant:/var/opt/mssql/data
     environment:
       - ACCEPT_EULA=Y
-      - MSSQL_SA_PASSWORD=password@12345#
+      - MSSQL_SA_PASSWORD=${MSSQL_SA_PASSWORD:?set MSSQL_SA_PASSWORD in the .env file beside docker-compose.yml}
     entrypoint:
       - /bin/bash
       - -e
@@ -104,7 +106,7 @@ services:
       - ASPNETCORE_HTTPS_PORT=
       - DB_HOST=AliantDb
       - DB_NAME=Antares
-      - DB_SA_PASSWORD=password@12345#
+      - DB_SA_PASSWORD=${MSSQL_SA_PASSWORD:?set MSSQL_SA_PASSWORD in the .env file beside docker-compose.yml}
       - MSSQL_SSL_CERTIFICATE_CREATION=disabled
       - BasePath=Aliant1
       - API_URL=http://172.17.0.1:8080
@@ -112,6 +114,10 @@ services:
       # Set here rather than only in appsettings so it still matches the bind mount below when
       # docker-compose.override.yml switches the environment to Development.
       - ScenariosDataPath=/app/ScenariosData
+      # InfluxService reads its token from the InfluxDB admin-token secret below (never from the code)
+      - INFLUXDB_TOKEN_FILE=/run/secrets/influxdb2-admin-token
+    secrets:
+      - influxdb2-admin-token
     networks:
       - AliantNetwork
 

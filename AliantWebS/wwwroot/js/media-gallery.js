@@ -2,13 +2,57 @@
 // thumbnail in view, and the full-screen viewer's zoom, pan and swipe (a server round trip per pointer move would
 // make both unusable).
 
+// Scrolls the filmstrip only - scrollIntoView would scroll the page too, down to a strip below the fold.
 export function reveal(strip, index) {
     const item = strip && strip.children ? strip.children[index] : null;
-    if (item) item.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+    if (!item) return;
+    const s = strip.getBoundingClientRect();
+    const r = item.getBoundingClientRect();
+    strip.scrollTo({ left: strip.scrollLeft + r.left - s.left - (s.width - r.width) / 2, behavior: 'smooth' });
 }
 
 export function focus(element) {
     if (element) element.focus({ preventScroll: true });
+}
+
+// Minutes to add to local time to get UTC (Date.getTimezoneOffset): the server dates files in UTC.
+export function timezoneOffset() {
+    return new Date().getTimezoneOffset();
+}
+
+// Files dropped anywhere on the gallery card go to its "Add files" input, as if picked there. A drop the card cannot
+// take is still swallowed: left alone, the browser would open the file in place of the app.
+export function attachDrop(card) {
+    const hasFiles = e => !!e.dataTransfer && [...e.dataTransfer.types].includes('Files');
+    const input = () => card.querySelector('input[type=file]:not([disabled])');
+    const over = e => {
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = input() ? 'copy' : 'none';
+        card.classList.add('is-dragover');
+    };
+    const leave = e => {
+        if (!card.contains(e.relatedTarget)) card.classList.remove('is-dragover');
+    };
+    const drop = e => {
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        card.classList.remove('is-dragover');
+        const target = input();
+        if (!target || !e.dataTransfer.files.length) return;
+        target.files = e.dataTransfer.files;
+        target.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    card.addEventListener('dragover', over);
+    card.addEventListener('dragleave', leave);
+    card.addEventListener('drop', drop);
+    return {
+        dispose() {
+            card.removeEventListener('dragover', over);
+            card.removeEventListener('dragleave', leave);
+            card.removeEventListener('drop', drop);
+        },
+    };
 }
 
 export function createViewer(viewport, dotnet) {

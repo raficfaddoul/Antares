@@ -25,15 +25,27 @@ const SIZES = {
     '720': { width: 1280, height: 720 },
 };
 
-const PHOTO_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif'];
+// As MediaLibrary on the server. No HEIC: most browsers cannot show it (an iPhone's picker hands a web page JPEG).
+const PHOTO_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'];
 const VIDEO_EXTENSIONS = ['mp4', 'webm', 'mov', 'm4v'];
 
 export function create(root, dotnet, options) {
     return new CameraStudio(root, dotnet, options || {});
 }
 
+// Only the known settings, each only when it has the right type: anything else (another version, a hand edit) falls
+// back to the component's default instead of failing to deserialize.
 export function loadSettings() {
-    try { return JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null'); } catch { return null; }
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null'); } catch { return null; }
+    if (!saved || typeof saved !== 'object') return null;
+    const pick = (key, type) => (typeof saved[key] === type ? saved[key] : undefined);
+    return {
+        mode: pick('mode', 'string'), resolution: pick('resolution', 'string'), deviceId: pick('deviceId', 'string'),
+        timer: Number.isInteger(saved.timer) ? saved.timer : undefined,
+        grid: pick('grid', 'boolean'), stamp: pick('stamp', 'boolean'), location: pick('location', 'boolean'),
+        mic: pick('mic', 'boolean'), sound: pick('sound', 'boolean'),
+    };
 }
 
 export function saveSettings(settings) {
@@ -77,6 +89,9 @@ class CameraStudio {
         this.sequence = 0;
         this.pinch = new Map();
         this.editor = null;
+        this.micFailed = false;
+        this.wakeLock = null;
+        this.wakeLockRequest = null;
         this.disposed = false;
 
         this.shutterSound = new Audio(new URL(SHUTTER_SOUND, document.baseURI).href);
@@ -91,6 +106,7 @@ class CameraStudio {
             pointermove: e => this.onPointerMove(e),
             pointerup: e => this.onPointerUp(e),
             pointercancel: e => this.onPointerUp(e),
+            mousedown: e => this.keepTextFocus(e),
         };
         for (const [name, handler] of Object.entries(this.handlers)) {
             root.addEventListener(name, handler, name === 'wheel' ? { passive: false } : undefined);
@@ -99,6 +115,10 @@ class CameraStudio {
         document.addEventListener('keydown', this.onKeyDown);
         this.onVisibility = () => this.checkStream();
         document.addEventListener('visibilitychange', this.onVisibility);
+        this.onWindowFocus = () => this.resumeAfterNative();
+        window.addEventListener('focus', this.onWindowFocus);
+        // Keyboard shortcuts work from the start, without a first click (and without focusing the Close button).
+        root.focus({ preventScroll: true });
 
         this.resizeObserver = new ResizeObserver(() => this.layoutFrame());
         const stage = this.el('stage');
@@ -161,7 +181,10 @@ class CameraStudio {
         this.stream = stream;
         const track = stream.getVideoTracks()[0];
         track.addEventListener('ended', () => {
-            if (this.stream === stream && !this.disposed) this.notify('OnStreamEnded');
+            if (this.stream !== stream || this.disposed) return;
+            // A clip being recorded keeps what it has (it would otherwise go on recording a frozen or empty picture).
+            if (this.recording) this.stopRecording();
+            this.notify('OnStreamEnded');
         });
 
         const video = this.el('video');
@@ -222,6 +245,7 @@ class CameraStudio {
         const target = this.facing === 'user' ? 'environment' : 'user';
         const result = await this.start({ facing: target });
         if (result.stale || (result.ok && result.facing === target)) return result;
+        if (!result.ok && result.error !== 'notfound') return result; // blocked or busy: another camera would be too
         const devices = await this.listDevices();
         if (devices.length < 2) return result.ok ? result : this.start({});
         const index = devices.findIndex(d => d.id === previous);
@@ -230,17 +254,27 @@ class CameraStudio {
 
     // Resolution 'auto' follows the mode: the sharpest the camera gives for photos, 1080p for video (a 4K clip is
     // several times larger to keep in memory and to upload, for little gain on a site inspection).
-    async retune() {
+    // Kept as this.retuning so a recording started meanwhile waits for the new format before sizing anything.
+    retune() {
+        this.retuning = this.retuneNow().finally(() => { this.retuning = null; });
+        return this.retuning;
+    }
+
+    async retuneNow() {
         const track = this.videoTrack();
-        if (!track || this.recording) return;
+        if (!track || track.readyState !== 'live' || this.recording) return;
         const size = this.sizeFor(this.settings.resolution, this.settings.mode);
+        const video = this.el('video');
+        const before = video ? `${video.videoWidth}x${video.videoHeight}` : '';
         try {
             await track.applyConstraints({ width: { ideal: size.width }, height: { ideal: size.height }, frameRate: { ideal: 30 } });
         } catch { /* keeps the current format */ }
-        const video = this.el('video');
-        if (video) await waitFor(() => video.videoWidth > 0, 2000);
+        // The element reports the new size a few frames after the constraints are applied.
+        if (video) await waitFor(() => video.videoWidth > 0 && `${video.videoWidth}x${video.videoHeight}` !== before, 1500);
         this.layoutFrame();
-        if (this.stream && !this.disposed) this.notify('OnStreamInfo', { ok: true, ...(await this.describeStream()) });
+        if (this.stream && !this.disposed && track.readyState === 'live') {
+            this.notify('OnStreamInfo', { ok: true, ...(await this.describeStream()) });
+        }
     }
 
     sizeFor(resolution, mode) {
@@ -303,6 +337,8 @@ class CameraStudio {
 
     setZoom(value) {
         const zoom = this.zoom;
+        // A clip recorded straight from the camera cannot follow a digital zoom: it stays as it started.
+        if (!zoom.native && this.recording && !this.recording.compositor) return zoom.value;
         const clamped = Math.min(zoom.max, Math.max(zoom.min, Number(value) || zoom.min));
         zoom.value = Math.round(clamped / zoom.step) * zoom.step;
         this.renderZoom();
@@ -368,8 +404,11 @@ class CameraStudio {
         const settings = this.settings;
         const format = previous.resolution !== settings.resolution ||
             (previous.mode !== settings.mode && settings.resolution === 'auto');
+        if (previous.mode !== settings.mode) this.cancelCountdown(); // a photo timer must not end in a video
         if (format && this.stream) this.retune();
-        if (settings.mode === 'video' && settings.mic) this.ensureMic();
+        // A refused or missing microphone is asked again only when the user changes the mode or the sound setting.
+        if (previous.mode !== settings.mode || previous.mic !== settings.mic) this.micFailed = false;
+        if (settings.mode === 'video' && settings.mic && !this.micFailed) this.ensureMic();
         else if (!this.recording) this.releaseMic();
         this.syncLocation();
         this.renderStamp(true);
@@ -469,14 +508,16 @@ class CameraStudio {
     // ---- shutter -----------------------------------------------------------------------------------------------
 
     shutter() {
-        if (this.disposed || this.view !== 'camera') return;
+        if (this.disposed) return;
+        // A recording always stops, whatever is on screen.
+        if (this.recording) { this.stopRecording(); return; }
+        if (this.view !== 'camera') return;
         if (this.countdown) { this.cancelCountdown(); return; }
         if (this.settings.mode === 'video') {
-            if (this.recording) { this.stopRecording(); return; }
             if (this.recordingStarting) return;
-            this.afterTimer(() => this.startRecording());
+            this.afterTimer(() => { if (this.settings.mode === 'video' && this.view === 'camera') this.startRecording(); });
         } else {
-            this.afterTimer(() => this.capturePhoto());
+            this.afterTimer(() => { if (this.settings.mode === 'photo' && this.view === 'camera') this.capturePhoto(); });
         }
     }
 
@@ -533,19 +574,25 @@ class CameraStudio {
         const video = this.el('video');
         if (!this.stream || !video || !video.videoWidth) { this.notify('OnNotice', 'not-ready', ''); return; }
         const takenAt = Date.now();
-        const canvas = this.grabFrame(video);
-        if (this.settings.stamp) this.drawStamp(canvas.getContext('2d'), canvas.width, canvas.height, new Date(takenAt));
-        this.feedback();
         const position = this.settings.location ? this.position : null;
+        let canvas = null, small = null;
         try {
+            canvas = this.grabFrame(video);
+            if (this.settings.stamp) this.drawStamp(canvas.getContext('2d'), canvas.width, canvas.height, new Date(takenAt));
+            this.feedback();
             const blob = await canvasToBlob(canvas, 'image/jpeg', PHOTO_QUALITY);
-            const thumb = await canvasToBlob(scaled(canvas, canvas.width, canvas.height, THUMB_SIZE), 'image/jpeg', THUMB_QUALITY);
+            small = scaled(canvas, canvas.width, canvas.height, THUMB_SIZE);
+            const thumb = await canvasToBlob(small, 'image/jpeg', THUMB_QUALITY);
             this.addShot({
                 kind: 'photo', blob, thumb, width: canvas.width, height: canvas.height, duration: 0,
                 mime: 'image/jpeg', ext: 'jpg', takenAt, source: 'camera', position,
             });
         } catch (error) {
             this.notify('OnNotice', 'capture-failed', error.message || String(error));
+        } finally {
+            // Frees the canvases' memory now: iOS caps the total, and a burst of 4K frames would reach it.
+            release(canvas);
+            release(small);
         }
     }
 
@@ -585,15 +632,18 @@ class CameraStudio {
 
     async ensureMic() {
         if (this.mic && this.mic.getAudioTracks().some(t => t.readyState === 'live')) return this.mic;
+        if (this.micFailed) return null;
         if (this.micPromise) return this.micPromise;
         this.micPromise = (async () => {
             try {
                 const mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
-                const stillWanted = !this.disposed && this.settings.mic && (this.settings.mode === 'video' || this.recording);
+                const stillWanted = !this.disposed && this.settings.mic &&
+                    (this.settings.mode === 'video' || this.recording || this.recordingStarting);
                 if (!stillWanted) { stopTracks(mic); return null; }
                 this.mic = mic;
                 return mic;
             } catch (error) {
+                this.micFailed = true; // said once; asked again when the mode or the sound setting changes
                 this.notify('OnNotice', 'mic-unavailable', error.name || '');
                 return null;
             } finally {
@@ -613,19 +663,27 @@ class CameraStudio {
         if (!this.stream || !video || !video.videoWidth) { this.notify('OnNotice', 'not-ready', ''); return; }
         if (typeof MediaRecorder === 'undefined') { this.notify('OnNotice', 'record-unsupported', ''); return; }
         this.recordingStarting = true;
+        this.abortStart = false;
         try {
+            if (this.retuning) await this.retuning; // a mode switch may still be changing the format
+            const mic = this.settings.mic ? await this.ensureMic() : null;
+            // Meanwhile (the microphone prompt can stay open) the user may have switched to Photo, opened a shot,
+            // closed the dialog, or lost the camera: then there is nothing to record.
+            const track = this.videoTrack();
+            if (this.disposed || this.abortStart || this.settings.mode !== 'video' || this.view !== 'camera' ||
+                !track || track.readyState !== 'live' || !video.videoWidth) return;
+
             const composite = this.settings.stamp || (!this.zoom.native && this.zoom.value > 1.01);
             const compositor = composite ? this.startCompositor(video) : null;
             const tracks = compositor ? compositor.stream.getVideoTracks() : this.stream.getVideoTracks();
-            const mic = this.settings.mic ? await this.ensureMic() : null;
-            if (this.disposed || !this.stream) { if (compositor) compositor.stop(); return; }
-            const audio = mic ? mic.getAudioTracks() : [];
+            const audio = mic ? mic.getAudioTracks().filter(t => t.readyState === 'live') : [];
             const mime = pickRecordingType(audio.length > 0);
+            const width = compositor ? compositor.width : video.videoWidth;
             const height = compositor ? compositor.height : video.videoHeight;
             let recorder;
             try {
                 recorder = new MediaRecorder(new MediaStream([...tracks, ...audio]),
-                    { mimeType: mime || undefined, videoBitsPerSecond: bitrateFor(height) });
+                    { mimeType: mime || undefined, videoBitsPerSecond: bitrateFor(Math.min(width, height)) });
             } catch {
                 try {
                     recorder = new MediaRecorder(new MediaStream([...tracks, ...audio]));
@@ -636,15 +694,23 @@ class CameraStudio {
                 }
             }
 
-            const poster = scaled(this.grabFrame(video, 1280), 0, 0, THUMB_SIZE);
+            const frame = this.grabFrame(video, 1280);
+            const poster = scaled(frame, 0, 0, THUMB_SIZE);
+            release(frame);
+            let resolveDone = () => { };
             const session = {
-                recorder, compositor, chunks: [], startedAt: Date.now(), poster,
-                width: compositor ? compositor.width : video.videoWidth, height,
+                recorder, compositor, chunks: [], startedAt: Date.now(), poster, width, height,
                 position: this.settings.location ? this.position : null, discard: false,
+                done: new Promise(resolve => { resolveDone = resolve; }),
             };
+            session.resolveDone = resolveDone;
             recorder.ondataavailable = e => { if (e.data && e.data.size) session.chunks.push(e.data); };
             recorder.onerror = e => this.notify('OnNotice', 'record-failed', (e.error && e.error.message) || '');
-            recorder.onstop = () => this.finishRecording(session);
+            recorder.onstop = () => {
+                // Stopped by itself (an error, its tracks gone): the interface stops too, and the clip is kept.
+                if (this.recording === session) this.endRecordingUi(session, false);
+                this.finishRecording(session);
+            };
             recorder.start(1000);
             this.recording = session;
             this.root.dataset.recording = '1';
@@ -656,6 +722,16 @@ class CameraStudio {
         } finally {
             this.recordingStarting = false;
         }
+    }
+
+    // Stops a recording whatever is on screen, and resolves once its clip is a shot (or null): closing the dialog
+    // waits for it, so the clip is counted - and saved or discarded knowingly - instead of vanishing.
+    async finishRecordingNow() {
+        if (this.recordingStarting) this.abortStart = true;
+        const session = this.recording;
+        if (!session) return null;
+        this.stopRecording();
+        return session.done;
     }
 
     renderRecordTime() {
@@ -673,14 +749,21 @@ class CameraStudio {
     stopRecording(discard) {
         const session = this.recording;
         if (!session) return;
+        this.endRecordingUi(session, discard);
+        try { session.recorder.stop(); } catch { this.finishRecording(session); }
+    }
+
+    // What a stop looks like, whoever stops (the user, the length cap, the recorder itself): ticker, red badge,
+    // wake lock and the component's state.
+    endRecordingUi(session, discard) {
+        if (this.recording !== session) return;
         this.recording = null;
         session.discard = !!discard;
-        session.duration = (Date.now() - session.startedAt) / 1000;
+        if (!session.duration) session.duration = (Date.now() - session.startedAt) / 1000;
         clearInterval(this.recordTicker);
         delete this.root.dataset.recording;
         const label = this.el('rec-time');
         if (label) label.textContent = '';
-        try { session.recorder.stop(); } catch { this.finishRecording(session); }
         this.releaseWakeLock();
         if (!discard) this.beep(440, 120);
         this.notify('OnRecording', false);
@@ -689,40 +772,54 @@ class CameraStudio {
     async finishRecording(session) {
         if (session.finished) return;
         session.finished = true;
-        if (session.compositor) session.compositor.stop();
-        if (this.settings.mode !== 'video' || !this.settings.mic) this.releaseMic();
-        if (session.discard || this.disposed || !session.chunks.length) return;
-        const type = (session.recorder.mimeType || session.chunks[0].type || 'video/webm').split(';')[0];
-        let blob = new Blob(session.chunks, { type });
-        if (type === 'video/webm') blob = await fixWebmDuration(blob, session.duration * 1000);
-        let thumb = null;
-        try { thumb = await canvasToBlob(session.poster, 'image/jpeg', THUMB_QUALITY); } catch { /* no poster */ }
-        this.addShot({
-            kind: 'video', blob, thumb, width: session.width, height: session.height, duration: session.duration,
-            mime: type, ext: extensionFor(type), takenAt: session.startedAt, source: 'camera', position: session.position,
-        });
+        let described = null;
+        try {
+            if (session.compositor) session.compositor.stop();
+            if (this.settings.mode !== 'video' || !this.settings.mic) this.releaseMic();
+            if (!session.duration) session.duration = (Date.now() - session.startedAt) / 1000;
+            if (session.discard || this.disposed || !session.chunks.length) return;
+            const type = (session.recorder.mimeType || session.chunks[0].type || 'video/webm').split(';')[0];
+            let blob = new Blob(session.chunks, { type });
+            if (type === 'video/webm' && session.duration > 0) blob = await fixWebmDuration(blob, session.duration * 1000);
+            let thumb = null;
+            try { thumb = await canvasToBlob(session.poster, 'image/jpeg', THUMB_QUALITY); } catch { /* no poster */ }
+            release(session.poster);
+            described = this.addShot({
+                kind: 'video', blob, thumb, width: session.width, height: session.height, duration: session.duration,
+                mime: type, ext: extensionFor(type), takenAt: session.startedAt, source: 'camera', position: session.position,
+            });
+        } finally {
+            session.resolveDone(described);
+        }
     }
 
     // Stamp and digital zoom are not in the camera's own frames, so a clip that needs them is recorded from a canvas
-    // that redraws each frame (capped at 1080p: a phone cannot composite 4K in real time).
+    // that redraws each frame (capped at 1080p: a phone cannot composite 4K in real time). The canvas keeps the clip's
+    // first size; each frame is fitted into it, since the camera's frame can change size mid-clip (a phone turned).
     startCompositor(video) {
-        const factor = () => (this.zoom.native ? 1 : this.zoom.value);
-        const sourceWidth = video.videoWidth;
-        const sourceHeight = video.videoHeight;
-        const scale = Math.min(1, COMPOSITE_MAX_SIDE / Math.max(sourceWidth, sourceHeight));
+        const scale = Math.min(1, COMPOSITE_MAX_SIDE / Math.max(video.videoWidth, video.videoHeight));
         const canvas = document.createElement('canvas');
-        canvas.width = even(sourceWidth * scale);
-        canvas.height = even(sourceHeight * scale);
+        canvas.width = even(video.videoWidth * scale);
+        canvas.height = even(video.videoHeight * scale);
         const ctx = canvas.getContext('2d');
         let running = true;
         const draw = () => {
             if (!running) return;
-            const z = factor();
-            const cropWidth = sourceWidth / z;
-            const cropHeight = sourceHeight / z;
-            ctx.drawImage(video, (sourceWidth - cropWidth) / 2, (sourceHeight - cropHeight) / 2, cropWidth, cropHeight,
-                0, 0, canvas.width, canvas.height);
-            if (this.settings.stamp) this.drawStamp(ctx, canvas.width, canvas.height, new Date());
+            const sourceWidth = video.videoWidth;
+            const sourceHeight = video.videoHeight;
+            if (sourceWidth && sourceHeight) {
+                const z = this.zoom.native ? 1 : this.zoom.value;
+                const cropWidth = sourceWidth / z;
+                const cropHeight = sourceHeight / z;
+                const fit = Math.min(canvas.width / cropWidth, canvas.height / cropHeight);
+                const width = cropWidth * fit;
+                const height = cropHeight * fit;
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(video, (sourceWidth - cropWidth) / 2, (sourceHeight - cropHeight) / 2, cropWidth, cropHeight,
+                    (canvas.width - width) / 2, (canvas.height - height) / 2, width, height);
+                if (this.settings.stamp) this.drawStamp(ctx, canvas.width, canvas.height, new Date());
+            }
             if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(draw);
             else requestAnimationFrame(draw);
         };
@@ -730,15 +827,24 @@ class CameraStudio {
         const stream = canvas.captureStream(30);
         return {
             stream, width: canvas.width, height: canvas.height,
-            stop() { running = false; stopTracks(stream); },
+            stop() { running = false; stopTracks(stream); release(canvas); },
         };
     }
 
-    async holdWakeLock() {
-        try { this.wakeLock = navigator.wakeLock ? await navigator.wakeLock.request('screen') : null; } catch { this.wakeLock = null; }
+    // The request resolves later: a lock that arrives after the recording ended is released at once.
+    holdWakeLock() {
+        if (!navigator.wakeLock) return;
+        const request = navigator.wakeLock.request('screen')
+            .then(lock => {
+                if (this.wakeLockRequest === request) this.wakeLock = lock;
+                else lock.release().catch(() => { });
+            })
+            .catch(() => { });
+        this.wakeLockRequest = request;
     }
 
     releaseWakeLock() {
+        this.wakeLockRequest = null;
         if (this.wakeLock) this.wakeLock.release().catch(() => { });
         this.wakeLock = null;
     }
@@ -754,8 +860,10 @@ class CameraStudio {
             edited: false,
         };
         this.shots.set(id, shot);
-        if (this.disposed) { this.remove(id); return; }
-        this.notify('OnShot', describeShot(shot));
+        if (this.disposed) { this.remove(id); return null; }
+        const described = describeShot(shot);
+        this.notify('OnShot', described);
+        return described;
     }
 
     blob(id) {
@@ -805,7 +913,8 @@ class CameraStudio {
 
     // ---- markup ------------------------------------------------------------------------------------------------
 
-    async openMarkup(id) {
+    // style: the tool, colour and thickness the toolbar shows (kept from one photo to the next).
+    async openMarkup(id, style) {
         this.closeMarkup();
         const shot = this.shots.get(id);
         const host = this.el('markup-host');
@@ -813,6 +922,11 @@ class CameraStudio {
         const input = this.el('markup-text');
         if (!shot || shot.kind !== 'photo' || !host || !canvas) return false;
         const editor = new MarkupEditor(this, shot, host, canvas, input);
+        if (style) {
+            if (['arrow', 'rect', 'ellipse', 'pen', 'text'].includes(style.tool)) editor.tool = style.tool;
+            if (/^#[0-9a-f]{6}$/i.test(style.color || '')) editor.color = style.color;
+            if (MARKUP_WIDTHS[style.size]) editor.size = style.size;
+        }
         this.editor = editor;
         try {
             await editor.open();
@@ -842,7 +956,7 @@ class CameraStudio {
         if (!editor) return null;
         editor.commitText();
         const shot = editor.shot;
-        if (!editor.shapes.length) { this.closeMarkup(); return describeShot(shot); }
+        if (!editor.shapes.length) { this.closeMarkup(); return null; } // nothing drawn: the shot is unchanged
         const { blob, thumb, width, height } = await editor.export();
         this.closeMarkup();
         URL.revokeObjectURL(shot.url);
@@ -862,6 +976,12 @@ class CameraStudio {
     // ---- events ------------------------------------------------------------------------------------------------
 
     onClick(e) {
+        const markup = e.target.closest('[data-markup]');
+        if (markup && this.root.contains(markup) && !markup.disabled) {
+            const [command, value] = markup.dataset.markup.split(':');
+            this.markup(command, value);
+            return;
+        }
         const action = e.target.closest('[data-cam-action]');
         if (!action || !this.root.contains(action)) return;
         if (action.dataset.camAction === 'shutter') {
@@ -877,7 +997,28 @@ class CameraStudio {
         if (role !== 'import' && role !== 'native') return;
         const files = [...input.files];
         input.value = '';
+        if (role === 'native') this.resumeAfterNative();
         this.importFiles(files, role === 'native' ? 'native' : 'import');
+    }
+
+    // The phone's own camera app cannot open the camera while this page holds it (Android ends our stream, or the
+    // app fails): release it when that picker opens, and ask the component to start it again when the user is back.
+    pauseForNative() {
+        if (!this.stream) return;
+        this.nativePaused = true;
+        this.stopStream();
+    }
+
+    resumeAfterNative() {
+        if (!this.nativePaused || this.disposed) return;
+        this.nativePaused = false;
+        this.notify('OnResumeRequested');
+    }
+
+    // Keeps a text being typed in the markup editor alive when a colour or size is picked: the button must not take
+    // the focus (the text would be committed in the old style before the new one applies).
+    keepTextFocus(e) {
+        if (this.editor && this.editor.textAt && e.target.closest('[data-markup]')) e.preventDefault();
     }
 
     onInput(e) {
@@ -892,6 +1033,8 @@ class CameraStudio {
     }
 
     onPointerDown(e) {
+        this.keepTextFocus(e);
+        if (e.target.closest && e.target.closest('[data-cam="native"]')) this.pauseForNative();
         if (e.pointerType !== 'touch' || this.view !== 'camera' || !e.target.closest('[data-cam="stage"]')) return;
         this.pinch.set(e.pointerId, { x: e.clientX, y: e.clientY });
         if (this.pinch.size === 2) {
@@ -919,6 +1062,9 @@ class CameraStudio {
         const typing = (tag === 'INPUT' && !['range', 'checkbox', 'radio', 'button'].includes(target.type)) ||
             tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable;
         const key = e.key;
+        // The zoom slider and the settings switches keep their own keys (arrows move the slider, Space toggles).
+        if (tag === 'INPUT' && ['range', 'checkbox', 'radio'].includes(target.type) &&
+            (key.startsWith('Arrow') || key === ' ' || key === 'Enter' || key === 'Home' || key === 'End')) return;
 
         if (this.editor) {
             if (typing) return;
@@ -934,7 +1080,8 @@ class CameraStudio {
         }
         if (e.ctrlKey || e.metaKey || e.altKey) return;
         if (key === ' ' || key === 'Enter') {
-            if (tag === 'BUTTON' || tag === 'A' || tag === 'LABEL' || tag === 'SUMMARY') return;
+            if (tag === 'BUTTON' || tag === 'A' || tag === 'LABEL' || tag === 'SUMMARY' || tag === 'INPUT') return;
+            if (e.repeat) { e.preventDefault(); return; } // a held key is one photo, not a burst
             if (this.view === 'camera') { e.preventDefault(); this.shutter(); }
             return;
         }
@@ -968,6 +1115,7 @@ class CameraStudio {
         for (const [name, handler] of Object.entries(this.handlers)) this.root.removeEventListener(name, handler);
         document.removeEventListener('keydown', this.onKeyDown);
         document.removeEventListener('visibilitychange', this.onVisibility);
+        window.removeEventListener('focus', this.onWindowFocus);
         for (const id of [...this.shots.keys()]) this.remove(id);
         if (this.audio) this.audio.close().catch(() => { });
         this.shutterSound.removeAttribute('src');
@@ -1075,14 +1223,16 @@ class MarkupEditor {
         ctx.beginPath();
         ctx.rect(0, 0, this.image.width, this.image.height);
         ctx.clip();
-        for (const shape of this.shapes) drawShape(ctx, shape);
-        if (this.current) drawShape(ctx, this.current);
+        const devicePixels = this.dpr * this.scale; // per image pixel: halos are in device pixels
+        for (const shape of this.shapes) drawShape(ctx, shape, devicePixels);
+        if (this.current) drawShape(ctx, this.current, devicePixels);
         ctx.restore();
     }
 
     down(e) {
         if (e.pointerType === 'mouse' && e.button !== 0) return;
         e.preventDefault();
+        if (this.current) return; // a second finger while drawing: the first one owns the stroke
         const point = this.toImage(e);
         if (this.tool === 'text') { this.placeText(point); return; }
         this.commitText();
@@ -1090,13 +1240,13 @@ class MarkupEditor {
         try { this.canvas.setPointerCapture(e.pointerId); } catch { /* not capturable */ }
         this.current = {
             type: this.tool, color: this.color, width: this.base * MARKUP_WIDTHS[this.size],
-            points: [point], x1: point.x, y1: point.y, x2: point.x, y2: point.y,
+            points: [point], x1: point.x, y1: point.y, x2: point.x, y2: point.y, pointerId: e.pointerId,
         };
         this.draw();
     }
 
     move(e) {
-        if (!this.current) return;
+        if (!this.current || e.pointerId !== this.current.pointerId) return;
         const point = this.toImage(e);
         const shape = this.current;
         if (shape.type === 'pen') {
@@ -1109,10 +1259,11 @@ class MarkupEditor {
         this.draw();
     }
 
-    up() {
+    up(e) {
         const shape = this.current;
-        if (!shape) return;
+        if (!shape || (e && e.pointerId !== shape.pointerId)) return;
         this.current = null;
+        delete shape.pointerId;
         const length = Math.hypot(shape.x2 - shape.x1, shape.y2 - shape.y1) * this.scale;
         const kept = shape.type === 'pen' ? shape.points.length > 1 : length >= 4;
         if (kept) {
@@ -1137,11 +1288,14 @@ class MarkupEditor {
         setTimeout(() => this.input && this.input.focus(), 0);
     }
 
+    // The box is typed in at 16px and scaled to the text's real size: iOS zooms the whole page into any field under 16px.
     restyleText() {
         if (!this.input || this.input.hidden) return;
         const size = this.base * MARKUP_TEXT[this.size];
         this.textSize = size;
-        this.input.style.fontSize = `${Math.max(12, size * this.scale)}px`;
+        this.input.style.fontSize = '16px';
+        this.input.style.transformOrigin = '0 0';
+        this.input.style.transform = `scale(${Math.max(12, size * this.scale) / 16})`;
         this.input.style.color = this.color;
     }
 
@@ -1192,21 +1346,41 @@ class MarkupEditor {
         this.studio.notify('OnMarkupState', this.shapes.length > 0, this.undone.length > 0);
     }
 
+    // At full size; if the browser cannot hold a canvas that large (older iOS caps canvases at 16.7 MP), at the largest
+    // size it can.
     async export() {
-        const canvas = document.createElement('canvas');
-        canvas.width = this.image.width;
-        canvas.height = this.image.height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(this.image, 0, 0);
-        for (const shape of this.shapes) drawShape(ctx, shape);
-        const blob = await canvasToBlob(canvas, 'image/jpeg', PHOTO_QUALITY);
-        const thumb = await canvasToBlob(scaled(canvas, canvas.width, canvas.height, THUMB_SIZE), 'image/jpeg', THUMB_QUALITY);
-        return { blob, thumb, width: canvas.width, height: canvas.height };
+        const full = this.image.width * this.image.height;
+        for (const limit of [Infinity, 16_777_216, 8_000_000]) {
+            const factor = full > limit ? Math.sqrt(limit / full) : 1;
+            if (limit !== Infinity && factor === 1) continue;
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.floor(this.image.width * factor);
+            canvas.height = Math.floor(this.image.height * factor);
+            let small = null;
+            try {
+                const ctx = canvas.getContext('2d');
+                if (!ctx) continue;
+                ctx.scale(factor, factor);
+                ctx.drawImage(this.image, 0, 0);
+                for (const shape of this.shapes) drawShape(ctx, shape, factor);
+                const blob = await canvasToBlob(canvas, 'image/jpeg', PHOTO_QUALITY);
+                small = scaled(canvas, canvas.width, canvas.height, THUMB_SIZE);
+                const thumb = await canvasToBlob(small, 'image/jpeg', THUMB_QUALITY);
+                return { blob, thumb, width: canvas.width, height: canvas.height };
+            } catch {
+                // too large for this browser: try smaller
+            } finally {
+                release(canvas);
+                release(small);
+            }
+        }
+        throw new Error('The image is too large to mark up on this device.');
     }
 }
 
-// Every mark gets a soft dark halo so a red arrow still reads on a dark beam and a white one on the sky.
-function drawShape(ctx, shape) {
+// Every mark gets a soft dark halo so a red arrow still reads on a dark beam and a white one on the sky. The halo is
+// sized in image pixels like the mark; the canvas draws blurs in device pixels, hence devicePixels (per image pixel).
+function drawShape(ctx, shape, devicePixels = 1) {
     ctx.save();
     ctx.strokeStyle = shape.color;
     ctx.fillStyle = shape.color;
@@ -1214,7 +1388,7 @@ function drawShape(ctx, shape) {
     ctx.lineJoin = 'round';
     ctx.lineWidth = shape.width || 1;
     ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
-    ctx.shadowBlur = Math.max(2, (shape.width || shape.size / 8) * 0.9);
+    ctx.shadowBlur = Math.max(1, Math.max(2, (shape.width || shape.size / 8) * 0.9) * devicePixels);
     const { x1, y1, x2, y2 } = shape;
     switch (shape.type) {
         case 'pen': {
@@ -1259,7 +1433,7 @@ function drawShape(ctx, shape) {
         case 'text': {
             ctx.font = `700 ${shape.size}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
             ctx.textBaseline = 'top';
-            ctx.shadowBlur = shape.size * 0.25;
+            ctx.shadowBlur = Math.max(1, shape.size * 0.25 * devicePixels);
             ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
             ctx.lineWidth = shape.size * 0.12;
             ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)';
@@ -1342,6 +1516,14 @@ function even(value) {
     return Math.max(2, Math.round(value / 2) * 2);
 }
 
+// Gives a canvas's memory back at once (iOS caps the total canvas memory of a page).
+function release(canvas) {
+    if (canvas && typeof canvas.getContext === 'function') {
+        canvas.width = 0;
+        canvas.height = 0;
+    }
+}
+
 function canvasToBlob(canvas, type, quality) {
     return new Promise((resolve, reject) => {
         canvas.toBlob(blob => (blob ? resolve(blob) : reject(new Error('The image could not be encoded.'))), type, quality);
@@ -1418,7 +1600,7 @@ function extensionFor(type) {
     const mime = (type || '').split(';')[0].toLowerCase();
     return {
         'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif',
-        'image/heic': 'heic', 'image/heif': 'heif',
+        'image/bmp': 'bmp',
         'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov', 'video/x-m4v': 'm4v',
     }[mime] || '';
 }
@@ -1460,10 +1642,16 @@ function videoPoster(blob) {
             if (error) reject(error); else resolve(result);
         };
         const timer = setTimeout(() => done(null, new Error('timeout')), 8000);
-        video.addEventListener('loadeddata', () => {
+        // Seek as soon as the metadata is there: iOS may never load more than metadata for a video nobody plays.
+        let seeking = false;
+        const seek = () => {
+            if (seeking) return;
+            seeking = true;
             const duration = Number.isFinite(video.duration) ? video.duration : 0;
             video.currentTime = duration > 1 ? 0.5 : 0;
-        }, { once: true });
+        };
+        video.addEventListener('loadedmetadata', seek, { once: true });
+        video.addEventListener('loadeddata', seek, { once: true });
         video.addEventListener('seeked', async () => {
             try {
                 const thumb = await canvasToBlob(scaled(video, video.videoWidth, video.videoHeight, THUMB_SIZE), 'image/jpeg', THUMB_QUALITY);
@@ -1477,13 +1665,15 @@ function videoPoster(blob) {
         }, { once: true });
         video.addEventListener('error', () => done(null, new Error('decode')), { once: true });
         video.src = url;
+        video.load();
     });
 }
 
 // ---- WebM duration ---------------------------------------------------------------------------------------------
-// MediaRecorder writes WebM as a live stream: the file has no Duration, so a player shows no length and cannot seek
-// until it has read the whole clip. Insert Duration into the Segment's Info element. Only the layout MediaRecorder
-// writes is handled (Segment of unknown size, no SeekHead before Info); anything else is returned untouched.
+// MediaRecorder writes WebM as a live stream: the file has no Duration (Chrome) or a Duration of 0 (Firefox), so a
+// player shows no length and cannot seek until it has read the whole clip. Insert Duration into the Segment's Info
+// element, or overwrite a zero one in place. Only the layouts MediaRecorder writes are handled (Segment of unknown size;
+// before Info at most an empty SeekHead, as Firefox writes); anything else is returned untouched.
 
 async function fixWebmDuration(blob, durationMs) {
     try {
@@ -1506,23 +1696,40 @@ async function fixWebmDuration(blob, durationMs) {
             const childSize = readEbmlSize(head, position + childId.length);
             if (!childSize || childSize.unknown) return blob;
             const dataStart = position + childId.length + childSize.length;
-            if (childId.value === 0x114D9B74) return blob; // SeekHead: its offsets would move
+            if (childId.value === 0x114D9B74) {
+                if (childSize.value > 0) return blob; // a real SeekHead: its offsets would move
+                position = dataStart;                  // Firefox's empty one: nothing points past it
+                continue;
+            }
             if (childId.value === 0x1549A966) {
                 if (dataStart + childSize.value > head.length) return blob;
                 const info = head.subarray(dataStart, dataStart + childSize.value);
                 let timecodeScale = 1_000_000;
+                let existing = null;
                 for (let p = 0; p < info.length;) {
                     const elementId = readEbmlId(info, p);
                     const elementSize = elementId && readEbmlSize(info, p + elementId.length);
                     if (!elementId || !elementSize || elementSize.unknown) return blob;
                     const valueStart = p + elementId.length + elementSize.length;
-                    if (elementId.value === 0x4489) return blob; // already has a Duration
+                    if (elementId.value === 0x4489) existing = { start: valueStart, length: elementSize.value };
                     if (elementId.value === 0x2AD7B1) {
                         let scale = 0;
                         for (let i = 0; i < elementSize.value; i++) scale = scale * 256 + info[valueStart + i];
                         if (scale > 0) timecodeScale = scale;
                     }
                     p = valueStart + elementSize.value;
+                }
+                const ticks = durationMs * 1_000_000 / timecodeScale;
+                if (existing) {
+                    if (existing.length !== 4 && existing.length !== 8) return blob;
+                    const view = new DataView(info.buffer, info.byteOffset + existing.start, existing.length);
+                    const current = existing.length === 8 ? view.getFloat64(0) : view.getFloat32(0);
+                    if (current > 0) return blob; // a real Duration: keep it
+                    const bytes = new Uint8Array(existing.length);
+                    if (existing.length === 8) new DataView(bytes.buffer).setFloat64(0, ticks);
+                    else new DataView(bytes.buffer).setFloat32(0, ticks);
+                    const at = dataStart + existing.start;
+                    return new Blob([blob.slice(0, at), bytes, blob.slice(at + existing.length)], { type: blob.type });
                 }
                 const duration = new Uint8Array(11);
                 duration.set([0x44, 0x89, 0x88]);

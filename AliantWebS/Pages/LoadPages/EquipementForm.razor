@@ -14,16 +14,16 @@
 }
 else
 {
-    @if (ButtonText != "Create")
+    @if (!string.IsNullOrEmpty(Title))
     {
-        <Div Style="display: flex">
-            <h2>@Title</h2>
-            <div style="margin-left: auto; ">
-                <Blazorise.Button Clicked="@OnLoadCasesButtonClicked" Color="Blazorise.Color.Primary">Edit Event Load Cases</Blazorise.Button>
-            </div>
-        </Div>
+        <h2>@Title</h2>
     }
     <hr />
+
+    @if (!string.IsNullOrEmpty(Error))
+    {
+        <div class="alert alert-danger equipement-error" role="alert">@Error</div>
+    }
 
     <EditForm EditContext="@EditContext" id="EquipementFormId" OnValidSubmit="@OnValidSubmit">
         <DataAnnotationsValidator />
@@ -39,14 +39,45 @@ else
                 <div class="form-group">
                     <label>@L["Description"] :</label>
                     <div>
-                        <textarea style="height:150px" @bind="@Equipement.Description" @oninput='(() =>areachanged("ShortDescription"))' class="form-control"></textarea>
+                        <textarea style="height:150px" @bind="@Equipement.Description" @oninput='(() =>areachanged("Description"))' class="form-control"></textarea>
                         <ValidationMessage For="@(() => Equipement.Description)" />
                     </div>
                 </div>
 
             </Column>
             <Column ColumnSize="ColumnSize.Is6">
-
+                <div class="form-group">
+                    <label for="equipement-type">@L["Equipment type"] :</label>
+                    <div>
+                        @if (equipementTypes == null)
+                        {
+                            <em>@L["Loading"]...</em>
+                        }
+                        else if (equipementTypes.Count == 0)
+                        {
+                            <p class="text-danger no-equipement-type">
+                                @L["There is no equipment type yet: create one in Equipement Types first."]
+                                <a href="EquipementTypes">@L["Equipement Types"]</a>
+                            </p>
+                        }
+                        else
+                        {
+                            @* An equipment cannot exist without a type (EquipementTypeID is required in the database). *@
+                            <select id="equipement-type" class="form-control" value="@(Equipement.EquipementTypeId == Guid.Empty ? "" : Equipement.EquipementTypeId.ToString())" @onchange="TypeChanged">
+                                @if (Equipement.EquipementTypeId == Guid.Empty)
+                                {
+                                    @* A new equipment, or one whose type was deleted meanwhile (ReloadTypesAsync). *@
+                                    <option value="">@L["Choose a type"]</option>
+                                }
+                                @foreach (var type in equipementTypes)
+                                {
+                                    <option value="@type.EquipementTypeId">@(string.IsNullOrWhiteSpace(type.Name) ? L["(no name)"] : type.Name)</option>
+                                }
+                            </select>
+                        }
+                        <ValidationMessage For="@(() => Equipement.EquipementTypeId)" />
+                    </div>
+                </div>
 
 
             </Column>
@@ -68,7 +99,7 @@ else
             <div class="col-md-4">
                 <div class="form-group">
                     <button type="button" class="btn btn-success" @onclick="@Cancel">
-                        Cancel
+                        @L["Cancel"]
                     </button>
                 </div>
             </div>
@@ -87,24 +118,32 @@ else
 
     [Parameter] public string Title { get; set; }
 
+    /// <summary>Why the last save failed, shown above the form (the page that saves sets it).</summary>
+    [Parameter] public string Error { get; set; }
 
     [Parameter] public EventCallback OnValidSubmit { get; set; }
 
     [Parameter] public Equipement Equipement { get; set; }
 
+    private List<EquipementType> equipementTypes;
+
+    // The context the handlers below are attached to, and the "choose a type" message kept in it.
+    private EditContext subscribed;
+    private ValidationMessageStore typeMessages;
+
 
     public override async Task SetParametersAsync(ParameterView parameters)
     {
         await base.SetParametersAsync(parameters);
-        if (EditContext == null)
-        {
-            navigationManager.NavigateTo("Equipements");
-            return;
-        }
+        // No redirect when there is no EditContext yet: the pages render this form once their equipment is loaded,
+        // and until then it says "Loading" (redirecting here sent a freshly opened Edit page back to the list).
+        if (EditContext == null || ReferenceEquals(subscribed, EditContext)) return;
 
-        EditContext.OnFieldChanged -= FieldChanged;
+        Unsubscribe();
+        subscribed = EditContext;
+        typeMessages = new ValidationMessageStore(EditContext);
         EditContext.OnFieldChanged += FieldChanged;
-
+        EditContext.OnValidationRequested += ValidateType;
     }
 
     protected override async Task OnInitializedAsync()
@@ -115,7 +154,7 @@ else
         appData.FormId = "EquipementFormId";
         appData.DisplaySubmitButton = true;
 
-
+        equipementTypes = (await entitiesService.GetAllEntitiesAsync<EquipementType>()).OrderBy(t => t.Name).ToList();
     }
 
 
@@ -125,35 +164,63 @@ else
         EditContext.NotifyFieldChanged(EditContext.Field(s));
     }
 
+    /// <summary>
+    /// Reads the types again, after a refused save: a type deleted meanwhile (by another tab or user) leaves the list, and
+    /// an equipment that had it is back to "Choose a type".
+    /// </summary>
+    public async Task ReloadTypesAsync()
+    {
+        equipementTypes = (await entitiesService.GetAllEntitiesAsync<EquipementType>()).OrderBy(t => t.Name).ToList();
+        if (Equipement != null && Equipement.EquipementTypeId != Guid.Empty
+            && !equipementTypes.Any(t => t.EquipementTypeId == Equipement.EquipementTypeId))
+            Equipement.EquipementTypeId = Guid.Empty;
+        StateHasChanged();
+    }
+
+    private void TypeChanged(ChangeEventArgs e)
+    {
+        var type = equipementTypes?.FirstOrDefault(t => t.EquipementTypeId.ToString() == e.Value?.ToString());
+        if (type == null) return;
+        // The key only: the pages hold the equipment as plain data and save it through a context of their own
+        // (SaveOwnedAsync / UpdateOwnedAsync), where a type object of this circuit's context would be inserted again.
+        Equipement.EquipementTypeId = type.EquipementTypeId;
+        var field = EditContext.Field(nameof(Equipement.EquipementTypeId));
+        typeMessages.Clear(field);
+        EditContext.NotifyFieldChanged(field);
+        EditContext.NotifyValidationStateChanged();
+    }
+
+    private void ValidateType(object sender, ValidationRequestedEventArgs e)
+    {
+        typeMessages.Clear();
+        if (Equipement.EquipementTypeId == Guid.Empty)
+            typeMessages.Add(EditContext.Field(nameof(Equipement.EquipementTypeId)), L["Choose the equipment's type."]);
+    }
+
     private void FieldChanged(object sender, FieldChangedEventArgs arg)
     {
         appData.SaveChanges = true;
     }
 
-
-    void OnLoadCasesButtonClicked()
-    {
-        navigationManager.NavigateTo("LoadCases/" + Equipement.EquipementId);
-    }
-
     void Cancel()
     {
-        navigationManager.NavigateTo("Events");
+        navigationManager.NavigateTo("Equipements");
     }
 
 
-
+    private void Unsubscribe()
+    {
+        if (subscribed == null) return;
+        subscribed.OnFieldChanged -= FieldChanged;
+        subscribed.OnValidationRequested -= ValidateType;
+        subscribed = null;
+    }
 
     void IDisposable.Dispose()
     {
-        // Unsubscribe from the event when our component is disposed
-        if (EditContext != null)
-        {
-            EditContext.OnFieldChanged -= FieldChanged;
-        }
-
+        // Unsubscribe from the events when our component is disposed
+        Unsubscribe();
     }
 
 
 }
-

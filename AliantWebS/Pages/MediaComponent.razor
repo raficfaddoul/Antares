@@ -15,9 +15,10 @@
 @inject Microsoft.AspNetCore.Mvc.ViewFeatures.IFileVersionProvider fileVersions
 
 @* The photos and videos of an event, element, structure or site: a viewer with a filmstrip, the camera, file
-   upload, full screen (MediaViewer), download and delete. The files are MediaLibrary's (the Images folder). *@
+   upload (button, or files dropped anywhere on the card), full screen (MediaViewer), download and delete. The files are
+   MediaLibrary's (the Images folder). The browser half is wwwroot/js/media-gallery.js. *@
 
-<div class="media">
+<div class="media" @ref="card">
     <div class="media-head">
         <div class="media-title">
             @MediaIcons.Svg("image")
@@ -28,7 +29,8 @@
             }
         </div>
         <div class="media-actions">
-            @if (canStore)
+            @* Kept in the page for the whole upload: the browser reads each file through its input element. *@
+            @if (canStore || uploading)
             {
                 <button type="button" class="media-btn media-btn-primary" title="@L["Camera"]" disabled="@uploading" @onclick="OpenCameraAsync">
                     @MediaIcons.Svg("camera") <span class="media-hide-sm">@L["Camera"]</span>
@@ -65,9 +67,9 @@
                 <div class="media-empty-icon">@MediaIcons.Svg(canStore ? "image-plus" : "image")</div>
                 <strong>@L["No photos or videos yet"]</strong>
                 <span>@(canStore ? L["Use the camera, add files, or drop them here."] : CannotStoreText)</span>
-                @if (canStore && !uploading)
+                @if (canStore || uploading)
                 {
-                    <InputFile class="media-drop-input" OnChange="AddFilesAsync" multiple accept="image/*,video/*" title="@L["Add files"]" />
+                    <InputFile class="media-drop-input" OnChange="AddFilesAsync" multiple accept="image/*,video/*" disabled="@uploading" title="@L["Add files"]" />
                 }
             </div>
         }
@@ -75,39 +77,39 @@
     else
     {
         var item = items[active];
-        <div class="media-stage" tabindex="0" aria-label="@L["{0} of {1}", active + 1, items.Count]" @onkeydown="OnStageKeyAsync">
+        <div class="media-stage" role="group" tabindex="0" aria-label="@L["{0} of {1}", active + 1, items.Count]" @onkeydown="OnStageKeyAsync">
             @if (item.Kind == MediaKind.Photo)
             {
-                <img @key="item.Url" src="@item.Url" alt="@item.Name" decoding="async" title="@L["Open full screen"]" @onclick="OpenViewerAsync" />
+                <img @key="item.Url" src="@item.Url" alt="@item.DisplayName" decoding="async" title="@L["Open full screen"]" @onclick="OpenViewerAsync" />
             }
             else if (item.Kind == MediaKind.Video)
             {
-                <video @key="item.Url" src="@item.Url" poster="@item.ThumbnailUrl" controls preload="metadata" playsinline></video>
+                <video @key="item.Url" src="@item.Url" poster="@item.ThumbnailUrl" controls preload="metadata" playsinline @onkeydown:stopPropagation="true"></video>
             }
             else
             {
-                <div class="media-file">@MediaIcons.Svg("image") <span>@item.Name</span></div>
+                <div class="media-file">@MediaIcons.Svg("image") <span>@item.DisplayName</span></div>
             }
 
             <span class="media-counter">@(active + 1) / @items.Count</span>
             <div class="media-stage-actions">
-                <button type="button" class="media-round" title="@L["Open full screen"]" aria-label="@L["Open full screen"]" @onclick="OpenViewerAsync">@MediaIcons.Svg("expand")</button>
-                <a class="media-round" href="@item.Url" download="@item.Name" title="@L["Download"]" aria-label="@L["Download"]">@MediaIcons.Svg("download")</a>
-                <button type="button" class="media-round media-round-danger" title="@L["Delete"]" aria-label="@L["Delete"]" disabled="@uploading" @onclick="() => DeleteAsync(item)">@MediaIcons.Svg("trash")</button>
+                <button type="button" class="media-round" title="@L["Open full screen"]" aria-label="@L["Open full screen"]" @onclick="OpenViewerAsync" @onkeydown:stopPropagation="true">@MediaIcons.Svg("expand")</button>
+                <a class="media-round" href="@item.Url" download="@item.DisplayName" title="@L["Download"]" aria-label="@L["Download"]" @onkeydown:stopPropagation="true">@MediaIcons.Svg("download")</a>
+                <button type="button" class="media-round media-round-danger" title="@L["Delete"]" aria-label="@L["Delete"]" disabled="@uploading" @onclick="() => DeleteAsync(item)" @onkeydown:stopPropagation="true">@MediaIcons.Svg("trash")</button>
             </div>
             @if (active > 0)
             {
-                <button type="button" class="media-nav media-nav-prev" aria-label="@L["Previous"]" @onclick="() => Select(active - 1)">@MediaIcons.Svg("chevron-left")</button>
+                <button type="button" class="media-nav media-nav-prev" aria-label="@L["Previous"]" @onclick="() => Select(active - 1)" @onkeydown:stopPropagation="true">@MediaIcons.Svg("chevron-left")</button>
             }
             @if (active < items.Count - 1)
             {
-                <button type="button" class="media-nav media-nav-next" aria-label="@L["Next"]" @onclick="() => Select(active + 1)">@MediaIcons.Svg("chevron-right")</button>
+                <button type="button" class="media-nav media-nav-next" aria-label="@L["Next"]" @onclick="() => Select(active + 1)" @onkeydown:stopPropagation="true">@MediaIcons.Svg("chevron-right")</button>
             }
         </div>
 
         <div class="media-caption">
-            <span class="media-name" title="@item.Name">@item.Name</span>
-            <span>@item.Modified.ToString("g", CultureInfo.CurrentCulture)</span>
+            <span class="media-name" title="@item.DisplayName">@item.DisplayName</span>
+            <span>@Local(item.ModifiedUtc).ToString("g", CultureInfo.CurrentCulture)</span>
             <span>@CameraComponent.FormatSize(item.Size)</span>
         </div>
 
@@ -118,7 +120,7 @@
                 {
                     var position = i;
                     var thumb = items[i];
-                    <button type="button" @key="thumb.Path" class="media-thumb @(position == active ? "is-active" : "")" title="@thumb.Name" aria-label="@thumb.Name" @onclick="() => Select(position)">
+                    <button type="button" @key="thumb.Path" class="media-thumb @(position == active ? "is-active" : "")" title="@thumb.DisplayName" aria-label="@thumb.DisplayName" aria-current="@(position == active ? "true" : null)" @onclick="() => Select(position)">
                         @if (thumb.ThumbnailUrl != null || thumb.Kind == MediaKind.Photo)
                         {
                             <img src="@(thumb.ThumbnailUrl ?? thumb.Url)" alt="" loading="lazy" decoding="async" />
@@ -162,10 +164,11 @@
     private bool loading = true, canStore, revealActive, disposed;
     private object? loadedOwner;
     private List<Element>? loadedElements;
-    private ElementReference strip;
-    private IJSObjectReference? module;
+    private ElementReference card, strip;
+    private IJSObjectReference? module, dropTarget;
+    private int? timezoneOffset;
 
-    private bool uploading;
+    private bool uploading, reloadAfterUpload;
     private int uploadIndex, uploadCount, uploadPercent;
     private string uploadName = "";
     private DateTime lastUploadRender;
@@ -174,9 +177,19 @@
         ? L["Save this item first to add photos and videos."]
         : L["Photos and videos cannot be stored for this item."];
 
-    // Parents re-render often: the folder is read again only when the item changes, not on every render.
+    // Files are dated by the server (UTC in the container); people read them on their own clock.
+    private DateTime Local(DateTime utc) => timezoneOffset is int minutes ? utc.AddMinutes(-minutes) : utc.ToLocalTime();
+
+    // Parents re-render often: the folder is read again only when the item changes, not on every render. During an
+    // upload nothing is re-read or re-rendered away (the files are being read through this component's inputs): the
+    // item shown then is reloaded once the upload is over.
     protected override async Task OnParametersSetAsync()
     {
+        if (uploading)
+        {
+            reloadAfterUpload = true;
+            return;
+        }
         canStore = ElementsToDispay == null && MediaLibrary.CanStore(selectedObject);
         if (ReferenceEquals(loadedOwner, selectedObject) && ReferenceEquals(loadedElements, ElementsToDispay) && !loading) return;
         var sameItem = loadedOwner != null && MediaLibrary.IdOf(loadedOwner) == MediaLibrary.IdOf(selectedObject);
@@ -205,17 +218,27 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!revealActive || items.Count < 2 || disposed) return;
-        revealActive = false;
+        if (disposed) return;
         try
         {
-            module ??= await js.InvokeAsync<IJSObjectReference>("import", "." + fileVersions.AddFileVersionToPath(default, "/js/media-gallery.js"));
-            if (disposed) return;
-            await module.InvokeVoidAsync("reveal", strip, active);
+            if (firstRender)
+            {
+                module = await js.InvokeAsync<IJSObjectReference>("import", "." + fileVersions.AddFileVersionToPath(default, "/js/media-gallery.js"));
+                if (disposed) return;
+                timezoneOffset = await module.InvokeAsync<int>("timezoneOffset");
+                dropTarget = await module.InvokeAsync<IJSObjectReference>("attachDrop", card);
+                if (disposed) return;
+                StateHasChanged();
+            }
+            if (revealActive && items.Count > 1 && module != null)
+            {
+                revealActive = false;
+                await module.InvokeVoidAsync("reveal", strip, active);
+            }
         }
         catch (Exception ex) when (IsInteropFailure(ex))
         {
-            // Scrolling the strip is a comfort; the gallery works without it.
+            // Scrolling the strip, the drop zone and the local clock are comforts; the gallery works without them.
         }
     }
 
@@ -226,14 +249,13 @@
         revealActive = true;
     }
 
+    // Only keys pressed on the stage itself reach here: its buttons, link and video stop their own.
     private async Task OnStageKeyAsync(KeyboardEventArgs e)
     {
         switch (e.Key)
         {
             case "ArrowLeft": Select(active - 1); break;
             case "ArrowRight": Select(active + 1); break;
-            case "Home": Select(0); break;
-            case "End": Select(items.Count - 1); break;
             case "Enter": await OpenViewerAsync(); break;
             case "Delete": if (items.Count > 0 && !uploading) await DeleteAsync(items[active]); break;
         }
@@ -241,6 +263,8 @@
 
     // ---- dialogs -----------------------------------------------------------------------------------------------
 
+    // AutoFocusFirstElement off: Radzen would focus the dialog's first button (the camera's Close), and the first
+    // Space a keyboard user presses to take a photo would close the camera instead.
     public static DialogOptions MediaDialogOptions(bool closeOnEsc, bool fullScreen) => new()
     {
         ShowTitle = false,
@@ -253,6 +277,7 @@
         CloseDialogOnOverlayClick = false,
         Draggable = false,
         Resizable = false,
+        AutoFocusFirstElement = false,
     };
 
     private async Task OpenCameraAsync()
@@ -264,16 +289,25 @@
         await ReloadAsync(keepPosition: true, selectNewest: result is int changed && changed > 0);
     }
 
+    // The viewer reports each move, so the gallery stays on the last item shown however the viewer is closed
+    // (its X, or Esc, which Radzen closes with no result).
     private async Task OpenViewerAsync()
     {
         if (items.Count == 0) return;
-        var result = await DialogService.OpenAsync<MediaViewer>(items[active].Name,
-            new Dictionary<string, object> { { "Items", items }, { "Index", active } },
+        var shown = active;
+        await DialogService.OpenAsync<MediaViewer>(items[active].DisplayName,
+            new Dictionary<string, object>
+            {
+                { "Items", items },
+                { "Index", active },
+                { "TimezoneOffset", timezoneOffset },
+                { "IndexChanged", (Action<int>)(index => shown = index) },
+            },
             MediaDialogOptions(closeOnEsc: true, fullScreen: true));
         if (disposed) return;
-        if (result is int index && index >= 0 && index < items.Count)
+        if (shown >= 0 && shown < items.Count && shown != active)
         {
-            active = index;
+            active = shown;
             revealActive = true;
         }
     }
@@ -282,7 +316,9 @@
 
     private async Task AddFilesAsync(InputFileChangeEventArgs e)
     {
-        if (!canStore || uploading) return;
+        // The files go to the item shown when they were chosen, even if the page selects another one meanwhile.
+        var owner = selectedObject;
+        if (uploading || ElementsToDispay != null || !MediaLibrary.CanStore(owner)) return;
         IReadOnlyList<IBrowserFile> files;
         try
         {
@@ -322,10 +358,10 @@
                     continue;
                 }
 
-                var baseName = MediaLibrary.CleanBaseName(file.Name) ?? MediaLibrary.TimestampName(file.LastModified.LocalDateTime);
+                var baseName = MediaLibrary.CleanBaseName(file.Name) ?? MediaLibrary.TimestampName(Local(file.LastModified.UtcDateTime));
                 try
                 {
-                    await MediaLibrary.StoreAsync(selectedObject, Environment.ContentRootPath, baseName, ext, async temp =>
+                    await MediaLibrary.StoreAsync(owner, Environment.ContentRootPath, baseName, ext, async temp =>
                     {
                         await using var input = file.OpenReadStream(limit);
                         await using var output = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, FileOptions.Asynchronous);
@@ -360,7 +396,20 @@
         }
 
         if (disposed) return;
-        await ReloadAsync(keepPosition: added == 0, selectNewest: added > 0);
+        var sameItem = ReferenceEquals(owner, selectedObject) && !reloadAfterUpload;
+        reloadAfterUpload = false;
+        if (sameItem)
+        {
+            await ReloadAsync(keepPosition: added == 0, selectNewest: added > 0);
+        }
+        else
+        {
+            // The page moved to another item during the upload: show that one now.
+            canStore = ElementsToDispay == null && MediaLibrary.CanStore(selectedObject);
+            loadedOwner = selectedObject;
+            loadedElements = ElementsToDispay;
+            await ReloadAsync(keepPosition: false, selectNewest: ReferenceEquals(owner, selectedObject) && added > 0);
+        }
         if (problems.Count > 0)
             Notify(NotificationSeverity.Error, string.Join(" · ", problems), L["Not added"]);
         else if (added > 0)
@@ -370,7 +419,7 @@
     private async Task DeleteAsync(MediaItem item)
     {
         var confirmed = await DialogService.Confirm(
-            L["{0} will be deleted. This cannot be undone.", item.Name],
+            L["{0} will be deleted. This cannot be undone.", item.DisplayName],
             item.Kind == MediaKind.Video ? L["Delete this video?"] : L["Delete this photo?"],
             new ConfirmOptions { OkButtonText = L["Delete"], CancelButtonText = L["Cancel"] });
         if (confirmed != true || disposed) return;
@@ -404,13 +453,18 @@
     public async ValueTask DisposeAsync()
     {
         disposed = true;
-        var released = module;
-        module = null;
-        if (released != null)
+        var (releasedDrop, releasedModule) = (dropTarget, module);
+        (dropTarget, module) = (null, null);
+        try
         {
-            try { await released.DisposeAsync(); }
-            catch (Exception ex) when (IsInteropFailure(ex)) { }
+            if (releasedDrop != null)
+            {
+                await releasedDrop.InvokeVoidAsync("dispose");
+                await releasedDrop.DisposeAsync();
+            }
+            if (releasedModule != null) await releasedModule.DisposeAsync();
         }
+        catch (Exception ex) when (IsInteropFailure(ex)) { }
     }
 
     private static bool IsInteropFailure(Exception ex) =>

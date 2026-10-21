@@ -9,15 +9,15 @@
    pan and swipe run in wwwroot/js/media-gallery.js. The dialog's result is the index last shown, so the gallery
    stays on it. *@
 
-<div class="mv" tabindex="-1" @ref="root" @onkeydown="OnKeyAsync">
+<div class="mv" tabindex="-1" @ref="root" role="dialog" aria-label="@(Items.Count > 0 ? Items[index].DisplayName : null)" @onkeydown="OnKeyAsync">
     @if (Items.Count > 0)
     {
         var item = Items[index];
         <header class="mv-top">
             <span class="mv-count">@L["{0} of {1}", index + 1, Items.Count]</span>
             <div class="mv-name">
-                <strong title="@item.Name">@item.Name</strong>
-                <small>@item.Modified.ToString("g", CultureInfo.CurrentCulture) · @CameraComponent.FormatSize(item.Size)</small>
+                <strong title="@item.DisplayName">@item.DisplayName</strong>
+                <small>@Local(item.ModifiedUtc).ToString("g", CultureInfo.CurrentCulture) · @CameraComponent.FormatSize(item.Size)</small>
             </div>
             <div class="mv-actions">
                 @if (item.Kind == MediaKind.Photo)
@@ -26,7 +26,7 @@
                     <button type="button" class="mv-zoom" title="@L["Fit to screen"] (0)" @onclick="ResetZoomAsync">@((int)Math.Round(zoom * 100))%</button>
                     <button type="button" class="mv-btn" title="@L["Zoom in"] (+)" aria-label="@L["Zoom in"]" disabled="@(zoom >= 7.99)" @onclick="() => ZoomAsync(1.5)">@MediaIcons.Svg("zoom-in")</button>
                 }
-                <a class="mv-btn" href="@item.Url" download="@item.Name" title="@L["Download"]" aria-label="@L["Download"]">@MediaIcons.Svg("download")</a>
+                <a class="mv-btn" href="@item.Url" download="@item.DisplayName" title="@L["Download"]" aria-label="@L["Download"]">@MediaIcons.Svg("download")</a>
                 <button type="button" class="mv-btn" title="@L["Close"] (Esc)" aria-label="@L["Close"]" @onclick="Close">@MediaIcons.Svg("close")</button>
             </div>
         </header>
@@ -34,15 +34,15 @@
         <div class="mv-stage" @ref="viewport">
             @if (item.Kind == MediaKind.Photo)
             {
-                <img @key="item.Url" data-media="zoomable" src="@item.Url" alt="@item.Name" draggable="false" />
+                <img @key="item.Url" data-media="zoomable" src="@item.Url" alt="@item.DisplayName" draggable="false" />
             }
             else if (item.Kind == MediaKind.Video)
             {
-                <video @key="item.Url" src="@item.Url" poster="@item.ThumbnailUrl" controls autoplay playsinline></video>
+                <video @key="item.Url" src="@item.Url" poster="@item.ThumbnailUrl" controls autoplay playsinline @onkeydown:stopPropagation="true"></video>
             }
             else
             {
-                <div class="mv-file">@MediaIcons.Svg("image") <span>@item.Name</span></div>
+                <div class="mv-file">@MediaIcons.Svg("image") <span>@item.DisplayName</span></div>
             }
             @if (index > 0)
             {
@@ -61,7 +61,7 @@
                 {
                     var position = i;
                     var thumb = Items[i];
-                    <button type="button" @key="thumb.Path" class="mv-thumb @(position == index ? "is-active" : "")" aria-label="@thumb.Name" @onclick="() => GoAsync(position)">
+                    <button type="button" @key="thumb.Path" class="mv-thumb @(position == index ? "is-active" : "")" aria-label="@thumb.DisplayName" @onclick="() => GoAsync(position)">
                         @if (thumb.ThumbnailUrl != null || thumb.Kind == MediaKind.Photo)
                         {
                             <img src="@(thumb.ThumbnailUrl ?? thumb.Url)" alt="" loading="lazy" decoding="async" />
@@ -84,6 +84,14 @@
 @code {
     [Parameter] public List<MediaItem> Items { get; set; } = new();
     [Parameter] public int Index { get; set; }
+
+    /// <summary>Called with each item shown, so the gallery can follow (Esc closes the dialog with no result).</summary>
+    [Parameter] public Action<int>? IndexChanged { get; set; }
+
+    /// <summary>The browser's Date.getTimezoneOffset(): files are dated in UTC by the server.</summary>
+    [Parameter] public int? TimezoneOffset { get; set; }
+
+    private DateTime Local(DateTime utc) => TimezoneOffset is int minutes ? utc.AddMinutes(-minutes) : utc.ToLocalTime();
 
     private ElementReference root, viewport, strip;
     private IJSObjectReference? module, viewer;
@@ -133,6 +141,7 @@
         index = next;
         moved = true;
         zoom = 1;
+        IndexChanged?.Invoke(index);
         if (viewer != null) await Quietly(() => viewer.InvokeAsync<double>("reset").AsTask());
     }
 

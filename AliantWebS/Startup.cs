@@ -11,6 +11,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -28,6 +29,7 @@ using Blazored.LocalStorage;
 using Microsoft.AspNetCore.Localization;
 using System.Globalization;
 using System.Net.Http;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
 
 namespace AliantWebS
@@ -172,6 +174,13 @@ namespace AliantWebS
             // Journal rows written by the background monitoring loop, which has no user and no scope.
             JournalWriter.DbFactory = app.ApplicationServices.GetRequiredService<IDbContextFactory<AliantWebContext>>();
 
+            // The InfluxDB token is no longer in the code: say so at startup rather than on the first sensor chart.
+            // Without it every InfluxDB call fails, the background report/alarm fetcher included.
+            if (!InfluxService.IsConfigured)
+                app.ApplicationServices.GetRequiredService<ILogger<Startup>>().LogError(
+                    "No InfluxDB token: set INFLUXDB_TOKEN, or INFLUXDB_TOKEN_FILE to a file holding it. Until then sensor data, " +
+                    "reports and alarms (e-mails, siren) are not processed.");
+
             var basePath = Environment.GetEnvironmentVariable("BasePath")
                ?? Configuration["BasePath"];
             if (!string.IsNullOrWhiteSpace(basePath))
@@ -188,11 +197,8 @@ namespace AliantWebS
 
             app.UseStaticFiles(new StaticFileOptions { ContentTypeProvider = provider });
 
-            app.UseStaticFiles(new StaticFileOptions
-            {
-                FileProvider = new PhysicalFileProvider(Path.Combine(Directory.GetCurrentDirectory(), "Images" )),
-                RequestPath = "/Images"
-            });
+            // The Images folder (photos and videos of events, elements, structures and sites) is served further down,
+            // after UseAuthentication: only signed-in users may fetch it.
             //app.UseStaticFiles(new StaticFileOptions
             //{
             //    FileProvider = new PhysicalFileProvider(Path.Combine(Directory.GetCurrentDirectory(), "BIM")),
@@ -244,6 +250,35 @@ namespace AliantWebS
             app.UseAuthentication();
             app.UseAuthorization();
 
+            // Photos and videos (Images/): here, after UseAuthentication has read the Identity cookie, so a request
+            // without a signed-in user gets 401 and no bytes (a link sent outside, or a guessed structure photo name,
+            // leads nowhere). "private": a shared cache (a proxy) must not keep them for others; "no-cache": the browser
+            // asks again each time (a cheap 304 through this check), so nothing is shown from its cache after sign-out.
+            // Case-sensitive on purpose: wwwroot's own "images" (the app's logos) stay public and are served above anyway.
+            app.MapWhen(context => context.Request.Path.StartsWithSegments("/Images", StringComparison.Ordinal), images =>
+            {
+                images.Use(async (context, next) =>
+                {
+                    if (context.User.Identity?.IsAuthenticated != true)
+                    {
+                        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                        return;
+                    }
+                    await next();
+                });
+                images.UseStaticFiles(new StaticFileOptions
+                {
+                    FileProvider = new PhysicalFileProvider(Path.Combine(Directory.GetCurrentDirectory(), "Images")),
+                    RequestPath = "/Images",
+                    OnPrepareResponse = file => file.Context.Response.Headers.CacheControl = "private, no-cache",
+                });
+                images.Run(context =>
+                {
+                    context.Response.StatusCode = StatusCodes.Status404NotFound;
+                    return Task.CompletedTask;
+                });
+            });
+
             app.UseEndpoints(endpoints =>
             {
                 endpoints.MapControllers();
@@ -255,4 +290,4 @@ namespace AliantWebS
 }
 
 // git clone https://github.com/raficfaddoul/AliantWebS
-//docker exec -it AliantDbContainer /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'password@12345#'
+//docker exec -it AliantDbContainer bash -c '/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -C'

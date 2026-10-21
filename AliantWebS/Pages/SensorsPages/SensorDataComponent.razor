@@ -89,7 +89,7 @@
     {
         <label>
             Upload up to @maxAllowedFiles of up to @maxFileSize bytes:
-            <InputFile OnChange="@LoadDataFiles" multiple>kjkkh5</InputFile>
+            <InputFile OnChange="@LoadDataFiles" multiple accept=".csv">kjkkh5</InputFile>
 
         </label>
     }
@@ -98,7 +98,6 @@
 
 
 @code {
-    private static readonly string Token = "YwhDlJHxjnsQgGON-mj2yKNPuVeKQZuz4MEeAUtHWP2k39pOmn2a_KtXLdro6foOMq9Pnz4iyoJKijp7XbBWfg==";
 
 
     private long maxFileSize = 1024 * 15;
