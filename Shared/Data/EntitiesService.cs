@@ -36,6 +36,31 @@ namespace AliantWebS.Data
         /// </summary>
         public AliantWebContext CreateOwnedContext() => _DBFactory.CreateDbContext();
 
+        /// <summary>
+        /// A scenario's mother grids and palonniers, each with its element type and its charges (ChargeMp), read fresh in
+        /// ONE query through a context of its own, disposed here: nothing of them is tracked anywhere, so no later save of
+        /// another page writes an edit nobody confirmed, and nothing is left behind when the scenario is deleted. The
+        /// scenario's id is a parameter of the query: only its rows are read.
+        ///
+        /// The graph is resolved by identity: every charge's MotherGridPalonnier is the very element of the list, as the
+        /// load transmission needs it. The charges come grouped by element (elements by id, then charges by id). Save a
+        /// change with the owned methods (UpdateOwnedAsync...), which read only the row's own columns - never hand these
+        /// objects to the shared context, which would attach the whole graph.
+        /// </summary>
+        public async Task<(List<MotherGridPalonnier> Elements, List<ChargeMp> Charges)> ReadScenarioElementsAsync(Guid scenarioId)
+        {
+            await using var db = CreateOwnedContext();
+            var elements = await db.MotherGridPalonniers
+                .AsNoTrackingWithIdentityResolution()
+                .Include(e => e.ElementType)
+                .Include(e => e.ChargeMps)
+                .Where(e => e.EventMpscenarioId == scenarioId)
+                .OrderBy(e => e.MotherGridPalonnierId)
+                .ToListAsync();
+            var charges = elements.SelectMany(e => e.ChargeMps.OrderBy(c => c.ChargeMpid)).ToList();
+            return (elements, charges);
+        }
+
 
         private bool busy = false;
         private int delay = 5;
@@ -760,6 +785,13 @@ namespace AliantWebS.Data
 
             return true;
         }
+
+        /// <summary>
+        /// What a grid's ✓ tells when UpdateOwnedAsync threw: the database's own reason (not EF's "see the inner exception"),
+        /// and that the row is still in edit with what was typed.
+        /// </summary>
+        public static string NotSavedMessage(Exception ex) =>
+            $"L'enregistrement a échoué : {ex.GetBaseException().Message}\nLa ligne reste en édition, rien n'est perdu.";
 
         /// <summary>
         /// Stores a row a page holds as plain data, through a context of its own: inserted when it has no key yet, updated

@@ -25,7 +25,7 @@
                 {
                     <div class="@(palonnierComponentSelected ? "" : "selected-background" )" @onclick="MotherGridComponentEntered">
                         <MotherGridComponent @ref="MotherGridGridRef" ElementTypesList="ElementTypesList" MPList="MList" Title="MotherGrids"
-                                           MPGridChanged="HandleMGridChanged" MotherGridPalonnierListChanged="HandleMotherGridListChanged"
+                                           MPGridChanged="HandleMGridChanged" MotherGridPalonnierListChanged="HandleElementListChanged"
                                            RowSaved="HandleRowSaved"
                                            Famille="true" EventMpscenarioId="@EventMpscenarioId" @bind-SelectedMP="selectedMotherGrid"
                                            Inventory="inventory" InventoryError="@inventoryError">
@@ -40,7 +40,7 @@
                 {
                     <div class="@(palonnierComponentSelected ? "selected-background" : "")" @onclick="PalonnierComponentEntered">
                         <MotherGridComponent @ref="PalonnierGridRef" ElementTypesList="ElementTypesList" MPList="PList" Title="Palonniers"
-                                           MPGridChanged="HandlePGridChanged" MotherGridPalonnierListChanged="HandlePalonnierListChanged"
+                                           MPGridChanged="HandlePGridChanged" MotherGridPalonnierListChanged="HandleElementListChanged"
                                            RowSaved="HandleRowSaved"
                                            Famille="false" EventMpscenarioId="@EventMpscenarioId" @bind-SelectedMP="selectedPalonnier"
                                            Inventory="inventory" InventoryError="@inventoryError">
@@ -61,7 +61,7 @@
                 <ChargeMPComponent @ref="chargeMpComponent"
                     EventMpscenarioId="@EventMpscenarioId"
                     ChargeList="ChargeList"
-                    MotherGridPalonnierID="@(selectedMotherGrid?.MotherGridPalonnierId ?? selectedPalonnier?.MotherGridPalonnierId)"
+                    Carrier="@(selectedMotherGrid ?? selectedPalonnier)"
 
                     ChargeListChanged="HandleChargeListChanged"
                     OnCalculCharpente="HandleCalculCharpente"
@@ -199,8 +199,9 @@
     protected override async Task OnParametersSetAsync()
     {
         // After the calculation going, if any. This runs at every redraw of the layout - a pick in the scenario dropdown
-        // redraws it while the calculation for the scenario being left saves - and its queries share the circuit's
-        // context: a query started during that save made EF refuse a second operation on it and ended the circuit.
+        // redraws it while the calculation for the scenario being left runs - and the element types below are still read
+        // through the circuit's shared context, as the calculation reads them: a query started during another of its
+        // operations made EF refuse a second operation on it and ended the circuit.
         if (chargeMpComponent is { } charges)
             await charges.WhenIdle();
 
@@ -213,31 +214,45 @@
         ElementTypesList = await entitiesService.GetFilteredEntitiesAsync<ElementType>(
             x => x.Category != null && x.Category.Name.ToLower() == "mothergridpalonnier", "Category");
 
-        // "ElementType" is INCLUDED, because the grid prints mp.ElementType.Name. It used to work without,
-        // and only by accident: EF filled the navigation from whatever types this circuit's context already
-        // tracked. Since the generation writes through a context of its own (Pipeline.GenerateLayout,
-        // EntitiesService.CreateOwnedContext), a type it creates is not tracked here, and every row of that
-        // type came back with ElementType = null - and a NullReferenceException in the middle of rendering.
-        MList = await entitiesService.GetFilteredEntitiesAsync<MotherGridPalonnier>(
-            x => ((x.EventMpscenarioId == EventMpscenarioId) && (x.Famille == true)), "ElementType");
-        PList = await entitiesService.GetFilteredEntitiesAsync<MotherGridPalonnier>(
-            x => ((x.EventMpscenarioId == EventMpscenarioId) && (x.Famille == false)), "ElementType");
-        RebindSelection();
-
-        //   Charger toutes les charges pour la visualisation
-        ChargeList = await LoadChargesAsync();
+        await ReadRowsAsync();
 
         inventoryStamp = InventoryStamp();
 
         await LoadInventoryAsync();
     }
 
-    // Every charge on the scenario's elements: on the palonniers, and on the mother lines they hang from
-    // directly (a motor within 8 cm of a point line), so the list and the plan show them all.
-    private Task<List<ChargeMp>> LoadChargesAsync() =>
-        entitiesService.GetFilteredEntitiesAsync<ChargeMp>(
-            x => x.MotherGridPalonnier.EventMpscenarioId == EventMpscenarioId,
-            "MotherGridPalonnier");
+    // What the lists hold - or are being read for: the scenario, and the layout's count of « Générer l'implantation »
+    // runs (null outside the conception layout). And which read is the latest.
+    private (Guid Scenario, int? Generations)? rowsReadFor;
+    private int rowsReads;
+
+    // The scenario's mothers, palonniers and every charge on them - on the palonniers, and on the mother lines they hang
+    // from directly (a motor within 8 cm of a point line) - in one read through a context of their own, untracked
+    // (EntitiesService.ReadScenarioElementsAsync, element types included: the grid prints them). The page holds them as
+    // plain data and saves each change itself, through the owned methods.
+    //
+    // Read again only when the scenario shown changes, or after « Générer l'implantation » (which replaces every row,
+    // whether it then succeeds or not). The layout draws this page again for many reasons - a save anywhere in the tab,
+    // the unsaved-changes flag - and every read gives new objects: it replaced the rows the grids were editing. A read
+    // that fails propagates, as before: an empty list would say the scenario has no elements.
+    private async Task ReadRowsAsync()
+    {
+        var key = (EventMpscenarioId, Layout?.LayoutGenerations);
+        if (rowsReadFor == key) return;
+        rowsReadFor = key;
+        int read = ++rowsReads;
+
+        var (elements, charges) = key.EventMpscenarioId == Guid.Empty
+            ? (new List<MotherGridPalonnier>(), new List<ChargeMp>())   // no scenario on screen: nothing to read
+            : await entitiesService.ReadScenarioElementsAsync(key.EventMpscenarioId);
+
+        // The latest read wins: a slower read of the scenario shown before must not replace this one's rows.
+        if (read != rowsReads) return;
+        MList = elements.Where(e => e.Famille).ToList();
+        PList = elements.Where(e => !e.Famille).ToList();
+        ChargeList = charges;
+        RebindSelection();
+    }
 
     private async Task LoadInventoryAsync()
     {
@@ -360,109 +375,74 @@
         PGrid = grid;
     }
 
-    private async void HandleMotherGridListChanged(List<MotherGridPalonnier> l)
+    // A row of either list was added, deleted or opened for editing. The charges of an element no longer listed went with
+    // it (the database deletes them: ON DELETE CASCADE): off the charge grid, its total and the plan - the plan draws the
+    // same list. The others stay where they are, so a charge being edited keeps what was typed.
+    private async Task HandleElementListChanged(List<MotherGridPalonnier> changed)
     {
-            await RefreshChargeList();
+        var listed = MList.Concat(PList).Select(e => e.MotherGridPalonnierId).ToHashSet();
+        await chargeMpComponent.KeepChargesOf(listed);
         RebindSelection();
         StateHasChanged();
     }
 
-    private async void HandlePalonnierListChanged(List<MotherGridPalonnier> l)
+    // « Erase Selected » on the plan: the row of whichever list holds it, by id (the plan draws the lists' own objects).
+    private async Task HandleErase(MotherGridPalonnier mp)
     {
-            await RefreshChargeList();
-        RebindSelection();
-        StateHasChanged();
-    }
-    private async Task RefreshChargeList()
-    {
-        ChargeList = await LoadChargesAsync();
-    }
-
-    private async void HandleErase(MotherGridPalonnier mp)
-    {
-        if (MList.Contains(mp))
+        if (MList.Any(m => m.MotherGridPalonnierId == mp.MotherGridPalonnierId))
         {
             await MotherGridGridRef.DeleteMP(mp);
         }
 
-        if (PList.Contains(mp))
+        if (PList.Any(p => p.MotherGridPalonnierId == mp.MotherGridPalonnierId))
         {
             await PalonnierGridRef.DeleteMP(mp);
         }
     }
 
-    // A line drawn on the plan becomes a mother or a palonnier, of the type last chosen in its list, made of the
-    // pieces the stock can still make for it (MotherGridComponent.ProposeFor).
-    private async void HandleLineDrawn((double x1, double y1, double x2, double y2) t)
+    // A line drawn on the plan becomes a mother or a palonnier - of the list last entered - of the type last chosen in that
+    // list, made of the pieces the stock can still make for it (MotherGridComponent.ProposeFor).
+    private async Task HandleLineDrawn((double x1, double y1, double x2, double y2) line)
     {
         // Relative to Point0 of a scenario not known yet (the plan is in View mode then; a line already under way).
         if (Here is null) return;
 
-        if (!palonnierComponentSelected)
-        {
-            if ((MotherGridGridRef.lastSelectedElementType == null) ||
-                (MotherGridGridRef.lastSelectedElementType.ElementTypeId == Guid.Empty))
-            {
-                if (ElementTypesList.Count == 0) return;
-                MotherGridGridRef.lastSelectedElementType = ElementTypesList.FirstOrDefault();
-            }
-
-
-            MotherGridPalonnier mp = new MotherGridPalonnier();
-            mp.EventMpscenarioId = EventMpscenarioId;
-            mp.Famille = true;
-            mp.ElementTypeId = MotherGridGridRef.lastSelectedElementType.ElementTypeId;
-            mp.X1 = t.x1; mp.Y1 = t.y1;
-            mp.X2 = t.x2; mp.Y2 = t.y2;
-
-            var proposal = MotherGridGridRef.ProposeFor(mp);
-            mp.Composition = proposal.Composition;
-
-            if ((await entitiesService.InsertEntityAsync(mp)) != null)
-            {
-                MList.Add(mp);
-                StateHasChanged();
-                await MotherGridGridRef.MPGrid.InsertRow(mp);
-                await MotherGridGridRef.MPGrid.UpdateRow(mp);
-                MotherGridGridRef.ShowStatus(ProposalNote(proposal));
-            }
-            else
-            {
-                await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
-            }
-        }
+        if (palonnierComponentSelected)
+            await AddDrawnLineAsync(PalonnierGridRef, famille: false, line);
         else
+            await AddDrawnLineAsync(MotherGridGridRef, famille: true, line);
+    }
+
+    private async Task AddDrawnLineAsync(MotherGridComponent grid, bool famille, (double x1, double y1, double x2, double y2) line)
+    {
+        if ((grid.lastSelectedElementType == null) || (grid.lastSelectedElementType.ElementTypeId == Guid.Empty))
         {
-            if ((PalonnierGridRef.lastSelectedElementType == null) ||
-                (PalonnierGridRef.lastSelectedElementType.ElementTypeId == Guid.Empty))
-            {
-                if (ElementTypesList.Count == 0) return;
-                PalonnierGridRef.lastSelectedElementType = ElementTypesList.FirstOrDefault();
-            }
-
-            MotherGridPalonnier mp = new MotherGridPalonnier();
-            mp.EventMpscenarioId = EventMpscenarioId;
-            mp.Famille = false;
-            mp.ElementTypeId = PalonnierGridRef.lastSelectedElementType.ElementTypeId;
-            mp.X1 = t.x1; mp.Y1 = t.y1;
-            mp.X2 = t.x2; mp.Y2 = t.y2;
-
-            var proposal = PalonnierGridRef.ProposeFor(mp);
-            mp.Composition = proposal.Composition;
-
-            if ((await entitiesService.InsertEntityAsync(mp)) != null)
-            {
-                PList.Add(mp);
-                StateHasChanged();
-                await PalonnierGridRef.MPGrid.InsertRow(mp);
-                await PalonnierGridRef.MPGrid.UpdateRow(mp);
-                PalonnierGridRef.ShowStatus(ProposalNote(proposal));
-            }
-            else
-            {
-                await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
-            }
+            if (ElementTypesList.Count == 0) return;
+            grid.lastSelectedElementType = ElementTypesList.FirstOrDefault();
         }
+
+        Guid scenarioId = EventMpscenarioId;
+
+        // Ids only, no navigation: InsertOwnedAsync adds what the new row points to, and its type would be inserted again.
+        MotherGridPalonnier mp = new MotherGridPalonnier();
+        mp.EventMpscenarioId = scenarioId;
+        mp.Famille = famille;
+        mp.ElementTypeId = grid.lastSelectedElementType.ElementTypeId;
+        mp.X1 = line.x1; mp.Y1 = line.y1;
+        mp.X2 = line.x2; mp.Y2 = line.y2;
+
+        var proposal = grid.ProposeFor(mp);
+        mp.Composition = proposal.Composition;
+
+        // A refused insert is shown by the service itself. Into the list only if the page still shows that scenario (Back,
+        // or the dropdown, may have moved it meanwhile): the row would sit in another scenario's list.
+        if (!await entitiesService.InsertOwnedAsync(mp) || EventMpscenarioId != scenarioId) return;
+
+        (famille ? MList : PList).Add(mp);
+        StateHasChanged();
+        await grid.MPGrid.InsertRow(mp);
+        await grid.MPGrid.UpdateRow(mp);
+        grid.ShowStatus(ProposalNote(proposal));
     }
 
     // What to tell about the pieces of a line just drawn: why the stock proposed none, or a caveat about the
@@ -477,15 +457,17 @@
         StateHasChanged();
     }
 
-    // The lists are reloaded as new instances, and Generate Layout replaces every row. A selection still
-    // pointing at an old instance had the Accrochages panel show - and try to save - a row that no longer
-    // exists. So the selection follows its row by id, and is dropped when the row is gone.
+    // Every read gives new instances, and Generate Layout replaces every row. A selection still pointing at an old
+    // instance had the Accrochages panel show - and try to save - a row that no longer exists. So the selection follows
+    // its row by id, and is dropped when the row is gone; the selected charge too.
     private void RebindSelection()
     {
         if (selectedPalonnier is not null)
             selectedPalonnier = PList.FirstOrDefault(p => p.MotherGridPalonnierId == selectedPalonnier.MotherGridPalonnierId);
         if (selectedMotherGrid is not null)
             selectedMotherGrid = MList.FirstOrDefault(m => m.MotherGridPalonnierId == selectedMotherGrid.MotherGridPalonnierId);
+        if (selectedCharge is not null)
+            selectedCharge = ChargeList.FirstOrDefault(c => c.ChargeMpid == selectedCharge.ChargeMpid);
     }
 
     // A crossing hooked or unhooked by hand: redraw the plan, whose markers show where the palonnier hangs.

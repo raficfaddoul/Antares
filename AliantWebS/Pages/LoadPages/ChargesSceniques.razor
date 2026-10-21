@@ -346,8 +346,7 @@ private bool showDecimalSettings = false;
         {
             // UpdateOwnedAsync throws when the save fails. Unhandled here it kills the Blazor circuit, so a
             // name the column cannot hold used to blank the whole page and take the other rows' edits with it.
-            await js.InvokeVoidAsync("alert",
-                $"L'enregistrement a échoué : {ex.GetBaseException().Message}\nLa ligne reste en édition, rien n'est perdu.");
+            await js.InvokeVoidAsync("alert", EntitiesService.NotSavedMessage(ex));
         }
 
         CalculateChargeTotale();

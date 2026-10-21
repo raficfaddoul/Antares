@@ -155,8 +155,10 @@ public sealed class ReportDataBuilder
         var beamLoads = BuildBeamLoads(venue, charpente, gaps);
 
         // ── Pre-rig composition ──────────────────────────────────
-        var elements = await _entities.GetFilteredEntitiesAsync<MotherGridPalonnier>(
-            m => m.EventMpscenarioId == scenario.EventMpscenarioId);
+        // The elements and the charges placed on them (for the allowed loads below), read fresh in one query through a
+        // context of their own, as the charges above: Mother Grid saves them that way, and the circuit's shared context
+        // would hand back the values it read the first time - the study would print a layout the page has since changed.
+        var (elements, chargeMps) = await _entities.ReadScenarioElementsAsync(scenario.EventMpscenarioId);
 
         var elementTypes = await _entities.GetAllEntitiesAsync<ElementType>();
         var typeNames = elementTypes.ToDictionary(t => t.ElementTypeId, t => t.Name ?? "");
@@ -179,10 +181,6 @@ public sealed class ReportDataBuilder
         gaps.AddRange(SkippedRowGaps(inventory.Skipped, elements, typeNames));
 
         // ── Allowed loads ────────────────────────────────────────
-        var chargeMps = await _entities.GetFilteredEntitiesAsync<ChargeMp>(
-            c => c.MotherGridPalonnier.EventMpscenarioId == scenario.EventMpscenarioId,
-            "MotherGridPalonnier");
-
         // Where each palonnier hangs: from every mother it crosses, save where the optimiser or a person
         // recorded otherwise. The same reading Calcul Charpente makes (PalonnierHanging.Resolve), so the
         // spans checked here are the spans the loads were transmitted over.

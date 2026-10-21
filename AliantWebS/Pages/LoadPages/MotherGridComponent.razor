@@ -89,7 +89,7 @@ else
                   <Template Context="mp">
                     @* An exception while rendering takes the whole circuit down, not the cell. A row whose type
                        cannot be read says so, in the cell, and the page stays usable to fix it. *@
-                    @if (mp.ElementType is { } elementType)
+                    @if (TypeOf(mp) is { } elementType)
                     {
                         @elementType.Name
                     }
@@ -303,12 +303,13 @@ else
 
     public ElementType lastSelectedElementType = new ElementType();
 
-    // What was typed in the "Pièces" box of a row being edited, until the row is saved.
-    private readonly Dictionary<MotherGridPalonnier, string> piecesText = new();
+    // What was typed in the "Pièces" box of a row being edited, until the row is saved. By the row's id: the page reads
+    // its rows afresh (another scenario and back, Générer l'implantation), and every read gives new objects.
+    private readonly Dictionary<Guid, string> piecesText = new();
 
-    // Rows added with "Add New": they have no ends yet, so they get the stock's proposal when first saved
+    // Rows added with "Add New", by id: they have no ends yet, so they get the stock's proposal when first saved
     // with both ends and no pieces typed.
-    private readonly HashSet<MotherGridPalonnier> proposeOnSave = new();
+    private readonly HashSet<Guid> proposeOnSave = new();
 
     private string? statusMessage;
 
@@ -360,24 +361,30 @@ else
 
     public async Task DeleteMP(MotherGridPalonnier mp)
     {
-        if (await entitiesService.DeleteEntityAsync(mp))
+        // One DELETE through a context of its own; the database deletes the row's charges with it (cascade). A refused
+        // delete is shown by the service itself; a row another tab already deleted counts as deleted.
+        if (await entitiesService.DeleteOwnedAsync(mp))
         {
-            piecesText.Remove(mp);
-            proposeOnSave.Remove(mp);
-            if (MPList.Remove(mp))
+            if (ForgetRow(mp.MotherGridPalonnierId))
             {
                 await MPGrid.Reload();
                 await MotherGridPalonnierListChanged.InvokeAsync(MPList);
-               // StateHasChanged();
-
             }
         }
 
     }
 
+    // A row deleted: off the list, with what was typed in its box and its pending proposal. True when it was listed.
+    private bool ForgetRow(Guid id)
+    {
+        piecesText.Remove(id);
+        proposeOnSave.Remove(id);
+        return MPList.RemoveAll(m => m.MotherGridPalonnierId == id) > 0;
+    }
+
     async void EditRow(MotherGridPalonnier mp)
     {
-        piecesText.Remove(mp);   // the box starts from what is stored
+        piecesText.Remove(mp.MotherGridPalonnierId);   // the box starts from what is stored
         await MPGrid.EditRow(mp);
         await MotherGridPalonnierListChanged.InvokeAsync(MPList);
 
@@ -408,17 +415,17 @@ else
 
         if (lastSelectedElementType == null) return;
 
+        // Its type's id only, no navigation: InsertOwnedAsync adds what the new row points to.
         mp.ElementTypeId = lastSelectedElementType.ElementTypeId;
+        Guid scenarioId = mp.EventMpscenarioId;
 
-        if ((await entitiesService.InsertEntityAsync(mp)) != null)
+        // A refused insert is shown by the service itself. Into the list only if it still shows that scenario (Back, or
+        // the dropdown, may have moved the page meanwhile): the row would sit in another scenario's list.
+        if (await entitiesService.InsertOwnedAsync(mp) && EventMpscenarioId == scenarioId)
         {
             MPList.Add(mp);
-            proposeOnSave.Add(mp);
+            proposeOnSave.Add(mp.MotherGridPalonnierId);
             await MPGrid.InsertRow(mp);
-        }
-        else
-        {
-            await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
         }
     }
 
@@ -451,15 +458,26 @@ else
 
     async Task UpdateRow(MotherGridPalonnier mp)
     {
-        await SaveRowAsync(mp);
+        try
+        {
+            await SaveRowAsync(mp);
+        }
+        catch (Exception ex)
+        {
+            // The database refused the row, or it no longer exists (deleted from another tab). Unhandled here it ends the
+            // circuit; the row stays in edit with what was typed.
+            await js.InvokeVoidAsync("alert", EntitiesService.NotSavedMessage(ex));
+        }
     }
 
-    // Saves a row. The pieces typed in its box are read first; text that cannot be read is refused and the row
-    // stays in edit. A row added with "Add New" that now has both ends, and no pieces typed, gets the stock's
-    // proposal. True once saved.
+    // Saves a row through a context of its own (UpdateOwnedAsync: only the columns that changed). The pieces typed in its
+    // box are read first; text that cannot be read is refused and the row stays in edit. A row added with "Add New" that
+    // now has both ends, and no pieces typed, gets the stock's proposal. True once saved; throws when the database refuses
+    // the row or it no longer exists - the callers say why, each in its own words.
     private async Task<bool> SaveRowAsync(MotherGridPalonnier mp)
     {
-        bool typedPieces = piecesText.TryGetValue(mp, out var typed);
+        var id = mp.MotherGridPalonnierId;
+        bool typedPieces = piecesText.TryGetValue(id, out var typed);
         if (typedPieces)
         {
             var (composition, problem) = TrussPieces.FromText(typed);
@@ -471,10 +489,10 @@ else
             mp.Composition = composition;
         }
 
-        if (!typedPieces && proposeOnSave.Contains(mp)
+        if (!typedPieces && proposeOnSave.Contains(id)
             && string.IsNullOrWhiteSpace(mp.Composition) && TrussPieces.DrawnLengthM(mp) is not null)
         {
-            proposeOnSave.Remove(mp);
+            proposeOnSave.Remove(id);
             var proposal = ProposeFor(mp);
             mp.Composition = proposal.Composition;
             statusMessage = proposal.Composition is null
@@ -482,11 +500,11 @@ else
                 : proposal.Message;
         }
 
-        if (await entitiesService.UpdateEntityAsync(mp))
+        if (await entitiesService.UpdateOwnedAsync(mp))
         {
-            piecesText.Remove(mp);
+            piecesText.Remove(id);
             await MPGrid.UpdateRow(mp);
-            lastSelectedElementType = mp.ElementType;
+            lastSelectedElementType = TypeOf(mp);
             await RowSaved.InvokeAsync(mp);
             return true;
         }
@@ -495,20 +513,20 @@ else
 
     public async Task DeleteAllMP()
     {
+        // The rows on screen when asked, not whatever list the component holds once the dialog is answered: the layout
+        // follows the address and can switch the page to another scenario meanwhile.
+        var toDelete = MPList.ToList();
         bool confirmed = await js.InvokeAsync<bool>("confirm", L["Are you sure you want to delete all items?"].ToString());
         if (!confirmed) return;
 
-        var toDelete = MPList.ToList();
         foreach (var item in toDelete)
         {
             // Off the list only once deleted (a row another tab already deleted counts as deleted): a refused delete
-            // is undone in memory too, and the row stays. Stopped at the first refusal, which the service has already
-            // shown - one alert, not one per row.
-            if (!await entitiesService.DeleteEntityAsync(item)) break;
-            MPList.Remove(item);
+            // leaves the row where it is. Stopped at the first refusal, which the service has already shown - one
+            // alert, not one per row.
+            if (!await entitiesService.DeleteOwnedAsync(item)) break;
+            ForgetRow(item.MotherGridPalonnierId);
         }
-        piecesText.Clear();
-        proposeOnSave.Clear();
 
         await MPGrid.Reload();
         await MotherGridPalonnierListChanged.InvokeAsync(MPList);
@@ -530,19 +548,25 @@ else
 
     // ── Pieces ───────────────────────────────────────────────────────────────────────────────────
 
+    // The row's element type: the category's type with its id - the edit's select changes the id only, and a row saved
+    // through a context of its own keeps the navigation it was read with - else the type the row was read with, for a
+    // type outside the category. Null when neither has its id: the cell then says « type introuvable », never a wrong name.
+    private ElementType? TypeOf(MotherGridPalonnier e) =>
+        ElementTypesList?.FirstOrDefault(t => t.ElementTypeId == e.ElementTypeId)
+        ?? (e.ElementType?.ElementTypeId == e.ElementTypeId ? e.ElementType : null);
+
     // The element's model: its element type, named as the inventory's "Modèle" (Generate Layout creates the
     // types from those names).
-    private string? ModelOf(MotherGridPalonnier e) =>
-        ElementTypesList?.FirstOrDefault(t => t.ElementTypeId == e.ElementTypeId)?.Name ?? e.ElementType?.Name;
+    private string? ModelOf(MotherGridPalonnier e) => TypeOf(e)?.Name;
 
     private List<string> WarningsOf(MotherGridPalonnier e) =>
         TrussPieces.Warnings(e, ModelOf, MPList ?? new List<MotherGridPalonnier>(), Inventory, Famille);
 
     private string PiecesTextOf(MotherGridPalonnier e) =>
-        piecesText.TryGetValue(e, out var typed) ? typed : TrussPieces.EditText(e);
+        piecesText.TryGetValue(e.MotherGridPalonnierId, out var typed) ? typed : TrussPieces.EditText(e);
 
     private void SetPiecesText(MotherGridPalonnier e, ChangeEventArgs args) =>
-        piecesText[e] = args.Value?.ToString() ?? "";
+        piecesText[e.MotherGridPalonnierId] = args.Value?.ToString() ?? "";
 
     private void ClearStatus() => statusMessage = null;
 
@@ -573,10 +597,21 @@ else
 
         var previous = mp.Composition;
         mp.Composition = proposal.Composition;
-        if (!await SaveRowAsync(mp))
+        string? failure;
+        try
         {
-            mp.Composition = previous;
-            await js.InvokeVoidAsync("alert", "Les pièces proposées n’ont pas pu être enregistrées.");
+            failure = await SaveRowAsync(mp) ? null : "Les pièces proposées n’ont pas pu être enregistrées.";
+        }
+        catch (Exception ex)
+        {
+            // Refused by the database, or the row deleted from another tab: one alert with the reason (the row is not in
+            // edit, so not « La ligne reste en édition »).
+            failure = $"Les pièces proposées n’ont pas pu être enregistrées : {ex.GetBaseException().Message}";
+        }
+        if (failure is not null)
+        {
+            mp.Composition = previous;   // its pieces as they were
+            await js.InvokeVoidAsync("alert", failure);
             return;
         }
         statusMessage = proposal.Message;
@@ -593,7 +628,7 @@ else
         }
 
         var lengths = global::Helpers.TrussComposition.Parse(proposal.Composition, out _) ?? new List<double>();
-        piecesText[mp] = string.Join("+", lengths.OrderByDescending(l => l).Select(TrussPieces.Metres));
+        piecesText[mp.MotherGridPalonnierId] = string.Join("+", lengths.OrderByDescending(l => l).Select(TrussPieces.Metres));
         statusMessage = proposal.Message;
     }
 
@@ -611,6 +646,7 @@ else
 
     async Task ImportMGFromExcel(InputFileChangeEventArgs e)
     {
+        Guid scenarioId = EventMpscenarioId;
         isImporting = true;
         StateHasChanged();
         try
@@ -620,9 +656,11 @@ else
             mem.Position = 0;
 
             // ── Directly reuse Pipeline's function ───────────────────
+            // Rows with ids only, no navigation (InsertOwnedRangeAsync adds what they point to); the type cell finds
+            // their type by its id (TypeOf).
             var toInsert = await RiggingOptimizer.Pipeline.ImportMotherGridPalonniersFromStream(
                 mem,
-                EventMpscenarioId,
+                scenarioId,
                 Famille,
                 ElementTypesList,
                 MPList.Select(x => x.Name),
@@ -645,11 +683,15 @@ else
                 return;
             }
 
-            if (await entitiesService.InsertEntitiesAsync(toInsert))
+            if (await entitiesService.InsertOwnedRangeAsync(toInsert))
             {
-                MPList.AddRange(toInsert);
-                await MPGrid.Reload();
-                await MotherGridPalonnierListChanged.InvokeAsync(MPList);
+                // Into the list only if it still shows that scenario.
+                if (EventMpscenarioId == scenarioId)
+                {
+                    MPList.AddRange(toInsert);
+                    await MPGrid.Reload();
+                    await MotherGridPalonnierListChanged.InvokeAsync(MPList);
+                }
                 await js.InvokeVoidAsync("alert", $"{toInsert.Count} item(s) imported successfully.");
             }
             else
@@ -659,7 +701,8 @@ else
         }
         catch (Exception ex)
         {
-            await js.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+            // The database's own reason, not EF's "see the inner exception".
+            await js.InvokeVoidAsync("alert", $"Error: {ex.GetBaseException().Message}");
         }
         finally
         {
