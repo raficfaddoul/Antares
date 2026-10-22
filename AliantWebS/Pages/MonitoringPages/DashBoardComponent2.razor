@@ -81,7 +81,7 @@
         border-radius: 8px;
     }
 
-    /* Under the top-right graph: curves with sensors left out, curves without a reading. */
+    /* Under a graph: what it leaves out or lacks (sensors, readings, a direction, units), said in plain words. */
     .dashboard-curve-notes {
         margin: 0;
         padding: 2px 10px 4px 28px;
@@ -185,12 +185,7 @@
                         </div>
                         @if (!chargeState.Loading && curveNotes.Count > 0)
                         {
-                            <ul class="dashboard-curve-notes">
-                                @foreach (var note in curveNotes)
-                                {
-                                    <li>@note</li>
-                                }
-                            </ul>
+                            @(CurveNotesList(curveNotes))
                         }
                     </div>
                 </RadzenSplitterPane>
@@ -207,6 +202,10 @@
                             <IndicesInTimeComponent GraphId="g3" @ref="curveGraph" Headers="DateHeaderOnly()" Indices="NoSeries()"></IndicesInTimeComponent>
                             @(PanelCover(curveState, curveState.Nothing))
                         </div>
+                        @if (!curveState.Loading && typeCurveNotes.Count > 0)
+                        {
+                            @(CurveNotesList(typeCurveNotes))
+                        }
                     </div>
                 </RadzenSplitterPane>
             </RadzenSplitter>
@@ -224,15 +223,13 @@
     const string NoWeightChannel = "Les manilles n'ont pas de voie « weight ».";
     const string NoShackleThreshold = "Aucune manille n'a de seuil d'alarme pour la voie « weight ».";
     const string ChooseCurveType = "Choisissez un type de capteur pour afficher sa courbe.";
+    const string CurveTitlePrefix = "Min et max hebdomadaires";
 
     // "Tous" in Capteurs affichés: every sensor of the structure.
     static readonly Guid AllTypes = Guid.Empty;
 
     // The bottom-right curve's default: the first present type whose name contains this (else none is chosen).
     const string InclinometerTypeNamePart = "Inclin";
-
-    // Decimals the curves keep (the CSV sent to the browser).
-    const int CurveDecimals = 4;
 
     // Sensors named in a log line about thresholds (unreadable, or naming a channel the type lacks); the rest are counted.
     const int LoggedExamples = 5;
@@ -245,6 +242,24 @@
         + "non compté(s) dans la courbe.";
 
     static string NoReading(AlarmCurve curve, string periodLabel) => $"« {curve.Name} » : aucune mesure sur la période ({periodLabel}).";
+
+    // The bottom-right graph's sentences (decision 12). A type is named by AlarmRatioCurves.TypeName, as everywhere here.
+    static string NoChannel(string typeName) => $"Le type « {typeName} » n'a aucune voie de mesure.";
+
+    static string DirectionNotPlotted(string channel) =>
+        $"La voie « {channel} » n'est pas tracée : un minimum ou un maximum hebdomadaire d'un angle n'a pas de sens.";
+
+    static string NothingToPlot(string typeName, IEnumerable<ChannelDataType> leftOut) =>
+        string.Join(" ", leftOut.Select(c => DirectionNotPlotted(c.Name)).Prepend($"Le type « {typeName} » n'a aucune voie à tracer."));
+
+    static string NoTypeReading(string typeName, string periodLabel) =>
+        $"Aucune mesure des capteurs « {typeName} » sur la période ({periodLabel}).";
+
+    static string ChannelsWithoutReading(string periodLabel, IEnumerable<string> channels) =>
+        $"Aucune mesure sur la période ({periodLabel}) pour : {string.Join(", ", channels)}.";
+
+    static string ChannelsWithoutUnit(IEnumerable<string> channels) =>
+        $"Aucune unité enregistrée pour : {string.Join(", ", channels)}.";
 
     // ── State ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -269,7 +284,8 @@
 
     sealed record TypeOption(string Text, Guid? Value);
 
-    sealed record Curve(List<Dictionary<object, double>> Indices, List<string> Headers);
+    /// <summary>What the bottom-right graph draws: its series and axes, and the lines under it.</summary>
+    sealed record TypeCurveView(WeeklyMinMax Curve, List<string> Notes);
 
     /// <summary>
     /// What one charge read shows: the reading, the gauges' sentence and the graph's (null when each draws), the lines
@@ -322,6 +338,8 @@
     string gaugesNothing;
     string graphNothing;
     List<string> curveNotes = new();
+    // The lines under the bottom-right graph (empty unless it draws).
+    List<string> typeCurveNotes = new();
 
     IndicesInTimeComponent chargeGraph;
     IndicesInTimeComponent curveGraph;
@@ -340,8 +358,11 @@
     }
 
     string CurveTitle => curveTypeId is Guid id
-        ? $"Maximum hebdomadaire : {presentTypes.Single(t => t.ElementTypeId == id).Name}"
-        : "Maximum hebdomadaire";
+        ? $"{CurveTitlePrefix} : {AlarmRatioCurves.TypeName(PresentType(id))}"
+        : CurveTitlePrefix;
+
+    // The dropdowns offer present types only.
+    ElementType PresentType(Guid id) => presentTypes.Single(t => t.ElementTypeId == id);
 
     static string Busy(PanelState state) => state.Loading ? "true" : "false";
     static List<string> DateHeaderOnly() => new() { "Date" };
@@ -357,6 +378,14 @@
 
     private RenderFragment NothingNotice(string text, bool cover) =>
         @<div class="dashboard-nothing @(cover ? "cover" : "banner")" role="status">@text</div>;
+
+    private static RenderFragment CurveNotesList(List<string> notes) =>
+        @<ul class="dashboard-curve-notes">
+            @foreach (var note in notes)
+            {
+                <li>@note</li>
+            }
+        </ul>;
 
     // Over a chart: loading, a failure, or why it shows nothing (the chart under it is cleared). One read can feed
     // several panels, each with its own reason: the caller passes the panel's.
@@ -410,8 +439,10 @@
 
             allSensors = await LoadSensorsAsync(lifetime);
             if (lifetime.IsCancellationRequested) return;
-            presentTypes = allSensors.Select(s => s.ElementType).DistinctBy(t => t.ElementTypeId).OrderBy(t => t.Name).ToList();
-            curveTypeOptions = presentTypes.Select(t => new TypeOption(t.Name, t.ElementTypeId)).ToList();
+            // Named, and ordered, by the text shown: a type without a name by its id (the top-right curves' rule).
+            presentTypes = allSensors.Select(s => s.ElementType).DistinctBy(t => t.ElementTypeId)
+                .OrderBy(AlarmRatioCurves.TypeName).ToList();
+            curveTypeOptions = presentTypes.Select(t => new TypeOption(AlarmRatioCurves.TypeName(t), t.ElementTypeId)).ToList();
             shownTypeOptions = curveTypeOptions.Prepend(new TypeOption("Tous", AllTypes)).ToList();
 
             (shackles, weightChannel) = await SensorChargeRatioHelper.LoadShackleSensorsAsync(dbContextFactory, appData.Structure);
@@ -488,7 +519,7 @@
         shownSensors = SensorsOfType(shownTypeId);
 
         var inclinometer = presentTypes
-            .FirstOrDefault(t => t.Name.Contains(InclinometerTypeNamePart, StringComparison.OrdinalIgnoreCase))
+            .FirstOrDefault(t => AlarmRatioCurves.TypeName(t).Contains(InclinometerTypeNamePart, StringComparison.OrdinalIgnoreCase))
             ?.ElementTypeId;
         curveTypeId = PresentOrDefault(appData.DashboardCurveTypeId ?? inclinometer, inclinometer, "courbe hebdomadaire");
     }
@@ -736,55 +767,42 @@
         return RunAsync(curveReads, curveState, ct => ReadCurveAsync(typeId, start, end, label, ct), DrawCurveAsync, ClearCurveAsync);
     }
 
-    private async Task<Outcome<Curve>> ReadCurveAsync(Guid? typeId, DateTime start, DateTime end, string periodLabel, CancellationToken ct)
+    // The weekly min and max of every channel of the type but its directions (decision 12): both reads in this one read
+    // of the panel, so latest wins, cancellation and the failure notice cover them together. Each case where nothing is
+    // drawn is said without reading InfluxDB when it can be.
+    private async Task<Outcome<TypeCurveView>> ReadCurveAsync(Guid? typeId, DateTime start, DateTime end, string periodLabel,
+        CancellationToken ct)
     {
-        if (typeId is not Guid id) return Outcome<Curve>.Say(ChooseCurveType);
-        var type = presentTypes.Single(t => t.ElementTypeId == id);   // the dropdown offers present types only
+        if (typeId is not Guid id) return Outcome<TypeCurveView>.Say(ChooseCurveType);
+        var type = PresentType(id);
+        var typeName = AlarmRatioCurves.TypeName(type);
 
-        var sensors = allSensors.Where(s => s.ElementTypeId == id).ToList();
-        var channels = type.ChannelDataTypeElementTypes   // loaded with the sensors (LoadSensorsAsync)
-            .Where(cdtet => cdtet.ChannelDataType != null)
-            .Select(cdtet => cdtet.ChannelDataType)
-            .DistinctBy(cdt => cdt.ChannelDataTypeId)
-            .ToList();
-        if (channels.Count == 0) return Outcome<Curve>.Say($"Le type « {type.Name} » n'a aucune voie de mesure.");
+        var channels = WeeklyMinMaxCurves.ChannelsOf(type);   // loaded with the sensors (LoadSensorsAsync)
+        if (channels.Plotted.Count == 0)
+            return Outcome<TypeCurveView>.Say(channels.LeftOut.Count == 0
+                ? NoChannel(typeName)
+                : NothingToPlot(typeName, channels.LeftOut));
 
-        var rows = await InfluxService.GetData(
-            sensors.Select(s => s.ElementId.ToString()).ToList(),
-            channels.Select(c => c.ChannelDataTypeId.ToString()).ToList(),
-            start, end, ReportsService.BucketName,
-            aggregateWindowDuration: InfluxService.WeeklyWindow, aggregateFn: "max", cancellationToken: ct);
+        var curve = await WeeklyMinMaxCurves.ReadAsync(SensorsOfType(id), channels.Plotted, start, end, ct);
+        if (!curve.HasSeries) return Outcome<TypeCurveView>.Say(NoTypeReading(typeName, periodLabel));
 
-        var curve = WeeklyMaxPerChannel(rows, channels);
-        return curve.Indices.Count == 0
-            ? Outcome<Curve>.Say($"Aucune mesure des capteurs « {type.Name} » sur la période ({periodLabel}).")
-            : Outcome<Curve>.Drawn(curve);
+        // Under the graph, in this order: the directions left out, the channels without a reading, those without a unit.
+        var notes = channels.LeftOut.Select(c => DirectionNotPlotted(c.Name)).ToList();
+        if (curve.WithoutReading.Count > 0) notes.Add(ChannelsWithoutReading(periodLabel, curve.WithoutReading));
+        if (curve.WithoutUnit.Count > 0) notes.Add(ChannelsWithoutUnit(curve.WithoutUnit));
+        return Outcome<TypeCurveView>.Drawn(new TypeCurveView(curve, notes));
     }
 
-    // For each channel, the weekly maximum across the type's sensors; a channel with no reading has no series.
-    // rows: [0]=DateTime, [1]=sensorId, [2]=channel1, [3]=channel2, ...
-    private static Curve WeeklyMaxPerChannel(List<object[]> rows, List<ChannelDataType> channels)
+    private Task DrawCurveAsync(TypeCurveView view, CancellationToken ct)
     {
-        var curve = new Curve(new List<Dictionary<object, double>>(), new List<string> { "Date" });
-        for (int ch = 0; ch < channels.Count; ch++)
-        {
-            int dataIndex = ch + 2;
-            var weeklyMax = rows
-                .Where(r => r[0] is DateTime && r.Length > dataIndex && r[dataIndex] != null)
-                .GroupBy(r => InfluxService.WeekStart((DateTime)r[0]))
-                .OrderBy(g => g.Key)
-                .ToDictionary(g => (object)g.Key, g => Math.Round(g.Max(r => (double)r[dataIndex]), CurveDecimals));
-
-            if (weeklyMax.Count > 0)
-            {
-                curve.Indices.Add(weeklyMax);
-                curve.Headers.Add(channels[ch].Name);
-            }
-        }
-        return curve;
+        typeCurveNotes = view.Notes;
+        return curveGraph.DisplayData(view.Curve.Indices, view.Curve.Headers, axes: view.Curve.Axes);
     }
 
-    private Task DrawCurveAsync(Curve curve, CancellationToken ct) => curveGraph.DisplayData(curve.Indices, curve.Headers);
-
-    private Task ClearCurveAsync() => curveGraph.DisplayData(NoSeries(), DateHeaderOnly());
+    // Nothing to draw, or a failure: the data, the axis notice (the empty draw removes it) and the lines go.
+    private Task ClearCurveAsync()
+    {
+        typeCurveNotes = new List<string>();
+        return curveGraph.DisplayData(NoSeries(), DateHeaderOnly());
+    }
 }
