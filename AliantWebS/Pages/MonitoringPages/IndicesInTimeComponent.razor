@@ -25,12 +25,27 @@
         height: 100%;
         width: 100%;
         min-height: 300px;
+        display: flex;
+        flex-direction: column;
     }
 
+    /* Takes the height the axis notice leaves; dygraphInterop.js resizes the graph when it changes. */
     .chart-flex-row {
         display: flex;
-        height: 100%;
+        flex: 1 1 auto;
+        min-height: 0;
         width: 100%;
+    }
+
+    /* PlotAxes.Notice: several channels drawn on one axis, so on one scale. */
+    .chart-axis-notice {
+        flex: 0 0 auto;
+        padding: 3px 10px;
+        margin-bottom: 4px;
+        border-left: 3px solid #e0a030;
+        background: #fff6e5;
+        color: #6b4500;
+        font-size: 0.8rem;
     }
 
     .dygraph-plot {
@@ -109,6 +124,10 @@
 </style>
 
 <div class="chart-container-with-zoom">
+    @if (axisNotice != null)
+    {
+        <div class="chart-axis-notice">@axisNotice</div>
+    }
     <div class="chart-flex-row">
         <div id="@GraphId" class="dygraph-plot"></div>
         <div id="@(GraphId)_legend" class="dygraph-side-legend"></div>
@@ -145,6 +164,7 @@
     DotNetObjectReference<IndicesInTimeComponent> selfRef;
     bool graphCreated;
     bool pointDeleteMenuOn;
+    string axisNotice;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -175,15 +195,15 @@
 
     public void Dispose() => selfRef?.Dispose();
 
+    /// <param name="axes">The Y axis of each curve and the axes' labels; its notice is shown above the plot. Unset,
+    /// every curve is on the left axis.</param>
     /// <param name="pointNotes">Shown under a point's value, in the legend and the curve tooltip, while the pointer
     /// is on it. They go with the data, so the graph redraws once; none puts dygraph's own legend back.</param>
     public async Task DisplayData(
         List<Dictionary<object, double>> Indices,
         List<string> Headers,
         DateTime? startDate = null,
-        Dictionary<string, string> seriesAxisMap = null,
-        string y1Label = null,
-        string y2Label = null,
+        PlotAxes axes = null,
         IReadOnlyList<PointNote> pointNotes = null)
     {
         // x written like the CSV's first column, which dygraphInterop.js parses the same way.
@@ -205,6 +225,7 @@
                 // No points, so no notes: the empty list also clears any the graph had.
                 await JSRuntime.InvokeVoidAsync("updateDygraphWithAxes", GraphId, emptyCsv,
                     new Dictionary<string, string>(), "", "", Array.Empty<object>());
+                await ShowAxisNotice(null);
                 return;
             }
 
@@ -267,15 +288,15 @@
 
             string csvData = sb.ToString();
 
-            // Use axis-aware update when dual axes are needed
-            if (seriesAxisMap != null && seriesAxisMap.Count > 0)
+            if (axes != null)
             {
-                await JSRuntime.InvokeVoidAsync("updateDygraphWithAxes", GraphId, csvData, seriesAxisMap, y1Label ?? "", y2Label ?? "", notes);
+                await JSRuntime.InvokeVoidAsync("updateDygraphWithAxes", GraphId, csvData, axes.AxisOfSeries, axes.LeftLabel, axes.RightLabel, notes);
             }
             else
             {
                 await JSRuntime.InvokeVoidAsync("updateDygraphFast", GraphId, csvData, notes);
             }
+            await ShowAxisNotice(axes?.Notice);
 
             Console.WriteLine($"Rendered {sortedKeys.Count:N0} data points for graph '{GraphId}'");
             
@@ -286,6 +307,15 @@
         {
             Console.Error.WriteLine($"Error while building CSV for Dygraph: {ex.Message}");
         }
+    }
+
+    // Renders only when the notice changes; DisplayData may be called off the renderer's thread.
+    Task ShowAxisNotice(string notice)
+    {
+        if (notice == axisNotice)
+            return Task.CompletedTask;
+        axisNotice = notice;
+        return InvokeAsync(StateHasChanged);
     }
 
     public async Task RemoveFromJavascript()

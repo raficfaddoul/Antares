@@ -946,6 +946,7 @@
                 }
             }
 
+            var curves = new List<(string Series, string Channel)>();
             foreach (var (sensor, channelDataType) in sensorChannelPairs)
             {
                 var key = $"{sensor.ElementId}|{channelDataType.ChannelDataTypeId}";
@@ -954,37 +955,18 @@
                 string checkboxKey = $"{sensor.ElementId}_{channelDataType.ChannelDataTypeId}";
                 checkboxStates[checkboxKey] = true;
 
-                headers.Add($"{sensor.Name}|{channelDataType.Name}");
+                var header = $"{sensor.Name}|{channelDataType.Name}";
+                headers.Add(header);
+                curves.Add((header, channelDataType.Name));
                 indices.Add((key, dic));
             }
 
             loadingMessage = "Rendering chart...";
             StateHasChanged();
 
-            // Assign series to the two Y axes by CHANNEL TYPE, in a stable (sorted) order so the
-            // left/right axes don't depend on the order sensors were selected. The map + labels are
-            // rebuilt on every plot — including when a series is deselected and only one type is
-            // left — so a stale axis/label can't linger (e.g. select A, select B, deselect A).
-            var distinctChannelTypeNames = sensorChannelPairs
-                .Select(x => x.channelDataType.Name)
-                .Distinct()
-                .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-            string y1Label = distinctChannelTypeNames.ElementAtOrDefault(0) ?? "";
-            string y2Label = distinctChannelTypeNames.Count > 1 ? distinctChannelTypeNames[1] : "";
-
-            var seriesAxisMap = new Dictionary<string, string>();
-            foreach (var (sensor, channelDataType) in sensorChannelPairs)
-            {
-                var headerName = $"{sensor.Name}|{channelDataType.Name}";
-                // 2nd distinct type → right axis (y2); 1st type (and any 3rd+) → left axis (y).
-                seriesAxisMap[headerName] = (y2Label != "" && channelDataType.Name == y2Label) ? "y2" : "y";
-            }
-
             if (iitc != null)
             {
-                await iitc.DisplayData(indices.Select(x => x.Item2).ToList(), headers, null, seriesAxisMap, y1Label, y2Label);
+                await iitc.DisplayData(indices.Select(x => x.Item2).ToList(), headers, axes: PlotAxes.For(curves));
                 plotted = new OutlierReadings.Plot(receivedStartDate, receivedEndDate, maxDataPoints, bucketName);
             }
 
