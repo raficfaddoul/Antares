@@ -727,7 +727,8 @@ public const string WeeklyWindow = "1w";
 
 /// <summary>
 /// The Monday 00:00 of the calendar week holding the instant: the week a <see cref="WeeklyWindow"/> row belongs
-/// to. Rows are filed with it because a first week cut by the query range is dated by the range start.
+/// to. <see cref="FoldDaysIntoWeeks"/> files each day with it, so a first week cut by the range start is dated by
+/// its Monday too.
 /// </summary>
 public static DateTime WeekStart(DateTime at)
 {
@@ -735,18 +736,70 @@ public static DateTime WeekStart(DateTime at)
     return at.Date.AddDays(-daysSinceMonday);
 }
 
+// The functions a week can be folded from its days with: a week's max is the max of its days, its min the min of
+// theirs. A mean (or a sum, a last...) of a week is not that of its days, so a weekly window refuses the others.
+private static readonly string[] WeeklyFunctions = { "max", "min" };
+
 /// <summary>
-/// The Flux aggregateWindow step. Flux counts windows from the Unix epoch, a Thursday, and dates a row by its
-/// window's end, so a weekly window gets offset -3d (Monday) and timeSrc _start (dated by that Monday).
-/// A missing window or function throws: it would otherwise reach InfluxDB as an unreadable query.
+/// The Flux aggregateWindow step. A weekly window is read as days, dated by their start (timeSrc _start), and
+/// GetData folds them into Monday weeks (<see cref="FoldDaysIntoWeeks"/>): Flux counts weeks from the Unix epoch, a
+/// Thursday, and the offset -3d that would move them to Monday stops InfluxDB aggregating in its storage engine
+/// (3 months of 81 shackles: 66.6 s instead of 3.3 s on the docker copy, 2026-10-23). A missing window or function,
+/// or a weekly function days cannot make, throws: it would otherwise reach InfluxDB or give a wrong figure.
 /// </summary>
 public static string AggregateWindowClause(string? every, string? fn)
 {
     ArgumentException.ThrowIfNullOrEmpty(every);
     ArgumentException.ThrowIfNullOrEmpty(fn);
 
-    string calendarWeek = every == WeeklyWindow ? @", offset: -3d, timeSrc: ""_start""" : "";
-    return $"|> aggregateWindow(every: {every}{calendarWeek}, fn: {fn}, createEmpty: false)";
+    if (every == WeeklyWindow)
+    {
+        RequireWeeklyFunction(fn);
+        return $@"|> aggregateWindow(every: 1d, timeSrc: ""_start"", fn: {fn}, createEmpty: false)";
+    }
+    return $"|> aggregateWindow(every: {every}, fn: {fn}, createEmpty: false)";
+}
+
+private static void RequireWeeklyFunction(string? fn)
+{
+    if (fn == null || !WeeklyFunctions.Contains(fn))
+        throw new ArgumentException(
+            $"A weekly window is made from its days, which only works for {string.Join(" or ", WeeklyFunctions)}, not '{fn}'.",
+            nameof(fn));
+}
+
+/// <summary>
+/// Daily rows of a weekly read ([0] the day, [1] the sensor, [2..] one value per channel, null where nothing was
+/// read) folded into one row per sensor and Monday week, dated by that Monday (UTC): each channel's max or min over
+/// the week's days, null when none of them had a reading. Sensors keep the order they were read in, weeks are in
+/// date order within a sensor. A day cut by the range start belongs to the week of that day.
+/// </summary>
+public static List<object[]> FoldDaysIntoWeeks(IEnumerable<object[]> days, string fn)
+{
+    ArgumentNullException.ThrowIfNull(days);
+    RequireWeeklyFunction(fn);
+    Func<double, double, double> fold = fn == "max" ? Math.Max : Math.Min;
+
+    var dayList = days.ToList();
+    var sensorOrder = dayList.Select(day => (string)day[1]).Distinct().Select((sensor, i) => (sensor, i))
+        .ToDictionary(x => x.sensor, x => x.i);
+
+    return dayList
+        .GroupBy(day => ((string)day[1], WeekStart((DateTime)day[0])))
+        .OrderBy(week => sensorOrder[week.Key.Item1]).ThenBy(week => week.Key.Item2)
+        .Select(week =>
+        {
+            var row = new object[week.First().Length];
+            row[0] = DateTime.SpecifyKind(week.Key.Item2, DateTimeKind.Utc);
+            row[1] = week.Key.Item1;
+            for (int channel = 2; channel < row.Length; channel++)
+            {
+                var values = week.Where(day => day[channel] != null).Select(day => (double)day[channel]).ToList();
+                if (values.Count > 0) row[channel] = values.Aggregate(fold);   // none read: the cell stays null
+            }
+            return row;
+        })
+        .ToList();
 }
 
 /// <summary>
@@ -849,6 +902,9 @@ static public async Task<List<object[]>> GetData(
 {
     // Abort before doing any work if the caller (e.g. a page the user navigated away from) is gone.
     cancellationToken.ThrowIfCancellationRequested();
+
+    // A weekly read is made from days, which only max and min allow: refused before InfluxDB is asked anything.
+    if (aggregateWindowDuration == WeeklyWindow) RequireWeeklyFunction(aggregateFn);
 
     var bucket = BucketName ?? InfluxService.bucket;
     List<object[]> ll = new List<object[]>();
@@ -991,6 +1047,9 @@ static public async Task<List<object[]>> GetData(
     cancellationToken.ThrowIfCancellationRequested();
     if (failure != null)
         throw new InfluxReadException($"InfluxDB query failed: {failure.Message}", failure);
+
+    // A weekly read came back as days (see AggregateWindowClause): one row per sensor and Monday week.
+    if (aggEvery == WeeklyWindow) ll = FoldDaysIntoWeeks(ll, aggFn);
 
     Console.WriteLine($"Influx returned {ll.Count} row(s) for {sensorsIds.Count} sensor(s) / {channelsIds.Count} channel(s).");
 
