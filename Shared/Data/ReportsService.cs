@@ -785,17 +785,22 @@ static public async Task<(int Count, long MaxTimestamp)> GetReportsAsync(
         {
             try
             {
+                // One query, so these collections multiply into its rows: load each sensor's OWN attributes (its
+                // "Seuil Alarme"), not every element's under the attribute type. AsNoTracking links nothing outside
+                // these paths, so values loaded under the type never reached sensor.AttributeElements.
                 var category = await dbContext.Categories
                     .Include(c => c.ElementTypes)
                         .ThenInclude(et => et.AttributeTypeElementTypes)
                             .ThenInclude(atte => atte.AttributeType)
-                                .ThenInclude(at => at.AttributeElements)
                     .Include(c => c.ElementTypes)
                         .ThenInclude(et => et.ChannelDataTypeElementTypes)
                             .ThenInclude(cdte => cdte.ChannelDataType)
                     .Include(c => c.ElementTypes)
                         .ThenInclude(et => et.Elements)
                             .ThenInclude(e => e.Structure)   // alarm e-mails name the structure
+                    .Include(c => c.ElementTypes)
+                        .ThenInclude(et => et.Elements)
+                            .ThenInclude(e => e.AttributeElements)
                     .Where(c => c.Name == "sensing device")
                     .AsNoTracking()
                     .FirstOrDefaultAsync();
