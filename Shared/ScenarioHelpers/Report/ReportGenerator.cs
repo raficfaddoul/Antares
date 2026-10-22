@@ -80,9 +80,9 @@ public sealed class ReportGenerator
         var report = await builder.BuildAsync(ev, scenario, context);
 
         // Geometry for the drawings only. Loaded here rather than held on the service, which is scoped
-        // and would otherwise carry one scenario's trusses into the next request.
-        var elements = await _entities.GetFilteredEntitiesAsync<MotherGridPalonnier>(
-            m => m.EventMpscenarioId == scenario.EventMpscenarioId);
+        // and would otherwise carry one scenario's trusses into the next request. Read fresh, through a context of their
+        // own (as the builder above reads them), never through the circuit's shared one.
+        var (elements, _) = await _entities.ReadScenarioElementsAsync(scenario.EventMpscenarioId);
         var elementTypes = await _entities.GetAllEntitiesAsync<ElementType>();
         var typeNames = elementTypes.ToDictionary(t => t.ElementTypeId, t => t.Name ?? "");
 

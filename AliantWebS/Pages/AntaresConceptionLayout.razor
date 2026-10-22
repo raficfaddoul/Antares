@@ -91,6 +91,13 @@
     /// <summary>The scenarios of the event shown, as the dropdown lists them.</summary>
     public IReadOnlyList<EventMpscenario> ScenarioList => Scenarios;
 
+    /// <summary>
+    /// How many runs of « Générer l'implantation » have ended in this layout, whether they succeeded or failed: each may
+    /// have replaced the scenario's elements (Pipeline.GenerateLayout commits them before it writes its files, and can
+    /// still fail after). Mother Grid reads its rows again when this changes.
+    /// </summary>
+    public int LayoutGenerations { get; private set; }
+
     private bool isGenerating = false;
 
     // The pages are drawn once the layout has followed the address a first time (see the markup).
@@ -332,8 +339,17 @@
             // database access is its own context and AppSettings' factory - so on the thread pool it commits
             // whatever the page is doing, and the page's read simply waits the few milliseconds until it has.
             // The optimiser, the PNG and the workbook stop freezing the page while they run, too.
-            await Task.Run(() => Pipeline.GenerateLayout(
-                paths.DataDir, paths.OutputDir, entitiesService, scenarioId, commonDataDir));
+            try
+            {
+                await Task.Run(() => Pipeline.GenerateLayout(
+                    paths.DataDir, paths.OutputDir, entitiesService, scenarioId, commonDataDir));
+            }
+            finally
+            {
+                // Counted before the page is drawn again, success or failure: a failed run may already have replaced
+                // the rows, and the page must not keep showing - and saving - rows that are gone.
+                LayoutGenerations++;
+            }
 
             // Back on the circuit - the await above resumes here - for the navigation and the page.
             await ScenarioChanged();

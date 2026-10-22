@@ -141,8 +141,9 @@
         var mothers = MotherGrids ?? new List<MotherGridPalonnier>();
 
         // A palonnier the page no longer lists - Generate Layout replaces them all, a delete removes one -
-        // is gone from the database: saving it would fail. Say so instead.
-        if (Palonniers is not null && !Palonniers.Any(p => ReferenceEquals(p, palonnier)))
+        // is gone from the database: saving it would fail. Say so instead. By id: every read of the page gives
+        // new objects.
+        if (Palonniers is not null && !Palonniers.Any(p => p.MotherGridPalonnierId == palonnier.MotherGridPalonnierId))
         {
             version++;
             await js.InvokeVoidAsync("alert",
@@ -178,8 +179,10 @@
         saving = true;
         try
         {
+            // Through a context of its own: the palonnier's changed columns only - here its hooks - and nothing else of
+            // the tab. Throws when the database refuses it, or when it was deleted from another tab.
             palonnier.Accrochages = stored;
-            if (!await entitiesService.UpdateEntityAsync(palonnier))
+            if (!await entitiesService.UpdateOwnedAsync(palonnier))
             {
                 palonnier.Accrochages = previous;
                 version++;
@@ -191,7 +194,7 @@
         {
             palonnier.Accrochages = previous;
             version++;
-            await js.InvokeVoidAsync("alert", $"L’accrochage n’a pas pu être enregistré : {ex.Message}");
+            await js.InvokeVoidAsync("alert", $"L’accrochage n’a pas pu être enregistré : {ex.GetBaseException().Message}");
             return;
         }
         finally

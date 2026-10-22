@@ -1,5 +1,3 @@
-@page "/ChargeMPComponent/{MotherGridPalonnierID:guid}"
-
 @using AliantWebS.Data
 @using AliantWebS.Reporting
 @inject EntitiesService entitiesService
@@ -13,17 +11,10 @@
 @inject IStringLocalizer<Languages> L
 @inject NotificationService notifications
 
-@layout AntaresConceptionLayout
-
 @* Leaving the page that shows these charges stores their loads first (CalculateBeforeLeaving). *@
 <NavigationLock OnBeforeInternalNavigation="CalculateBeforeLeaving" />
 
-@if (ChargeList is null)
-{
-    <p><em>@L["Loading"]... !</em></p>
-}
-else
-{
+@* ChargeList is required: the page reads the charges and hands them over, and OnParametersSet refuses null. *@
 <Div Style="display: flex; align-items: center;">
 
     <a class="nav-link" @onclick="@(args => Insertmp())" @onclick:preventDefault="true" href="">
@@ -138,7 +129,6 @@ else
         </RadzenDataGrid>
 
     </EditForm>
-}
 
 
 @code {
@@ -175,8 +165,10 @@ else
 
 
 
+    /// <summary>The element selected on the page - a mother or a palonnier - which a charge added or imported is placed
+    /// on. Null when none is selected.</summary>
     [Parameter]
-    public Guid? MotherGridPalonnierID { get; set; }
+    public MotherGridPalonnier? Carrier { get; set; }
 
     [Parameter]
     public Guid EventMpscenarioId { get; set; }
@@ -208,8 +200,8 @@ bool isImportingCharges = false;
     private bool isCalculating => unfinishedRuns > 0;
 
     /// <summary>Completes when no calculation is running or waiting - including one queued while this waits (never
-    /// faults). The page awaits it before it reloads its rows through the circuit's shared context, which a calculation
-    /// may be saving through.</summary>
+    /// faults). The page awaits it before it reads the element types through the circuit's shared context, which a
+    /// calculation reads them through too (its elements, charges and Charpente row have contexts of their own).</summary>
     public async Task WhenIdle()
     {
         while (!calculation.IsCompleted)
@@ -244,9 +236,8 @@ bool isImportingCharges = false;
 
     // Staying: this very Mother Grid (Générer l'implantation navigates back to it), or the router's own reload of a link it
     // could not route - the click itself was the departure, handled then. Mother Grid is the only page that shows this
-    // component (its own route, unused, has no scenario: a departure there calculates nothing). Any other address, another
-    // scenario's Mother Grid included, is a departure: the calculation reads this page's own scenario, whatever the
-    // dropdown already shows.
+    // component. Any other address, another scenario's Mother Grid included, is a departure: the calculation reads this
+    // page's own scenario, whatever the dropdown already shows.
     private bool IsStaying(LocationChangingContext context)
     {
         if (!context.IsNavigationIntercepted && string.Equals(context.TargetLocation, navigationManager.Uri, StringComparison.Ordinal))
@@ -320,22 +311,21 @@ bool isImportingCharges = false;
         catch (ObjectDisposedException) { }
     }
 
-    protected override async Task OnParametersSetAsync()
+    protected override void OnParametersSet()
     {
-        if (ChargeList == null)
-        {
-        ChargeList = await entitiesService.GetFilteredEntitiesAsync<ChargeMp>(
-            x => ((x.MotherGridPalonnier.EventMpscenarioId == EventMpscenarioId)), 
-            "MotherGridPalonnier");
-        }
-         CalculateChargeTotale();
+        // The page reads the charges with its elements (EntitiesService.ReadScenarioElementsAsync) and hands them over:
+        // this grid reads nothing itself.
+        if (ChargeList is null)
+            throw new InvalidOperationException("ChargeMPComponent : la page qui l'affiche doit lui donner ChargeList.");
+        CalculateChargeTotale();
     }
 
     async Task DeleteMP(ChargeMp mp)
     {
-        if (await entitiesService.DeleteEntityAsync(mp))
+        // A refused delete is shown by the service itself; a charge another tab already deleted counts as deleted.
+        if (await entitiesService.DeleteOwnedAsync(mp))
         {
-            if (ChargeList.Remove(mp))
+            if (ChargeList.RemoveAll(c => c.ChargeMpid == mp.ChargeMpid) > 0)
             {
                 await chargeGrid.Reload();
             }
@@ -349,6 +339,18 @@ bool isImportingCharges = false;
         }
     }
 
+    /// <summary>
+    /// Takes off the grid the charges whose element the page no longer lists - deleted, and the database deleted its
+    /// charges with it (ON DELETE CASCADE). In place: given a new list, the EditForm would build the grid anew, and a charge
+    /// being edited would lose what was typed. The total follows.
+    /// </summary>
+    public async Task KeepChargesOf(IReadOnlySet<Guid> listedElements)
+    {
+        if (ChargeList.RemoveAll(c => !listedElements.Contains(c.MotherGridPalonnierId)) == 0) return;
+        await chargeGrid.Reload();
+        CalculateChargeTotale();
+    }
+
     void EditRow(ChargeMp mp)
     {
         chargeGrid.EditRow(mp);
@@ -357,22 +359,25 @@ bool isImportingCharges = false;
 
     async Task Insertmp()
     {
-        if (MotherGridPalonnierID == null)
+        if (Carrier is not { } carrier)
         {
             await js.InvokeVoidAsync("alert", $"{L["No MotherGrid/Palonnier selected. Please select one before adding a charge."]}");
             return;
         }
-        ChargeMp mp = new ChargeMp();
-        mp.MotherGridPalonnierId = (Guid)MotherGridPalonnierID;
+        Guid scenarioId = EventMpscenarioId;
 
-        if ((await entitiesService.InsertEntityAsync(mp)) != null)
+        // Its carrier's id only: InsertOwnedAsync adds what the new row points to, and the element would be inserted a
+        // second time with it.
+        ChargeMp mp = new ChargeMp();
+        mp.MotherGridPalonnierId = carrier.MotherGridPalonnierId;
+
+        // A refused insert is shown by the service itself. Into the grid only if it still shows that scenario (Back, or
+        // the dropdown, may have moved the page meanwhile).
+        if (await entitiesService.InsertOwnedAsync(mp) && EventMpscenarioId == scenarioId)
         {
+            mp.MotherGridPalonnier = carrier;   // for the carrier column, as a read of the page gives it
             ChargeList.Add(mp);
             await chargeGrid.InsertRow(mp);
-        }
-        else
-        {
-            await js.InvokeVoidAsync("alert", $"Update Unsuccessfull!");
         }
         CalculateChargeTotale();
         
@@ -385,9 +390,18 @@ bool isImportingCharges = false;
 
     async Task UpdateRow(ChargeMp mp)
     {
-        if (await entitiesService.UpdateEntityAsync(mp))
+        try
         {
-            await chargeGrid.UpdateRow(mp);
+            if (await entitiesService.UpdateOwnedAsync(mp))
+            {
+                await chargeGrid.UpdateRow(mp);
+            }
+        }
+        catch (Exception ex)
+        {
+            // UpdateOwnedAsync throws when the database refuses the row, or when it no longer exists (deleted from another
+            // tab). Unhandled here it ends the circuit; the row stays in edit with what was typed.
+            await js.InvokeVoidAsync("alert", EntitiesService.NotSavedMessage(ex));
         }
         CalculateChargeTotale();
         
@@ -443,14 +457,10 @@ bool isImportingCharges = false;
             }
             scenarioName = here.Scenario.Name;
 
-            // Récupérer tous les mothergrids et palonniers du scénario
-            var allMotherGridsAndPalonniers = await entitiesService.GetFilteredEntitiesAsync<MotherGridPalonnier>(
-                x => x.EventMpscenarioId == scenarioId);
-
-            // Récupérer toutes les charges
-            var allCharges = await entitiesService.GetFilteredEntitiesAsync<ChargeMp>(
-                x => x.MotherGridPalonnier.EventMpscenarioId == scenarioId,
-                "MotherGridPalonnier");
+            // The scenario's mothers and palonniers and their charges as stored, read fresh through a context of their own:
+            // what is calculated is what the database holds - another tab's change included, a value typed and not
+            // confirmed with ✓ not (the page then hides the result, which no longer matches what it shows).
+            var (allMotherGridsAndPalonniers, allCharges) = await entitiesService.ReadScenarioElementsAsync(scenarioId);
 
             // The scenario's Charpente row, read fresh through a context of its own - or a new one, inserted with its loads
             // once they are calculated (SaveCharpenteAsync), not empty before. The Charpente page and the report read it fresh
@@ -580,16 +590,30 @@ bool isImportingCharges = false;
 
     async Task TriggerChargeExcelImport()
     {
-        if (MotherGridPalonnierID == null)
+        if (Carrier is null)
         {
-            await js.InvokeVoidAsync("alert", L["No MotherGrid/Palonnier selected. Please select one before importing."].ToString());
+            await AlertNoCarrierToImportOnto();
             return;
         }
         await js.InvokeVoidAsync("eval", "document.getElementById('chargeImport').click()");
     }
 
+    // Before the file dialog opens, and again when the file arrives (the selection may have been cleared meanwhile).
+    private ValueTask AlertNoCarrierToImportOnto() =>
+        js.InvokeVoidAsync("alert", L["No MotherGrid/Palonnier selected. Please select one before importing."].ToString());
+
     async Task ImportChargesFromExcel(InputFileChangeEventArgs e)
     {
+        // The element selected when the file arrives: the charges are placed along it. Cleared while the file dialog was
+        // open, nothing is imported. One deleted from another tab meanwhile is refused by the database (its foreign key),
+        // and the catch below says so.
+        if (Carrier is not { } palonnier)
+        {
+            await AlertNoCarrierToImportOnto();
+            return;
+        }
+        Guid scenarioId = EventMpscenarioId;
+
         isImportingCharges = true;
         StateHasChanged();
         try
@@ -597,14 +621,6 @@ bool isImportingCharges = false;
             using var mem = new System.IO.MemoryStream();
             await e.File.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024).CopyToAsync(mem);
             mem.Position = 0;
-
-            var palonnier = await entitiesService.GetEntityAsync<MotherGridPalonnier>((Guid)MotherGridPalonnierID);
-
-            if (palonnier == null)
-            {
-                await js.InvokeVoidAsync("alert", "Selected palonnier not found in database.");
-                return;
-            }
 
             var toInsert = await RiggingOptimizer.Pipeline.ImportChargeMpsFromStream(
                 mem,
@@ -630,13 +646,19 @@ bool isImportingCharges = false;
                 return;
             }
 
-            if (await entitiesService.InsertEntitiesAsync(toInsert))
+            // The rows carry their carrier's id only (InsertOwnedRangeAsync adds what they point to).
+            if (await entitiesService.InsertOwnedRangeAsync(toInsert))
             {
-                ChargeList.AddRange(toInsert);
-                await chargeGrid.Reload();
-                CalculateChargeTotale();
-                if (ChargeListChanged.HasDelegate)
-                    await ChargeListChanged.InvokeAsync();
+                // Into the grid only if it still shows that scenario.
+                if (EventMpscenarioId == scenarioId)
+                {
+                    foreach (var charge in toInsert) charge.MotherGridPalonnier = palonnier;
+                    ChargeList.AddRange(toInsert);
+                    await chargeGrid.Reload();
+                    CalculateChargeTotale();
+                    if (ChargeListChanged.HasDelegate)
+                        await ChargeListChanged.InvokeAsync();
+                }
                 await js.InvokeVoidAsync("alert", $"{toInsert.Count} charge(s) imported successfully.");
             }
             else
@@ -646,7 +668,8 @@ bool isImportingCharges = false;
         }
         catch (Exception ex)
         {
-            await js.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+            // The database's own reason (a refused row, the carrier deleted meanwhile), not EF's "see the inner exception".
+            await js.InvokeVoidAsync("alert", $"Error: {ex.GetBaseException().Message}");
         }
         finally
         {
