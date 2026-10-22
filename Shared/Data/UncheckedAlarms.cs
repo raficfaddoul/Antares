@@ -8,8 +8,10 @@ namespace AliantWebS.Data
     /// <summary>
     /// Alarm thresholds the collection loop could not check. A reading whose calibration (C1/C0) cannot be read, or whose
     /// coefficient is not a number, is still stored, raw as every reading is; but a raw value is never compared with a
-    /// threshold typed in calibrated units (Rafic, 2026-10-22). While that lasts it is said on every page (MainLayout)
-    /// and on Alarm Management, and ReportsService journals it once when it starts and once when it ends.
+    /// threshold typed in calibrated units. Nor is a reading whose sensor's threshold cannot be read (Rafic, 2026-10-22).
+    /// While that lasts it is said on every page (MainLayout) and on Alarm Management, and ReportsService journals it
+    /// once when it starts and once when it ends. ReportsService keeps a second one for the sensor load
+    /// (<see cref="Set"/>): while it fails, no report is read at all.
     /// </summary>
     public sealed class UncheckedAlarms
     {
@@ -30,10 +32,14 @@ namespace AliantWebS.Data
         public event Action? Changed;
 
         /// <summary>After one batch of reports: the readings it could not check, as ("sensor / channel", why).</summary>
-        public Change Update(IReadOnlyCollection<(string Reading, string Reason)> uncheckedReadings, DateTime now)
+        public Change Update(IReadOnlyCollection<(string Reading, string Reason)> uncheckedReadings, DateTime now) =>
+            Set(uncheckedReadings.Count == 0 ? null : Describe(uncheckedReadings), now);
+
+        /// <summary>What is not checked, said as is; null when everything is checked again.</summary>
+        public Change Set(string? message, DateTime now)
         {
             var before = Current;
-            var after = uncheckedReadings.Count == 0 ? null : new State(Describe(uncheckedReadings), before?.Since ?? now);
+            var after = message == null ? null : new State(message, before?.Since ?? now);
             if (after?.Message == before?.Message) return Change.None;
 
             Volatile.Write(ref current, after);

@@ -32,6 +32,9 @@
     @{ var uncheckedAlarms = ReportsService.UncheckedAlarms.Current; }
     <AlarmFailureBanner Icon="🔔⚠️" Title="@L["Seuils d'alarme non vérifiés"]"
                         Message="@uncheckedAlarms?.Message" Time="@(uncheckedAlarms?.Since ?? DateTime.MinValue)" />
+    @{ var sensorsUnavailable = ReportsService.SensorsUnavailable.Current; }
+    <AlarmFailureBanner Icon="📡⚠️" Title="@L["Capteurs non chargés, aucun rapport n'est lu"]"
+                        Message="@sensorsUnavailable?.Message" Time="@(sensorsUnavailable?.Since ?? DateTime.MinValue)" />
 </div>
 
 
@@ -234,9 +237,12 @@
 
         ReportsService.UncheckedAlarms.Changed -= AlarmChainStatusChanged;
         ReportsService.UncheckedAlarms.Changed += AlarmChainStatusChanged;
+
+        ReportsService.SensorsUnavailable.Changed -= AlarmChainStatusChanged;
+        ReportsService.SensorsUnavailable.Changed += AlarmChainStatusChanged;
     }
 
-    // The alarm chain's banners (AlarmFailureBanner) follow the e-mail status and the unchecked thresholds.
+    // The alarm chain's banners (AlarmFailureBanner) follow the e-mail status, the unchecked thresholds and the sensor load.
     private void AlarmChainStatusChanged()
     {
         InvokeAsync(StateHasChanged);
@@ -283,6 +289,7 @@
         // Static events: a leak here outlives the circuit.
         AppData.OnEmailStatusChanged -= AlarmChainStatusChanged;
         ReportsService.UncheckedAlarms.Changed -= AlarmChainStatusChanged;
+        ReportsService.SensorsUnavailable.Changed -= AlarmChainStatusChanged;
     }
 
     void SHMClick(MenuItemEventArgs args)

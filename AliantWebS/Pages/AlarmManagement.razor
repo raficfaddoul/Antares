@@ -464,6 +464,23 @@
             </div>
         }
 
+        @if (ReportsService.SensorsUnavailable.Current is { } sensorsUnavailable)
+        {
+            <div class="sensors-unavailable" style="background:#fff5f5; border:2px solid #fc8181; border-left:6px solid #c53030;
+                        border-radius:12px; padding:16px 20px; margin-bottom:25px; color:#742a2a;">
+                <div style="font-weight:700; font-size:16px; margin-bottom:6px;">
+                    📡⚠️ Capteurs non chargés depuis le @sensorsUnavailable.Since.ToString("dd/MM/yyyy à HH:mm") — aucun rapport n'est lu
+                </div>
+                <div style="font-size:14px;">@sensorsUnavailable.Message</div>
+                <div style="font-size:13px; opacity:.8; margin-top:6px;">
+                    Sans la liste des capteurs et de leurs seuils, aucune mesure n'est enregistrée ni comparée à son
+                    seuil : aucune nouvelle alarme ne peut être détectée. Un nouvel essai a lieu à chaque cycle ; dès
+                    qu'il réussit, la lecture repart du dernier rapport traité, sans perte. Le détail est dans le
+                    journal (alarm.sensors.unavailable).
+                </div>
+            </div>
+        }
+
         @if (ReportsService.UncheckedAlarms.Current is { } uncheckedAlarms)
         {
             <div class="unchecked-alarms" style="background:#fff5f5; border:2px solid #fc8181; border-left:6px solid #c53030;
@@ -474,8 +491,9 @@
                 <div style="font-size:14px;">@uncheckedAlarms.Message</div>
                 <div style="font-size:13px; opacity:.8; margin-top:6px;">
                     Les mesures de ces voies sont enregistrées, mais aucune n'est comparée à son seuil : sans son
-                    étalonnage, une valeur brute ne peut pas l'être. Corrigez ou rétablissez les coefficients
-                    (C1/C0) ; le détail est dans le journal (alarm.check.unavailable).
+                    étalonnage, une valeur brute ne peut pas l'être, et un seuil illisible ne peut pas servir.
+                    Corrigez la cause indiquée : les coefficients (C1/C0), ou l'attribut « Seuil Alarme » du capteur
+                    (Cartographie des éléments de charpente) ; le détail est dans le journal (alarm.check.unavailable).
                 </div>
             </div>
         }

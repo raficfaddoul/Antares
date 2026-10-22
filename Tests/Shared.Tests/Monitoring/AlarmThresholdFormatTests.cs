@@ -77,12 +77,27 @@ public class AlarmThresholdFormatTests
     }
 
     [Fact]
-    public void Channel_names_ignore_case_and_spaces_and_the_last_one_given_wins()
+    public void Channel_names_ignore_case_and_spaces_and_the_same_value_given_twice_counts_once()
     {
-        var thresholds = AlarmThresholdFormat.Parse(" Weight : 1500 ;weight:2000");
+        var unreadable = new List<string>();
+
+        var thresholds = AlarmThresholdFormat.Parse(" Weight : 1500 ;weight:1500", unreadable);
 
         Assert.Single(thresholds);
-        Assert.Equal(2000, thresholds["WEIGHT"]);
+        Assert.Equal(1500, thresholds["WEIGHT"]);
+        Assert.Empty(unreadable);
+    }
+
+    [Fact]
+    public void A_channel_given_two_values_has_none_and_every_part_naming_it_is_unreadable()
+    {
+        // Which one is meant cannot be known (Rafic, 2026-10-22): no value is picked.
+        var unreadable = new List<string>();
+
+        var thresholds = AlarmThresholdFormat.Parse(" Weight : 1500 ;temperature:60;weight:2000;WEIGHT:1500", unreadable);
+
+        Assert.Equal(new[] { "temperature" }, thresholds.Keys);
+        Assert.Equal(new[] { "Weight : 1500", "weight:2000", "WEIGHT:1500" }, unreadable);
     }
 
     [Fact]

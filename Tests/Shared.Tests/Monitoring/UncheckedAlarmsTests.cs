@@ -67,4 +67,20 @@ public class UncheckedAlarmsTests
             + $" ; {Unusable} (1 voie(s) : Manille 9 / weight)",
             alarms.Current.Message);
     }
+
+    [Fact]
+    public void A_message_set_as_is_follows_the_same_start_and_end()
+    {
+        // The sensor load (ReportsService.SensorsUnavailable): one reason, no channel to name.
+        var alarms = new UncheckedAlarms();
+        const string Refused = "Timeout expired";
+
+        Assert.Equal(Change.Started, alarms.Set(Refused, T0));
+        Assert.Equal(Refused, alarms.Current.Message);
+        Assert.Equal(Change.None, alarms.Set(Refused, T0.AddMinutes(1)));
+        Assert.Equal(Change.Updated, alarms.Set("Login failed", T0.AddMinutes(2)));
+        Assert.Equal(T0, alarms.Current.Since);
+        Assert.Equal(Change.Ended, alarms.Set(null, T0.AddMinutes(3)));
+        Assert.Null(alarms.Current);
+    }
 }

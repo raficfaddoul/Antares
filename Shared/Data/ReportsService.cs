@@ -103,9 +103,12 @@ namespace AliantWebS.Data
         private static CancellationToken FetchStopToken { get { lock (_fetchLock) return _fetchStop.Token; } }
 
         // ── Thresholds that could not be checked ──────────────────────────────────────────────
-        // A reading whose calibration cannot be had is stored raw but not compared with its threshold:
+        // A reading whose calibration or threshold cannot be had is stored but not compared with its threshold:
         // said on every page and on /alarm-management while it lasts (see UncheckedAlarms).
         public static readonly UncheckedAlarms UncheckedAlarms = new();
+
+        // While the sensors cannot be loaded no report is read at all, so nothing can be checked: said the same way.
+        public static readonly UncheckedAlarms SensorsUnavailable = new();
 
         private static void ApplyFetchPaused(bool paused)
         {
@@ -385,8 +388,7 @@ static public async Task<(int Count, long MaxTimestamp)> GetReportsAsync(
             bool hasNewAlarms = false;
             int cycleCount = 0;
 
-            // Load sensors once before the loop
-            IEnumerable<Element> sensors = await LoadSensorsAsync(dbContext);
+            IEnumerable<Element>? sensors = null;   // loaded on the first cycle: see SensorsForCycleAsync
 
             // The persisted pause, again here: the loop must never start a replay that the page says is paused,
             // whatever order startup ran in.
@@ -428,16 +430,13 @@ static public async Task<(int Count, long MaxTimestamp)> GetReportsAsync(
 
                     hasNewAlarms = false;
 
-                    // Refresh sensors periodically instead of every cycle
-                    if (cycleCount % SENSOR_REFRESH_CYCLES == 0 && cycleCount > 0)
-                    {
-                        sensors = await LoadSensorsAsync(dbContext);
-                    }
+                    // Refresh sensors periodically instead of every cycle, and on the next cycle after a failed load.
+                    sensors = await SensorsForCycleAsync(dbContext, sensors, refreshDue: cycleCount % SENSOR_REFRESH_CYCLES == 0);
                     cycleCount++;
 
                     if (sensors == null)
                     {
-                        Console.WriteLine("[StartContinuousFetch] No sensors loaded, skipping cycle.");
+                        // No report is read: none is lost, the next read starts after the last report processed.
                         await Task.Delay(TimeSpan.FromSeconds(pollingIntervalSeconds), cancellationToken);
                         continue;
                     }
@@ -571,7 +570,7 @@ static public async Task<(int Count, long MaxTimestamp)> GetReportsAsync(
                 case UncheckedAlarms.Change.Started:
                     Console.WriteLine($"[Alarmes] Seuils non vérifiés : {after!.Message}");
                     await JournalWriter.WriteSystemAsync(JournalCategory.Alarme, "alarm.check.unavailable",
-                        details: $"Mesures enregistrées brutes, seuils non vérifiés : {after.Message}", severity: 2);
+                        details: $"Mesures enregistrées, seuils non vérifiés : {after.Message}", severity: 2);
                     break;
                 case UncheckedAlarms.Change.Updated:
                     Console.WriteLine($"[Alarmes] Seuils non vérifiés : {after!.Message}");
@@ -580,6 +579,34 @@ static public async Task<(int Count, long MaxTimestamp)> GetReportsAsync(
                     Console.WriteLine("[Alarmes] Tous les seuils sont de nouveau vérifiés.");
                     await JournalWriter.WriteSystemAsync(JournalCategory.Alarme, "alarm.check.restored",
                         details: $"Tous les seuils sont de nouveau vérifiés (non vérifiés depuis le {before!.Since:dd/MM/yyyy HH:mm:ss}).",
+                        severity: 1);
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// After each sensor load: why it failed (null when it succeeded). Console and journal when a failure starts and
+        /// when it ends, the banner (SensorsUnavailable.Changed) whenever what is said changes.
+        /// </summary>
+        public static async Task RecordSensorLoadAsync(string? failure, DateTime now)
+        {
+            var before = SensorsUnavailable.Current;
+            var change = SensorsUnavailable.Set(failure, now);
+
+            switch (change)
+            {
+                case UncheckedAlarms.Change.Started:
+                case UncheckedAlarms.Change.Updated:
+                    Console.WriteLine($"[Alarmes] Capteurs non chargés, aucun rapport n'est lu : {failure}");
+                    if (change == UncheckedAlarms.Change.Started)
+                        await JournalWriter.WriteSystemAsync(JournalCategory.Alarme, "alarm.sensors.unavailable",
+                            details: $"Capteurs non chargés, aucun rapport n'est lu ni aucun seuil vérifié : {failure}", severity: 2);
+                    break;
+                case UncheckedAlarms.Change.Ended:
+                    Console.WriteLine("[Alarmes] Capteurs chargés, la lecture des rapports reprend.");
+                    await JournalWriter.WriteSystemAsync(JournalCategory.Alarme, "alarm.sensors.restored",
+                        details: $"Capteurs chargés, la lecture des rapports reprend au dernier rapport traité "
+                               + $"(arrêtée depuis le {before!.Since:dd/MM/yyyy HH:mm:ss}).",
                         severity: 1);
                     break;
             }
@@ -619,35 +646,8 @@ static public async Task<(int Count, long MaxTimestamp)> GetReportsAsync(
                         .Tag("sensor", sensor.ElementId.ToString())
                         .Timestamp(DateTimeOffset.FromUnixTimeSeconds(report.report_datetime), WritePrecision.Us);
 
-                    Dictionary<string, double> thresholdValues = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
-                    if (sensor.ElementType?.AttributeTypeElementTypes.Count > 0)
-                    {
-                        foreach (var at in sensor.ElementType.AttributeTypeElementTypes)
-                        {
-                            bool isAlarmThreshold = TagMappingResolver.Matches(thresholdNames, at.AttributeType.Name);
-
-                            if (isAlarmThreshold)
-                            {
-                                var alarmValue = sensor.AttributeElements
-                                    .Where(x => x.AttributeTypeId == at.AttributeTypeId)
-                                    .Select(x => x.Value)
-                                    .FirstOrDefault();
-
-                                if (!string.IsNullOrEmpty(alarmValue))
-                                {
-                                    string[]? realValues = alarmValue.Split(';');
-                                    foreach (var v in realValues)
-                                    {
-                                        string[]? realValue = v.Split(':');
-                                        if (realValue.Length == 2 && double.TryParse(realValue[1], out double thresholdValue))
-                                        {
-                                            thresholdValues.Add(realValue[0], thresholdValue);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    var unreadableThreshold = new List<string>();
+                    var thresholdValues = ThresholdsOf(sensor, thresholdNames, unreadableThreshold);
 
                     foreach (var v in rd.values)
                     {
@@ -673,7 +673,14 @@ static public async Task<(int Count, long MaxTimestamp)> GetReportsAsync(
                             // calibration is applied on read.
                             p = p.Field(ChannelDataTypeID.ToString(), numericValue.Value);
 
-                            if (!thresholdValues.ContainsKey(v.Key)) continue;   // no threshold: nothing to check
+                            if (!thresholdValues.ContainsKey(v.Key))
+                            {
+                                // No threshold: nothing to check - unless a part of the sensor's threshold could not
+                                // be read, which may have been this channel's. Then it is said, never skipped.
+                                if (unreadableThreshold.Count > 0)
+                                    uncheckedReadings.Add(($"{sensor.Name} / {v.Key}", UnreadableThresholdReason(unreadableThreshold)));
+                                continue;
+                            }
 
                             // ...but the threshold is compared against the REPORTED value, i.e. the
                             // same y = C1·x + C0 the charts, gauges and SVG show. Comparing the raw
@@ -781,40 +788,79 @@ static public async Task<(int Count, long MaxTimestamp)> GetReportsAsync(
     return (points, hasNewAlarms, uncheckedReadings);
 }
 
-        static private async Task<IEnumerable<Element>> LoadSensorsAsync(AliantWebContext dbContext)
+        /// <summary>
+        /// The sensor's alarm threshold per channel, read as the dashboard reads it (AlarmThresholdFormat). All its
+        /// threshold values are read as one, so a channel given two different values has none. What cannot be read is
+        /// added to <paramref name="unreadable"/>.
+        /// </summary>
+        static private Dictionary<string, double> ThresholdsOf(Element sensor, HashSet<string> thresholdNames, List<string> unreadable)
         {
+            var thresholdTypes = sensor.ElementType!.AttributeTypeElementTypes   // LoadSensorsAsync loads each sensor under its type
+                .Where(link => TagMappingResolver.Matches(thresholdNames, link.AttributeType.Name))
+                .Select(link => link.AttributeTypeId)
+                .ToHashSet();
+            var values = sensor.AttributeElements
+                .Where(a => thresholdTypes.Contains(a.AttributeTypeId))
+                .Select(a => a.Value);
+
+            return AlarmThresholdFormat.Parse(string.Join(";", values), unreadable);
+        }
+
+        static private string UnreadableThresholdReason(IEnumerable<string> unreadableParts) =>
+            $"Seuil d'alarme illisible « {string.Join(";", unreadableParts)} » "
+            + $"(attendu : une valeur par canal, par ex. {AlarmThresholdFormat.Example})";
+
+        /// <summary>
+        /// The sensors a cycle reads reports with: <paramref name="current"/> while there is one and no refresh is due,
+        /// otherwise loaded again. A failed load gives null - that cycle reads no report and the next one tries again
+        /// (Rafic, 2026-10-22) - and is said (SensorsUnavailable) until a load succeeds.
+        /// </summary>
+        static private async Task<IEnumerable<Element>?> SensorsForCycleAsync(AliantWebContext dbContext,
+            IEnumerable<Element>? current, bool refreshDue)
+        {
+            if (current != null && !refreshDue) return current;
+
+            IEnumerable<Element> sensors;
             try
             {
-                // One query, so these collections multiply into its rows: load each sensor's OWN attributes (its
-                // "Seuil Alarme"), not every element's under the attribute type. AsNoTracking links nothing outside
-                // these paths, so values loaded under the type never reached sensor.AttributeElements.
-                var category = await dbContext.Categories
-                    .Include(c => c.ElementTypes)
-                        .ThenInclude(et => et.AttributeTypeElementTypes)
-                            .ThenInclude(atte => atte.AttributeType)
-                    .Include(c => c.ElementTypes)
-                        .ThenInclude(et => et.ChannelDataTypeElementTypes)
-                            .ThenInclude(cdte => cdte.ChannelDataType)
-                    .Include(c => c.ElementTypes)
-                        .ThenInclude(et => et.Elements)
-                            .ThenInclude(e => e.Structure)   // alarm e-mails name the structure
-                    .Include(c => c.ElementTypes)
-                        .ThenInclude(et => et.Elements)
-                            .ThenInclude(e => e.AttributeElements)
-                    .Where(c => c.Name == "sensing device")
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync();
-
-                var sensors = category?.ElementTypes.SelectMany(et => et.Elements).ToList() 
-                              ?? new List<Element>();
-                Console.WriteLine($"[LoadSensorsAsync] Loaded {sensors.Count()} sensors.");
-                return sensors;
+                sensors = await LoadSensorsAsync(dbContext);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[LoadSensorsAsync] Failed to load sensors: {ex.Message}");
+                await RecordSensorLoadAsync(ex.GetBaseException().Message, DateTime.Now);
                 return null;
             }
+
+            await RecordSensorLoadAsync(null, DateTime.Now);
+            return sensors;
+        }
+
+        static private async Task<IEnumerable<Element>> LoadSensorsAsync(AliantWebContext dbContext)
+        {
+            // One query, so these collections multiply into its rows: load each sensor's OWN attributes (its
+            // "Seuil Alarme"), not every element's under the attribute type. AsNoTracking links nothing outside
+            // these paths, so values loaded under the type never reached sensor.AttributeElements.
+            var category = await dbContext.Categories
+                .Include(c => c.ElementTypes)
+                    .ThenInclude(et => et.AttributeTypeElementTypes)
+                        .ThenInclude(atte => atte.AttributeType)
+                .Include(c => c.ElementTypes)
+                    .ThenInclude(et => et.ChannelDataTypeElementTypes)
+                        .ThenInclude(cdte => cdte.ChannelDataType)
+                .Include(c => c.ElementTypes)
+                    .ThenInclude(et => et.Elements)
+                        .ThenInclude(e => e.Structure)   // alarm e-mails name the structure
+                .Include(c => c.ElementTypes)
+                    .ThenInclude(et => et.Elements)
+                        .ThenInclude(e => e.AttributeElements)
+                .Where(c => c.Name == "sensing device")
+                .AsNoTracking()
+                .FirstOrDefaultAsync();
+
+            var sensors = category?.ElementTypes.SelectMany(et => et.Elements).ToList()
+                          ?? new List<Element>();
+            Console.WriteLine($"[LoadSensorsAsync] Loaded {sensors.Count()} sensors.");
+            return sensors;
         }
 
         /// <summary>
