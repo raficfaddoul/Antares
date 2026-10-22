@@ -11,10 +11,11 @@ namespace AliantWebS.Data
     /// <summary>
     /// The manille (shackle) charge ratios, so the Influx queries and the ratio maths live in exactly one place. Two
     /// responsibilities: the plan's charge-ratio colour map (<see cref="ComputeAsync"/>, the Surveillance tab's
-    /// SurveillanceCapteursAntares) and the dashboard's shackle figures (DashBoardComponent2: the weekly peaks of the
-    /// charge curve, the gauges with the critical-share rule <see cref="CriticalRatio"/>, <see cref="Percent"/>, and the
-    /// read that gathers them, <see cref="ReadChargeAsync"/>, with its records below). Both rest on the same thresholds
-    /// and <see cref="Ratio"/>; split the dashboard part out if it grows beyond the shackles.
+    /// SurveillanceCapteursAntares) and the dashboard's shackle figures (DashBoardComponent2: the gauges with the
+    /// critical-share rule <see cref="CriticalRatio"/> and <see cref="Percent"/>, see <see cref="Charge"/>). Both rest on
+    /// the same thresholds (<see cref="ThresholdsByChannel"/>, the one parse loop) and <see cref="Ratio"/>, as do the
+    /// weekly peaks (<see cref="WeeklyPeaks"/>) and each sensor's highest ratio (<see cref="MaxRatioBySensor"/>). The
+    /// dashboard's part for every sensor type with an alarm threshold, beyond the shackles, lives in AlarmRatioCurves.
     ///
     /// The ratio is measured against each sensor's OWN alarm threshold for that channel — the
     /// "Seuil Alarme" attribute, packed as "weight:2000;temperature:60". So 100% means "at the
@@ -36,20 +37,39 @@ namespace AliantWebS.Data
         /// Per-sensor alarm threshold for one channel, keyed by ElementId. Sensors with no usable
         /// threshold are simply absent from the result. A threshold value with a part that is not
         /// "channel:number" (see AlarmThresholdFormat) is added to <paramref name="unreadable"/> when one is
-        /// given, whatever channel was asked for.
+        /// given, whatever channel was asked for. The projection of <see cref="LoadThresholdsByChannelAsync"/> on one
+        /// channel (<see cref="ForChannel"/>); empty, with no SQL, for no factory, no sensor or no channel name.
         /// </summary>
         public static async Task<Dictionary<Guid, double>> LoadThresholdsAsync(
             IDbContextFactory<AliantWebContext> dbContextFactory,
             IReadOnlyCollection<Element> sensors,
             string channelName,
-            ICollection<(Guid ElementId, string Value)> unreadable = null)
+            ICollection<(Guid ElementId, string Value)>? unreadable = null)
         {
-            var result = new Dictionary<Guid, double>();
             if (dbContextFactory == null || sensors == null || sensors.Count == 0
                 || string.IsNullOrWhiteSpace(channelName))
-                return result;
+                return new Dictionary<Guid, double>();
 
-            using var context = await dbContextFactory.CreateDbContextAsync();
+            var byChannel = await LoadThresholdsByChannelAsync(dbContextFactory, sensors, unreadable, CancellationToken.None);
+            return ForChannel(byChannel, channelName);
+        }
+
+        /// <summary>
+        /// Every channel's alarm threshold per sensor, as <see cref="ThresholdsByChannel"/> reads them from the sensors'
+        /// "Seuil Alarme" attributes (the code tag seuil_alarme or any of its aliases). No sensor: an empty map, with no
+        /// SQL. Throws on a null factory or null sensors: an empty map would pass for "no threshold".
+        /// </summary>
+        public static async Task<Dictionary<Guid, Dictionary<string, double>>> LoadThresholdsByChannelAsync(
+            IDbContextFactory<AliantWebContext> dbContextFactory,
+            IReadOnlyCollection<Element> sensors,
+            ICollection<(Guid ElementId, string Value)>? unreadable,
+            CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(dbContextFactory);
+            ArgumentNullException.ThrowIfNull(sensors);
+            if (sensors.Count == 0) return new Dictionary<Guid, Dictionary<string, double>>();
+
+            using var context = await dbContextFactory.CreateDbContextAsync(cancellationToken);
 
             // Which attribute names carry a threshold — code tag plus every user alias.
             var accepted = await TagMappingResolver.AcceptedNamesAsync(context, "seuil_alarme");
@@ -59,21 +79,62 @@ namespace AliantWebS.Data
                 .Where(ae => sensorIds.Contains(ae.ElementId))
                 .Select(ae => new { ae.ElementId, Name = ae.AttributeType.Name, ae.Value })
                 .AsNoTracking()
-                .ToListAsync();
+                .ToListAsync(cancellationToken);
 
-            foreach (var row in rows)
+            // Matches takes a null name as no match.
+            return ThresholdsByChannel(
+                rows.Where(row => TagMappingResolver.Matches(accepted, row.Name!)).Select(row => (row.ElementId, row.Value)),
+                unreadable);
+        }
+
+        /// <summary>
+        /// The alarm thresholds of every channel per sensor, from its "Seuil Alarme" values in row order: sensor →
+        /// channel name (any case) → threshold. Per sensor and channel a later row's non-zero value wins; a zero is no
+        /// threshold and replaces nothing; a blank value is no threshold and nothing to report. A row with a part that is
+        /// not "channel:number" is added once to <paramref name="unreadable"/> when one is given, and its readable parts
+        /// still count. A sensor with no threshold is absent.
+        /// </summary>
+        public static Dictionary<Guid, Dictionary<string, double>> ThresholdsByChannel(
+            IEnumerable<(Guid ElementId, string? Value)> thresholdValues,
+            ICollection<(Guid ElementId, string Value)>? unreadable = null)
+        {
+            ArgumentNullException.ThrowIfNull(thresholdValues);
+
+            var result = new Dictionary<Guid, Dictionary<string, double>>();
+            foreach (var (sensorId, value) in thresholdValues)
             {
-                if (!TagMappingResolver.Matches(accepted, row.Name)) continue;
-                if (string.IsNullOrWhiteSpace(row.Value)) continue;
+                if (string.IsNullOrWhiteSpace(value)) continue;
 
                 var unreadableParts = new List<string>();
-                var thresholds = AlarmThresholdFormat.Parse(row.Value, unreadableParts);
-                if (unreadableParts.Count > 0) unreadable?.Add((row.ElementId, row.Value));
+                var thresholds = AlarmThresholdFormat.Parse(value, unreadableParts);
+                if (unreadableParts.Count > 0) unreadable?.Add((sensorId, value));
 
-                if (thresholds.TryGetValue(channelName.Trim(), out var t) && t != 0)
-                    result[row.ElementId] = t;
+                foreach (var (channel, threshold) in thresholds)
+                {
+                    if (threshold == 0) continue;   // no threshold: it replaces none read before
+                    if (!result.TryGetValue(sensorId, out var ofSensor))
+                        result[sensorId] = ofSensor = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+                    ofSensor[channel] = threshold;
+                }
             }
+            return result;
+        }
 
+        /// <summary>
+        /// One channel's thresholds, keyed by ElementId, from <see cref="ThresholdsByChannel"/>'s map: the channel name is
+        /// trimmed and matched whatever its case; a sensor without a threshold for it is absent.
+        /// </summary>
+        public static Dictionary<Guid, double> ForChannel(
+            IReadOnlyDictionary<Guid, Dictionary<string, double>> byChannel, string channelName)
+        {
+            ArgumentNullException.ThrowIfNull(byChannel);
+            ArgumentException.ThrowIfNullOrWhiteSpace(channelName);
+
+            var channel = channelName.Trim();
+            var result = new Dictionary<Guid, double>();
+            foreach (var (sensorId, thresholds) in byChannel)
+                if (thresholds.TryGetValue(channel, out var threshold))
+                    result[sensorId] = threshold;
             return result;
         }
 
@@ -141,7 +202,7 @@ namespace AliantWebS.Data
         /// <paramref name="combine"/> joins them should the window ever be cut in two), keyed by ElementId.
         /// Throws when InfluxDB cannot be read.
         /// </summary>
-        private static async Task<Dictionary<Guid, double>> PerSensorAsync(
+        internal static async Task<Dictionary<Guid, double>> PerSensorAsync(
             IReadOnlyCollection<Element> sensors, ChannelDataType channel, DateTime startDate, DateTime endDate,
             string aggregateFn, Func<IEnumerable<double>, double> combine, CancellationToken cancellationToken)
         {
@@ -155,7 +216,7 @@ namespace AliantWebS.Data
         }
 
         // One channel of the sensors, aggregated per window: GetData rows ([0] time, [1] sensor id, [2] value).
-        private static Task<List<object[]>> ReadChannelAsync(
+        internal static Task<List<object[]>> ReadChannelAsync(
             IReadOnlyCollection<Element> sensors, ChannelDataType channel, DateTime startDate, DateTime endDate,
             string aggregateWindow, string aggregateFn, CancellationToken cancellationToken) =>
             InfluxService.GetData(
@@ -200,7 +261,7 @@ namespace AliantWebS.Data
             => thresholds.TryGetValue(sensorId, out var threshold) && threshold != 0 ? value / threshold : null;
 
         /// <summary>
-        /// The dashboard's "Charge max manilles / seuil d'alarme" curve: for each week, Monday to Sunday and dated
+        /// One of the dashboard's curves in % of the alarm threshold: for each week, Monday to Sunday and dated
         /// by its Monday, the highest reading rated against its own sensor's threshold, and the sensor that gave it.
         /// <paramref name="rows"/> are InfluxService.GetData rows: [0] time, [1] sensor id, [2] value. A reading
         /// with no value, or of a sensor with no threshold, is left out; a week with nothing left has no peak. On a
@@ -236,11 +297,24 @@ namespace AliantWebS.Data
         public static int Percent(double ratio) => (int)Math.Round(ratio * 100, MidpointRounding.AwayFromZero);
 
         /// <summary>
-        /// The dashboard's shackle figures from what was read over one period: the weekly peaks (the charge curve), each
-        /// rated shackle's highest ratio (the plan's colours) and the three gauges. A shackle without a threshold is left
-        /// out of all of them and counted. <paramref name="meanBySensor"/> holds each shackle's mean reading over the
-        /// period, <paramref name="weeklyMaxRows"/> its weekly maxima (GetData rows). With no reading of a rated shackle
-        /// there are no gauges (null), never zeros.
+        /// Each rated sensor's highest reading over its own threshold, keyed by ElementId, from GetData rows ([0] time,
+        /// [1] sensor id, [2] value). A sensor with no threshold, or no reading, is absent.
+        /// </summary>
+        public static Dictionary<Guid, double> MaxRatioBySensor(IEnumerable<object[]> rows, IReadOnlyDictionary<Guid, double> thresholds)
+        {
+            var maxRatioBySensor = new Dictionary<Guid, double>();
+            foreach (var (_, sensorId, ratio) in RatedReadings(rows, thresholds))
+                if (!maxRatioBySensor.TryGetValue(sensorId, out var max) || ratio > max)
+                    maxRatioBySensor[sensorId] = ratio;
+            return maxRatioBySensor;
+        }
+
+        /// <summary>
+        /// The dashboard's shackle gauges from what was read over one period, and how many shackles are rated. A shackle
+        /// without a threshold is left out and counted. <paramref name="meanBySensor"/> holds each rated shackle's mean
+        /// reading over the period, <paramref name="weeklyMaxRows"/> the weekly maxima (GetData rows) the shackle curves
+        /// are drawn from, so the max gauge is the highest weekly peak. With no reading of a rated shackle there are no
+        /// gauges (null), never zeros.
         /// </summary>
         public static ShackleCharge Charge(
             IReadOnlyCollection<Guid> shackleIds,
@@ -248,16 +322,9 @@ namespace AliantWebS.Data
             IReadOnlyDictionary<Guid, double> meanBySensor,
             IEnumerable<object[]> weeklyMaxRows)
         {
-            var rows = weeklyMaxRows.ToList();
             int rated = shackleIds.Count(id => Ratio(thresholds, id, 0) is not null);
-
-            var maxRatioBySensor = new Dictionary<Guid, double>();
-            foreach (var (_, sensorId, ratio) in RatedReadings(rows, thresholds))
-                if (!maxRatioBySensor.TryGetValue(sensorId, out var max) || ratio > max)
-                    maxRatioBySensor[sensorId] = ratio;
-
-            return new ShackleCharge(WeeklyPeaks(rows, thresholds), maxRatioBySensor,
-                Gauges(maxRatioBySensor, thresholds, meanBySensor), rated, shackleIds.Count - rated);
+            var maxRatioBySensor = MaxRatioBySensor(weeklyMaxRows, thresholds);
+            return new ShackleCharge(Gauges(maxRatioBySensor, thresholds, meanBySensor), rated, shackleIds.Count - rated);
         }
 
         private static ShackleGauges? Gauges(IReadOnlyDictionary<Guid, double> maxRatioBySensor,
@@ -279,37 +346,6 @@ namespace AliantWebS.Data
                 MaxPercent: Percent(maxRatioBySensor.Values.Max()),
                 CriticalPercent: Percent((double)critical / maxRatioBySensor.Count));
         }
-
-        /// <summary>
-        /// Reads the dashboard's shackle figures over [start, end]: the weekly maxima and each shackle's mean over the
-        /// whole period (InfluxDB, together), then the thresholds (SQL), and rates them (<see cref="Charge"/>). Thresholds that
-        /// cannot be read in full are added to <paramref name="unreadable"/>. Throws InfluxReadException when InfluxDB
-        /// cannot be read, and OperationCanceledException when <paramref name="cancellationToken"/> is cancelled.
-        /// </summary>
-        public static async Task<ShackleCharge> ReadChargeAsync(
-            IDbContextFactory<AliantWebContext> dbContextFactory,
-            IReadOnlyCollection<Element> shackles,
-            ChannelDataType weightChannel,
-            DateTime start,
-            DateTime end,
-            ICollection<(Guid ElementId, string Value)> unreadable,
-            CancellationToken cancellationToken)
-        {
-            ArgumentNullException.ThrowIfNull(dbContextFactory);
-            ArgumentNullException.ThrowIfNull(weightChannel);
-            if (shackles == null || shackles.Count == 0)
-                throw new ArgumentException("No shackle to read: say so instead of reading.", nameof(shackles));
-
-            // The two InfluxDB reads are independent: run together.
-            var weeklyMaxRead = ReadChannelAsync(shackles, weightChannel, start, end, InfluxService.WeeklyWindow, "max", cancellationToken);
-            var meansRead = PerSensorAsync(shackles, weightChannel, start, end, "mean", values => values.Average(), cancellationToken);
-            await Task.WhenAll(weeklyMaxRead, meansRead);
-            var (weeklyMax, means) = (weeklyMaxRead.Result, meansRead.Result);
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var thresholds = await LoadThresholdsAsync(dbContextFactory, shackles, weightChannel.Name, unreadable);
-            return Charge(shackles.Select(s => s.ElementId).ToList(), thresholds, means, weeklyMax);
-        }
     }
 
     /// <summary>One week's peak charge ratio and the sensor that reached it, see SensorChargeRatioHelper.WeeklyPeaks.</summary>
@@ -319,14 +355,9 @@ namespace AliantWebS.Data
     public record ShackleGauges(int MeanPercent, int MaxPercent, int CriticalPercent);
 
     /// <summary>
-    /// The shackle figures of one period, see SensorChargeRatioHelper.Charge: the charge curve's weekly peaks, each rated
-    /// shackle's highest ratio (the plan's colours), the gauges (null when no rated shackle was read in the period), how
-    /// many shackles have a threshold (Rated) and how many were left out for lack of one (WithoutThreshold).
+    /// The shackle figures of one period, see SensorChargeRatioHelper.Charge: the gauges (null when no rated shackle was
+    /// read in the period), how many shackles have a threshold (Rated) and how many were left out for lack of one
+    /// (WithoutThreshold).
     /// </summary>
-    public record ShackleCharge(
-        IReadOnlyList<WeeklyPeak> WeeklyPeaks,
-        IReadOnlyDictionary<Guid, double> MaxRatioBySensor,
-        ShackleGauges? Gauges,
-        int Rated,
-        int WithoutThreshold);
+    public record ShackleCharge(ShackleGauges? Gauges, int Rated, int WithoutThreshold);
 }

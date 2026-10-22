@@ -7,7 +7,8 @@ namespace Shared.Tests.Monitoring;
 /// The dashboard's shackle figures (decisions 3, 4, 6 and 11 of the 2026-10-22 redesign), from the rows InfluxService
 /// returns: each shackle rated against its own threshold, the real value above 100 %, the critical share over a
 /// named 0.80, nearest-percent rounding, no figure at all rather than zeros when nothing was measured, and the max
-/// gauge, the highest weekly peak and the worst plan colour one number by construction.
+/// gauge, the highest weekly peak and the worst plan colour one number by construction. Since slice s2 the weekly peaks
+/// and the per-sensor maxima are SensorChargeRatioHelper.WeeklyPeaks and MaxRatioBySensor, checked on the same rows.
 /// </summary>
 public class ShackleChargeTests
 {
@@ -26,13 +27,21 @@ public class ShackleChargeTests
         params object?[][] weeklyMaxRows) =>
         SensorChargeRatioHelper.Charge(shackles, thresholds, means, weeklyMaxRows!);
 
+    static List<WeeklyPeak> WeeklyPeaks(Dictionary<Guid, double> thresholds, params object?[][] rows) =>
+        SensorChargeRatioHelper.WeeklyPeaks(rows!, thresholds);
+
+    static IReadOnlyDictionary<Guid, double> MaxRatioBySensor(Dictionary<Guid, double> thresholds, params object?[][] rows) =>
+        SensorChargeRatioHelper.MaxRatioBySensor(rows!, thresholds);
+
     [Fact]
     public void A_shackle_at_1_4_times_its_threshold_reads_140_percent()
     {
-        var charge = Charge(new[] { A }, new() { [A] = 1500 }, new() { [A] = 750 }, Row(Week1, A, 2100));
+        var thresholds = new Dictionary<Guid, double> { [A] = 1500 };
+        var row = Row(Week1, A, 2100);
+        var charge = Charge(new[] { A }, thresholds, new() { [A] = 750 }, row);
 
         Assert.Equal(140, charge.Gauges!.MaxPercent);
-        Assert.Equal(1.4, charge.MaxRatioBySensor[A], 10);
+        Assert.Equal(1.4, MaxRatioBySensor(thresholds, row)[A], 10);
         Assert.Equal(100, charge.Gauges.CriticalPercent);
     }
 
@@ -64,13 +73,15 @@ public class ShackleChargeTests
     [Fact]
     public void A_shackle_without_a_threshold_is_left_out_and_counted()
     {
-        var charge = Charge(new[] { A, Unrated }, new() { [A] = 1000 }, new() { [A] = 400, [Unrated] = 5000 },
-            Row(Week1, A, 500), Row(Week1, Unrated, 9000), Row(Week2, Unrated, 9000));
+        var thresholds = new Dictionary<Guid, double> { [A] = 1000 };
+        var rows = new[] { Row(Week1, A, 500), Row(Week1, Unrated, 9000), Row(Week2, Unrated, 9000) };
+        var charge = Charge(new[] { A, Unrated }, thresholds, new() { [A] = 400, [Unrated] = 5000 }, rows);
 
         Assert.Equal(new ShackleGauges(40, 50, 0), charge.Gauges);
-        Assert.Equal(new[] { A }, charge.MaxRatioBySensor.Keys);
-        Assert.All(charge.WeeklyPeaks, p => Assert.Equal(A, p.SensorId));
-        Assert.Single(charge.WeeklyPeaks);
+        Assert.Equal(new[] { A }, MaxRatioBySensor(thresholds, rows).Keys);
+        var peaks = WeeklyPeaks(thresholds, rows);
+        Assert.All(peaks, p => Assert.Equal(A, p.SensorId));
+        Assert.Single(peaks);
         Assert.Equal(1, charge.Rated);
         Assert.Equal(1, charge.WithoutThreshold);
     }
@@ -78,11 +89,12 @@ public class ShackleChargeTests
     [Fact]
     public void No_reading_of_a_rated_shackle_gives_no_gauges_never_zeros()
     {
-        var charge = Charge(new[] { A, B }, new() { [A] = 1000 }, new());
+        var thresholds = new Dictionary<Guid, double> { [A] = 1000 };
+        var charge = Charge(new[] { A, B }, thresholds, new());
 
         Assert.Null(charge.Gauges);
-        Assert.Empty(charge.MaxRatioBySensor);
-        Assert.Empty(charge.WeeklyPeaks);
+        Assert.Empty(MaxRatioBySensor(thresholds));
+        Assert.Empty(WeeklyPeaks(thresholds));
         Assert.Equal(1, charge.Rated);
         Assert.Equal(1, charge.WithoutThreshold);
     }
@@ -99,26 +111,30 @@ public class ShackleChargeTests
     [Fact]
     public void The_max_gauge_equals_the_highest_weekly_peak_and_the_worst_plan_ratio()
     {
-        var charge = Charge(new[] { A, B }, new() { [A] = 1000, [B] = 1500 }, new() { [A] = 300, [B] = 300 },
-            Row(Week1, A, 300), Row(Week1, B, 1200), Row(Week2, A, 1130), Row(Week2, B, 1500), Row(Week3, A, 200), Row(Week3, B, null));
+        var thresholds = new Dictionary<Guid, double> { [A] = 1000, [B] = 1500 };
+        var rows = new[] { Row(Week1, A, 300), Row(Week1, B, 1200), Row(Week2, A, 1130), Row(Week2, B, 1500), Row(Week3, A, 200), Row(Week3, B, null) };
+        var charge = Charge(new[] { A, B }, thresholds, new() { [A] = 300, [B] = 300 }, rows);
+        var peaks = WeeklyPeaks(thresholds, rows);
+        var maxRatioBySensor = MaxRatioBySensor(thresholds, rows);
 
-        Assert.Equal(new[] { 0.8, 1.13, 0.2 }, charge.WeeklyPeaks.Select(p => Math.Round(p.Ratio, 10)));
-        Assert.Equal(new[] { B, A, A }, charge.WeeklyPeaks.Select(p => p.SensorId));
-        Assert.Equal(1.13, charge.MaxRatioBySensor[A], 10);
-        Assert.Equal(1.0, charge.MaxRatioBySensor[B], 10);
+        Assert.Equal(new[] { 0.8, 1.13, 0.2 }, peaks.Select(p => Math.Round(p.Ratio, 10)));
+        Assert.Equal(new[] { B, A, A }, peaks.Select(p => p.SensorId));
+        Assert.Equal(1.13, maxRatioBySensor[A], 10);
+        Assert.Equal(1.0, maxRatioBySensor[B], 10);
         Assert.Equal(113, charge.Gauges!.MaxPercent);
-        Assert.Equal(SensorChargeRatioHelper.Percent(charge.WeeklyPeaks.Max(p => p.Ratio)), charge.Gauges.MaxPercent);
-        Assert.Equal(SensorChargeRatioHelper.Percent(charge.MaxRatioBySensor.Values.Max()), charge.Gauges.MaxPercent);
+        Assert.Equal(SensorChargeRatioHelper.Percent(peaks.Max(p => p.Ratio)), charge.Gauges.MaxPercent);
+        Assert.Equal(SensorChargeRatioHelper.Percent(maxRatioBySensor.Values.Max()), charge.Gauges.MaxPercent);
     }
 
     [Fact]
     public void Rows_after_a_threshold_less_sensor_colour_nothing()
     {
-        var charge = Charge(new[] { A, Unrated }, new() { [A] = 1000 }, new() { [Unrated] = 900 },
-            Row(Week1, Unrated, 900), Row(Week2, Unrated, 950));
+        var thresholds = new Dictionary<Guid, double> { [A] = 1000 };
+        var rows = new[] { Row(Week1, Unrated, 900), Row(Week2, Unrated, 950) };
+        var charge = Charge(new[] { A, Unrated }, thresholds, new() { [Unrated] = 900 }, rows);
 
-        Assert.Empty(charge.MaxRatioBySensor);
-        Assert.Empty(charge.WeeklyPeaks);
+        Assert.Empty(MaxRatioBySensor(thresholds, rows));
+        Assert.Empty(WeeklyPeaks(thresholds, rows));
         Assert.Null(charge.Gauges);
         Assert.Equal(1, charge.Rated);
     }

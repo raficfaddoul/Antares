@@ -80,6 +80,14 @@
         padding: 6px 10px;
         border-radius: 8px;
     }
+
+    /* Under the top-right graph: curves with sensors left out, curves without a reading. */
+    .dashboard-curve-notes {
+        margin: 0;
+        padding: 2px 10px 4px 28px;
+        font-size: 12px;
+        color: #6c757d;
+    }
 </style>
 
 <NavigationLock OnBeforeInternalNavigation="appData.OnBeforeInternalNavigation" ConfirmExternalNavigation="appData.SaveConfirmation && appData.SaveChanges" />
@@ -118,7 +126,7 @@
                                     </div>
                                 </RadzenSplitterPane>
                             </RadzenSplitter>
-                            @(PanelCover(chargeState))
+                            @(PanelCover(chargeState, gaugesNothing))
                         </div>
                         @if (!chargeState.Loading && excludedShackles != null)
                         {
@@ -142,9 +150,9 @@
                         {
                             <ReadFailureNotice Title="@ReadFailureNotice.ChargeColoursTitle" Message="@chargeState.Failure" />
                         }
-                        else if (chargeState.Nothing != null)
+                        else if (graphNothing != null)
                         {
-                            @(NothingNotice(chargeState.Nothing, cover: false))
+                            @(NothingNotice(graphNothing, cover: false))
                         }
                         <div style="flex: 1; min-height: 0; position: relative;">
                             <AliantWebS.Pages.CADPages.SVGComponent
@@ -169,12 +177,21 @@
                 <RadzenSplitterPane Size="50%" Style="overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column;">
                     <div data-panel="charge" aria-busy="@Busy(chargeState)" style="display: flex; flex-direction: column; flex: 1;">
                         <div class="dashboard-panel-bar">
-                            <Label style="font-weight: 600;">@ChargeSeries</Label>
+                            <Label style="font-weight: 600;">@GraphTitle</Label>
                         </div>
                         <div style="flex: 1; min-height: 320px; position: relative;">
                             <IndicesInTimeComponent GraphId="g2" @ref="chargeGraph" Headers="DateHeaderOnly()" Indices="NoSeries()"></IndicesInTimeComponent>
-                            @(PanelCover(chargeState))
+                            @(PanelCover(chargeState, graphNothing))
                         </div>
+                        @if (!chargeState.Loading && curveNotes.Count > 0)
+                        {
+                            <ul class="dashboard-curve-notes">
+                                @foreach (var note in curveNotes)
+                                {
+                                    <li>@note</li>
+                                }
+                            </ul>
+                        }
                     </div>
                 </RadzenSplitterPane>
 
@@ -188,7 +205,7 @@
                         </div>
                         <div style="flex: 1; min-height: 320px; position: relative;">
                             <IndicesInTimeComponent GraphId="g3" @ref="curveGraph" Headers="DateHeaderOnly()" Indices="NoSeries()"></IndicesInTimeComponent>
-                            @(PanelCover(curveState))
+                            @(PanelCover(curveState, curveState.Nothing))
                         </div>
                     </div>
                 </RadzenSplitterPane>
@@ -200,7 +217,8 @@
 @code {
     // ── Texts ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
-    const string ChargeSeries = "Charge max manilles / seuil d'alarme";
+    const string GraphTitle = "Maximum hebdomadaire en % du seuil d'alarme";
+    const string NoAlarmThreshold = "Aucun capteur de cette structure n'a de seuil d'alarme pour une voie de son type.";
     const string UnexpectedErrorTitle = "Erreur inattendue";
     const string NoShackle = "Aucune manille sur cette structure.";
     const string NoWeightChannel = "Les manilles n'ont pas de voie « weight ».";
@@ -216,8 +234,17 @@
     // Decimals the curves keep (the CSV sent to the browser).
     const int CurveDecimals = 4;
 
-    // Sensors named in the log line about unreadable thresholds; the rest are counted.
-    const int UnreadableExamples = 5;
+    // Sensors named in a log line about thresholds (unreadable, or naming a channel the type lacks); the rest are counted.
+    const int LoggedExamples = 5;
+
+    static string NoAlarmReading(string periodLabel) =>
+        $"Aucune mesure des capteurs ayant un seuil d'alarme sur la période ({periodLabel}).";
+
+    static string LeftOut(AlarmCurve curve) =>
+        $"« {curve.Name} » : {curve.WithoutThreshold} capteur(s) sur {curve.SensorsOfType} sans seuil d'alarme pour cette voie, "
+        + "non compté(s) dans la courbe.";
+
+    static string NoReading(AlarmCurve curve, string periodLabel) => $"« {curve.Name} » : aucune mesure sur la période ({periodLabel}).";
 
     // ── State ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -244,11 +271,18 @@
 
     sealed record Curve(List<Dictionary<object, double>> Indices, List<string> Headers);
 
+    /// <summary>
+    /// What one charge read shows: the reading, the gauges' sentence and the graph's (null when each draws), the lines
+    /// under the graph, and the shackles left out of the gauges (null when none, or when the gauges say why they are empty).
+    /// </summary>
+    sealed record ChargeView(AlarmRatioReading Reading, string GaugesNothing, string GraphNothing, List<string> CurveNotes,
+        string ExcludedShackles);
+
     // Disposed with the page (leaving it, or switching tab): the first load (SQL) in flight is cancelled. Its token is
     // taken once, here: CancellationTokenSource.Token throws once the source is disposed.
     private readonly CancellationTokenSource _lifetime = new();
     private readonly CancellationToken lifetime;
-    // Gauges, plan colours and the charge curve come from one read; the bottom-right curve from another. Disposed with
+    // Gauges, plan colours and the top-right graph come from one read; the bottom-right curve from another. Disposed with
     // the page, which cancels the read each has in flight.
     private readonly LatestRead chargeReads = new();
     private readonly LatestRead curveReads = new();
@@ -281,9 +315,13 @@
     List<Element> shackles = new();
     ChannelDataType weightChannel;
 
-    // ElementId → the shackle's highest charge ratio over the period; a sensor absent from it is drawn grey.
+    // ElementId → the sensor's worst ratio to its alarm thresholds over the period; a sensor absent from it is drawn grey.
     Dictionary<Guid, double> sensorChargeRatios = new();
     string excludedShackles;
+    // Why the gauges, and why the top-right graph and the plan colours, show nothing (null when they draw).
+    string gaugesNothing;
+    string graphNothing;
+    List<string> curveNotes = new();
 
     IndicesInTimeComponent chargeGraph;
     IndicesInTimeComponent curveGraph;
@@ -320,8 +358,9 @@
     private RenderFragment NothingNotice(string text, bool cover) =>
         @<div class="dashboard-nothing @(cover ? "cover" : "banner")" role="status">@text</div>;
 
-    // Over a chart: loading, a failure, or nothing to show (the chart under it is cleared).
-    private RenderFragment PanelCover(PanelState state) =>
+    // Over a chart: loading, a failure, or why it shows nothing (the chart under it is cleared). One read can feed
+    // several panels, each with its own reason: the caller passes the panel's.
+    private RenderFragment PanelCover(PanelState state, string nothing) =>
         @<text>
             @if (state.Loading)
             {
@@ -335,9 +374,9 @@
             {
                 <ReadFailureNotice Message="@state.Failure" Cover="true" />
             }
-            else if (state.Nothing != null)
+            else if (nothing != null)
             {
-                @(NothingNotice(state.Nothing, cover: true))
+                @(NothingNotice(nothing, cover: true))
             }
         </text>;
 
@@ -546,7 +585,7 @@
         }
     }
 
-    // ── Gauges, plan colours, charge curve ────────────────────────────────────────────────────────────────────────
+    // ── Gauges, plan colours, top-right graph ─────────────────────────────────────────────────────────────────────
 
     private Task LoadChargeAsync()
     {
@@ -555,79 +594,137 @@
         return RunAsync(chargeReads, chargeState, ct => ReadChargeAsync(start, end, label, ct), DrawChargeAsync, ClearChargeAsync);
     }
 
-    private async Task<Outcome<ShackleCharge>> ReadChargeAsync(DateTime start, DateTime end, string periodLabel, CancellationToken ct)
+    // Always read: the thresholds (SQL) decide which curves exist. Each panel then says its own reason when it is empty.
+    private async Task<Outcome<ChargeView>> ReadChargeAsync(DateTime start, DateTime end, string periodLabel, CancellationToken ct)
     {
-        if (shackles.Count == 0) return Outcome<ShackleCharge>.Say(NoShackle);
-        if (weightChannel == null) return Outcome<ShackleCharge>.Say(NoWeightChannel);
-
         var unreadable = new List<(Guid ElementId, string Value)>();
-        var charge = await SensorChargeRatioHelper.ReadChargeAsync(dbContextFactory, shackles, weightChannel, start, end, unreadable, ct);
+        var channelsTheTypeLacks = new List<(Guid SensorId, string Channel)>();
+        var reading = await AlarmRatioCurves.ReadAsync(dbContextFactory, allSensors, shackles, weightChannel, start, end,
+            unreadable, channelsTheTypeLacks, ct);
         LogUnreadableThresholds(unreadable);
+        LogChannelsTheTypeLacks(channelsTheTypeLacks);
 
-        if (charge.Rated == 0) return Outcome<ShackleCharge>.Say(NoShackleThreshold);
-        if (charge.Gauges == null)
-            // Shackles without a threshold may have been read: only the rated ones were not, and the others are counted.
-            return Outcome<ShackleCharge>.Say(charge.WithoutThreshold == 0
-                ? $"Aucune mesure des manilles sur la période ({periodLabel})."
-                : $"Aucune mesure des manilles ayant un seuil d'alarme sur la période ({periodLabel}). {ExcludedShackles(charge)}");
-        return Outcome<ShackleCharge>.Drawn(charge);
+        return Outcome<ChargeView>.Drawn(new ChargeView(reading, GaugesNothing(reading.Shackles, periodLabel),
+            GraphNothing(reading, periodLabel), CurveNotes(reading, periodLabel), ExcludedFromDrawnGauges(reading.Shackles)));
     }
 
-    // The shackles left out for lack of a threshold, counted on screen (decision 6).
+    // Why the gauges are empty (decision 6), or null when they draw.
+    private string GaugesNothing(ShackleCharge charge, string periodLabel)
+    {
+        if (shackles.Count == 0) return NoShackle;
+        if (weightChannel == null) return NoWeightChannel;
+        if (charge == null)
+            throw new InvalidOperationException("The shackles were not rated although there are shackles and a weight channel.");
+        if (charge.Rated == 0) return NoShackleThreshold;
+        if (charge.Gauges != null) return null;
+        // Shackles without a threshold may have been read: only the rated ones were not, and the others are counted.
+        return charge.WithoutThreshold == 0
+            ? $"Aucune mesure des manilles sur la période ({periodLabel})."
+            : $"Aucune mesure des manilles ayant un seuil d'alarme sur la période ({periodLabel}). {ExcludedShackles(charge)}";
+    }
+
+    // Why the top-right graph and the plan colours are empty, or null when a curve draws.
+    private static string GraphNothing(AlarmRatioReading reading, string periodLabel) =>
+        reading.Curves.Count == 0 ? NoAlarmThreshold
+        : reading.Curves.All(c => c.Peaks.Count == 0) ? NoAlarmReading(periodLabel)
+        : null;
+
+    // Under the graph, in curve order: the sensors each curve leaves out, and a curve without a reading while others draw.
+    private static List<string> CurveNotes(AlarmRatioReading reading, string periodLabel)
+    {
+        bool anyDrawn = reading.Curves.Any(c => c.Peaks.Count > 0);
+        var notes = new List<string>();
+        foreach (var (curve, peaks) in reading.Curves)
+        {
+            if (curve.WithoutThreshold > 0) notes.Add(LeftOut(curve));
+            if (peaks.Count == 0 && anyDrawn) notes.Add(NoReading(curve, periodLabel));
+        }
+        return notes;
+    }
+
+    // The shackles left out for lack of a threshold, counted on screen (decision 6). A gauge cover already says it.
+    private static string ExcludedFromDrawnGauges(ShackleCharge charge) =>
+        charge is { Gauges: not null, WithoutThreshold: > 0 } ? ExcludedShackles(charge) : null;
+
     private static string ExcludedShackles(ShackleCharge charge) =>
         $"{charge.WithoutThreshold} manille(s) sur {charge.Rated + charge.WithoutThreshold} sans seuil d'alarme : "
-        + "non comptée(s) dans les jauges, les couleurs et la courbe de charge.";
+        + "non comptée(s) dans les jauges.";
 
-    private async Task DrawChargeAsync(ShackleCharge charge, CancellationToken ct)
+    private async Task DrawChargeAsync(ChargeView view, CancellationToken ct)
     {
-        sensorChargeRatios = new Dictionary<Guid, double>(charge.MaxRatioBySensor);
-        excludedShackles = charge.WithoutThreshold == 0 ? null : ExcludedShackles(charge);
+        sensorChargeRatios = new Dictionary<Guid, double>(view.Reading.WorstRatioBySensor);
+        gaugesNothing = view.GaugesNothing;
+        graphNothing = view.GraphNothing;
+        curveNotes = view.CurveNotes;
+        excludedShackles = view.ExcludedShackles;
 
-        var gauges = charge.Gauges!;
-        await js.InvokeVoidAsync("renderChart", gauges.MeanPercent, gauges.MaxPercent, gauges.CriticalPercent);
-        if (ct.IsCancellationRequested) return;
-
-        // The curve with its notes: the shackle behind each weekly peak.
-        var peaks = new List<Dictionary<object, double>>
+        if (view.Reading.Shackles?.Gauges is ShackleGauges gauges)
         {
-            charge.WeeklyPeaks.ToDictionary(p => (object)p.Week, p => Math.Round(p.Ratio, CurveDecimals)),
-        };
-        var notes = charge.WeeklyPeaks
-            .Select(p => new IndicesInTimeComponent.PointNote(ChargeSeries, p.Week, "Manille : " + ShackleName(p.SensorId)))
+            await js.InvokeVoidAsync("renderChart", gauges.MeanPercent, gauges.MaxPercent, gauges.CriticalPercent);
+            if (ct.IsCancellationRequested) return;
+        }
+
+        // One series per curve with a reading, in % of each sensor's own threshold, each point naming its sensor.
+        var drawn = view.Reading.Curves.Where(c => c.Peaks.Count > 0).ToList();
+        if (drawn.Count == 0)
+        {
+            await ClearGraphAsync();
+            return;
+        }
+        var indices = drawn
+            .Select(c => c.Peaks.ToDictionary(p => (object)p.Week, p => (double)SensorChargeRatioHelper.Percent(p.Ratio)))
             .ToList();
-        await chargeGraph.DisplayData(peaks, new List<string> { "Date", ChargeSeries }, pointNotes: notes);
+        var headers = drawn.Select(c => c.Curve.Name).Prepend("Date").ToList();
+        var notes = drawn
+            .SelectMany(c => c.Peaks.Select(p => new IndicesInTimeComponent.PointNote(
+                c.Curve.Name, p.Week, $"{c.Curve.TypeName} : {SensorName(p.SensorId)}")))
+            .ToList();
+        await chargeGraph.DisplayData(indices, headers, pointNotes: notes);
     }
 
-    // Nothing to show, or a failure: no gauge is drawn (the cover says why), the curve is emptied, the plan is grey.
-    private async Task ClearChargeAsync()
+    // A failure: no gauge is drawn (the cover says why), the graph is emptied, the plan is grey.
+    private Task ClearChargeAsync()
     {
         sensorChargeRatios = new Dictionary<Guid, double>();
-        excludedShackles = null;
-        await chargeGraph.DisplayData(NoSeries(), DateHeaderOnly());
+        gaugesNothing = graphNothing = excludedShackles = null;
+        curveNotes = new List<string>();
+        return ClearGraphAsync();
     }
 
-    // An unreadable threshold is no threshold, for the gauges, the charge curve and the alarms alike, and
-    // nothing else says so: the gauges simply fall. Name the sensors, so the cause is in the log.
+    private Task ClearGraphAsync() => chargeGraph.DisplayData(NoSeries(), DateHeaderOnly());
+
+    // An unreadable threshold is no threshold, for the gauges, the graph and the alarms alike, and nothing else says
+    // so: the sensor simply drops out. Name the sensors, so the cause is in the log.
     private void LogUnreadableThresholds(List<(Guid ElementId, string Value)> unreadable)
     {
         if (unreadable.Count == 0) return;
-
-        var examples = unreadable
-            .Take(UnreadableExamples)
-            .Select(u => $"{ShackleName(u.ElementId)} '{u.Value}'");
-
         Console.WriteLine($"[Dashboard] {unreadable.Count} sensor(s) whose alarm threshold cannot be read in full "
                         + $"(an unreadable part is a threshold for no channel): "
-                        + $"{string.Join(", ", examples)}{(unreadable.Count > UnreadableExamples ? ", ..." : "")}. "
+                        + $"{Examples(unreadable, u => $"{SensorName(u.ElementId)} '{u.Value}'")}. "
                         + $"Expected channel:value, e.g. {AlarmThresholdFormat.Example}.");
     }
 
-    // A shackle's name for messages and notes; its id when it has none.
-    private string ShackleName(Guid id)
+    // A threshold for a channel its sensor's type does not have draws nothing: name it, so it is never silent.
+    private void LogChannelsTheTypeLacks(List<(Guid SensorId, string Channel)> lacking)
     {
-        var name = shackles.FirstOrDefault(s => s.ElementId == id)?.Name;
+        if (lacking.Count == 0) return;
+        Console.WriteLine($"[Dashboard] {lacking.Count} alarm threshold(s) name a channel their sensor's type does not have "
+                        + $"and draw nothing: "
+                        + $"{Examples(lacking, l => $"{SensorName(l.SensorId)} '{l.Channel}' ({TypeNameOf(l.SensorId)})")}.");
+    }
+
+    private static string Examples<T>(List<T> items, Func<T, string> describe) =>
+        string.Join(", ", items.Take(LoggedExamples).Select(describe)) + (items.Count > LoggedExamples ? ", ..." : "");
+
+    // A sensor's name for messages and notes; its id when it has none.
+    private string SensorName(Guid id)
+    {
+        var name = (allSensors.FirstOrDefault(s => s.ElementId == id) ?? shackles.FirstOrDefault(s => s.ElementId == id))?.Name;
         return string.IsNullOrWhiteSpace(name) ? id.ToString() : name;
     }
+
+    // Only for a sensor of allSensors, whose type was loaded with it (the curves are planned from those).
+    private string TypeNameOf(Guid sensorId) => AlarmRatioCurves.TypeName(allSensors.Single(s => s.ElementId == sensorId).ElementType);
 
     // ── Bottom-right curve ────────────────────────────────────────────────────────────────────────────────────────
 
