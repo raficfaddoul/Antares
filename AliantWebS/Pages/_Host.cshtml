@@ -59,7 +59,7 @@
     <script src="~/js/ImageTaging.js" asp-append-version="true"></script>
     <script src="~/js/downloads.js" asp-append-version="true"></script>
    
-    <script src="~/rafic.js"></script>
+    <script src="~/rafic.js" asp-append-version="true"></script>
     <link href="_content/Components/blazorcarousel.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
   @*  <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">*@
@@ -75,7 +75,7 @@
     <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/dygraph/2.2.1/dygraph.min.js"></script>
     <link rel="stylesheet" type="text/css" href="//cdnjs.cloudflare.com/ajax/libs/dygraph/2.2.1/dygraph.min.css" />
     <link rel="stylesheet" href="https://code.ionicframework.com/ionicons/1.5.2/css/ionicons.min.css">
-    <script src="~/js/draggable-panels.js"></script>
+    <script src="~/js/draggable-panels.js" asp-append-version="true"></script>
 </head>
 <body>
     <component type="typeof(App)" render-mode="ServerPrerendered" />
@@ -93,15 +93,15 @@
 
     <!-- Started by Blazor.start() at the end of the body, once every script below has run -->
     <script src="_framework/blazor.server.js" autostart="false"></script>
-    <script src="_content/Radzen.Blazor/Radzen.Blazor.js"></script>
-    <script src="_content/Blazorise/blazorise.js"></script>
-    <script src="_content/Blazorise.Bootstrap/blazorise.bootstrap.js"></script>
-    <script src="js/index.bundle.js"></script>
+    <script src="_content/Radzen.Blazor/Radzen.Blazor.js" asp-append-version="true"></script>
+    <script src="_content/Blazorise/blazorise.js" asp-append-version="true"></script>
+    <script src="_content/Blazorise.Bootstrap/blazorise.bootstrap.js" asp-append-version="true"></script>
+    <script src="js/index.bundle.js" asp-append-version="true"></script>
      <!-- Import the plotly.js library -->
-<script src="_content/Plotly.Blazor/plotly-latest.min.js" type="text/javascript"></script>
+<script src="_content/Plotly.Blazor/plotly-latest.min.js" type="text/javascript" asp-append-version="true"></script>
 
 <!-- Import the plotly.js interop functions -->
-<script src="_content/Plotly.Blazor/plotly-interop.js" type="text/javascript"></script>
+<script src="_content/Plotly.Blazor/plotly-interop.js" type="text/javascript" asp-append-version="true"></script>
 
 
     <script type="module">
@@ -142,14 +142,14 @@
     </script>
 *@
 
-    <script src="js/aos.js"></script>
+    <script src="js/aos.js" asp-append-version="true"></script>
     <script>
         AOS.init({
         });
     </script>
 
-    <script src="js/dygraphInterop.js"></script>
-    <script src="js/dashboard.js"></script>
+    <script src="js/dygraphInterop.js" asp-append-version="true"></script>
+    <script src="js/dashboard.js" asp-append-version="true"></script>
 
 
 @*    <script>
@@ -170,15 +170,15 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
-    <script src="js/Maping.js">       
+    <script src="js/Maping.js" asp-append-version="true">       
     </script>
 
-    <script src="js/divers.js"></script>
+    <script src="js/divers.js" asp-append-version="true"></script>
 
     <!-- Adding from CDN -->
      <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
-    <script src="js/threejsInterop.js"></script> 
+    <script src="js/threejsInterop.js" asp-append-version="true"></script> 
 
 @*     <script src="https://unpkg.com/three-dxf-viewer@1.0.0"></script> *@
 @*     <script src="js/dxfViewer.js"></script>
@@ -188,9 +188,9 @@
             console.log('DXFViewer:', window.DXFViewer);
         });
     </script> *@
-    <script src="js/apexscript.js"></script>
+    <script src="js/apexscript.js" asp-append-version="true"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
-    <script src="~/js/influx-notifications.js"></script>
+    <script src="~/js/influx-notifications.js" asp-append-version="true"></script>
 
     <!-- Keep last: a component's first OnAfterRenderAsync calls these scripts' globals (initializeDygraph, ...),
          so the circuit must not connect before they have run, as it could on a slow first load. -->
