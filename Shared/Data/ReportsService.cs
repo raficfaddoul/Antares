@@ -1109,17 +1109,6 @@ static public async Task<(int Count, long MaxTimestamp)> GetReportsAsync(
         }
 
         /// <summary>
-        /// Gets list of all active alarms
-        /// </summary>
-        public static List<string> GetActiveAlarms()
-        {
-            lock (_alarmLock)
-            {
-                return _activeAlarms.Keys.ToList();
-            }
-        }
-
-        /// <summary>
         /// Gets dictionary of all active alarm details
         /// </summary>
         public static Dictionary<string, AlarmDetail> GetAlarmDetails()

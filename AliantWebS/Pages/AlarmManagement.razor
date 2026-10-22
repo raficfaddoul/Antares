@@ -688,26 +688,12 @@
         }
     }
 
+    // Every latched alarm, as the collection loop holds it. Its key ("{sensor}_{channel}") is never parsed: sensor and
+    // channel names hold '_' themselves (Manille_H5, x_axis), and splitting it hid every alarm on this page.
     private void LoadActiveAlarms()
     {
-        var alarmKeys = ReportsService.GetActiveAlarms();
-        activeAlarms.Clear();
-
-        foreach (var key in alarmKeys)
-        {
-            var parts = key.Split('_');
-            if (parts.Length == 2)
-            {
-                // Get the alarm detail from the static dictionary
-                var alarmDetails = ReportsService.GetAlarmDetails();
-                if (alarmDetails.TryGetValue(key, out var detail))
-                {
-                    activeAlarms[key] = detail;
-                }
-            }
-        }
-
-        uniqueSensors = activeAlarms.Select(a => a.Value.SensorName).Distinct().Count();
+        activeAlarms = ReportsService.GetAlarmDetails();
+        uniqueSensors = activeAlarms.Values.Select(a => a.SensorName).Distinct().Count();
     }
 
     // ── Mute switches (administrator only) ────────────────────────────────────────────────
