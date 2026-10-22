@@ -44,6 +44,13 @@ namespace AliantWebS.Data
 
         public bool Monitoring { get; set; } = false;
 
+        // The dashboard's choices (Tableau de bord), kept for the circuit: switching tab re-creates the page. The
+        // period's code (DashboardPeriod), the plan's "Capteurs affichés" type and the bottom-right curve's type; a
+        // null type is not chosen yet, and the page applies its default.
+        public string DashboardPeriodCode { get; set; } = DashboardPeriod.Default.Code;
+        public Guid? DashboardShownTypeId { get; set; }
+        public Guid? DashboardCurveTypeId { get; set; }
+
 
 
         public bool creating { get; set; } = false;

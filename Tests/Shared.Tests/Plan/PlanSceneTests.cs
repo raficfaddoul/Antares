@@ -820,9 +820,27 @@ public class PlanSceneTests
             Assert.Equal(colour, PlanScene.SensorStroke(ratio));
         }
 
-        Assert.Equal("#4CAF50", PlanScene.SensorFill(null));
-        Assert.Equal(OriginalSensorColor(null), PlanScene.SensorFill(null));
-        Assert.Equal("#4CAF50", PlanScene.SensorStroke(null));
+        // Without a ratio: grey since 2026-10-22, no longer the green of ratio 0 (see the test below).
+        Assert.Equal(PlanScene.NoCapacityColor, PlanScene.SensorFill(null));
+        Assert.Equal(PlanScene.NoCapacityColor, PlanScene.SensorStroke(null));
+    }
+
+    [Fact]
+    public void A_sensor_without_a_ratio_is_grey_like_a_point_without_capacity()
+    {
+        // Decision 5 of the dashboard redesign (2026-10-22): "no ratio known" is not "lightly loaded". The old green
+        // #4CAF50 was nearly RatioColor(0); every plan built on PlanScene (dashboard and Surveillance) now draws it grey.
+        var scene = PlanScene.Build(new Venue().Data);
+        var unrated = scene.Sensors.Where(s => s.Ratio is null).ToList();
+        Assert.NotEmpty(unrated);
+
+        foreach (var sensor in unrated)
+        {
+            Assert.Equal("#9e9e9e", PlanScene.SensorFill(sensor.Ratio));
+            Assert.Equal("#9e9e9e", PlanScene.SensorStroke(sensor.Ratio));
+        }
+        Assert.Equal("#9e9e9e", PlanScene.NoCapacityColor);
+        Assert.NotEqual(PlanScene.RatioColor(0), PlanScene.SensorFill(null));
     }
 
     [Fact]

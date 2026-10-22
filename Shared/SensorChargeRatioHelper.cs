@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using AliantWebS.Models;
@@ -8,9 +9,12 @@ using AliantWebS.Models;
 namespace AliantWebS.Data
 {
     /// <summary>
-    /// Shared logic for the manille (shackle) charge-ratio colour map used by the SVG.
-    /// Used by both DashBoardComponent2 and SurveillanceCapteursAntares so the Influx query and the
-    /// ratio maths live in exactly one place.
+    /// The manille (shackle) charge ratios, so the Influx queries and the ratio maths live in exactly one place. Two
+    /// responsibilities: the plan's charge-ratio colour map (<see cref="ComputeAsync"/>, the Surveillance tab's
+    /// SurveillanceCapteursAntares) and the dashboard's shackle figures (DashBoardComponent2: the weekly peaks of the
+    /// charge curve, the gauges with the critical-share rule <see cref="CriticalRatio"/>, <see cref="Percent"/>, and the
+    /// read that gathers them, <see cref="ReadChargeAsync"/>, with its records below). Both rest on the same thresholds
+    /// and <see cref="Ratio"/>; split the dashboard part out if it grows beyond the shackles.
     ///
     /// The ratio is measured against each sensor's OWN alarm threshold for that channel — the
     /// "Seuil Alarme" attribute, packed as "weight:2000;temperature:60". So 100% means "at the
@@ -19,6 +23,15 @@ namespace AliantWebS.Data
     /// </summary>
     public static class SensorChargeRatioHelper
     {
+        /// <summary>A shackle (manille) is a sensing device whose type name contains this: the one definition.</summary>
+        public const string ShackleTypeNamePart = "Manille";
+
+        /// <summary>A shackle whose charge ratio is above this (not at it) counts as a critical element.</summary>
+        public const double CriticalRatio = 0.80;
+
+        // One aggregate window longer than any period asked for, so one row per sensor.
+        private const string WholePeriodWindow = "36500d";
+
         /// <summary>
         /// Per-sensor alarm threshold for one channel, keyed by ElementId. Sensors with no usable
         /// threshold are simply absent from the result. A threshold value with a part that is not
@@ -83,7 +96,7 @@ namespace AliantWebS.Data
                     .ThenInclude(cdtet => cdtet.ChannelDataType)
                 .Where(et => et.Category != null
                           && et.Category.Name.ToLower() == "sensing device"
-                          && et.Name.Contains("Manille"))
+                          && et.Name.Contains(ShackleTypeNamePart))
                 .AsNoTracking()
                 .ToListAsync();
 
@@ -115,31 +128,42 @@ namespace AliantWebS.Data
             DateTime endDate,
             System.Threading.CancellationToken cancellationToken = default)
         {
-            var maxWeights = new Dictionary<Guid, double>();
-
             if (shackleSensors == null || shackleSensors.Count == 0 || weightChannelDataType == null)
-                return maxWeights;
-
-            var sensorIds = shackleSensors.Select(s => s.ElementId.ToString()).ToList();
-            var channelIds = new List<string> { weightChannelDataType.ChannelDataTypeId.ToString() };
+                return new Dictionary<Guid, double>();
 
             // One aggregated max per sensor over the whole [startDate, endDate] window.
-            var maxData = await InfluxService.GetData(
-                sensorIds, channelIds, startDate, endDate, ReportsService.BucketName,
-                aggregateWindowDuration: "36500d", aggregateFn: "max",
-                cancellationToken: cancellationToken);
-
-            var perSensorMax = maxData
-                .Where(r => r[2] != null)
-                .GroupBy(r => (string)r[1])
-                .ToDictionary(g => g.Key, g => g.Max(r => (double)r[2]));
-
-            foreach (var kvp in perSensorMax)
-                if (Guid.TryParse(kvp.Key, out var sensorId))
-                    maxWeights[sensorId] = kvp.Value;
-
-            return maxWeights;
+            return await PerSensorAsync(shackleSensors, weightChannelDataType, startDate, endDate,
+                "max", values => values.Max(), cancellationToken);
         }
+
+        /// <summary>
+        /// One aggregate of the channel per sensor over the whole [startDate, endDate] window (one row per sensor;
+        /// <paramref name="combine"/> joins them should the window ever be cut in two), keyed by ElementId.
+        /// Throws when InfluxDB cannot be read.
+        /// </summary>
+        private static async Task<Dictionary<Guid, double>> PerSensorAsync(
+            IReadOnlyCollection<Element> sensors, ChannelDataType channel, DateTime startDate, DateTime endDate,
+            string aggregateFn, Func<IEnumerable<double>, double> combine, CancellationToken cancellationToken)
+        {
+            var rows = await ReadChannelAsync(sensors, channel, startDate, endDate, WholePeriodWindow, aggregateFn, cancellationToken);
+
+            var perSensor = new Dictionary<Guid, double>();
+            foreach (var bySensor in rows.Where(r => r[2] != null).GroupBy(r => r[1] as string))
+                if (Guid.TryParse(bySensor.Key, out var sensorId))
+                    perSensor[sensorId] = combine(bySensor.Select(r => (double)r[2]));
+            return perSensor;
+        }
+
+        // One channel of the sensors, aggregated per window: GetData rows ([0] time, [1] sensor id, [2] value).
+        private static Task<List<object[]>> ReadChannelAsync(
+            IReadOnlyCollection<Element> sensors, ChannelDataType channel, DateTime startDate, DateTime endDate,
+            string aggregateWindow, string aggregateFn, CancellationToken cancellationToken) =>
+            InfluxService.GetData(
+                sensors.Select(s => s.ElementId.ToString()).ToList(),
+                new List<string> { channel.ChannelDataTypeId.ToString() },
+                startDate, endDate, ReportsService.BucketName,
+                aggregateWindowDuration: aggregateWindow, aggregateFn: aggregateFn,
+                cancellationToken: cancellationToken);
 
         /// <summary>
         /// Per-sensor charge ratio = (max value over [startDate, endDate]) / that sensor's own alarm
@@ -185,20 +209,124 @@ namespace AliantWebS.Data
         public static List<WeeklyPeak> WeeklyPeaks(IEnumerable<object[]> rows, IReadOnlyDictionary<Guid, double> thresholds)
         {
             var peaks = new SortedDictionary<DateTime, WeeklyPeak>();
-            foreach (var r in rows)
+            foreach (var (at, sensorId, ratio) in RatedReadings(rows, thresholds))
             {
-                if (r[0] is not DateTime at || r[2] == null) continue;
-                if (!Guid.TryParse(r[1] as string, out var sensorId)) continue;
-                if (Ratio(thresholds, sensorId, (double)r[2]) is not double ratio) continue;
-
                 var week = InfluxService.WeekStart(at);
                 if (!peaks.TryGetValue(week, out var peak) || ratio > peak.Ratio)
                     peaks[week] = new WeeklyPeak(week, ratio, sensorId);
             }
             return peaks.Values.ToList();
         }
+
+        // GetData rows ([0] time, [1] sensor id, [2] value) rated against their own sensor's threshold; a row with no
+        // value, or of a sensor with no threshold, is left out.
+        private static IEnumerable<(DateTime At, Guid SensorId, double Ratio)> RatedReadings(
+            IEnumerable<object[]> rows, IReadOnlyDictionary<Guid, double> thresholds)
+        {
+            foreach (var r in rows)
+            {
+                if (r[0] is not DateTime at || r[2] == null) continue;
+                if (!Guid.TryParse(r[1] as string, out var sensorId)) continue;
+                if (Ratio(thresholds, sensorId, (double)r[2]) is double ratio)
+                    yield return (at, sensorId, ratio);
+            }
+        }
+
+        /// <summary>A ratio as a whole percentage, to the nearest (a half away from zero), never clamped: 1.4 is 140.</summary>
+        public static int Percent(double ratio) => (int)Math.Round(ratio * 100, MidpointRounding.AwayFromZero);
+
+        /// <summary>
+        /// The dashboard's shackle figures from what was read over one period: the weekly peaks (the charge curve), each
+        /// rated shackle's highest ratio (the plan's colours) and the three gauges. A shackle without a threshold is left
+        /// out of all of them and counted. <paramref name="meanBySensor"/> holds each shackle's mean reading over the
+        /// period, <paramref name="weeklyMaxRows"/> its weekly maxima (GetData rows). With no reading of a rated shackle
+        /// there are no gauges (null), never zeros.
+        /// </summary>
+        public static ShackleCharge Charge(
+            IReadOnlyCollection<Guid> shackleIds,
+            IReadOnlyDictionary<Guid, double> thresholds,
+            IReadOnlyDictionary<Guid, double> meanBySensor,
+            IEnumerable<object[]> weeklyMaxRows)
+        {
+            var rows = weeklyMaxRows.ToList();
+            int rated = shackleIds.Count(id => Ratio(thresholds, id, 0) is not null);
+
+            var maxRatioBySensor = new Dictionary<Guid, double>();
+            foreach (var (_, sensorId, ratio) in RatedReadings(rows, thresholds))
+                if (!maxRatioBySensor.TryGetValue(sensorId, out var max) || ratio > max)
+                    maxRatioBySensor[sensorId] = ratio;
+
+            return new ShackleCharge(WeeklyPeaks(rows, thresholds), maxRatioBySensor,
+                Gauges(maxRatioBySensor, thresholds, meanBySensor), rated, shackleIds.Count - rated);
+        }
+
+        private static ShackleGauges? Gauges(IReadOnlyDictionary<Guid, double> maxRatioBySensor,
+            IReadOnlyDictionary<Guid, double> thresholds, IReadOnlyDictionary<Guid, double> meanBySensor)
+        {
+            if (maxRatioBySensor.Count == 0) return null;
+
+            var meanRatios = maxRatioBySensor.Keys
+                .Select(id => meanBySensor.TryGetValue(id, out var mean) ? Ratio(thresholds, id, mean) : null)
+                .OfType<double>()
+                .ToList();
+            if (meanRatios.Count == 0)
+                throw new InvalidOperationException(
+                    "The shackles have weekly maxima over the period but no mean: the two reads disagree, no gauge can be drawn.");
+
+            int critical = maxRatioBySensor.Values.Count(r => r > CriticalRatio);
+            return new ShackleGauges(
+                MeanPercent: Percent(meanRatios.Average()),
+                MaxPercent: Percent(maxRatioBySensor.Values.Max()),
+                CriticalPercent: Percent((double)critical / maxRatioBySensor.Count));
+        }
+
+        /// <summary>
+        /// Reads the dashboard's shackle figures over [start, end]: the weekly maxima and each shackle's mean over the
+        /// whole period (InfluxDB, together), then the thresholds (SQL), and rates them (<see cref="Charge"/>). Thresholds that
+        /// cannot be read in full are added to <paramref name="unreadable"/>. Throws InfluxReadException when InfluxDB
+        /// cannot be read, and OperationCanceledException when <paramref name="cancellationToken"/> is cancelled.
+        /// </summary>
+        public static async Task<ShackleCharge> ReadChargeAsync(
+            IDbContextFactory<AliantWebContext> dbContextFactory,
+            IReadOnlyCollection<Element> shackles,
+            ChannelDataType weightChannel,
+            DateTime start,
+            DateTime end,
+            ICollection<(Guid ElementId, string Value)> unreadable,
+            CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(dbContextFactory);
+            ArgumentNullException.ThrowIfNull(weightChannel);
+            if (shackles == null || shackles.Count == 0)
+                throw new ArgumentException("No shackle to read: say so instead of reading.", nameof(shackles));
+
+            // The two InfluxDB reads are independent: run together.
+            var weeklyMaxRead = ReadChannelAsync(shackles, weightChannel, start, end, InfluxService.WeeklyWindow, "max", cancellationToken);
+            var meansRead = PerSensorAsync(shackles, weightChannel, start, end, "mean", values => values.Average(), cancellationToken);
+            await Task.WhenAll(weeklyMaxRead, meansRead);
+            var (weeklyMax, means) = (weeklyMaxRead.Result, meansRead.Result);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var thresholds = await LoadThresholdsAsync(dbContextFactory, shackles, weightChannel.Name, unreadable);
+            return Charge(shackles.Select(s => s.ElementId).ToList(), thresholds, means, weeklyMax);
+        }
     }
 
     /// <summary>One week's peak charge ratio and the sensor that reached it, see SensorChargeRatioHelper.WeeklyPeaks.</summary>
     public record WeeklyPeak(DateTime Week, double Ratio, Guid SensorId);
+
+    /// <summary>The dashboard's three gauges, in whole percent, unclamped (a shackle at 1.4 x its threshold is 140).</summary>
+    public record ShackleGauges(int MeanPercent, int MaxPercent, int CriticalPercent);
+
+    /// <summary>
+    /// The shackle figures of one period, see SensorChargeRatioHelper.Charge: the charge curve's weekly peaks, each rated
+    /// shackle's highest ratio (the plan's colours), the gauges (null when no rated shackle was read in the period), how
+    /// many shackles have a threshold (Rated) and how many were left out for lack of one (WithoutThreshold).
+    /// </summary>
+    public record ShackleCharge(
+        IReadOnlyList<WeeklyPeak> WeeklyPeaks,
+        IReadOnlyDictionary<Guid, double> MaxRatioBySensor,
+        ShackleGauges? Gauges,
+        int Rated,
+        int WithoutThreshold);
 }
