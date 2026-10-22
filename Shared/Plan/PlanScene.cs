@@ -226,14 +226,17 @@ public sealed class PlanScene
         return $"rgb({r},{g},0)";
     }
 
-    /// <summary>A point with no capacity on record: grey, because "unknown" is not "lightly loaded" (as on the Charpente page).</summary>
+    /// <summary>
+    /// A point with no capacity on record, or a sensor with no charge ratio: grey, because "unknown" is not "lightly
+    /// loaded" (as on the Charpente page).
+    /// </summary>
     public const string NoCapacityColor = "#9e9e9e";
 
-    /// <summary>A sensor's fill by its charge ratio, on <see cref="RatioColor"/>'s scale; green without one.</summary>
-    public static string SensorFill(double? ratio) => ratio is { } value ? RatioColor(value) : "#4CAF50";
+    /// <summary>A sensor's fill by its charge ratio, on <see cref="RatioColor"/>'s scale; grey without one.</summary>
+    public static string SensorFill(double? ratio) => ratio is { } value ? RatioColor(value) : NoCapacityColor;
 
-    /// <summary>A sensor's ring: its fill colour when a ratio is known, green otherwise.</summary>
-    public static string SensorStroke(double? ratio) => ratio is null ? "#4CAF50" : SensorFill(ratio);
+    /// <summary>A sensor's ring: the same colour as its fill.</summary>
+    public static string SensorStroke(double? ratio) => SensorFill(ratio);
 
     // ── Text ──────────────────────────────────────────────────────────────────────────────────
 
