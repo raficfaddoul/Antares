@@ -21,6 +21,11 @@ namespace AliantWebS.Data
     /// Missing coefficients default to identity (C1 = 1, C0 = 0): a sensor with no calibration
     /// attributes passes through unchanged — a safe no-op until real values are set.
     ///
+    /// A load that fails, or a coefficient that is not a number, is never turned into raw values that
+    /// look calibrated (Rafic, 2026-10-22): whoever asks for those values gets a CalibrationReadException
+    /// (see CalibrationTable). The pages show it as unreadable data, the export is refused, and the alarm
+    /// checks skip those readings (UncheckedAlarms).
+    ///
     /// The transform is applied INSIDE the Flux query (a map() before aggregateWindow) so that
     /// max / downsampling aggregate the CALIBRATED values — correct even when the slope C1 is
     /// negative (where max(raw) would otherwise become min after a naive post-multiply).
@@ -81,22 +86,25 @@ namespace AliantWebS.Data
         /// map afterwards as-is; max/min with any negative slope splits the stream so those pairs
         /// aggregate with the opposite function. Anything else (sum, count, …) is not linear in the
         /// aggregate — those fall back to mapping before aggregation, which is always correct.
+        ///
+        /// Throws CalibrationReadException when the calibration cannot be read, or when a pair the
+        /// query reads has an unusable coefficient.
         /// </summary>
         public static async Task<CalibrationPlan> BuildPlanAsync(
             IEnumerable<string> sensorIds, IEnumerable<string> channelIds, string aggregateFn)
+            => BuildPlan(await LoadTableAsync(), sensorIds, channelIds, aggregateFn);
+
+        /// <summary>BuildPlanAsync on a table already loaded.</summary>
+        public static CalibrationPlan BuildPlan(
+            CalibrationTable table, IEnumerable<string> sensorIds, IEnumerable<string> channelIds, string aggregateFn)
         {
             var plan = new CalibrationPlan();
-            if (DbFactory == null) return plan;
-
-            var all = await SafeLoadAsync(sensorIds, channelIds);
-            if (all.Count == 0) return plan;
 
             // Keep only the (sensor, channel) pairs this query actually asks for, so the map clause
             // stays small instead of listing every calibrated sensor in the database.
             var wantedSensors = new HashSet<string>(sensorIds ?? Enumerable.Empty<string>(), StringComparer.OrdinalIgnoreCase);
             var wantedChannels = new HashSet<string>(channelIds ?? Enumerable.Empty<string>(), StringComparer.OrdinalIgnoreCase);
-            var coeffs = all.Where(kv => wantedSensors.Contains(kv.Key.sensorId)
-                                      && wantedChannels.Contains(kv.Key.channelId)).ToList();
+            var coeffs = table.Of(from s in wantedSensors from c in wantedChannels select (s, c));
             if (coeffs.Count == 0) return plan;
 
             var sb = new StringBuilder();
@@ -202,57 +210,49 @@ namespace AliantWebS.Data
         /// <summary>
         /// Calibrate GetDataForExport results in place (raw / unaggregated data, so a post-multiply is
         /// exact for any slope). Inner keys are "sensorId|channelId" lower-cased.
+        ///
+        /// Throws CalibrationReadException, before any value changes, when the calibration cannot be
+        /// read or a pair the export holds has an unusable coefficient: the export is refused rather
+        /// than written raw (Rafic, 2026-10-22).
         /// </summary>
-        public static async Task ApplyToExportAsync(
-            Dictionary<DateTime, Dictionary<string, double>> data,
-            IEnumerable<string> sensorIds,
-            IEnumerable<string> channelIds)
+        public static async Task ApplyToExportAsync(Dictionary<DateTime, Dictionary<string, double>> data)
         {
-            if (DbFactory == null || data == null || data.Count == 0) return;
+            ArgumentNullException.ThrowIfNull(data);
+            if (data.Count == 0) return;
 
-            var coeffs = await SafeLoadAsync(sensorIds, channelIds);
-            if (coeffs.Count == 0) return;
+            ApplyToExport(await LoadTableAsync(), data);
+        }
 
-            var byPair = coeffs.ToDictionary(
-                kv => $"{kv.Key.sensorId}|{kv.Key.channelId}".ToLowerInvariant(),
-                kv => kv.Value);
+        /// <summary>ApplyToExportAsync on a table already loaded.</summary>
+        public static void ApplyToExport(CalibrationTable table, Dictionary<DateTime, Dictionary<string, double>> data)
+        {
+            var pairKeys = data.Values.SelectMany(perTimestamp => perTimestamp.Keys)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            // Every pair checked first: Of throws for an unusable one before anything is changed.
+            var byPair = table.Of(pairKeys.Select(SplitPairKey)).ToDictionary(
+                kv => $"{kv.Key.sensorId}|{kv.Key.channelId}",
+                kv => kv.Value,
+                StringComparer.OrdinalIgnoreCase);
+            if (byPair.Count == 0) return;
 
             foreach (var perTimestamp in data.Values)
             {
                 foreach (var pairKey in perTimestamp.Keys.ToList())
                 {
-                    if (byPair.TryGetValue(pairKey.ToLowerInvariant(), out var c))
+                    if (byPair.TryGetValue(pairKey, out var c))
                         perTimestamp[pairKey] = c.C1 * perTimestamp[pairKey] + c.C0;
                 }
             }
         }
 
-        /// <summary>
-        /// Coefficients for one (sensor, channel), or identity (1, 0) when none are configured.
-        /// Used by the alarm evaluation, which must compare the REPORTED value — the same number the
-        /// charts and gauges show — rather than the raw sample.
-        /// </summary>
-        public static async Task<(double C1, double C0)> GetCoefficientsAsync(Guid sensorId, Guid channelId)
+        private static (string SensorId, string ChannelId) SplitPairKey(string pairKey)
         {
-            if (DbFactory == null) return (1.0, 0.0);
-
-            var all = await SafeLoadAsync(null, null);   // cached; only non-identity pairs are stored
-            return all.TryGetValue((sensorId.ToString(), channelId.ToString()), out var c) ? c : (1.0, 0.0);
-        }
-
-        private static async Task<Dictionary<(string sensorId, string channelId), (double C1, double C0)>> SafeLoadAsync(
-            IEnumerable<string> sensorIds, IEnumerable<string> channelIds)
-        {
-            try
-            {
-                return await LoadAsync(sensorIds, channelIds);
-            }
-            catch (Exception ex)
-            {
-                // Never let a calibration lookup break data retrieval — fall back to raw values.
-                Console.WriteLine($"[SensorCalibration] load failed, using raw values: {ex.Message}");
-                return new Dictionary<(string, string), (double, double)>();
-            }
+            int bar = pairKey.IndexOf('|');
+            if (bar < 0)
+                throw new ArgumentException($"Export key \"{pairKey}\" is not \"sensorId|channelId\".", nameof(pairKey));
+            return (pairKey[..bar], pairKey[(bar + 1)..]);
         }
 
         // ---- cache -------------------------------------------------------------------------
@@ -260,30 +260,70 @@ namespace AliantWebS.Data
         // attribute. Loading it per GetData call cost ~1s each (≈6 calls per dashboard load), so it
         // is held until explicitly dropped — every code path that writes a coefficient calls
         // Invalidate(), so there is no TTL to guess at.
+        //
+        // A failed load is never cached: the next read tries again. A load that began before an
+        // Invalidate() keeps its table to itself, since it may hold the coefficients from before the
+        // edit (the generation tells). Loads are not single-flight: two concurrent reads may both
+        // load, and each gets a whole table or the failure.
         private static readonly object _cacheLock = new();
-        private static Dictionary<(string, string), (double, double)> _cache;
+        private static CalibrationTable? _cache;
+        private static long _generation;
 
         public static void Invalidate()
         {
-            lock (_cacheLock) { _cache = null; }
+            lock (_cacheLock)
+            {
+                _cache = null;
+                _generation++;
+            }
         }
 
-        // Non-identity coefficients keyed by (sensorId, channelId), in the same string form used by
-        // the Influx tags (sensor.ElementId.ToString() and the channel id passed to GetData).
-        // NOTE: loads ALL calibrated sensors/channels (not just the requested ones) so a single
-        // cached table serves every query; callers filter by intersecting with their own ids.
-        private static async Task<Dictionary<(string sensorId, string channelId), (double C1, double C0)>> LoadAsync(
-            IEnumerable<string> sensorIds, IEnumerable<string> channelIds)
+        /// <summary>
+        /// The calibration of every sensor channel: cached, or loaded now. Identity when no database is
+        /// configured (DbFactory null). When the load fails it is logged, and the table returned is
+        /// CalibrationTable.Unreadable: every channel asked of it throws CalibrationReadException.
+        /// </summary>
+        public static async Task<CalibrationTable> LoadTableAsync()
         {
+            var factory = DbFactory;
+            if (factory == null) return CalibrationTable.Identity;
+
+            long generation;
             lock (_cacheLock)
             {
                 if (_cache != null)
                     return _cache;
+                generation = _generation;
             }
 
-            var result = new Dictionary<(string, string), (double, double)>();
+            CalibrationTable table;
+            try
+            {
+                table = await ReadTableAsync(factory);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[SensorCalibration] load failed: {ex}");
+                return CalibrationTable.Unreadable(new CalibrationReadException(
+                    $"Les coefficients d'étalonnage (C1/C0) n'ont pas pu être lus : {ex.GetBaseException().Message}", ex));
+            }
 
-            using var db = await DbFactory.CreateDbContextAsync();
+            lock (_cacheLock)
+            {
+                if (generation == _generation)
+                    _cache = table;
+            }
+
+            return table;
+        }
+
+        // Every sensor's coefficients, keyed by (sensorId, channelId) in the same string form used by
+        // the Influx tags (sensor.ElementId.ToString() and the channel id passed to GetData).
+        // NOTE: loads ALL calibrated sensors/channels (not just the requested ones) so a single
+        // cached table serves every query; callers ask it for their own pairs.
+        private static async Task<CalibrationTable> ReadTableAsync(IDbContextFactory<AliantWebContext> factory)
+        {
+            using var db = await factory.CreateDbContextAsync();
 
             // Accepted C1/C0 attribute-name prefixes: the code tag itself PLUS every user alias, so
             // "C1_weight" keeps working whether or not a mapping row exists.
@@ -311,53 +351,17 @@ namespace AliantWebS.Data
 
             var attrRows = await db.Set<AttributeElement>()
                 .Where(ae => likePatterns.Any(p => EF.Functions.Like(ae.AttributeType.Name, p)))
-                .Select(ae => new { ae.ElementId, Name = ae.AttributeType.Name, ae.Value })
+                .Select(ae => new CalibrationTable.Attribute(ae.ElementId, ae.Element.Name, ae.AttributeType.Name, ae.Value))
                 .AsNoTracking()
                 .ToListAsync();
 
-            foreach (var bySensor in attrRows.GroupBy(a => a.ElementId))
-            {
-                foreach (var channel in channels)
-                {
-                    if (string.IsNullOrWhiteSpace(channel.Name)) continue;
+            var table = CalibrationTable.FromAttributes(
+                attrRows, channels.Select(c => (c.ChannelDataTypeId, c.Name)), c1Prefixes, c0Prefixes);
 
-                    // Any accepted prefix may carry the coefficient — code tag or user alias.
-                    bool MatchesPrefix(HashSet<string> prefixes, string attrName) =>
-                        attrName != null && prefixes.Any(p =>
-                            string.Equals(attrName.Trim(), $"{p}_{channel.Name}", StringComparison.OrdinalIgnoreCase));
+            foreach (var reason in table.UnusableChannels)
+                Console.Error.WriteLine($"[SensorCalibration] unusable coefficient, its channel's reads will fail: {reason}");
 
-                    double c1 = ParseValue(bySensor.FirstOrDefault(a => MatchesPrefix(c1Prefixes, a.Name))?.Value) ?? 1.0;
-                    double c0 = ParseValue(bySensor.FirstOrDefault(a => MatchesPrefix(c0Prefixes, a.Name))?.Value) ?? 0.0;
-
-                    if (c1 == 1.0 && c0 == 0.0) continue;   // identity → nothing to apply
-
-                    result[(bySensor.Key.ToString(), channel.ChannelDataTypeId.ToString())] = (c1, c0);
-                }
-            }
-
-            lock (_cacheLock)
-            {
-                _cache = result;
-            }
-
-            return result;
-        }
-
-        private static double? ParseValue(string raw)
-        {
-            if (string.IsNullOrWhiteSpace(raw)) return null;
-            raw = raw.Trim();
-
-            // Accept both "2.5" and "2,5" — the attribute is typed by hand and the app runs under a
-            // French locale, so a decimal comma is common. Invariant first, then comma → dot.
-            if (double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var v))
-                return v;
-
-            if (double.TryParse(raw.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out v))
-                return v;
-
-            Console.WriteLine($"[SensorCalibration] unparsable coefficient value '{raw}'.");
-            return null;
+            return table;
         }
 
         // Format a coefficient as a Flux float literal (always with a decimal point, invariant, no

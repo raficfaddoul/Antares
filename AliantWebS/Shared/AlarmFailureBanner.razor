@@ -1,0 +1,39 @@
+@inject IStringLocalizer<Pages.Languages> L
+
+@* A failure of the alarm chain, shown on every page (MainLayout): alarm e-mails that do not leave, thresholds that are
+   not checked. It used to be a line in the container log, and the operators believed they were protected.
+   Dismissing hides this failure only: one reported later (a later Time) shows the banner again. *@
+@if (Message != null && Time > dismissed)
+{
+    <div style="background:#c53030; color:#fff; padding:10px 18px; display:flex; align-items:center;
+                gap:14px; font-size:14px; font-weight:600; box-shadow:0 2px 8px rgba(0,0,0,.25);">
+        <span style="font-size:18px;">@Icon</span>
+        <span style="flex:1;">
+            @Title — @Message
+            <span style="opacity:.85; font-weight:400;">
+                (@Time.ToString("yyyy-MM-dd HH:mm:ss"))
+            </span>
+        </span>
+        <a href="alarm-management" style="color:#fff; text-decoration:underline;">@L["Alarm Management"]</a>
+        <button type="button" @onclick="Dismiss"
+                style="background:transparent; border:1px solid rgba(255,255,255,.6); color:#fff;
+                       border-radius:6px; padding:3px 10px; cursor:pointer;">
+            @L["Masquer"]
+        </button>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public string Icon { get; set; }
+    [Parameter, EditorRequired] public string Title { get; set; }
+
+    /// <summary>What failed; null when nothing has, and then nothing is shown.</summary>
+    [Parameter] public string Message { get; set; }
+
+    /// <summary>When this failure was reported (local time): the key a dismissal is remembered by.</summary>
+    [Parameter] public DateTime Time { get; set; }
+
+    private DateTime dismissed = DateTime.MinValue;
+
+    private void Dismiss() => dismissed = Time;
+}

@@ -1117,8 +1117,9 @@ public static async Task<Dictionary<DateTime, Dictionary<string, double>>> GetDa
         throw;
     }
 
-    // Export the reported (calibrated) values: y = C1·x + C0 per (sensor, channel).
-    await SensorCalibration.ApplyToExportAsync(result, distinctSensors, distinctChannels);
+    // Export the reported (calibrated) values: y = C1·x + C0 per (sensor, channel). Throws, rather than leave raw
+    // values in the export, when that calibration cannot be read.
+    await SensorCalibration.ApplyToExportAsync(result);
 
     return result;
 }

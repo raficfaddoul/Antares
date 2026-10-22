@@ -102,6 +102,11 @@ namespace AliantWebS.Data
 
         private static CancellationToken FetchStopToken { get { lock (_fetchLock) return _fetchStop.Token; } }
 
+        // ── Thresholds that could not be checked ──────────────────────────────────────────────
+        // A reading whose calibration cannot be had is stored raw but not compared with its threshold:
+        // said on every page and on /alarm-management while it lasts (see UncheckedAlarms).
+        public static readonly UncheckedAlarms UncheckedAlarms = new();
+
         private static void ApplyFetchPaused(bool paused)
         {
             lock (_fetchLock)
@@ -451,11 +456,17 @@ static public async Task<(int Count, long MaxTimestamp)> GetReportsAsync(
                             thresholdNames = await TagMappingResolver.AcceptedNamesAsync(batchDb, "seuil_alarme");
                         }
 
+                        // The calibration once per batch too. A reading it cannot calibrate is still written
+                        // (raw, as every reading), but its threshold is not checked: see UncheckedAlarms.
+                        var calibration = await SensorCalibration.LoadTableAsync();
+                        var uncheckedReadings = new List<(string Reading, string Reason)>();
+
                         foreach (var report in batch)
                         {
-                            var result = await ConvertReportToPointData(report, sensors, scopeFactory, httpClient, thresholdNames);
+                            var result = await ConvertReportToPointData(report, sensors, scopeFactory, httpClient, thresholdNames, calibration);
                             pointsList.AddRange(result.Points);
                             hasNewAlarms |= result.HasNewAlarms;
+                            uncheckedReadings.AddRange(result.Unchecked);
                         }
 
                         // Write this batch to InfluxDB immediately
@@ -463,6 +474,8 @@ static public async Task<(int Count, long MaxTimestamp)> GetReportsAsync(
                         {
                             await InfluxService.WriteData(pointsList, BucketName);
                         }
+
+                        await RecordUncheckedAlarmsAsync(uncheckedReadings, DateTime.Now);
 
                         onNewReports?.Invoke(batch);
 
@@ -543,15 +556,46 @@ static public async Task<(int Count, long MaxTimestamp)> GetReportsAsync(
         public static bool IsFirstUnknownReportName(string? name) =>
             _unknownReportNames.TryAdd(name?.Trim() ?? string.Empty, 0);
 
-        static private async Task<(List<PointData> Points, bool HasNewAlarms)> ConvertReportToPointData(
+        /// <summary>
+        /// After a batch, the thresholds it could not check: console and journal when that starts and when it ends,
+        /// the banner (UncheckedAlarms.Changed) whenever what is said changes.
+        /// </summary>
+        public static async Task RecordUncheckedAlarmsAsync(IReadOnlyCollection<(string Reading, string Reason)> uncheckedReadings, DateTime now)
+        {
+            var before = UncheckedAlarms.Current;
+            var change = UncheckedAlarms.Update(uncheckedReadings, now);
+            var after = UncheckedAlarms.Current;
+
+            switch (change)
+            {
+                case UncheckedAlarms.Change.Started:
+                    Console.WriteLine($"[Alarmes] Seuils non vérifiés : {after!.Message}");
+                    await JournalWriter.WriteSystemAsync(JournalCategory.Alarme, "alarm.check.unavailable",
+                        details: $"Mesures enregistrées brutes, seuils non vérifiés : {after.Message}", severity: 2);
+                    break;
+                case UncheckedAlarms.Change.Updated:
+                    Console.WriteLine($"[Alarmes] Seuils non vérifiés : {after!.Message}");
+                    break;
+                case UncheckedAlarms.Change.Ended:
+                    Console.WriteLine("[Alarmes] Tous les seuils sont de nouveau vérifiés.");
+                    await JournalWriter.WriteSystemAsync(JournalCategory.Alarme, "alarm.check.restored",
+                        details: $"Tous les seuils sont de nouveau vérifiés (non vérifiés depuis le {before!.Since:dd/MM/yyyy HH:mm:ss}).",
+                        severity: 1);
+                    break;
+            }
+        }
+
+        static private async Task<(List<PointData> Points, bool HasNewAlarms, List<(string Reading, string Reason)> Unchecked)> ConvertReportToPointData(
     Report report,
     IEnumerable<Element> sensors,
     IServiceScopeFactory scopeFactory,
     HttpClient httpClient,
-    HashSet<string> thresholdNames)
+    HashSet<string> thresholdNames,
+    CalibrationTable calibration)
 {
     List<PointData> points = new List<PointData>();
     bool hasNewAlarms = false;
+    var uncheckedReadings = new List<(string Reading, string Reason)>();
 
     // Read once per report rather than per sample: AppSettings serves this from its cache, but the
     // levels must not change halfway through a report either.
@@ -629,18 +673,28 @@ static public async Task<(int Count, long MaxTimestamp)> GetReportsAsync(
                             // calibration is applied on read.
                             p = p.Field(ChannelDataTypeID.ToString(), numericValue.Value);
 
+                            if (!thresholdValues.ContainsKey(v.Key)) continue;   // no threshold: nothing to check
+
                             // ...but the threshold is compared against the REPORTED value, i.e. the
                             // same y = C1·x + C0 the charts, gauges and SVG show. Comparing the raw
                             // sample here would mean a threshold typed in calibrated units never
-                            // fires (or fires constantly) once a sensor is calibrated.
-                            var (c1, c0) = await SensorCalibration.GetCoefficientsAsync(sensor.ElementId, ChannelDataTypeID);
-                            double reportedValue = c1 * numericValue.Value + c0;
+                            // fires (or fires constantly) once a sensor is calibrated. So a reading
+                            // whose calibration cannot be had is not compared at all: it is unchecked.
+                            double reportedValue;
+                            try
+                            {
+                                var (c1, c0) = calibration.For(sensor.ElementId.ToString(), ChannelDataTypeID.ToString());
+                                reportedValue = c1 * numericValue.Value + c0;
+                            }
+                            catch (CalibrationReadException ex)
+                            {
+                                uncheckedReadings.Add(($"{sensor.Name} / {v.Key}", ex.Message));
+                                continue;
+                            }
 
                             // Three levels, each a percentage of this sensor's own threshold. Level 0
                             // means the value is below level 1, i.e. no alarm at all.
-                            int level = thresholdValues.ContainsKey(v.Key)
-                                ? alarmLevels.LevelFor(reportedValue, thresholdValues[v.Key])
-                                : 0;
+                            int level = alarmLevels.LevelFor(reportedValue, thresholdValues[v.Key]);
 
                             if (level > 0)
                             {
@@ -724,7 +778,7 @@ static public async Task<(int Count, long MaxTimestamp)> GetReportsAsync(
         }
     }
 
-    return (points, hasNewAlarms);
+    return (points, hasNewAlarms, uncheckedReadings);
 }
 
         static private async Task<IEnumerable<Element>> LoadSensorsAsync(AliantWebContext dbContext)

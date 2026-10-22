@@ -464,6 +464,22 @@
             </div>
         }
 
+        @if (ReportsService.UncheckedAlarms.Current is { } uncheckedAlarms)
+        {
+            <div class="unchecked-alarms" style="background:#fff5f5; border:2px solid #fc8181; border-left:6px solid #c53030;
+                        border-radius:12px; padding:16px 20px; margin-bottom:25px; color:#742a2a;">
+                <div style="font-weight:700; font-size:16px; margin-bottom:6px;">
+                    🔔⚠️ Seuils d'alarme non vérifiés depuis le @uncheckedAlarms.Since.ToString("dd/MM/yyyy à HH:mm")
+                </div>
+                <div style="font-size:14px;">@uncheckedAlarms.Message</div>
+                <div style="font-size:13px; opacity:.8; margin-top:6px;">
+                    Les mesures de ces voies sont enregistrées, mais aucune n'est comparée à son seuil : sans son
+                    étalonnage, une valeur brute ne peut pas l'être. Corrigez ou rétablissez les coefficients
+                    (C1/C0) ; le détail est dans le journal (alarm.check.unavailable).
+                </div>
+            </div>
+        }
+
         @if (AppData.EmailFailureMessage != null)
         {
             <div style="background:#fff5f5; border:2px solid #fc8181; border-left:6px solid #c53030;
