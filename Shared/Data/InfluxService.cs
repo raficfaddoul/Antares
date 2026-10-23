@@ -725,6 +725,12 @@ from(bucket: ""{bucketName}"")
 /// <summary>A weekly window: a calendar week, Monday 00:00 to Sunday 23:59 UTC, dated by its Monday.</summary>
 public const string WeeklyWindow = "1w";
 
+/// <summary>The Flux aggregate functions GetData's callers ask for.</summary>
+public const string AggregateMax = "max", AggregateMin = "min", AggregateMean = "mean";
+
+/// <summary>The columns of a GetData row: its time (UTC), its sensor id, then one value per channel asked for, in order.</summary>
+public const int TimeColumn = 0, SensorColumn = 1, FirstValueColumn = 2;
+
 /// <summary>
 /// The Monday 00:00 of the calendar week holding the instant: the week a <see cref="WeeklyWindow"/> row belongs
 /// to. <see cref="FoldDaysIntoWeeks"/> files each day with it, so a first week cut by the range start is dated by
@@ -738,7 +744,7 @@ public static DateTime WeekStart(DateTime at)
 
 // The functions a week can be folded from its days with: a week's max is the max of its days, its min the min of
 // theirs. A mean (or a sum, a last...) of a week is not that of its days, so a weekly window refuses the others.
-private static readonly string[] WeeklyFunctions = { "max", "min" };
+private static readonly string[] WeeklyFunctions = { AggregateMax, AggregateMin };
 
 /// <summary>
 /// The Flux aggregateWindow step. A weekly window is read as days, dated by their start (timeSrc _start), and
@@ -769,7 +775,7 @@ private static void RequireWeeklyFunction(string? fn)
 }
 
 /// <summary>
-/// Daily rows of a weekly read ([0] the day, [1] the sensor, [2..] one value per channel, null where nothing was
+/// Daily rows of a weekly read (GetData rows: the day, the sensor, one value per channel, null where nothing was
 /// read) folded into one row per sensor and Monday week, dated by that Monday (UTC): each channel's max or min over
 /// the week's days, null when none of them had a reading. Sensors keep the order they were read in, weeks are in
 /// date order within a sensor. A day cut by the range start belongs to the week of that day.
@@ -778,21 +784,21 @@ public static List<object[]> FoldDaysIntoWeeks(IEnumerable<object[]> days, strin
 {
     ArgumentNullException.ThrowIfNull(days);
     RequireWeeklyFunction(fn);
-    Func<double, double, double> fold = fn == "max" ? Math.Max : Math.Min;
+    Func<double, double, double> fold = fn == AggregateMax ? Math.Max : Math.Min;
 
     var dayList = days.ToList();
-    var sensorOrder = dayList.Select(day => (string)day[1]).Distinct().Select((sensor, i) => (sensor, i))
+    var sensorOrder = dayList.Select(day => (string)day[SensorColumn]).Distinct().Select((sensor, i) => (sensor, i))
         .ToDictionary(x => x.sensor, x => x.i);
 
     return dayList
-        .GroupBy(day => ((string)day[1], WeekStart((DateTime)day[0])))
+        .GroupBy(day => ((string)day[SensorColumn], WeekStart((DateTime)day[TimeColumn])))
         .OrderBy(week => sensorOrder[week.Key.Item1]).ThenBy(week => week.Key.Item2)
         .Select(week =>
         {
             var row = new object[week.First().Length];
-            row[0] = DateTime.SpecifyKind(week.Key.Item2, DateTimeKind.Utc);
-            row[1] = week.Key.Item1;
-            for (int channel = 2; channel < row.Length; channel++)
+            row[TimeColumn] = DateTime.SpecifyKind(week.Key.Item2, DateTimeKind.Utc);
+            row[SensorColumn] = week.Key.Item1;
+            for (int channel = FirstValueColumn; channel < row.Length; channel++)
             {
                 var values = week.Where(day => day[channel] != null).Select(day => (double)day[channel]).ToList();
                 if (values.Count > 0) row[channel] = values.Aggregate(fold);   // none read: the cell stays null
@@ -943,7 +949,7 @@ static public async Task<List<object[]>> GetData(
         // Use aggregateWindow to downsample at the query level. fn: max (not mean) so brief
         // load spikes survive downsampling and remain visible on the plotted curves.
         aggEvery = windowDuration;
-        aggFn = "max";
+        aggFn = AggregateMax;
 
         Console.WriteLine($"Applying downsampling: {windowDuration} window for ~{maxDataPoints} points");
     }
@@ -1019,11 +1025,11 @@ static public async Task<List<object[]>> GetData(
     Exception? failure = null;
     await queryApi.QueryAsync(flux, record =>
     {
-        var array = new object[channelsIds.Count() + 2];
-        array[0] = record.GetTime().Value.ToDateTimeUtc();
-        array[1] = record.GetValueByKey("sensor");
+        var array = new object[channelsIds.Count() + FirstValueColumn];
+        array[TimeColumn] = record.GetTime().Value.ToDateTimeUtc();
+        array[SensorColumn] = record.GetValueByKey("sensor");
 
-        int index = 2;
+        int index = FirstValueColumn;
         foreach (string key in channelsIds)
         {
             object value = record.GetValueByKey(key);

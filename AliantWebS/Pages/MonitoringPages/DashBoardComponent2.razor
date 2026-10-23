@@ -126,11 +126,11 @@
                                     </div>
                                 </RadzenSplitterPane>
                             </RadzenSplitter>
-                            @(PanelCover(chargeState, gaugesNothing))
+                            @(PanelCover(chargeState, chargeView?.GaugesNothing))
                         </div>
-                        @if (!chargeState.Loading && excludedShackles != null)
+                        @if (!chargeState.Loading && chargeView?.ExcludedShackles != null)
                         {
-                            <div style="padding: 2px 10px; font-size: 12px; color: #6c757d;">@excludedShackles</div>
+                            <div style="padding: 2px 10px; font-size: 12px; color: #6c757d;">@chargeView.ExcludedShackles</div>
                         }
                     </div>
                 </RadzenSplitterPane>
@@ -150,9 +150,9 @@
                         {
                             <ReadFailureNotice Title="@ReadFailureNotice.ChargeColoursTitle" Message="@chargeState.Failure" />
                         }
-                        else if (graphNothing != null)
+                        else if (chargeView?.GraphNothing != null)
                         {
-                            @(NothingNotice(graphNothing, cover: false))
+                            @(NothingNotice(chargeView.GraphNothing, cover: false))
                         }
                         <div style="flex: 1; min-height: 0; position: relative;">
                             <AliantWebS.Pages.CADPages.SVGComponent
@@ -181,11 +181,11 @@
                         </div>
                         <div style="flex: 1; min-height: 320px; position: relative;">
                             <IndicesInTimeComponent GraphId="g2" @ref="chargeGraph" Headers="DateHeaderOnly()" Indices="NoSeries()"></IndicesInTimeComponent>
-                            @(PanelCover(chargeState, graphNothing))
+                            @(PanelCover(chargeState, chargeView?.GraphNothing))
                         </div>
-                        @if (!chargeState.Loading && curveNotes.Count > 0)
+                        @if (!chargeState.Loading && chargeView is { CurveNotes.Count: > 0 })
                         {
-                            @(CurveNotesList(curveNotes))
+                            @(CurveNotesList(chargeView.CurveNotes))
                         }
                     </div>
                 </RadzenSplitterPane>
@@ -243,7 +243,7 @@
 
     static string NoReading(AlarmCurve curve, string periodLabel) => $"« {curve.Name} » : aucune mesure sur la période ({periodLabel}).";
 
-    // The bottom-right graph's sentences (decision 12). A type is named by AlarmRatioCurves.TypeName, as everywhere here.
+    // The bottom-right graph's sentences (decision 12). A type is named by SensorTypeCurves.TypeName, as everywhere here.
     static string NoChannel(string typeName) => $"Le type « {typeName} » n'a aucune voie de mesure.";
 
     static string DirectionNotPlotted(string channel) =>
@@ -294,10 +294,8 @@
     sealed record ChargeView(AlarmRatioReading Reading, string GaugesNothing, string GraphNothing, List<string> CurveNotes,
         string ExcludedShackles);
 
-    // Disposed with the page (leaving it, or switching tab): the first load (SQL) in flight is cancelled. Its token is
-    // taken once, here: CancellationTokenSource.Token throws once the source is disposed.
+    // Disposed with the page (leaving it, or switching tab): the first load (SQL) in flight is cancelled.
     private readonly CancellationTokenSource _lifetime = new();
-    private readonly CancellationToken lifetime;
     // Gauges, plan colours and the top-right graph come from one read; the bottom-right curve from another. Disposed with
     // the page, which cancels the read each has in flight.
     private readonly LatestRead chargeReads = new();
@@ -332,22 +330,15 @@
     ChannelDataType weightChannel;
 
     // ElementId → the sensor's worst ratio to its alarm thresholds over the period; a sensor absent from it is drawn grey.
+    // Copied once per drawn read: the plan redraws when it gets another dictionary.
     Dictionary<Guid, double> sensorChargeRatios = new();
-    string excludedShackles;
-    // Why the gauges, and why the top-right graph and the plan colours, show nothing (null when they draw).
-    string gaugesNothing;
-    string graphNothing;
-    List<string> curveNotes = new();
+    // What the last charge read shows (its sentences and notes), null while nothing is drawn (loading, failed, cleared).
+    ChargeView chargeView;
     // The lines under the bottom-right graph (empty unless it draws).
     List<string> typeCurveNotes = new();
 
     IndicesInTimeComponent chargeGraph;
     IndicesInTimeComponent curveGraph;
-
-    public DashBoardComponent2()
-    {
-        lifetime = _lifetime.Token;
-    }
 
     public void Dispose()
     {
@@ -358,7 +349,7 @@
     }
 
     string CurveTitle => curveTypeId is Guid id
-        ? $"{CurveTitlePrefix} : {AlarmRatioCurves.TypeName(PresentType(id))}"
+        ? $"{CurveTitlePrefix} : {SensorTypeCurves.TypeName(PresentType(id))}"
         : CurveTitlePrefix;
 
     // The dropdowns offer present types only.
@@ -395,13 +386,10 @@
             {
                 @(LoadingNotice(cover: true))
             }
-            @if (state.Failure != null && state.Unexpected)
+            @if (state.Failure != null)
             {
-                <ReadFailureNotice Title="@UnexpectedErrorTitle" Message="@state.Failure" Cover="true" />
-            }
-            else if (state.Failure != null)
-            {
-                <ReadFailureNotice Message="@state.Failure" Cover="true" />
+                <ReadFailureNotice Title="@(state.Unexpected ? UnexpectedErrorTitle : ReadFailureNotice.DefaultTitle)"
+                                   Message="@state.Failure" Cover="true" />
             }
             else if (nothing != null)
             {
@@ -430,6 +418,10 @@
     // The structure's sensors, the types present, the shackles, and the choices kept from before (AppData).
     private async Task LoadStructureAsync()
     {
+        // Left before the load started: nothing to read. Checked first, as CancellationTokenSource.Token throws once the
+        // source is disposed; IsCancellationRequested never does (Dispose cancels before disposing).
+        if (_lifetime.IsCancellationRequested) return;
+        var lifetime = _lifetime.Token;
         try
         {
             // Before any read: the event carries Point0, and without it the plan's origin marker, the coordinate
@@ -441,8 +433,8 @@
             if (lifetime.IsCancellationRequested) return;
             // Named, and ordered, by the text shown: a type without a name by its id (the top-right curves' rule).
             presentTypes = allSensors.Select(s => s.ElementType).DistinctBy(t => t.ElementTypeId)
-                .OrderBy(AlarmRatioCurves.TypeName).ToList();
-            curveTypeOptions = presentTypes.Select(t => new TypeOption(AlarmRatioCurves.TypeName(t), t.ElementTypeId)).ToList();
+                .OrderBy(SensorTypeCurves.TypeName).ToList();
+            curveTypeOptions = presentTypes.Select(t => new TypeOption(SensorTypeCurves.TypeName(t), t.ElementTypeId)).ToList();
             shownTypeOptions = curveTypeOptions.Prepend(new TypeOption("Tous", AllTypes)).ToList();
 
             (shackles, weightChannel) = await SensorChargeRatioHelper.LoadShackleSensorsAsync(dbContextFactory, appData.Structure);
@@ -519,7 +511,7 @@
         shownSensors = SensorsOfType(shownTypeId);
 
         var inclinometer = presentTypes
-            .FirstOrDefault(t => AlarmRatioCurves.TypeName(t).Contains(InclinometerTypeNamePart, StringComparison.OrdinalIgnoreCase))
+            .FirstOrDefault(t => SensorTypeCurves.TypeName(t).Contains(InclinometerTypeNamePart, StringComparison.OrdinalIgnoreCase))
             ?.ElementTypeId;
         curveTypeId = PresentOrDefault(appData.DashboardCurveTypeId ?? inclinometer, inclinometer, "courbe hebdomadaire");
     }
@@ -684,10 +676,7 @@
     private async Task DrawChargeAsync(ChargeView view, CancellationToken ct)
     {
         sensorChargeRatios = new Dictionary<Guid, double>(view.Reading.WorstRatioBySensor);
-        gaugesNothing = view.GaugesNothing;
-        graphNothing = view.GraphNothing;
-        curveNotes = view.CurveNotes;
-        excludedShackles = view.ExcludedShackles;
+        chargeView = view;
 
         if (view.Reading.Shackles?.Gauges is ShackleGauges gauges)
         {
@@ -717,8 +706,7 @@
     private Task ClearChargeAsync()
     {
         sensorChargeRatios = new Dictionary<Guid, double>();
-        gaugesNothing = graphNothing = excludedShackles = null;
-        curveNotes = new List<string>();
+        chargeView = null;
         return ClearGraphAsync();
     }
 
@@ -755,7 +743,7 @@
     }
 
     // Only for a sensor of allSensors, whose type was loaded with it (the curves are planned from those).
-    private string TypeNameOf(Guid sensorId) => AlarmRatioCurves.TypeName(allSensors.Single(s => s.ElementId == sensorId).ElementType);
+    private string TypeNameOf(Guid sensorId) => SensorTypeCurves.TypeName(allSensors.Single(s => s.ElementId == sensorId).ElementType);
 
     // ── Bottom-right curve ────────────────────────────────────────────────────────────────────────────────────────
 
@@ -775,7 +763,7 @@
     {
         if (typeId is not Guid id) return Outcome<TypeCurveView>.Say(ChooseCurveType);
         var type = PresentType(id);
-        var typeName = AlarmRatioCurves.TypeName(type);
+        var typeName = SensorTypeCurves.TypeName(type);
 
         var channels = WeeklyMinMaxCurves.ChannelsOf(type);   // loaded with the sensors (LoadSensorsAsync)
         if (channels.Plotted.Count == 0)

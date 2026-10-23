@@ -123,10 +123,10 @@ public class AlarmRatioCurvesTests
 
         var curve = Assert.Single(Plan(new[] { n1 }, Thresholds((n1, "voie_q:5"))));
 
-        Assert.Equal(nameless.ElementTypeId.ToString(), AlarmRatioCurves.TypeName(nameless));
-        Assert.Equal(AlarmRatioCurves.TypeName(nameless), curve.TypeName);
+        Assert.Equal(nameless.ElementTypeId.ToString(), SensorTypeCurves.TypeName(nameless));
+        Assert.Equal(SensorTypeCurves.TypeName(nameless), curve.TypeName);
         Assert.Equal($"{nameless.ElementTypeId} - voie_q", curve.Name);
-        Assert.Equal("Type Zeta", AlarmRatioCurves.TypeName(Type("Type Zeta", q)));
+        Assert.Equal("Type Zeta", SensorTypeCurves.TypeName(Type("Type Zeta", q)));
     }
 
     [Fact]

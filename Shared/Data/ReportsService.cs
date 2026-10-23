@@ -596,11 +596,12 @@ static public async Task<(int Count, long MaxTimestamp)> GetReportsAsync(
             switch (change)
             {
                 case UncheckedAlarms.Change.Started:
+                    Console.WriteLine($"[Alarmes] Capteurs non chargés, aucun rapport n'est lu : {failure}");
+                    await JournalWriter.WriteSystemAsync(JournalCategory.Alarme, "alarm.sensors.unavailable",
+                        details: $"Capteurs non chargés, aucun rapport n'est lu ni aucun seuil vérifié : {failure}", severity: 2);
+                    break;
                 case UncheckedAlarms.Change.Updated:
                     Console.WriteLine($"[Alarmes] Capteurs non chargés, aucun rapport n'est lu : {failure}");
-                    if (change == UncheckedAlarms.Change.Started)
-                        await JournalWriter.WriteSystemAsync(JournalCategory.Alarme, "alarm.sensors.unavailable",
-                            details: $"Capteurs non chargés, aucun rapport n'est lu ni aucun seuil vérifié : {failure}", severity: 2);
                     break;
                 case UncheckedAlarms.Change.Ended:
                     Console.WriteLine("[Alarmes] Capteurs chargés, la lecture des rapports reprend.");
@@ -789,9 +790,10 @@ static public async Task<(int Count, long MaxTimestamp)> GetReportsAsync(
 }
 
         /// <summary>
-        /// The sensor's alarm threshold per channel, read as the dashboard reads it (AlarmThresholdFormat). All its
-        /// threshold values are read as one, so a channel given two different values has none. What cannot be read is
-        /// added to <paramref name="unreadable"/>.
+        /// The sensor's alarm threshold per channel, parsed with AlarmThresholdFormat. All its threshold values are read
+        /// as one, so a channel given two different values has none. What cannot be read is added to
+        /// <paramref name="unreadable"/>. NOT the dashboard's rule (SensorChargeRatioHelper.ThresholdsByChannel reads row by
+        /// row, a later non-zero value winning, and a zero as no threshold): the two can rate a sensor differently.
         /// </summary>
         static private Dictionary<string, double> ThresholdsOf(Element sensor, HashSet<string> thresholdNames, List<string> unreadable)
         {

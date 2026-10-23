@@ -43,7 +43,7 @@ namespace AliantWebS.Data
             foreach (var sensor in sensors)
             {
                 var type = TypeOf(sensor);
-                typeNames.TryAdd(type.ElementTypeId, TypeName(type));
+                typeNames.TryAdd(type.ElementTypeId, SensorTypeCurves.TypeName(type));
                 sensorsOfType[type.ElementTypeId] = sensorsOfType.GetValueOrDefault(type.ElementTypeId) + 1;
 
                 if (!thresholdsBySensor.TryGetValue(sensor.ElementId, out var thresholds)) continue;
@@ -67,14 +67,16 @@ namespace AliantWebS.Data
                 .OrderBy(c => c.TypeName, StringComparer.Ordinal)
                 .ThenBy(c => c.Channel.Name, StringComparer.Ordinal)
                 .ToList();
-            RefuseNamesThatBreakTheGraph(curves);
+            SensorTypeCurves.RefuseUndrawableNames(curves, c => c.Name,
+                withComma: c => $"La courbe « {c.Name} » ne peut être tracée : son nom contient une virgule, le séparateur des données du graphique.",
+                twice: name => $"Deux types de capteurs donneraient la même courbe « {name} » : leurs points ne pourraient être distingués.");
             return curves;
         }
 
         /// <summary>
         /// Each curve's weekly peaks over the rows read for its channel (kept even when empty: a curve without a reading
         /// is said, not dropped), and each rated sensor's worst ratio across its curves. <paramref name="weeklyMaxRowsByChannelId"/>
-        /// holds GetData rows ([0] time, [1] sensor id, [2] value) per channel id. A curve whose channel was not read is
+        /// holds GetData rows (one value column) per channel id. A curve whose channel was not read is
         /// refused (ArgumentException): an empty curve must never stand in for a read that did not happen.
         /// </summary>
         public static AlarmRatioReading Rate(
@@ -148,10 +150,10 @@ namespace AliantWebS.Data
                 read => read.Channel.ChannelDataTypeId,
                 read => SensorChargeRatioHelper.ReadChannelAsync(
                     everyone.Where(s => read.SensorIds.Contains(s.ElementId)).ToList(), read.Channel, start, end,
-                    InfluxService.WeeklyWindow, "max", cancellationToken));
+                    InfluxService.WeeklyWindow, InfluxService.AggregateMax, cancellationToken));
             var meansRead = ratedShackles.Count > 0
-                ? SensorChargeRatioHelper.PerSensorAsync(ratedShackles, weightChannel!, start, end, "mean",
-                    values => values.Average(), cancellationToken)
+                ? SensorChargeRatioHelper.PerSensorAsync(ratedShackles, weightChannel!, start, end,
+                    InfluxService.AggregateMean, cancellationToken)
                 : null;
             var reads = weeklyMaxReads.Values.Cast<Task>().ToList();
             if (meansRead != null) reads.Add(meansRead);
@@ -192,43 +194,21 @@ namespace AliantWebS.Data
         {
             var type = sensor.ElementType
                 ?? throw new ArgumentException($"The sensor {sensor.ElementId} was given without its type: its thresholds cannot be matched to its channels.");
-            if (type.ChannelDataTypeElementTypes.Any(link => link.ChannelDataType == null))
-                throw new ArgumentException($"The type {type.ElementTypeId} was given without its channels: its thresholds cannot be matched.");
+            SensorTypeCurves.ChannelsOf(type, "its thresholds cannot be matched");   // refuses a type without its channels
             return type;
         }
-
-        /// <summary>
-        /// A type's name wherever the dashboard shows it (curves, notes, log lines): its id when the name is blank, as a
-        /// sensor without a name is shown by its id, so it is visible, never a blank legend.
-        /// </summary>
-        public static string TypeName(ElementType type) =>
-            string.IsNullOrWhiteSpace(type.Name) ? type.ElementTypeId.ToString() : type.Name;
 
         // The channel of the type the threshold names, whatever its case; null when the type has none of that name.
         private static ChannelDataType? ChannelOf(ElementType type, string channelName)
         {
-            var matches = type.ChannelDataTypeElementTypes
-                .Select(link => link.ChannelDataType)
+            var matches = SensorTypeCurves.ChannelsOf(type, "its thresholds cannot be matched")
                 .Where(channel => string.Equals(channel.Name, channelName, StringComparison.OrdinalIgnoreCase))
-                .DistinctBy(channel => channel.ChannelDataTypeId)
                 .ToList();
             if (matches.Count > 1)
                 throw new InvalidOperationException(
-                    $"Le seuil d'alarme « {channelName} » du type « {TypeName(type)} » correspond à plusieurs de ses voies "
+                    $"Le seuil d'alarme « {channelName} » du type « {SensorTypeCurves.TypeName(type)} » correspond à plusieurs de ses voies "
                     + $"({string.Join(", ", matches.Select(c => c.Name))}) : sa courbe ne peut être tracée.");
             return matches.SingleOrDefault();
-        }
-
-        // DisplayData joins the series names with commas and cannot tell two series of one name apart.
-        private static void RefuseNamesThatBreakTheGraph(IReadOnlyList<AlarmCurve> curves)
-        {
-            if (curves.FirstOrDefault(c => c.Name.Contains(',')) is AlarmCurve withComma)
-                throw new InvalidOperationException(
-                    $"La courbe « {withComma.Name} » ne peut être tracée : son nom contient une virgule, le séparateur des données du graphique.");
-
-            if (curves.GroupBy(c => c.Name, StringComparer.Ordinal).FirstOrDefault(g => g.Count() > 1) is { } twice)
-                throw new InvalidOperationException(
-                    $"Deux types de capteurs donneraient la même courbe « {twice.Key} » : leurs points ne pourraient être distingués.");
         }
     }
 

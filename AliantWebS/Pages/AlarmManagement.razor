@@ -8,6 +8,22 @@
 @attribute [Microsoft.AspNetCore.Authorization.Authorize(Roles = "Administrator,Developer,AlarmRecipient")]
 
 <style>
+    /* A failure that stops alarms from being detected or sent: collection paused, sensors not loaded, thresholds not
+       checked, e-mails failing. */
+    .alarm-failure-banner {
+        background: #fff5f5;
+        border: 2px solid #fc8181;
+        border-left: 6px solid #c53030;
+        border-radius: 12px;
+        padding: 16px 20px;
+        margin-bottom: 25px;
+        color: #742a2a;
+    }
+
+    .alarm-failure-title { font-weight: 700; font-size: 16px; margin-bottom: 6px; }
+    .alarm-failure-message { font-size: 14px; }
+    .alarm-failure-detail { font-size: 13px; opacity: .8; margin-top: 6px; }
+
     .alarm-container {
         padding: 20px;
         background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
@@ -451,12 +467,11 @@
 
         @if (fetchPaused)
         {
-            <div style="background:#fff5f5; border:2px solid #fc8181; border-left:6px solid #c53030;
-                        border-radius:12px; padding:16px 20px; margin-bottom:25px; color:#742a2a;">
-                <div style="font-weight:700; font-size:16px; margin-bottom:6px;">
+            <div class="alarm-failure-banner">
+                <div class="alarm-failure-title">
                     ⏸️ Collecte des mesures suspendue — aucune nouvelle alarme ne peut être détectée
                 </div>
-                <div style="font-size:14px;">
+                <div class="alarm-failure-message">
                     Les rapports des capteurs ne sont plus lus@(ReportsService.FetchPausedSinceUtc is { } since ? $" depuis le {since.ToLocalTime():dd/MM/yyyy à HH:mm}" : "").
                     Les alarmes déjà déclenchées restent affichées et continuent leurs rappels. À la reprise, la
                     lecture repart exactement du dernier rapport traité.
@@ -466,13 +481,12 @@
 
         @if (ReportsService.SensorsUnavailable.Current is { } sensorsUnavailable)
         {
-            <div class="sensors-unavailable" style="background:#fff5f5; border:2px solid #fc8181; border-left:6px solid #c53030;
-                        border-radius:12px; padding:16px 20px; margin-bottom:25px; color:#742a2a;">
-                <div style="font-weight:700; font-size:16px; margin-bottom:6px;">
+            <div class="alarm-failure-banner sensors-unavailable">
+                <div class="alarm-failure-title">
                     📡⚠️ Capteurs non chargés depuis le @sensorsUnavailable.Since.ToString("dd/MM/yyyy à HH:mm") — aucun rapport n'est lu
                 </div>
-                <div style="font-size:14px;">@sensorsUnavailable.Message</div>
-                <div style="font-size:13px; opacity:.8; margin-top:6px;">
+                <div class="alarm-failure-message">@sensorsUnavailable.Message</div>
+                <div class="alarm-failure-detail">
                     Sans la liste des capteurs et de leurs seuils, aucune mesure n'est enregistrée ni comparée à son
                     seuil : aucune nouvelle alarme ne peut être détectée. Un nouvel essai a lieu à chaque cycle ; dès
                     qu'il réussit, la lecture repart du dernier rapport traité, sans perte. Le détail est dans le
@@ -483,13 +497,12 @@
 
         @if (ReportsService.UncheckedAlarms.Current is { } uncheckedAlarms)
         {
-            <div class="unchecked-alarms" style="background:#fff5f5; border:2px solid #fc8181; border-left:6px solid #c53030;
-                        border-radius:12px; padding:16px 20px; margin-bottom:25px; color:#742a2a;">
-                <div style="font-weight:700; font-size:16px; margin-bottom:6px;">
+            <div class="alarm-failure-banner unchecked-alarms">
+                <div class="alarm-failure-title">
                     🔔⚠️ Seuils d'alarme non vérifiés depuis le @uncheckedAlarms.Since.ToString("dd/MM/yyyy à HH:mm")
                 </div>
-                <div style="font-size:14px;">@uncheckedAlarms.Message</div>
-                <div style="font-size:13px; opacity:.8; margin-top:6px;">
+                <div class="alarm-failure-message">@uncheckedAlarms.Message</div>
+                <div class="alarm-failure-detail">
                     Les mesures de ces voies sont enregistrées, mais aucune n'est comparée à son seuil : sans son
                     étalonnage, une valeur brute ne peut pas l'être, et un seuil illisible ne peut pas servir.
                     Corrigez la cause indiquée : les coefficients (C1/C0), ou l'attribut « Seuil Alarme » du capteur
@@ -500,13 +513,12 @@
 
         @if (AppData.EmailFailureMessage != null)
         {
-            <div style="background:#fff5f5; border:2px solid #fc8181; border-left:6px solid #c53030;
-                        border-radius:12px; padding:16px 20px; margin-bottom:25px; color:#742a2a;">
-                <div style="font-weight:700; font-size:16px; margin-bottom:6px;">
+            <div class="alarm-failure-banner">
+                <div class="alarm-failure-title">
                     ✉️⚠️ @L["Échec d'envoi des e-mails d'alarme"]
                 </div>
-                <div style="font-size:14px;">@AppData.EmailFailureMessage</div>
-                <div style="font-size:13px; opacity:.8; margin-top:6px;">
+                <div class="alarm-failure-message">@AppData.EmailFailureMessage</div>
+                <div class="alarm-failure-detail">
                     @L["Dernier échec"] : @AppData.EmailFailureTime.ToString("yyyy-MM-dd HH:mm:ss") —
                     @L["la détection et la sirène ne sont pas affectées. Vérifiez la clé SwanBrevoAPIKey et l'état du service Brevo ; le détail est dans le journal (alarm.email.failed)."]
                 </div>

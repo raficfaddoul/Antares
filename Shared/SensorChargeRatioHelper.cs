@@ -9,13 +9,13 @@ using AliantWebS.Models;
 namespace AliantWebS.Data
 {
     /// <summary>
-    /// The manille (shackle) charge ratios, so the Influx queries and the ratio maths live in exactly one place. Two
-    /// responsibilities: the plan's charge-ratio colour map (<see cref="ComputeAsync"/>, the Surveillance tab's
-    /// SurveillanceCapteursAntares) and the dashboard's shackle figures (DashBoardComponent2: the gauges with the
-    /// critical-share rule <see cref="CriticalRatio"/> and <see cref="Percent"/>, see <see cref="Charge"/>). Both rest on
-    /// the same thresholds (<see cref="ThresholdsByChannel"/>, the one parse loop) and <see cref="Ratio"/>, as do the
-    /// weekly peaks (<see cref="WeeklyPeaks"/>) and each sensor's highest ratio (<see cref="MaxRatioBySensor"/>). The
-    /// dashboard's part for every sensor type with an alarm threshold, beyond the shackles, lives in AlarmRatioCurves.
+    /// Charge ratios to each sensor's own alarm threshold, so the Influx queries and the ratio maths live in exactly one
+    /// place: the thresholds (<see cref="ThresholdsByChannel"/>, the one parse loop), <see cref="Ratio"/>, the weekly
+    /// peaks (<see cref="WeeklyPeaks"/>) and each sensor's highest ratio (<see cref="MaxRatioBySensor"/>), for any sensor
+    /// type. On top of them, two shackle (manille) uses: the plan's charge-ratio colour map (<see cref="ComputeAsync"/>,
+    /// the Surveillance tab's SurveillanceCapteursAntares) and the dashboard's gauges (the critical-share rule
+    /// <see cref="CriticalRatio"/> and <see cref="Percent"/>, see <see cref="Charge"/>). AlarmRatioCurves builds the
+    /// dashboard's curves for every sensor type with an alarm threshold from these pieces.
     ///
     /// The ratio is measured against each sensor's OWN alarm threshold for that channel — the
     /// "Seuil Alarme" attribute, packed as "weight:2000;temperature:60". So 100% means "at the
@@ -25,7 +25,7 @@ namespace AliantWebS.Data
     public static class SensorChargeRatioHelper
     {
         /// <summary>A shackle (manille) is a sensing device whose type name contains this: the one definition.</summary>
-        public const string ShackleTypeNamePart = "Manille";
+        private const string ShackleTypeNamePart = "Manille";
 
         /// <summary>A shackle whose charge ratio is above this (not at it) counts as a critical element.</summary>
         public const double CriticalRatio = 0.80;
@@ -194,28 +194,34 @@ namespace AliantWebS.Data
 
             // One aggregated max per sensor over the whole [startDate, endDate] window.
             return await PerSensorAsync(shackleSensors, weightChannelDataType, startDate, endDate,
-                "max", values => values.Max(), cancellationToken);
+                InfluxService.AggregateMax, cancellationToken);
         }
 
         /// <summary>
-        /// One aggregate of the channel per sensor over the whole [startDate, endDate] window (one row per sensor;
-        /// <paramref name="combine"/> joins them should the window ever be cut in two), keyed by ElementId.
-        /// Throws when InfluxDB cannot be read.
+        /// One aggregate of the channel per sensor over the whole [startDate, endDate] window, keyed by ElementId. The
+        /// window is longer than any period, so a sensor has one row; a second one is refused (InvalidOperationException),
+        /// never folded: two means cannot be averaged without their weights. Throws when InfluxDB cannot be read.
         /// </summary>
         internal static async Task<Dictionary<Guid, double>> PerSensorAsync(
             IReadOnlyCollection<Element> sensors, ChannelDataType channel, DateTime startDate, DateTime endDate,
-            string aggregateFn, Func<IEnumerable<double>, double> combine, CancellationToken cancellationToken)
+            string aggregateFn, CancellationToken cancellationToken)
         {
             var rows = await ReadChannelAsync(sensors, channel, startDate, endDate, WholePeriodWindow, aggregateFn, cancellationToken);
 
             var perSensor = new Dictionary<Guid, double>();
-            foreach (var bySensor in rows.Where(r => r[2] != null).GroupBy(r => r[1] as string))
-                if (Guid.TryParse(bySensor.Key, out var sensorId))
-                    perSensor[sensorId] = combine(bySensor.Select(r => (double)r[2]));
+            foreach (var bySensor in rows.Where(r => r[InfluxService.FirstValueColumn] != null)
+                         .GroupBy(r => r[InfluxService.SensorColumn] as string))
+            {
+                if (!Guid.TryParse(bySensor.Key, out var sensorId)) continue;
+                if (bySensor.Count() > 1)
+                    throw new InvalidOperationException(
+                        $"The whole-period {aggregateFn} of sensor {sensorId} came back as {bySensor.Count()} windows instead of one.");
+                perSensor[sensorId] = (double)bySensor.Single()[InfluxService.FirstValueColumn];
+            }
             return perSensor;
         }
 
-        // One channel of the sensors, aggregated per window: GetData rows ([0] time, [1] sensor id, [2] value).
+        // One channel of the sensors, aggregated per window: GetData rows with one value column.
         internal static Task<List<object[]>> ReadChannelAsync(
             IReadOnlyCollection<Element> sensors, ChannelDataType channel, DateTime startDate, DateTime endDate,
             string aggregateWindow, string aggregateFn, CancellationToken cancellationToken) =>
@@ -279,16 +285,17 @@ namespace AliantWebS.Data
             return peaks.Values.ToList();
         }
 
-        // GetData rows ([0] time, [1] sensor id, [2] value) rated against their own sensor's threshold; a row with no
-        // value, or of a sensor with no threshold, is left out.
+        // GetData rows (one value column) rated against their own sensor's threshold; a row with no value, or of a
+        // sensor with no threshold, is left out.
         private static IEnumerable<(DateTime At, Guid SensorId, double Ratio)> RatedReadings(
             IEnumerable<object[]> rows, IReadOnlyDictionary<Guid, double> thresholds)
         {
+            const int value = InfluxService.FirstValueColumn;
             foreach (var r in rows)
             {
-                if (r[0] is not DateTime at || r[2] == null) continue;
-                if (!Guid.TryParse(r[1] as string, out var sensorId)) continue;
-                if (Ratio(thresholds, sensorId, (double)r[2]) is double ratio)
+                if (r[InfluxService.TimeColumn] is not DateTime at || r[value] == null) continue;
+                if (!Guid.TryParse(r[InfluxService.SensorColumn] as string, out var sensorId)) continue;
+                if (Ratio(thresholds, sensorId, (double)r[value]) is double ratio)
                     yield return (at, sensorId, ratio);
             }
         }
@@ -297,8 +304,8 @@ namespace AliantWebS.Data
         public static int Percent(double ratio) => (int)Math.Round(ratio * 100, MidpointRounding.AwayFromZero);
 
         /// <summary>
-        /// Each rated sensor's highest reading over its own threshold, keyed by ElementId, from GetData rows ([0] time,
-        /// [1] sensor id, [2] value). A sensor with no threshold, or no reading, is absent.
+        /// Each rated sensor's highest reading over its own threshold, keyed by ElementId, from GetData rows (one value
+        /// column). A sensor with no threshold, or no reading, is absent.
         /// </summary>
         public static Dictionary<Guid, double> MaxRatioBySensor(IEnumerable<object[]> rows, IReadOnlyDictionary<Guid, double> thresholds)
         {

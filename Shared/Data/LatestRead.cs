@@ -14,8 +14,8 @@ namespace AliantWebS.Data
     /// </summary>
     public sealed class LatestRead : IDisposable
     {
+        // The latest read's source: never disposed while held (Begin retires the previous one, Dispose clears it).
         private CancellationTokenSource? current;
-        private CancellationToken currentToken = new(canceled: true);   // kept, so .Token is never read from a disposed source
         private bool disposed;
 
         /// <summary>Starts a read: cancels (then disposes) the previous one's source and returns the new read's token.</summary>
@@ -24,14 +24,13 @@ namespace AliantWebS.Data
             if (disposed) return new CancellationToken(canceled: true);
             var previous = current;
             current = new CancellationTokenSource();
-            currentToken = current.Token;
             Retire(previous);
-            return currentToken;
+            return current.Token;
         }
 
         /// <summary>True only for the latest Begin's token, while it is not cancelled.</summary>
         public bool IsCurrent(CancellationToken token) =>
-            !disposed && token == currentToken && !token.IsCancellationRequested;
+            !disposed && current != null && token == current.Token && !token.IsCancellationRequested;
 
         /// <summary>Cancels the current read; later Begins return cancelled tokens.</summary>
         public void Dispose()

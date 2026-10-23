@@ -22,12 +22,6 @@ namespace AliantWebS.Data
         /// <summary>Decimals the series keep (the CSV sent to the browser).</summary>
         public const int Decimals = 4;
 
-        // The InfluxDB aggregate functions of the two reads.
-        private const string MinFn = "min", MaxFn = "max";
-
-        // GetData rows: [0] time, [1] sensor id, then the channels asked for, in order.
-        private const int TimeColumn = 0, FirstChannelColumn = 2;
-
         public static string MinSeries(string channel) => $"{channel} (min)";
         public static string MaxSeries(string channel) => $"{channel} (max)";
 
@@ -41,18 +35,15 @@ namespace AliantWebS.Data
         /// </summary>
         public static TypeChannels ChannelsOf(ElementType type)
         {
-            ArgumentNullException.ThrowIfNull(type);
-            if (type.ChannelDataTypeElementTypes.Any(link => link.ChannelDataType == null))
-                throw new ArgumentException(
-                    $"The type {type.ElementTypeId} was given without its channels: its curve cannot be planned.", nameof(type));
-
-            var channels = type.ChannelDataTypeElementTypes
-                .Select(link => link.ChannelDataType)
-                .DistinctBy(channel => channel.ChannelDataTypeId)
+            var channels = SensorTypeCurves.ChannelsOf(type, "its curve cannot be planned")
                 .OrderBy(channel => channel.Name, StringComparer.Ordinal)
                 .ToList();
             var plotted = channels.Where(channel => !IsDirection(channel.Name)).ToList();
-            RefuseNamesThatBreakTheGraph(type, plotted);
+            string typeName = SensorTypeCurves.TypeName(type);
+            SensorTypeCurves.RefuseUndrawableNames(plotted, channel => channel.Name,
+                withComma: channel => $"La voie « {channel.Name} » du type « {typeName} » ne peut être tracée : "
+                    + "son nom contient une virgule, le séparateur des données du graphique.",
+                twice: name => $"Le type « {typeName} » a deux voies nommées « {name} » : leurs courbes ne pourraient être distinguées.");
             return new TypeChannels(plotted, channels.Where(channel => IsDirection(channel.Name)).ToList());
         }
 
@@ -87,7 +78,7 @@ namespace AliantWebS.Data
             for (int i = 0; i < plotted.Count; i++)
             {
                 var channel = plotted[i];
-                int column = FirstChannelColumn + i;
+                int column = InfluxService.FirstValueColumn + i;
                 var min = Weekly(minRows, column, values => values.Min());
                 var max = Weekly(maxRows, column, values => values.Max());
                 if (min.Count == 0 && max.Count == 0)
@@ -129,8 +120,8 @@ namespace AliantWebS.Data
                 aggregateWindowDuration: InfluxService.WeeklyWindow, aggregateFn: aggregateFn,
                 cancellationToken: cancellationToken);
 
-            var minRead = Read(MinFn);
-            var maxRead = Read(MaxFn);
+            var minRead = Read(InfluxService.AggregateMin);
+            var maxRead = Read(InfluxService.AggregateMax);
             await Task.WhenAll(minRead, maxRead);
             return Build(plotted, minRead.Result, maxRead.Result);
         }
@@ -139,7 +130,7 @@ namespace AliantWebS.Data
         private static Dictionary<object, double> Weekly(IReadOnlyList<object[]> rows, int column,
             Func<IEnumerable<double>, double> combine) =>
             rows.Where(row => row[column] != null)
-                .GroupBy(row => InfluxService.WeekStart((DateTime)row[TimeColumn]))
+                .GroupBy(row => InfluxService.WeekStart((DateTime)row[InfluxService.TimeColumn]))
                 .OrderBy(week => week.Key)
                 .ToDictionary(week => (object)week.Key,
                     week => Math.Round(combine(week.Select(row => (double)row[column])), Decimals));
@@ -147,33 +138,20 @@ namespace AliantWebS.Data
         private static void RefuseMalformedRows(IReadOnlyList<object[]> rows, int channels, string name)
         {
             ArgumentNullException.ThrowIfNull(rows, name);
-            int length = FirstChannelColumn + channels;
+            int length = InfluxService.FirstValueColumn + channels;
             foreach (var row in rows)
             {
                 if (row == null || row.Length != length)
                     throw new ArgumentException(
                         $"A row has {row?.Length.ToString() ?? "no"} cells where {length} were expected (time, sensor, {channels} channel(s)).", name);
-                if (row[TimeColumn] is not DateTime)
-                    throw new ArgumentException($"A row's time is not a DateTime: '{row[TimeColumn]}'.", name);
-                for (int column = FirstChannelColumn; column < length; column++)
+                if (row[InfluxService.TimeColumn] is not DateTime)
+                    throw new ArgumentException($"A row's time is not a DateTime: '{row[InfluxService.TimeColumn]}'.", name);
+                for (int column = InfluxService.FirstValueColumn; column < length; column++)
                     if (row[column] is not (null or double))
                         throw new ArgumentException($"A row's value is not a number: '{row[column]}'.", name);
             }
         }
 
-        // DisplayData joins the headers with commas and cannot tell two series of one name apart.
-        private static void RefuseNamesThatBreakTheGraph(ElementType type, IReadOnlyList<ChannelDataType> plotted)
-        {
-            if (plotted.FirstOrDefault(channel => channel.Name.Contains(',')) is ChannelDataType withComma)
-                throw new InvalidOperationException(
-                    $"La voie « {withComma.Name} » du type « {AlarmRatioCurves.TypeName(type)} » ne peut être tracée : "
-                    + "son nom contient une virgule, le séparateur des données du graphique.");
-
-            if (plotted.GroupBy(channel => channel.Name, StringComparer.Ordinal).FirstOrDefault(g => g.Count() > 1) is { } twice)
-                throw new InvalidOperationException(
-                    $"Le type « {AlarmRatioCurves.TypeName(type)} » a deux voies nommées « {twice.Key} » : "
-                    + "leurs courbes ne pourraient être distinguées.");
-        }
     }
 
     /// <summary>A type's channels: those the graph plots, and the directions it leaves out (both by name).</summary>

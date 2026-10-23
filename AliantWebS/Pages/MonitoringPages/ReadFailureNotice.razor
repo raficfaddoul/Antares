@@ -13,7 +13,10 @@
     /// <summary>The title over a plan whose charge colours could not be computed.</summary>
     public const string ChargeColoursTitle = "Couleurs de charge indisponibles";
 
-    [Parameter] public string Title { get; set; } = "Les données n'ont pas pu être lues";
+    /// <summary>The title when none is given: an InfluxDB read that failed.</summary>
+    public const string DefaultTitle = "Les données n'ont pas pu être lues";
+
+    [Parameter] public string Title { get; set; } = DefaultTitle;
     [Parameter] public string Message { get; set; }
     [Parameter] public bool Cover { get; set; }
 }
