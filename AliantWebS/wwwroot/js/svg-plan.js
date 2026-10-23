@@ -18,11 +18,13 @@
 //   [data-charge-key] a load symbol;  [data-sensor-key] a sensor marker;  [data-tip-title] a tooltip
 //   .plan-overlay     left empty by the server: the rubber band is drawn here
 //   .plan-readout     left empty by the server: the mouse position is written here
-//   [data-plan-action] fit | export-jpg | close-dialog;  in the export dialog, [data-plan-file-name] the file name box and
-//                     [data-plan-layer] the layer checkboxes, read as they are on the screen
+//   [data-plan-action] fit | full-page | leave-full-page | export-jpg | close-dialog;  in the export dialog,
+//                     [data-plan-file-name] the file name box and [data-plan-layer] the layer checkboxes, read as they
+//                     are on the screen
 //
 // What it writes, and the component's CSS relies on: data-hover on the .plan-element a click would take, data-panning on
-// the svg while panning, --plan-mark on .plan-root; the viewBox itself, which the server renders once and never again.
+// the svg while panning, --plan-mark on .plan-root, data-full-page on the host while the plan fills the window; the
+// viewBox itself, which the server renders once and never again.
 //
 // The rules (decided with Rafic on 2026-09-16, moved here from the server on 2026-09-17):
 // - Middle-button drag and Shift+drag pan on every page. A plain left drag draws in Draw mode and pans in
@@ -35,6 +37,8 @@
 //   last), within 1 m, as each toggle allows. Lines of 500 mm or less are dropped by the server.
 // - Hover and selection take the palonnier or mother within 8 px of the mouse, the palonnier on a tie: what
 //   lights up is what a click takes.
+// - Full page (2026-10-23): a toolbar button lays the plan over the whole window, under the page's dialogs,
+//   notifications and alarm banners; the other button or Esc puts it back. The view is kept: the plan only grows.
 // =============================================================
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -75,6 +79,7 @@ class Plan {
         this.on(svg, 'mousedown', e => { if (e.button === MIDDLE) e.preventDefault(); });
         this.on(svg, 'wheel', e => this.onWheel(e), { passive: false });
         this.on(host, 'click', e => this.onHostClick(e));
+        this.on(document, 'keydown', e => this.onKeyDown(e));
 
         // The view as the server left it was fitted to the Point0 of the first render; Point0 may have arrived since.
         this.extent = parseNumbers(svg.dataset.extent, 4);
@@ -166,6 +171,12 @@ class Plan {
 
     fit() {
         if (this.extent) this.setView(...this.extent);
+    }
+
+    /** The plan over the whole window, or back in its place. The viewBox stays: the same view, larger or smaller. */
+    setFullPage(on) {
+        this.hideTip();   // it points at where the mouse's target was
+        this.host.toggleAttribute('data-full-page', on);
     }
 
     onWheel(e) {
@@ -497,6 +508,8 @@ class Plan {
         if (!button || !this.host.contains(button)) return;
         const action = button.dataset.planAction;
         if (action === 'fit') this.fit();
+        else if (action === 'full-page') this.setFullPage(true);
+        else if (action === 'leave-full-page') this.setFullPage(false);
         // Run inside the click itself: the Save As picker needs the click's user activation, which a round trip to the
         // server would expire.
         else if (action === 'export-jpg') {
@@ -504,6 +517,11 @@ class Plan {
             const box = this.host.querySelector('[data-plan-file-name]');
             this.exportJpg((box && box.value.trim()) || 'plan');
         }
+    }
+
+    // Esc leaves full page, unless something else already took the key.
+    onKeyDown(e) {
+        if (e.key === 'Escape' && !e.defaultPrevented && this.host.hasAttribute('data-full-page')) this.setFullPage(false);
     }
 
     /**

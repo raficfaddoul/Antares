@@ -12,8 +12,8 @@
 
 @*
     The CAD plan. The server draws it from the model - every input first brought into one frame (PlanData), then placed
-    and labelled (PlanScene) - and the browser owns the view and the mouse (wwwroot/js/svg-plan.js): pan, zoom, hover,
-    tooltips, the rubber band, snapping and what counts as a click. The browser tells this component only what means
+    and labelled (PlanScene) - and the browser owns the view and the mouse (wwwroot/js/svg-plan.js): pan, zoom, full page,
+    hover, tooltips, the rubber band, snapping and what counts as a click. The browser tells this component only what means
     something to the page: a line drawn, an element or a sensor clicked, a point placed. See the module's header for the
     attributes it reads here.
 *@
@@ -26,13 +26,35 @@
         align-items: center;
         justify-content: center;
     }
+
+    .plan-host {
+        position: relative;
+        width: 100%;
+        height: 100%;
+    }
+
+    /* Full page: data-full-page is the browser's, set while the plan fills the window. Over the page and its bars (the
+       conception layout's top row is 1000 too, but comes earlier in the page), under what must stay in sight: Radzen's
+       dialogs (1001) and notifications (1002), the reload bar (1100), the alarm-failure banners (2000) and the plan's own
+       tooltip (2000). */
+    .plan-host[data-full-page] {
+        position: fixed;
+        inset: 0;
+        z-index: 1000;
+        background: #fff;
+    }
+
+    .plan-host:not([data-full-page]) [data-plan-action="leave-full-page"],
+    .plan-host[data-full-page] [data-plan-action="full-page"] {
+        display: none;
+    }
 </style>
 
 @{
     var scene = BuildScene();
 }
 
-<div class="plan-host" @ref="hostRef" style="position: relative; width: 100%; height: 100%;">
+<div class="plan-host" @ref="hostRef">
     @* The viewBox is the one of the first render and never changes here: from then on the browser owns the view. *@
     <svg @ref="svgRef" class="plan-svg" width="100%" height="100%" viewBox="@initialViewBox"
          data-mode="@ModeAttribute"
@@ -309,8 +331,15 @@
     @* ── Toolbar ── *@
     <div style="position: absolute; top: 10px; right: 10px; display: flex; flex-direction: column; gap: 4px; z-index: 10;
                 background: rgba(255,255,255,0.75); border-radius: 6px; padding: 4px; backdrop-filter: blur(4px);">
+        @* The plan over the whole window, and back (or Esc), handled by the browser; the style above shows one of the two. *@
+        <button type="button" class="toolbar-button" data-plan-action="full-page" title="Full page">
+            <i class="fas fa-expand"></i>
+        </button>
+        <button type="button" class="toolbar-button" data-plan-action="leave-full-page" title="Leave full page (Esc)">
+            <i class="fas fa-compress"></i>
+        </button>
         <button type="button" class="toolbar-button" data-plan-action="fit" title="Zoom to Extent">
-            <i class="fas fa-expand-arrows-alt"></i>
+            <i class="fas fa-vector-square"></i>
         </button>
         @if (Edits)
         {
