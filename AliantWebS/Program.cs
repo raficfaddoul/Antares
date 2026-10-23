@@ -20,9 +20,13 @@ namespace AliantWebS
         public static void Main(string[] args)
         {
             var host = CreateHostBuilder(args).Build();
+            // Before anything reads a setting or writes the journal: the alarm state restored below reads the mutes.
+            Startup.WireStaticServices(host.Services);
             EnsureDatabaseSchema(host.Services);
 
-            // Restore any alarm that was active before this restart, and re-assert the siren.
+            // Restore any alarm that was active before this restart, the mutes and the pause, and re-assert the siren.
+            // A failure stops the application here, loudly: it never runs unmuted or collecting in place of what the
+            // database holds.
             AliantWebS.Data.ReportsService
                 .InitializeAsync(host.Services.GetRequiredService<IServiceScopeFactory>())
                 .GetAwaiter().GetResult();

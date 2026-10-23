@@ -12,16 +12,25 @@ namespace AliantWebS.Data
     /// Operational settings stored in the AppSetting key/value table, so they can be changed without
     /// a rebuild. The table is created idempotently at startup (Program.EnsureDatabaseSchema).
     ///
-    /// Every getter takes the compiled-in value as its default, so the application behaves exactly as
-    /// before until a row is written — and keeps working if the database is unreachable.
+    /// Every getter takes the compiled-in value as its default for a key that has no row, so the
+    /// application behaves as before until a row is written. A table that cannot be read is NOT a table
+    /// without rows: a read or a write that cannot reach the database throws (InvalidOperationException,
+    /// naming the cause), never returns a default nor does nothing. Defaults standing in for the stored
+    /// values once turned every restart's siren and e-mail mutes off (5b51d8d to 2026-10-23).
     ///
     /// The whole table is tiny and read often (the alarm loop reads it every cycle), so it is cached
     /// until a write drops the cache. There is no TTL to guess at.
     /// </summary>
     public static class AppSettings
     {
-        // Set once at startup (Startup.Configure). When null, every getter returns its default.
+        // Set before anything runs (Program.Main, through Startup.WireStaticServices). Null = no database: reads and
+        // writes throw.
         public static IDbContextFactory<AliantWebContext> DbFactory { get; set; }
+
+        private static IDbContextFactory<AliantWebContext> Database => DbFactory
+            ?? throw new InvalidOperationException(
+                "Les réglages (table AppSetting) ne sont pas accessibles : la base de données ne leur a pas été donnée "
+                + "(AppSettings.DbFactory). Leurs valeurs par défaut ne remplacent pas les valeurs enregistrées.");
 
         // ── Keys ──────────────────────────────────────────────────────────────────────────────
         public const string SirenMuted        = "alarm.siren.muted";
@@ -88,11 +97,11 @@ namespace AliantWebS.Data
             }
 
             var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            if (DbFactory == null) return map;
+            var database = Database;
 
             try
             {
-                using var db = await DbFactory.CreateDbContextAsync();
+                using var db = await database.CreateDbContextAsync();
                 var rows = await db.Database
                     .SqlQueryRaw<SettingRow>("SELECT [Key], [Value] FROM AppSetting")
                     .ToListAsync();
@@ -102,9 +111,9 @@ namespace AliantWebS.Data
             }
             catch (Exception ex)
             {
-                // Never let a settings read break a caller — fall back to the compiled defaults.
-                Console.WriteLine($"[AppSettings] read failed, using defaults: {ex.Message}");
-                return map;
+                // Not cached: the next read tries again.
+                throw new InvalidOperationException(
+                    $"Les réglages (table AppSetting) n'ont pas pu être lus : {ex.GetBaseException().Message}", ex);
             }
 
             lock (_lock)
@@ -153,21 +162,29 @@ namespace AliantWebS.Data
         /// <summary>Upserts a setting and drops the cache so the new value is read immediately.</summary>
         public static async Task SetAsync(string key, string value, string description = null)
         {
-            if (DbFactory == null) return;
+            IDbContextFactory<AliantWebContext> database;
+            try { database = Database; }
+            catch (InvalidOperationException ex)
+            {
+                throw new InvalidOperationException($"Le réglage « {key} » n'a pas pu être enregistré : {ex.Message}", ex);
+            }
 
             try
             {
-                using var db = await DbFactory.CreateDbContextAsync();
+                // No description is sent as '' and stored as NULL: EF cannot map a DBNull parameter, so a write without
+                // a description used to fail every time, unseen (the failure was only logged until 2026-10-23).
+                using var db = await database.CreateDbContextAsync();
                 await db.Database.ExecuteSqlRawAsync(@"
 MERGE AppSetting AS t
 USING (SELECT {0} AS [Key]) AS s ON t.[Key] = s.[Key]
-WHEN MATCHED THEN UPDATE SET [Value] = {1}, Description = COALESCE({2}, Description), UpdatedAt = SYSDATETIME()
-WHEN NOT MATCHED THEN INSERT ([Key], [Value], Description, UpdatedAt) VALUES ({0}, {1}, {2}, SYSDATETIME());",
-                    key, value ?? "", (object)description ?? DBNull.Value);
+WHEN MATCHED THEN UPDATE SET [Value] = {1}, Description = COALESCE(NULLIF({2}, N''), Description), UpdatedAt = SYSDATETIME()
+WHEN NOT MATCHED THEN INSERT ([Key], [Value], Description, UpdatedAt) VALUES ({0}, {1}, NULLIF({2}, N''), SYSDATETIME());",
+                    key, value ?? "", description ?? "");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[AppSettings] write failed for '{key}': {ex.Message}");
+                throw new InvalidOperationException(
+                    $"Le réglage « {key} » n'a pas pu être enregistré : {ex.GetBaseException().Message}", ex);
             }
             finally
             {

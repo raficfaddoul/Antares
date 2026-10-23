@@ -956,7 +956,10 @@ static public async Task<(int Count, long MaxTimestamp)> GetReportsAsync(
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Alarms] Could not restore persisted state: {ex.Message}");
+                // Rethrown, so the application does not start: running on with "no alarm, not muted, collecting" would
+                // contradict what the database holds (the siren could sound although an administrator muted it).
+                Console.Error.WriteLine($"[Alarms] Could not restore persisted state, the application stops: {ex.GetBaseException().Message}");
+                throw;
             }
         }
 
@@ -1041,16 +1044,20 @@ static public async Task<(int Count, long MaxTimestamp)> GetReportsAsync(
             }
         }
 
-        /// <summary>Mute or unmute the physical siren. Detection and e-mail are unaffected.</summary>
+        /// <summary>
+        /// Mute or unmute the physical siren. Detection and e-mail are unaffected. Applied and driven first, then saved:
+        /// a save that fails (AppSettings throws) never leaves the siren sounding, and the caller says the change will
+        /// not survive a restart.
+        /// </summary>
         public static async Task SetSirenMutedAsync(bool muted)
         {
             lock (_alarmLock) { _sirenMuted = muted; }
             Console.WriteLine($"[Alarms] Siren {(muted ? "MUTED" : "UNMUTED")}.");
-            await AppSettings.SetAsync(AppSettings.SirenMuted, muted, "Physical siren muted by an administrator");
             await DriveSirenAsync();     // silences immediately, or re-asserts on unmute
+            await AppSettings.SetAsync(AppSettings.SirenMuted, muted, "Physical siren muted by an administrator");
         }
 
-        /// <summary>Stop or resume alarm e-mails. Detection and the siren are unaffected.</summary>
+        /// <summary>Stop or resume alarm e-mails. Detection and the siren are unaffected. Applied, then saved (see above).</summary>
         public static async Task SetEmailMutedAsync(bool muted)
         {
             lock (_alarmLock) { _emailMuted = muted; }

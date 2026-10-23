@@ -465,6 +465,14 @@
             }
         </div>
 
+        @if (actionFailed != null)
+        {
+            <div class="alarm-failure-banner alarm-action-failed">
+                <div class="alarm-failure-title">⚠️ Changement appliqué, mais non enregistré</div>
+                <div class="alarm-failure-message">@actionFailed</div>
+            </div>
+        }
+
         @if (fetchPaused)
         {
             <div class="alarm-failure-banner">
@@ -713,12 +721,29 @@
     private bool sirenMuted => ReportsService.SirenMuted;
     private bool emailMuted => ReportsService.EmailMuted;
 
+    // A switch applied now whose saving failed: it would not survive a restart, so the page says so.
+    private string actionFailed;
+
+    private async Task ApplySwitchAsync(Func<Task> change, string what)
+    {
+        actionFailed = null;
+        try
+        {
+            await change();
+        }
+        catch (InvalidOperationException ex)   // AppSettings could not save it
+        {
+            actionFailed = $"{what} : appliqué pour l'instant, mais pas enregistré, donc perdu au prochain redémarrage "
+                         + $"de l'application. {ex.Message}";
+        }
+    }
+
     private async Task ToggleSirenMute()
     {
         // ResetAlarmAsync/SetSirenMutedAsync drive the controller immediately rather than waiting
         // for the next polling cycle.
         bool muted = !ReportsService.SirenMuted;
-        await ReportsService.SetSirenMutedAsync(muted);
+        await ApplySwitchAsync(() => ReportsService.SetSirenMutedAsync(muted), muted ? "Sirène coupée" : "Sirène réactivée");
 
         await journal.WriteAsync(JournalCategory.Alarme, muted ? "siren.mute" : "siren.unmute",
             details: muted ? "Sirène coupée — la détection reste active" : "Sirène réactivée",
@@ -746,7 +771,8 @@
             if (!confirmed) return;
         }
 
-        await ReportsService.SetFetchPausedAsync(pause);
+        await ApplySwitchAsync(() => ReportsService.SetFetchPausedAsync(pause),
+            pause ? "Collecte suspendue" : "Collecte reprise");
 
         await journal.WriteAsync(JournalCategory.Alarme, pause ? "fetch.pause" : "fetch.resume",
             details: pause
@@ -760,7 +786,8 @@
     private async Task ToggleEmailMute()
     {
         bool muted = !ReportsService.EmailMuted;
-        await ReportsService.SetEmailMutedAsync(muted);
+        await ApplySwitchAsync(() => ReportsService.SetEmailMutedAsync(muted),
+            muted ? "E-mails d'alarme arrêtés" : "E-mails d'alarme réactivés");
 
         await journal.WriteAsync(JournalCategory.Alarme, muted ? "email.stop" : "email.resume",
             details: muted ? "E-mails d'alarme arrêtés — la détection reste active" : "E-mails d'alarme réactivés",

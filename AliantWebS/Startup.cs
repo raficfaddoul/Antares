@@ -164,15 +164,24 @@ namespace AliantWebS
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
+        /// <summary>
+        /// Gives the static services their database: the sensor calibration (y = C1·x + C0, applied by InfluxService on
+        /// every read), the settings (AppSetting) and the journal rows the background monitoring loop writes (no user,
+        /// no scope). Program.Main calls it before anything runs, ReportsService.InitializeAsync included: called only
+        /// here in Configure, the startup read the mutes before the settings had a database (5b51d8d to 2026-10-23).
+        /// </summary>
+        public static void WireStaticServices(IServiceProvider services)
+        {
+            var factory = services.GetRequiredService<IDbContextFactory<AliantWebContext>>();
+            SensorCalibration.DbFactory = factory;
+            AppSettings.DbFactory = factory;
+            JournalWriter.DbFactory = factory;
+        }
+
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
         {
-            // Give the sensor calibration (y = C1·x + C0) a DbContext so InfluxService transforms
-            // raw values → reported values on every read (plots, gauges, charge ratios, export).
-            SensorCalibration.DbFactory = app.ApplicationServices.GetRequiredService<IDbContextFactory<AliantWebContext>>();
-            AppSettings.DbFactory = app.ApplicationServices.GetRequiredService<IDbContextFactory<AliantWebContext>>();
-
-            // Journal rows written by the background monitoring loop, which has no user and no scope.
-            JournalWriter.DbFactory = app.ApplicationServices.GetRequiredService<IDbContextFactory<AliantWebContext>>();
+            // Program.Main has already done it; again here for a host built from Startup alone (the test harness).
+            WireStaticServices(app.ApplicationServices);
 
             // The InfluxDB token is no longer in the code: say so at startup rather than on the first sensor chart.
             // Without it every InfluxDB call fails, the background report/alarm fetcher included.
