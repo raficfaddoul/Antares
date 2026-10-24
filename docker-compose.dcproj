@@ -21,7 +21,5 @@
     <None Include="Dockerfile.dbfiles" />
     <None Include="nginx nginx.conf" />
     <None Include="nginx.conf" />
-    <None Include="Pages\AntaresConceptionLayout.razor" />
-    <None Include="Pages\LoadPages\ChargeMPComponent.razor" />
   </ItemGroup>
 </Project>
