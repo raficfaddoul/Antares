@@ -376,12 +376,18 @@ namespace Structural
         {
             double[] F = new double[6 * noeud.Count()];
 
-
+            //string s = "";
             foreach (var charge in ChargesStatiquePonctuelles)
             {
                 double P = charge.value;
+                //s += (P / 100).ToString() + ";";
                 for (int j = 0; j < charge.noeudInd.Count; j++)
-                    F[6 * charge.noeudInd[j] + 2] += P/100;
+                {
+                    F[6 * charge.noeudInd[j] + 2] += P / 100;
+                   // s += charge.noeudInd[j].ToString() + ";";
+                }
+                //s += "\n";
+
             }
             return F;
         }

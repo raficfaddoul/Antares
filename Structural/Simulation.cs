@@ -406,9 +406,10 @@ namespace Structural
                 }
                 element.Rows.Add(indexnoeud1, indexnoeud2, e, G, s, iy, iz, rho, b, h, el.ElementId, J);
 
+                // Equipment weight is a gravity load: passed negative, like the grid, self-weight, snow and measured loads.
                 foreach (var eq in el.Equipements)
                 {
-                    ChargesStatiquePonctuelles.Add((eq.EquipementId, new List<int>() { index },1, (eq.EquipementType.Weight ?? 0), eq.ProjectionParameter ?? 0));
+                    ChargesStatiquePonctuelles.Add((eq.EquipementId, new List<int>() { index },1, -(eq.EquipementType.Weight ?? 0), eq.ProjectionParameter ?? 0));
                 }
                 if (selectedLoadCases != null)
                 {

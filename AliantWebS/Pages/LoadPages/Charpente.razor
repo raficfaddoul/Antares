@@ -720,7 +720,7 @@
     // affectée à chaque nœud des éléments bois (voir CharpenteFEHelper.SurfacesAffectees).
     bool poidsPropre = true;
     bool neige = false;
-    double chargeQ = 90;
+    double chargeQ = 110;
     double chargeQ1 = 0;   // surcharge, kg/m² : activée avec le poids propre
     double epaisseurNeige = 0;
 
@@ -1274,8 +1274,9 @@
                     // If mapping exists and is not empty, add to chargeNodale
                     if (elementGuid.HasValue && elementGuid.Value != Guid.Empty)
                     {
-                        // dof = 2 for vertical load (Z-axis in 3D), adjust as needed
-                        chargeNodale[elementGuid.Value] = (dof: 2, value: chargeValue.Value);
+                        // dof = 2: vertical load (Z axis, upwards). Gravity loads are passed negative, like the self-weight
+                        // and snow that CharpenteFEHelper.AjouterChargesComplementaires adds.
+                        chargeNodale[elementGuid.Value] = (dof: 2, value: -chargeValue.Value);
                     }
                 }
             }
@@ -1437,9 +1438,11 @@
         sb.Append("</table>");
 
         // ---- Hypothèses de calcul : poids propre et neige ----
+        // Les charges de la grille sont passées au calcul en négatif (GetChargeNodale) : leur poids est l'opposé de leur somme.
+        double chargesSceniques = -charges.ChargesAppliquees;
         sb.Append("<h5>Hypothèses de calcul</h5>");
         sb.Append("<table class='cr-info'>");
-        sb.Append($"<tr><td>Charges scéniques appliquées</td><td><b>{charges.ChargesAppliquees:N0} kg</b></td></tr>");
+        sb.Append($"<tr><td>Charges scéniques appliquées</td><td><b>{chargesSceniques:N0} kg</b></td></tr>");
         if (charges.PoidsPropre)
         {
             sb.Append("<tr><td>Poids propre</td><td><span class='cr-oui'>pris en compte</span></td></tr>");
@@ -1466,8 +1469,8 @@
         // points associés au même nœud n'en font compter qu'un (GetChargeNodale écrase) : le signaler
         // plutôt que de laisser croire que toute la charge saisie a été vérifiée.
         double chargeGrille = GetGrandSumValue();
-        if (Math.Abs(chargeGrille - charges.ChargesAppliquees) > 0.5)
-            sb.Append($"<div class='cr-alerte'>La grille totalise {chargeGrille:N0} kg, mais seuls {charges.ChargesAppliquees:N0} kg sont appliqués : certains points chargés n'ont pas de nœud associé, ou partagent le même nœud.</div>");
+        if (Math.Abs(chargeGrille - chargesSceniques) > 0.5)
+            sb.Append($"<div class='cr-alerte'>La grille totalise {chargeGrille:N0} kg, mais seuls {chargesSceniques:N0} kg sont appliqués : certains points chargés n'ont pas de nœud associé, ou partagent le même nœud.</div>");
 
         // q et s ne s'appliquent qu'à la surface affectée aux nœuds : sans elle, ils ne pèsent rien.
         bool chargeSurfacique = (charges.PoidsPropre && (charges.Q > 0 || charges.Q1 > 0)) || (charges.Neige && charges.S > 0);
@@ -1637,19 +1640,21 @@
         }
         hs = s;
 
+        if (chargeNodale!=null && chargeNodale.Count!=0)
+        {
 
         s = "";
-        foreach (var charge in chargeNodale) 
+        foreach (var charge in chargeNodale)
         {
             Guid guid = charge.Key;
 //            int indexnoeud1 = nodes.Find(x => x.Gui.Gguid == noeud1);
-  
+
             double P = charge.Value.value;
             int dof = charge.Value.dof;
             s += guid.ToString()+";"+ P.ToString() + ";" + dof.ToString()+ "\n";
         }
         hs = s;
-      
+        }
 
     }
 }

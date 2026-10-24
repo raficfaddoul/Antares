@@ -100,6 +100,7 @@ namespace AliantWebS.Data
             List<(Guid, long?, string?, double, double, double)> effortMax = new System.Collections.Generic.List<(Guid, long?, string, double, double, double)>();
             for (int i = 0; i < uniteStr.Count; i++) effortMax.Add((Guid.Empty, 0, "", 0, 0, 0));
 
+            string sa = "";
             int nbelem = -1;
             double sigma = 0, tau = 0, sigmaMax = 20, tauMax = 15;
             foreach (DataRow elem in charpenteAntares.element.Rows)
@@ -117,8 +118,8 @@ namespace AliantWebS.Data
                 double S, Iy, Iz, J;
                 if (b > 0 && h > 0)
                 {
-                    sigma = Fe[0 + 6 * nbelem] / (b * h) + 6 * Fe[3 + 6 * nbelem] / (b * h * h) + 6 * Fe[4 + 6 * nbelem] / (h * b * b);
-                    tau = 1.5 * Fe[1 + 6 * nbelem] / (b * h) + 1.5 * Fe[2 + 6 * nbelem] / (b * h);
+                    sigma = Fe[0 + 6 * nbelem] / (b * h) + 6 * Fe[4 + 6 * nbelem] / (b * h * h);// + 6 * Fe[5 + 6 * nbelem] / (h * b * b);
+                    tau = 1.5 * Fe[2 + 6 * nbelem] / (b * h);// + 1.5 * Fe[1 + 6 * nbelem] / (b * h);
                     sigmaMax = 20;
                     tauMax = 15;
                 }
@@ -128,16 +129,20 @@ namespace AliantWebS.Data
                     Iy = elem.Field<double>("Iy");
                     Iz = elem.Field<double>("Iz");
 
-                    sigma = Fe[0 + 6 * nbelem] / S + Fe[3 + 6 * nbelem] * (0.145 / 2) / Iy + Fe[4 + 6 * nbelem] * (0.145 / 2) / Iz;
+                    sigma = Fe[0 + 6 * nbelem] / S + Fe[4 + 6 * nbelem] * (0.145 / 2) / Iy + Fe[5 + 6 * nbelem] * (0.145 / 2) / Iz;
                     tau = 1.5 * Fe[1 + 6 * nbelem] / S + 1.5 * Fe[2 + 6 * nbelem] / S;
                     sigmaMax = 355 / 1.2;
                     tauMax = 0.6 * 355 / 2;
                 }
 
-                sigma /= 1000;
-                tau /= 10000;
+                //sigma /= 1000;
+                //tau /= 10000;
                 double Taux = Math.Max(sigma / sigmaMax, tau / tauMax);
-
+                sa += nbelem.ToString() + ";"  + Fe[0 + 6 * nbelem].ToString() + ";" + Fe[1 + 6 * nbelem].ToString() + ";" + Fe[2 + 6 * nbelem].ToString() + ";" + Fe[4 + 6 * nbelem].ToString() + ";" + Fe[5 + 6 * nbelem].ToString() + ";" + sigma.ToString() + ";" + tau.ToString() + ";" + Taux.ToString() + "\n";
+                if (Taux>1)
+                {
+                    int cr = 0;
+                }
                result.Add(new BeamTaux
                 {
                     ElementId = id,
@@ -397,9 +402,9 @@ namespace AliantWebS.Data
 
                     double poids = rho * section * longueur;
                     if (poids <= 0) continue;
-
-                    Ajouter(nd1.ElementId, poids / 2);
-                    Ajouter(nd2.ElementId, poids / 2);
+                    
+                    Ajouter(nd1.ElementId, -poids / 2);
+                    Ajouter(nd2.ElementId, -poids / 2);
                     bilan.PoidsElements += poids;
                 }
             }
@@ -413,13 +418,13 @@ namespace AliantWebS.Data
 
                 if (poidsPropre)
                 {
-                    Ajouter(noeud, (q + q1) * surface);
+                    Ajouter(noeud, -(q + q1) * surface);
                     bilan.ChargeQ += q * surface;
                     bilan.ChargeQ1 += q1 * surface;
                 }
                 if (neige)
                 {
-                    Ajouter(noeud, s * surface);
+                    Ajouter(noeud, -s * surface);
                     bilan.ChargeNeige += s * surface;
                 }
                 // Pour vérification des surfaces

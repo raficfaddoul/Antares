@@ -280,7 +280,8 @@
             await bimRef.ApplyColorsAsync(colorMapping, tauxByBimId);
     }
 
-    // node load (dof 2 = vertical) = Σ over the node's child manilles of their max weight over [start, end].
+    // node load (dof 2 = vertical) = Σ over the node's child manilles of their max weight over [start, end], passed
+    // negative: gravity loads point down the Z axis, as on the Charpente page.
     private async Task<Dictionary<Guid, (int dof, double value)>> BuildMeasuredChargeNodaleAsync(
         DateTime start, DateTime end)
     {
@@ -297,9 +298,9 @@
             if (!maxWeights.TryGetValue(sensor.ElementId, out double w)) continue;
 
             if (chargeNodale.TryGetValue(nodeId, out var existing))
-                chargeNodale[nodeId] = (2, existing.value + w);
+                chargeNodale[nodeId] = (2, existing.value - w);
             else
-                chargeNodale[nodeId] = (2, w);
+                chargeNodale[nodeId] = (2, -w);
         }
 
         return chargeNodale;

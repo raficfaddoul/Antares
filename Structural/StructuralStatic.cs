@@ -236,7 +236,7 @@ namespace Structural
                 throw new InvalidOperationException("Matrice de rigidité non définie positive : structure instable (mécanisme ou appuis insuffisants).");
             }
             for (int i = 0; i < structure.nddl; i++)
-                q[i] = q1[i];
+                q[i] = q1[i]/1000;
 
             foreach (DataRow elem in structure.element.Rows)
             {
@@ -244,7 +244,10 @@ namespace Structural
                 Fe.Add(Fei);
             }
 
-
+            //string sq = "";
+            //for (int i = 0; i < structure.nddl / 6; i++)
+            //    sq += i.ToString() + ";" + q[6 * i + 0].ToString() + ";" + q[6 * i + 1].ToString() + ";" + q[6 * i + 2].ToString() + "\n";
+            
             // 12 solicitations par elements
             // 6 ddl par noeuds
 
